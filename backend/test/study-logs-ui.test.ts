@@ -15,7 +15,20 @@ type Log = {
 };
 
 // In-memory stand-in for /api/study-logs that records every request the screen sends.
-function fakeApi(initial: Log[] = [], reject?: { status: number; error: string }) {
+type Options = {
+  // Every write answers this error.
+  reject?: { status: number; error: string };
+  // Which list loads fail (1-based count of GETs); a failing load answers 500.
+  failGet?: (count: number) => boolean;
+  // When set, DELETE waits for this promise before answering.
+  holdDelete?: Promise<void>;
+  // Throw like an unreachable server for /api/study-logs.
+  offline?: boolean;
+};
+
+function fakeApi(initial: Log[] = [], options: Options = {}) {
+  const { reject, failGet, holdDelete, offline } = options;
+  let gets = 0;
   const logs = [...initial];
   const requests: { method: string; path: string; body?: unknown }[] = [];
   let nextId = 100;
@@ -36,9 +49,11 @@ function fakeApi(initial: Log[] = [], reject?: { status: number; error: string }
     const body = init.body === undefined ? undefined : JSON.parse(init.body);
     if (path === '/api/health') return reply(200, { ok: true, today: '2026-10-22' });
     requests.push({ method, path, body });
+    if (offline) throw new TypeError('fetch failed');
     if (reject && method !== 'GET') return reply(reject.status, { error: reject.error });
     const id = Number(path.split('/')[3]);
     if (method === 'GET') {
+      if (failGet?.(++gets)) return reply(500, { error: '서버 오류가 발생했습니다' });
       const sorted = [...logs].sort((a, b) =>
         (b.studyDate + b.startTime).localeCompare(a.studyDate + a.startTime),
       );
@@ -55,6 +70,7 @@ function fakeApi(initial: Log[] = [], reject?: { status: number; error: string }
       logs[index] = { id, ...body, durationMinutes: minutes(body.startTime, body.endTime) };
       return reply(200, { studyLog: logs[index] });
     }
+    await holdDelete;
     logs.splice(index, 1);
     return reply(204);
   };
@@ -132,7 +148,9 @@ uiTest('entering a session previews its duration and saving adds it to the list'
 });
 
 uiTest('a rejected save shows the server Korean message and keeps the input', async () => {
-  const api = fakeApi([], { status: 400, error: '종료 시각은 시작 시각과 달라야 합니다' });
+  const api = fakeApi([], {
+    reject: { status: 400, error: '종료 시각은 시작 시각과 달라야 합니다' },
+  });
   const ui = mount(api.fetch);
   await ui.settle();
   await ui.fill('시작', '10:00');
@@ -174,6 +192,9 @@ uiTest('editing a log fills the form and saves it with PUT', async () => {
   assert.match(ui.text(ui.find((n) => n.type === 'li')[0]), /09:00–11:00.*2시간/);
   assert.match(ui.text(ui.find((n) => n.props.role === 'status')), /수정했습니다/);
   assert.match(ui.text(ui.find((n) => n.type === 'h2')), /학습 기록 입력/);
+  // Back to a new entry for today, not the edited log's date.
+  assert.equal(ui.field('학습일'), '2026-10-22');
+  assert.equal(ui.field('시작'), '');
 });
 
 uiTest('deleting a log needs a second confirmation click', async () => {
@@ -189,6 +210,110 @@ uiTest('deleting a log needs a second confirmation click', async () => {
   );
   assert.equal(ui.find((n) => n.type === 'li').length, 0);
   assert.match(ui.text(), /삭제했습니다/);
+});
+
+uiTest('cancelling an edit restores the unsaved new entry', async () => {
+  const ui = mount(fakeApi([morning]).fetch);
+  await ui.settle();
+  await ui.fill('시작', '08:00');
+  await ui.click('수정', ui.find((n) => n.type === 'li')[0]);
+  assert.equal(ui.field('학습일'), '2026-10-21');
+  await ui.click('취소', ui.find((n) => n.type === 'form')[0]);
+  assert.match(ui.text(ui.find((n) => n.type === 'h2')), /학습 기록 입력/);
+  assert.equal(ui.field('학습일'), '2026-10-22');
+  assert.equal(ui.field('시작'), '08:00');
+});
+
+uiTest('a failed first load reports the error instead of claiming there are no logs', async () => {
+  const ui = mount(fakeApi([morning], { failGet: () => true }).fetch);
+  await ui.settle();
+  assert.match(
+    ui.text(ui.find((n) => n.props.role === 'alert')),
+    /최근 기록을 불러오지 못했습니다: 서버 오류가 발생했습니다/,
+  );
+  assert.doesNotMatch(ui.text(), /아직 학습 기록이 없습니다/);
+});
+
+uiTest('a failed reload after saving keeps the list already on screen', async () => {
+  const api = fakeApi([morning], { failGet: (count) => count > 1 });
+  const ui = mount(api.fetch);
+  await ui.settle();
+  await ui.fill('시작', '13:00');
+  await ui.fill('종료', '14:00');
+  await ui.submit();
+  assert.match(ui.text(ui.find((n) => n.props.role === 'status')), /저장했습니다/);
+  assert.match(
+    ui.text(ui.find((n) => n.props.role === 'alert')),
+    /최근 기록을 불러오지 못했습니다/,
+  );
+  assert.match(ui.text(ui.find((n) => n.type === 'li')), /09:00–10:30/);
+});
+
+uiTest('an unreachable server shows the connection message', async () => {
+  const ui = mount(fakeApi([], { offline: true }).fetch);
+  await ui.settle();
+  assert.match(ui.text(ui.find((n) => n.props.role === 'alert')), /서버에 연결할 수 없습니다/);
+});
+
+uiTest('buttons stay disabled while a delete is in flight, so it is sent once', async () => {
+  let release = () => {};
+  const api = fakeApi([morning], { holdDelete: new Promise<void>((r) => (release = r)) });
+  const ui = mount(api.fetch);
+  await ui.settle();
+  await ui.click('삭제', ui.find((n) => n.type === 'li')[0]);
+  await ui.click('삭제 확인');
+  const disabled = ui
+    .find((n) => n.type === 'button')
+    .filter((n) => ['삭제 확인', '저장'].includes(ui.text(n)))
+    .map((n) => n.props.disabled);
+  assert.deepEqual(disabled, [true, true]);
+  release();
+  await ui.settle();
+  assert.equal(api.requests.filter((request) => request.method === 'DELETE').length, 1);
+  assert.equal(ui.find((n) => n.type === 'li').length, 0);
+});
+
+uiTest('saving an edit of a log deleted elsewhere leaves edit mode and reloads', async () => {
+  const api = fakeApi([morning]);
+  const ui = mount(api.fetch);
+  await ui.settle();
+  await ui.click('수정', ui.find((n) => n.type === 'li')[0]);
+  api.logs.splice(0, 1);
+  await ui.submit();
+  assert.match(ui.text(ui.find((n) => n.props.role === 'alert')), /학습 기록을 찾을 수 없습니다/);
+  assert.match(ui.text(ui.find((n) => n.type === 'h2')), /학습 기록 입력/);
+  assert.equal(ui.find((n) => n.type === 'li').length, 0);
+});
+
+uiTest(
+  'a delete confirmation can be cancelled, and deleting the edited log ends the edit',
+  async () => {
+    const api = fakeApi([morning]);
+    const ui = mount(api.fetch);
+    await ui.settle();
+    await ui.click('삭제', ui.find((n) => n.type === 'li')[0]);
+    await ui.click('취소', ui.find((n) => n.type === 'li')[0]);
+    assert.match(ui.text(ui.find((n) => n.type === 'li')[0]), /수정삭제$/);
+    assert.equal(api.requests.filter((request) => request.method === 'DELETE').length, 0);
+
+    await ui.click('수정', ui.find((n) => n.type === 'li')[0]);
+    await ui.click('삭제', ui.find((n) => n.type === 'li')[0]);
+    await ui.click('삭제 확인');
+    assert.match(ui.text(ui.find((n) => n.type === 'h2')), /학습 기록 입력/);
+    assert.equal(ui.field('학습일'), '2026-10-22');
+  },
+);
+
+uiTest('list buttons name the log they act on', async () => {
+  const ui = mount(fakeApi([morning]).fetch);
+  await ui.settle();
+  const labels = ui
+    .find((n) => n.type === 'button' && typeof n.props['aria-label'] === 'string')
+    .map((n) => n.props['aria-label']);
+  assert.deepEqual(labels, [
+    '2026-10-21 09:00–10:30 기록 수정',
+    '2026-10-21 09:00–10:30 기록 삭제',
+  ]);
 });
 
 uiTest('duration preview follows the API rule and formats hours and minutes', () => {

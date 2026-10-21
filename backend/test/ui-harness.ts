@@ -150,7 +150,9 @@ export function mount(fetchImpl: FetchImpl) {
       scope.length ? scope[0] : tree,
     );
     assert.ok(button, 'button ' + label);
-    await (button.props.onClick as () => unknown)();
+    assert.ok(!button.props.disabled, 'button ' + label + ' is disabled');
+    // Not awaited: like a browser, the click returns while the handler's request is in flight.
+    void (button.props.onClick as () => unknown)();
     await settle();
   };
   // Types into the input, select or textarea inside the <label> whose text starts with `label`.
@@ -169,7 +171,7 @@ export function mount(fetchImpl: FetchImpl) {
   const submit = async () => {
     const [form] = find((n) => n.type === 'form');
     assert.ok(form, 'form');
-    await (form.props.onSubmit as (e: { preventDefault(): void }) => unknown)({
+    void (form.props.onSubmit as (e: { preventDefault(): void }) => unknown)({
       preventDefault() {},
     });
     await settle();

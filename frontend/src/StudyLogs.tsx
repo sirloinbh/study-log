@@ -6,6 +6,7 @@ import {
   previewMinutes,
   requestJson,
   statusLabels,
+  type RequestError,
   type StudyLog,
   type StudyLogForm,
   type StudyStatus,
@@ -15,36 +16,62 @@ type Notice = { kind: 'status' | 'alert'; text: string } | undefined;
 
 const recentLimit = 20;
 
+const describe = (log: StudyLog) => `${log.studyDate} ${log.startTime}–${log.endTime}`;
+
 export function StudyLogs({ today }: { today: string }) {
   const [form, setForm] = useState<StudyLogForm>(() => emptyForm(today));
   const [editingId, setEditingId] = useState<number | undefined>(undefined);
+  // The unsaved new entry, restored after an edit is saved or cancelled.
+  const [draft, setDraft] = useState<StudyLogForm | undefined>(undefined);
   const [logs, setLogs] = useState<StudyLog[] | undefined>(undefined);
+  const [loadError, setLoadError] = useState<string | undefined>(undefined);
   const [notice, setNotice] = useState<Notice>(undefined);
-  const [saving, setSaving] = useState(false);
+  // One request at a time: every action button is disabled while a save or delete is pending.
+  const [busy, setBusy] = useState(false);
   const [deletingId, setDeletingId] = useState<number | undefined>(undefined);
   const [reload, setReload] = useState(0);
 
   useEffect(() => {
+    // A slower, older response must not overwrite the list a newer request returned.
+    let current = true;
     requestJson<{ studyLogs: StudyLog[] }>(`/api/study-logs?limit=${recentLimit}`)
-      .then((data) => setLogs(data.studyLogs))
-      .catch((error: Error) => {
-        setLogs([]);
-        setNotice({ kind: 'alert', text: error.message });
+      .then((data) => {
+        if (!current) return;
+        setLogs(data.studyLogs);
+        setLoadError(undefined);
+      })
+      .catch((error: RequestError) => {
+        // Keep whatever list is already on screen; only report that it could not be refreshed.
+        if (current) setLoadError(error.message);
       });
+    return () => {
+      current = false;
+    };
   }, [reload]);
 
   const minutes = previewMinutes(form.startTime, form.endTime);
-  const change = (field: keyof StudyLogForm) => (event: { target: { value: string } }) =>
+  const change = (field: keyof StudyLogForm) => (event: { target: { value: string } }) => {
+    setNotice(undefined);
     setForm((current) => ({ ...current, [field]: event.target.value }));
+  };
 
-  const reset = () => {
-    setForm(emptyForm(form.studyDate));
+  const leaveEdit = () => {
+    setForm(draft ?? emptyForm(today));
+    setDraft(undefined);
     setEditingId(undefined);
+  };
+
+  const fail = (error: RequestError) => {
+    setNotice({ kind: 'alert', text: error.message });
+    // The log may have been deleted elsewhere; show the server's current list.
+    if (error.status === 404 && editingId !== undefined) leaveEdit();
+    setReload((count) => count + 1);
   };
 
   const save = async (event: { preventDefault(): void }) => {
     event.preventDefault();
-    setSaving(true);
+    if (busy) return;
+    setBusy(true);
     try {
       await requestJson(
         editingId === undefined ? '/api/study-logs' : `/api/study-logs/${editingId}`,
@@ -57,16 +84,19 @@ export function StudyLogs({ today }: { today: string }) {
         kind: 'status',
         text: editingId === undefined ? '저장했습니다' : '수정했습니다',
       });
-      reset();
+      // A new entry keeps its date for the next session of the same day.
+      if (editingId === undefined) setForm(emptyForm(form.studyDate));
+      else leaveEdit();
       setReload((count) => count + 1);
     } catch (error) {
-      setNotice({ kind: 'alert', text: (error as Error).message });
+      fail(error as RequestError);
     } finally {
-      setSaving(false);
+      setBusy(false);
     }
   };
 
   const edit = (log: StudyLog) => {
+    if (editingId === undefined) setDraft(form);
     setEditingId(log.id);
     setDeletingId(undefined);
     setNotice(undefined);
@@ -77,18 +107,23 @@ export function StudyLogs({ today }: { today: string }) {
       memo: log.memo,
       status: log.status,
     });
+    // On a phone the form sits above the list; bring it into view.
+    document.getElementById('study-log-date')?.focus?.();
   };
 
   const remove = async (id: number) => {
+    if (busy) return;
+    setBusy(true);
     try {
       await requestJson(`/api/study-logs/${id}`, { method: 'DELETE' });
       setNotice({ kind: 'status', text: '삭제했습니다' });
-      if (editingId === id) reset();
+      if (editingId === id) leaveEdit();
       setReload((count) => count + 1);
     } catch (error) {
-      setNotice({ kind: 'alert', text: (error as Error).message });
+      fail(error as RequestError);
     } finally {
       setDeletingId(undefined);
+      setBusy(false);
     }
   };
 
@@ -99,7 +134,13 @@ export function StudyLogs({ today }: { today: string }) {
         <form className="log-form" onSubmit={save}>
           <label>
             학습일
-            <input type="date" required value={form.studyDate} onChange={change('studyDate')} />
+            <input
+              id="study-log-date"
+              type="date"
+              required
+              value={form.studyDate}
+              onChange={change('studyDate')}
+            />
           </label>
           <label>
             시작
@@ -128,26 +169,35 @@ export function StudyLogs({ today }: { today: string }) {
             {crossesMidnight(form.startTime, form.endTime) ? ' (다음 날 종료)' : ''}
           </p>
           <div className="actions wide">
-            <button type="submit" className="primary" disabled={saving}>
+            <button type="submit" className="primary" disabled={busy}>
               {editingId === undefined ? '저장' : '수정 저장'}
             </button>
             {editingId !== undefined && (
-              <button type="button" className="secondary" onClick={reset}>
+              <button type="button" className="secondary" disabled={busy} onClick={leaveEdit}>
                 취소
               </button>
             )}
           </div>
         </form>
-        {notice && (
-          <p role={notice.kind} className={notice.kind === 'alert' ? 'error' : 'status'}>
+        {/* Always mounted so screen readers announce each new message. */}
+        <p role="status" className="status">
+          {notice?.kind === 'status' ? notice.text : ''}
+        </p>
+        {notice?.kind === 'alert' && (
+          <p role="alert" className="error">
             {notice.text}
           </p>
         )}
       </section>
       <section className="card">
         <h2>최근 기록</h2>
+        {loadError && (
+          <p role="alert" className="error">
+            최근 기록을 불러오지 못했습니다: {loadError}
+          </p>
+        )}
         {logs === undefined ? (
-          <p className="status">불러오는 중…</p>
+          !loadError && <p className="status">불러오는 중…</p>
         ) : logs.length === 0 ? (
           <p className="status">아직 학습 기록이 없습니다</p>
         ) : (
@@ -166,12 +216,20 @@ export function StudyLogs({ today }: { today: string }) {
                 <div className="log-actions">
                   {deletingId === log.id ? (
                     <>
-                      <button type="button" className="danger" onClick={() => remove(log.id)}>
+                      <button
+                        type="button"
+                        className="danger"
+                        disabled={busy}
+                        aria-label={`${describe(log)} 기록 삭제 확인`}
+                        onClick={() => remove(log.id)}
+                      >
                         삭제 확인
                       </button>
                       <button
                         type="button"
                         className="secondary"
+                        disabled={busy}
+                        aria-label={`${describe(log)} 기록 삭제 취소`}
                         onClick={() => setDeletingId(undefined)}
                       >
                         취소
@@ -179,12 +237,20 @@ export function StudyLogs({ today }: { today: string }) {
                     </>
                   ) : (
                     <>
-                      <button type="button" className="secondary" onClick={() => edit(log)}>
+                      <button
+                        type="button"
+                        className="secondary"
+                        disabled={busy}
+                        aria-label={`${describe(log)} 기록 수정`}
+                        onClick={() => edit(log)}
+                      >
                         수정
                       </button>
                       <button
                         type="button"
                         className="secondary"
+                        disabled={busy}
+                        aria-label={`${describe(log)} 기록 삭제`}
                         onClick={() => setDeletingId(log.id)}
                       >
                         삭제

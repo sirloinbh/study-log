@@ -169,6 +169,7 @@ nav button.active {
   border: 1px solid var(--card-line);
   border-radius: var(--radius-button);
   padding: 8px 12px;
+  min-height: 36px;
   font-size: 12px;
 }
 .danger {
@@ -225,6 +226,9 @@ nav button.active {
 .study-logs [role='status'],
 .study-logs [role='alert'] {
   margin: 16px 0 0;
+}
+.study-logs [role='status']:empty {
+  margin: 0;
 }
 .log-list {
   list-style: none;
@@ -306,5 +310,11 @@ nav button.active {
   }
   .log-form label:first-child {
     grid-column: 1 / -1;
+  }
+  .secondary,
+  .danger,
+  .primary {
+    min-height: 44px;
+    padding-inline: 16px;
   }
 }
