@@ -23,6 +23,7 @@
 ## 테스트
 
 - `backend/test/textbooks.test.ts`(단위·가짜 풀): 제목 누락·공백만·길이 초과, 저자 형식, 판본 길이, 잘못된 ID가 DB 조회 전 한국어 400. 없는 교재의 조회·수정·삭제 404.
+- `backend/test/textbooks.test.ts`(1차 리뷰 반영): 검증 사례를 POST·PUT 모두에 실행. 객체가 아닌 본문·깨진 JSON의 한국어 400, ID 7종(`0`, `-1`, `1.5`, `1e3`, `0x10`, `01`, 20자리)×GET·PUT·DELETE의 400.
 - `backend/test/textbooks.integration.test.ts`(실제 DB): 생성(공백 제거), 저자·판본 기본값, 제목순 목록, 수정, 삭제 후 404. 전용 제목 접두어 행만 정리한다.
 
 ## 검증
@@ -58,6 +59,15 @@
 - 지적(low): 이 문서의 `helpers.ts` 설명이 순변경 없음과 맞지 않았고, 병합 후 CI 결과가 빠져 있었다. 반영: 위 변경·병합 절을 고쳤다.
 - 분리: NUL 문자가 포함된 문자열이 500으로 응답하는 문제는 학습 기록에도 해당하는 공통 문제다. [#58](https://github.com/sirloinbh/study-log/issues/58)로 분리했다.
 - 검증: 로컬 `npm run check` exit 0. backend tests 21, pass 18, fail 0, skipped 3(DB 통합), 스킬 4 pass, 빌드 통과.
+
+## 자동 코드 리뷰 2차
+
+별도 읽기 전용 리뷰 에이전트가 1차 반영(d61bee9), 추가 diff(48f2095..d61bee9), 최종 전체 diff를 다시 확인했다.
+
+- 1차 지적 4건이 모두 정확하고 완전하게 반영됐다. 추가 diff에 회귀가 없다.
+- 남은 보완점이 없다. 리뷰 최대 2회 정책에 따라 3차 리뷰는 하지 않는다.
+- 비차단 메모: 테스트 절에 1차 반영 테스트가 빠져 있었다. 이 문서에 반영했다.
+- 검증: CI(d61bee9, run 39688320714) `verify` pass. backend tests 21, pass 21, skipped 0(DB 통합 실제 실행). 최종 head의 CI 통과를 확인한 뒤 병합한다.
 
 ## 한계·후속
 
