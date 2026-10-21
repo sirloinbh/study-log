@@ -129,8 +129,9 @@ function mount(fetchImpl: (path: string) => Promise<{ ok: boolean; json(): Promi
 
 const healthy = async () => ({ ok: true, json: async () => ({ ok: true, today: '2026-10-19' }) });
 
-// The backend-only deploy repository (subtree) has no frontend sources; the umbrella CI runs these.
-const frontendMissing = !existsSync(new URL('../../frontend/src/main.tsx', import.meta.url));
+// The backend-only deploy repository (subtree) has no frontend/ folder; the umbrella CI runs these.
+// Check the folder, not main.tsx, so a moved or renamed entry file still fails here instead of skipping.
+const frontendMissing = !existsSync(new URL('../../frontend/', import.meta.url));
 const uiTest = frontendMissing ? test.skip : test;
 
 uiTest('the shell shows the app title, navigation and a connected status', async () => {
