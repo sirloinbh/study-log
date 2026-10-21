@@ -4,7 +4,10 @@ import { createApp } from '../src/app.js';
 export async function withApi(
   pool: Pool,
   run: (
-    call: (path: string) => Promise<{ status: number; data: Record<string, unknown> }>,
+    call: (
+      path: string,
+      init?: { method?: string; body?: unknown; rawBody?: string; contentType?: string },
+    ) => Promise<{ status: number; data: Record<string, unknown> }>,
   ) => Promise<void>,
   options: { today?: () => string } = {},
 ) {
@@ -16,9 +19,21 @@ export async function withApi(
   try {
     const address = server.address();
     if (!address || typeof address === 'string') throw new Error('No TCP address');
-    await run(async (path) => {
-      const response = await fetch(`http://127.0.0.1:${address.port}${path}`);
-      return { status: response.status, data: (await response.json()) as Record<string, unknown> };
+    await run(async (path, init = {}) => {
+      const response = await fetch(`http://127.0.0.1:${address.port}${path}`, {
+        method: init.method ?? 'GET',
+        headers:
+          init.body === undefined && init.rawBody === undefined
+            ? {}
+            : { 'content-type': init.contentType ?? 'application/json' },
+        body: init.rawBody ?? (init.body === undefined ? undefined : JSON.stringify(init.body)),
+      });
+      // 204 responses have no body.
+      const text = await response.text();
+      return {
+        status: response.status,
+        data: (text ? JSON.parse(text) : {}) as Record<string, unknown>,
+      };
     });
   } finally {
     await new Promise<void>((resolve, reject) =>
