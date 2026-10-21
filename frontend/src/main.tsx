@@ -1,21 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { LayoutDashboard, Settings2 } from 'lucide-react';
+import { NotebookPen, Settings2 } from 'lucide-react';
 import './style.css';
 import { healthText, type Health } from './health';
+import { StudyLogs } from './StudyLogs';
 
 const pages = [
   {
-    key: 'overview',
-    label: '대시보드',
-    icon: LayoutDashboard,
-    description: '공부한 내용과 시간을 기록하고 학습 흐름을 돌아보는 개인 서비스',
+    key: 'logs',
+    label: '학습 기록',
+    icon: NotebookPen,
+    description: '오늘 공부한 시간과 내용을 기록하고 최근 기록을 확인합니다',
   },
   { key: 'settings', label: '설정', icon: Settings2, description: '앱 환경과 데이터 관리' },
 ];
 
 export function App() {
-  const [page, setPage] = useState('overview');
+  const [page, setPage] = useState('logs');
   const [health, setHealth] = useState<Health>({ state: 'loading' });
   useEffect(() => {
     fetch('/api/health')
@@ -33,7 +34,7 @@ export function App() {
   return (
     <div className="shell">
       <aside>
-        <a className="logo" href="#" onClick={() => setPage('overview')}>
+        <a className="logo" href="#" onClick={() => setPage('logs')}>
           <span className="logo-mark">S</span>
           <span>공부 기록</span>
         </a>
@@ -72,10 +73,13 @@ export function App() {
             {healthText(health)}
           </p>
         )}
-        <section className="card empty">
-          <h2>아직 기능이 없습니다</h2>
-          <p>기능은 GitHub 이슈 카드로 등록한 뒤 하나씩 추가합니다.</p>
-        </section>
+        {current.key === 'logs' && health.state === 'ok' && <StudyLogs today={health.today} />}
+        {current.key === 'settings' && (
+          <section className="card empty">
+            <h2>아직 설정 항목이 없습니다</h2>
+            <p>설정은 관련 이슈 카드에서 추가합니다.</p>
+          </section>
+        )}
       </main>
     </div>
   );
