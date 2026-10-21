@@ -6,7 +6,7 @@ export async function withApi(
   run: (
     call: (
       path: string,
-      init?: { method?: string; body?: unknown },
+      init?: { method?: string; body?: unknown; rawBody?: string },
     ) => Promise<{ status: number; data: Record<string, unknown> }>,
   ) => Promise<void>,
   options: { today?: () => string } = {},
@@ -22,8 +22,11 @@ export async function withApi(
     await run(async (path, init = {}) => {
       const response = await fetch(`http://127.0.0.1:${address.port}${path}`, {
         method: init.method ?? 'GET',
-        headers: init.body === undefined ? {} : { 'content-type': 'application/json' },
-        body: init.body === undefined ? undefined : JSON.stringify(init.body),
+        headers:
+          init.body === undefined && init.rawBody === undefined
+            ? {}
+            : { 'content-type': 'application/json' },
+        body: init.rawBody ?? (init.body === undefined ? undefined : JSON.stringify(init.body)),
       });
       // 204 responses have no body.
       const text = await response.text();

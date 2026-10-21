@@ -40,3 +40,19 @@
 - 로컬에 Docker·PostgreSQL이 없어 DB 통합 테스트와 마이그레이션 적용은 CI에서만 확인했다.
 - 테스트 helper가 fetch 금지 포트를 받으면 간헐적으로 실패하는 문제를 #12 작업 중 발견해 #56으로 등록했다.
 - 화면은 #11, 교재·챕터 연결은 #14, 자가 평가 필드는 #15에서 추가한다.
+
+## 자동 코드 리뷰 1차 (PR #55)
+
+이 브랜치에 `origin/main`(#54, #2, #4)을 병합한 뒤 별도 읽기 전용 리뷰 에이전트가 PR 전체 diff를 검토했다. 시간 계산·자정 넘김·SQL 파라미터화·마이그레이션 SQL에는 결함이 없다. 아래 지적은 모두 이 PR에서 반영했고 분리한 이슈는 없다.
+
+- 지적(medium): 본문이 없거나 배열인 POST·PUT 요청이 Zod 기본 영어 메시지("Required", "Expected object, received array")로 400 응답했다.
+  - 반영: `studyLogInput` 객체 스키마에 한국어 `required_error`·`invalid_type_error`("학습 기록 내용을 JSON 객체로 보내세요")를 지정했다.
+- 지적(low): ID 검증이 `z.coerce.number()`라 `1e3`·`0x10`·20자리 숫자를 받았다. 20자리 숫자는 Postgres bigint 범위 오류로 500이 됐다.
+  - 반영: 앞자리 0 없는 1~15자리 양의 정수만 받도록 바꿨다.
+- 지적(low): 깨진 JSON이나 256kb를 넘는 본문이 500 "서버 오류"로 응답했다.
+  - 반영: `app.ts` 오류 처리에서 `entity.parse.failed`는 400 "요청 본문의 JSON 형식이 올바르지 않습니다", `entity.too.large`는 413 "요청 본문이 너무 큽니다"로 응답한다.
+- 지적(low): "재실행해도 안전한 마이그레이션" 완료 기준을 실제로 검증하지 않았다.
+  - 반영: CI가 `database/migrations/*.sql`을 두 번 연속 적용한다.
+- 테스트(`backend/test/study-logs.test.ts`): 객체가 아닌 본문·깨진 JSON·JSON 문자열·초과 크기 본문 테스트와, 비정상 ID 7종 × 조회·수정·삭제 테스트를 추가했다. `backend/test/helpers.ts`에 원문 본문 전송용 `rawBody`를 추가했다.
+  - 수정 전 소스로 실행하면 새 테스트 2건이 실패하고, 수정 후에는 통과한다.
+- 보완 후 검증: 로컬 `npm run check` exit 0. backend tests 16, pass 14, fail 0, skipped 2(DB 통합 2건, `TEST_DATABASE_URL` 미설정). 스킬 4 pass, 빌드 통과. DB 통합 테스트와 마이그레이션 2회 적용은 CI에서 확인한다.

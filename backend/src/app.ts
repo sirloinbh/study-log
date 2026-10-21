@@ -38,7 +38,17 @@ export function createApp(pool: Pool, options: { today?: () => string } = {}) {
         res.status(400).json({ error: err.issues.map((issue) => issue.message).join(', ') });
         return;
       }
-      const error = typeof err === 'object' && err !== null ? (err as { code?: unknown }) : {};
+      const error =
+        typeof err === 'object' && err !== null ? (err as { code?: unknown; type?: unknown }) : {};
+      // express.json() rejects malformed or oversized bodies before any route runs.
+      if (error.type === 'entity.parse.failed') {
+        res.status(400).json({ error: '요청 본문의 JSON 형식이 올바르지 않습니다' });
+        return;
+      }
+      if (error.type === 'entity.too.large') {
+        res.status(413).json({ error: '요청 본문이 너무 큽니다' });
+        return;
+      }
       if (error.code === '23505') {
         res.status(409).json({ error: '이미 등록된 항목입니다' });
         return;
