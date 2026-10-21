@@ -31,7 +31,16 @@
 - 지적(low): 사용자 확인 항목에 완료 확인 방법이 없었다.
   - 반영: Docker는 `wsl --status`·`docker version`, Chrome은 `/chrome` 화면의 연결 표시로 확인한다고 적었다.
 - 메모: 검증 기록을 이슈 기준 명령인 `npm run format:check`로 바꿨다.
-- 검증: `npm run format:check` 통과. 보완점이 남지 않아 2차 리뷰 없이 마친다.
+- 검증: `npm run format:check` 통과.
+
+## 자동 코드 리뷰 2차
+
+별도 읽기 전용 리뷰 에이전트가 1차 반영(f0178d3)과 전체 diff를 다시 확인했다.
+
+- PowerShell 명령 문법, 저장소 루트 기준 경로, 완료 확인 명령(`wsl --status`, `docker version`, `/chrome`)이 맞다.
+- 비밀값·계정명 미기재, 포트(compose.yaml)를 다시 대조했다.
+- 보완점이 없다. 리뷰 최대 2회 정책에 따라 마친다.
+- 검증: `npm run format:check` 통과.
 
 ## 한계·후속
 
