@@ -19,9 +19,11 @@
 ## 검증
 
 문서·스킬만 변경했고 앱 동작 변경이 없어 앱 테스트는 추가하지 않았다.
+
 - `npm run skills:sync`: `.claude/skills/`를 `skills/`에서 다시 복사.
 - `npm run skills:check`: pass (`.claude/skills matches skills/.`).
 - `npm run test:skills`: **4 pass / 0 fail / 0 skip**.
 - `npm run format:check`: pass.
 - skill-creator `quick_validate.py`(`PYTHONUTF8=1`) 3개 스킬: 모두 `Skill is valid!`.
 - 전체 `npm run check`(lint·타입·앱 테스트·빌드)는 로컬에서 생략했다. 실행 코드 변경이 없으며 PR CI의 `verify` 작업이 전체 검사를 실행한다.
+- 첫 커밋에서 이 기록 파일의 빈 줄 하나가 Prettier 규칙에 어긋나 후속 커밋으로 고쳤다. 수정 후 `npm run format:check`: pass.
