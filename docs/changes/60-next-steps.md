@@ -19,8 +19,19 @@
 ## 검증
 
 - 문서만 바뀌어 앱 테스트는 추가하지 않았다.
-- `npx prettier --check docs/next-steps/README.md docs/changes/60-next-steps.md`: 통과.
+- `npm run format:check`: 통과.
 - 문서 안 상대 링크는 없다. 명령·경로는 이번 세션에서 실제로 쓴 값과 대조했다.
+
+## 자동 코드 리뷰 1차
+
+별도 읽기 전용 리뷰 에이전트가 이슈 완료 기준과 PR diff를 검토했다. 포트, 이슈 상태, Windows 명령, 비밀값 미기재에는 문제가 없었다.
+
+- 지적(low): 테스트 DB 마이그레이션 명령이 POSIX 형식이라 PowerShell에 그대로 붙여 넣을 수 없었다.
+  - 반영: PowerShell 형식(`$env:PGCLIENTENCODING='UTF8'; psql …`)으로 바꾸고, 저장소 루트에서 실행한다고 적었다.
+- 지적(low): 사용자 확인 항목에 완료 확인 방법이 없었다.
+  - 반영: Docker는 `wsl --status`·`docker version`, Chrome은 `/chrome` 화면의 연결 표시로 확인한다고 적었다.
+- 메모: 검증 기록을 이슈 기준 명령인 `npm run format:check`로 바꿨다.
+- 검증: `npm run format:check` 통과. 보완점이 남지 않아 2차 리뷰 없이 마친다.
 
 ## 한계·후속
 
