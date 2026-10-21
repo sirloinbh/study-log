@@ -18,7 +18,7 @@
 - `database/migrations/003_textbooks.sql`: `textbooks`(제목 1~200자 필수, 저자·판본 기본값 `''`). `IF NOT EXISTS`로 재실행 안전.
 - `backend/src/textbooks.ts`: `GET /api/textbooks`(제목순), `GET/PUT/DELETE /api/textbooks/:id`, `POST /api/textbooks`(201). 앞뒤 공백 제거, 한국어 검증 메시지, 없는 ID는 404 `교재를 찾을 수 없습니다`.
 - `backend/src/app.ts`: `/api/textbooks` 라우터 등록.
-- `backend/test/helpers.ts`: `call(path, { method, body })`와 204 응답 지원. #10(PR #55)과 같은 기반 변경이다.
+- `backend/test/helpers.ts`: 처음에는 `call(path, { method, body })`와 204 응답 지원을 추가했다. #10(PR #55)이 같은 변경에 `rawBody`·`contentType`을 더해 먼저 병합됐으므로, main 병합 후 이 PR의 순변경은 없다.
 
 ## 테스트
 
@@ -39,9 +39,27 @@
 - 충돌: `backend/test/helpers.ts`. main 쪽이 이 브랜치 변경에 `rawBody`·`contentType` 옵션을 더한 상위 집합이라 main 쪽을 그대로 택했다.
 - `backend/src/app.ts`: 자동 병합된 import와 라우터 등록 순서를 정리했다(`/api/study-logs` 다음 `/api/textbooks`). 동작 변화는 없다.
 - 마이그레이션 번호는 `002`(#10)·`003`(#12)로 겹치지 않는다.
-- 검증: 로컬 `npm run check` exit 0. backend tests 19, pass 16, fail 0, skipped 3(DB 통합), 스킬 4 pass, 빌드 통과. DB 통합은 CI에서 확인한다.
+- 검증: 로컬 `npm run check` exit 0. backend tests 19, pass 16, fail 0, skipped 3(DB 통합), 스킬 4 pass, 빌드 통과.
+- CI(48f2095, run 39687749020): `verify` pass. backend tests 19, pass 19, skipped 0(DB 통합 실제 실행), 스킬 4 pass.
+
+## 자동 코드 리뷰 1차
+
+별도 읽기 전용 리뷰 에이전트가 이슈 #12 완료 기준과 PR 전체 diff(48f2095 기준)를 검토했다. 마이그레이션 재실행 안전성, 삭제 정책, SQL 파라미터화, 라우터 등록 순서에는 결함이 없다.
+
+- 지적(high): ID 검증이 `z.coerce.number()`라 `1e3`·`0x10`·`01`을 받았다. 20자리 숫자는 Postgres bigint 범위 오류로 500이 됐고, `9007199254740993`은 다른 행으로 바뀌었다.
+  - 반영: #10과 같이 앞자리 0 없는 1~15자리 양의 정수만 받는다.
+- 지적(medium): 배열 본문이 Zod 영어 메시지 `Expected object, received array`로 400 응답했다.
+  - 반영: 객체 스키마에 한국어 메시지 "교재 내용을 JSON 객체로 보내세요"를 지정했다. `req.body ?? {}`를 없애 본문이 없는 요청도 같은 메시지를 받는다.
+- 지적(low): 검증 테스트가 POST와 `/0`만 다뤘다.
+  - 반영: `textbooks.test.ts`의 검증 사례를 POST와 PUT 모두에 실행한다.
+  - 객체가 아닌 본문과 깨진 JSON 테스트를 추가했다.
+  - ID 7종을 GET·PUT·DELETE에 보내는 테스트를 추가했다.
+  - 수정 전 `textbooks.ts`로 실행하면 새 테스트 2개가 실패하는 것을 확인했다.
+- 지적(low): 이 문서의 `helpers.ts` 설명이 순변경 없음과 맞지 않았고, 병합 후 CI 결과가 빠져 있었다. 반영: 위 변경·병합 절을 고쳤다.
+- 분리: NUL 문자가 포함된 문자열이 500으로 응답하는 문제는 학습 기록에도 해당하는 공통 문제다. [#58](https://github.com/sirloinbh/study-log/issues/58)로 분리했다.
+- 검증: 로컬 `npm run check` exit 0. backend tests 21, pass 18, fail 0, skipped 3(DB 통합), 스킬 4 pass, 빌드 통과.
 
 ## 한계·후속
 
 - 로컬에 PostgreSQL이 없어 DB 통합 테스트는 CI에서만 확인했다.
-- 화면은 #21, 목차는 #13에서 추가한다. 테스트 포트 간헐 실패는 #56.
+- 화면은 #21, 목차는 #13에서 추가한다. 테스트 포트 간헐 실패는 #56, 문자열 NUL 처리는 #58.
