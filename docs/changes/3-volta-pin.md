@@ -38,7 +38,7 @@ Volta를 쓰는 개발 PC에서는 `.node-version`·`.nvmrc`를 읽지 않아 �
 - 버전 고정값이 서로 일치하는지 검사하는 테스트는 없다. 이번 범위에서는 추가하지 않았다.
 - 보완 후 검증:
   - `npm run check`: exit 0. 앱 테스트 8 tests / 7 pass / 0 fail / 1 skip(`TEST_DATABASE_URL` 미설정 DB 통합 테스트, 이번에는 DB 검증 미실행). 스킬 4 pass, 포맷·lint·타입·빌드 통과.
-  - 루트, `frontend/`, `backend/`에서 `volta which node`가 모두 24.21.0을 가리킨다. 리뷰 시점에는 이 PC의 Volta 기본값이 24.21.0으로 바뀌어 있었다(PR 작성 시점 기본값은 위 목적 절의 22.17.0, `volta list`로 확인). 그래서 하위 폴더 결과만으로는 차이를 보이지 않는다. 동작 차이는 위 임시 폴더 재현으로 확인했다.
+  - 루트, `frontend/`, `backend/`에서 `volta which node`가 모두 24.21.0을 가리킨다. 리뷰 시점에는 이 PC의 Volta 기본값이 24.21.0으로 바뀌어 있었다(`volta list`로 확인. PR 작성 시점 기본값은 위 목적 절에 적힌 22.17.0). 그래서 하위 폴더 결과만으로는 차이를 보이지 않는다. 동작 차이는 위 임시 폴더 재현으로 확인했다.
   - npm은 `volta` 필드를 무시하므로 `npm ci`·잠금 파일·Docker 빌드에는 영향이 없다.
 
 ## 자동 코드 리뷰 2차 (PR #4)
