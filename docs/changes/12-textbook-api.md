@@ -18,7 +18,7 @@
 - `database/migrations/003_textbooks.sql`: `textbooks`(제목 1~200자 필수, 저자·판본 기본값 `''`). `IF NOT EXISTS`로 재실행 안전.
 - `backend/src/textbooks.ts`: `GET /api/textbooks`(제목순), `GET/PUT/DELETE /api/textbooks/:id`, `POST /api/textbooks`(201). 앞뒤 공백 제거, 한국어 검증 메시지, 없는 ID는 404 `교재를 찾을 수 없습니다`.
 - `backend/src/app.ts`: `/api/textbooks` 라우터 등록.
-- `backend/test/helpers.ts`: `call(path, { method, body })`와 204 응답 지원. #10(PR #55)과 같은 변경이라 병합 시 충돌하지 않는다.
+- `backend/test/helpers.ts`: `call(path, { method, body })`와 204 응답 지원. #10(PR #55)과 같은 기반 변경이다.
 
 ## 테스트
 
@@ -32,6 +32,14 @@
 | `npm run check` 1회차                             | 로컬, `TEST_DATABASE_URL` 미설정 | exit 1 — `textbooks.test.ts` 404 테스트가 `fetch failed: bad port`로 실패. 임의 포트가 fetch 금지 포트로 배정된 기존 helper 문제로, #56에 등록 |
 | `npm run check` 2회차                             | 같은 환경                        | exit 0. backend tests 11, pass 9, fail 0, skipped 2(DB 통합), 스킬 4 pass, 빌드 통과                                                           |
 | GitHub Actions `verify` (PR #57, run 39601039827) | Postgres 17 + 마이그레이션 적용  | pass — backend tests 11, pass 11, skipped 0 (DB 통합 실제 실행), 스킬 4 pass. `docker-build` pass                                              |
+
+## origin/main 병합 (#10 PR #55 병합 후)
+
+- PR #55 병합(d3561fc) 뒤 이 브랜치에 `origin/main`을 병합했다.
+- 충돌: `backend/test/helpers.ts`. main 쪽이 이 브랜치 변경에 `rawBody`·`contentType` 옵션을 더한 상위 집합이라 main 쪽을 그대로 택했다.
+- `backend/src/app.ts`: 자동 병합된 import와 라우터 등록 순서를 정리했다(`/api/study-logs` 다음 `/api/textbooks`). 동작 변화는 없다.
+- 마이그레이션 번호는 `002`(#10)·`003`(#12)로 겹치지 않는다.
+- 검증: 로컬 `npm run check` exit 0. backend tests 19, pass 16, fail 0, skipped 3(DB 통합), 스킬 4 pass, 빌드 통과. DB 통합은 CI에서 확인한다.
 
 ## 한계·후속
 

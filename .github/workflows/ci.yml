@@ -15,9 +15,12 @@ jobs:
         with: { node-version: '24.21.0', cache: npm }
       - run: npm install --global npm@11.19.0
       - run: npm ci
+      # Applied twice: every migration must be safe to re-run.
       - run: |
-          for migration in database/migrations/*.sql; do
-            psql "$TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration" || exit 1
+          for pass in 1 2; do
+            for migration in database/migrations/*.sql; do
+              psql "$TEST_DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration" || exit 1
+            done
           done
         env: { TEST_DATABASE_URL: 'postgres://study:test@localhost:5432/study' }
       - run: npm run check
