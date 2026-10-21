@@ -57,6 +57,45 @@ test('invalid list queries and ids are rejected in Korean', async () => {
   });
 });
 
+test('bodies that are not a JSON object are rejected in Korean before touching the DB', async () => {
+  await withApi(untouchedPool, async (call) => {
+    for (const init of [
+      { method: 'POST' },
+      { method: 'POST', body: [valid] },
+      { method: 'PUT', body: [valid] },
+    ]) {
+      const path = init.method === 'PUT' ? '/api/study-logs/1' : '/api/study-logs';
+      const { status, data } = await call(path, init);
+      assert.equal(status, 400, JSON.stringify(init));
+      assert.equal(data.error, '학습 기록 내용을 JSON 객체로 보내세요');
+    }
+    // Broken JSON and bare JSON strings are refused by the JSON body parser itself.
+    for (const rawBody of ['{"studyDate":', '"text"']) {
+      const malformed = await call('/api/study-logs', { method: 'POST', rawBody });
+      assert.equal(malformed.status, 400, rawBody);
+      assert.equal(malformed.data.error, '요청 본문의 JSON 형식이 올바르지 않습니다');
+    }
+    const tooLarge = await call('/api/study-logs', {
+      method: 'POST',
+      rawBody: JSON.stringify({ ...valid, memo: 'a'.repeat(300 * 1024) }),
+    });
+    assert.equal(tooLarge.status, 413);
+    assert.equal(tooLarge.data.error, '요청 본문이 너무 큽니다');
+  });
+});
+
+test('ids that are not plain positive integers are rejected before touching the DB', async () => {
+  await withApi(untouchedPool, async (call) => {
+    for (const id of ['0', '-1', '1.5', '1e3', '0x10', '01', '99999999999999999999']) {
+      for (const init of [{}, { method: 'PUT', body: valid }, { method: 'DELETE' }]) {
+        const { status, data } = await call(`/api/study-logs/${id}`, init);
+        assert.equal(status, 400, `${id} ${JSON.stringify(init)}`);
+        assert.match(String(data.error), /학습 기록 ID가 올바르지 않습니다/);
+      }
+    }
+  });
+});
+
 test('missing study logs answer a Korean 404 for read, update and delete', async () => {
   await withApi(emptyPool, async (call) => {
     for (const init of [{}, { method: 'PUT', body: valid }, { method: 'DELETE' }]) {

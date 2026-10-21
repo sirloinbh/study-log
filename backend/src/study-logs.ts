@@ -34,29 +34,37 @@ const clock = (label: string) =>
     .regex(/^([01]\d|2[0-3]):[0-5]\d$/, `${label}은 HH:MM 형식으로 입력하세요`);
 
 const studyLogInput = z
-  .object({
-    studyDate,
-    startTime: clock('시작 시각'),
-    endTime: clock('종료 시각'),
-    memo: z
-      .string({ invalid_type_error: '메모 형식이 올바르지 않습니다' })
-      .max(10000, '메모는 10000자 이하로 입력하세요')
-      .default(''),
-    status: z
-      .enum(studyStatuses, {
-        errorMap: () => ({ message: '상태는 계획, 진행 중, 완료, 중단 중에서 선택하세요' }),
-      })
-      .default('planned'),
-  })
+  .object(
+    {
+      studyDate,
+      startTime: clock('시작 시각'),
+      endTime: clock('종료 시각'),
+      memo: z
+        .string({ invalid_type_error: '메모 형식이 올바르지 않습니다' })
+        .max(10000, '메모는 10000자 이하로 입력하세요')
+        .default(''),
+      status: z
+        .enum(studyStatuses, {
+          errorMap: () => ({ message: '상태는 계획, 진행 중, 완료, 중단 중에서 선택하세요' }),
+        })
+        .default('planned'),
+    },
+    {
+      required_error: '학습 기록 내용을 JSON 객체로 보내세요',
+      invalid_type_error: '학습 기록 내용을 JSON 객체로 보내세요',
+    },
+  )
   .refine((log) => log.startTime !== log.endTime, {
     message: '종료 시각은 시작 시각과 달라야 합니다',
     path: ['endTime'],
   });
 
-const idParam = z.coerce
-  .number({ invalid_type_error: '학습 기록 ID가 올바르지 않습니다' })
-  .int('학습 기록 ID가 올바르지 않습니다')
-  .positive('학습 기록 ID가 올바르지 않습니다');
+// Only plain positive integers that stay exact in JS and fit the bigint column; "1e3", "0x10"
+// or 20-digit ids would otherwise reach Postgres and fail as a 500.
+const idParam = z
+  .string()
+  .regex(/^[1-9]\d{0,14}$/, '학습 기록 ID가 올바르지 않습니다')
+  .transform(Number);
 
 const listQuery = z.object({
   date: studyDate.optional(),
