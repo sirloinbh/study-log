@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { runInNewContext } from 'node:vm';
 import ts from 'typescript';
 
@@ -129,7 +129,12 @@ function mount(fetchImpl: (path: string) => Promise<{ ok: boolean; json(): Promi
 
 const healthy = async () => ({ ok: true, json: async () => ({ ok: true, today: '2026-10-19' }) });
 
-test('the shell shows the app title, navigation and a connected status', async () => {
+// The backend-only deploy repository (subtree) has no frontend/ folder; the umbrella CI runs these.
+// Check the folder, not main.tsx, so a moved or renamed entry file still fails here instead of skipping.
+const frontendMissing = !existsSync(new URL('../../frontend/', import.meta.url));
+const uiTest = frontendMissing ? test.skip : test;
+
+uiTest('the shell shows the app title, navigation and a connected status', async () => {
   const ui = mount(healthy);
   await ui.settle();
   assert.match(ui.text(), /공부 기록/);
@@ -138,7 +143,7 @@ test('the shell shows the app title, navigation and a connected status', async (
   assert.match(ui.text(status), /서버 연결됨 · 2026-10-19/);
 });
 
-test('an unreachable API shows a Korean alert instead of a crash', async () => {
+uiTest('an unreachable API shows a Korean alert instead of a crash', async () => {
   const ui = mount(async () => {
     throw new Error('offline');
   });
@@ -147,7 +152,7 @@ test('an unreachable API shows a Korean alert instead of a crash', async () => {
   assert.match(ui.text(alert), /서버에 연결할 수 없습니다/);
 });
 
-test('navigation switches the page heading', async () => {
+uiTest('navigation switches the page heading', async () => {
   const ui = mount(healthy);
   await ui.settle();
   await ui.click('설정');
