@@ -210,7 +210,8 @@ trim_trailing_whitespace = false
   },
   "allowScripts": { "esbuild@0.28.2": true, "esbuild@0.25.12": true },
   "engines": { "node": "24.21.0", "npm": "11.19.0" },
-  "packageManager": "npm@11.19.0"
+  "packageManager": "npm@11.19.0",
+  "volta": { "node": "24.21.0", "npm": "11.19.0" }
 }
 ```
 
@@ -345,7 +346,7 @@ backups/
 
 - frontend: `"dev": "vite --host 127.0.0.1"`, `"build": "tsc --noEmit && vite build"`, `"typecheck": "tsc --noEmit"`
 - backend: `"dev": "tsx watch --env-file-if-exists=../.env src/server.ts"`, `"start": "node dist/server.js"`, `"build": "tsc"`, `"test": "tsx --test test/*.test.ts"`, `"typecheck": "tsc -p tsconfig.check.json"`
-- 두 워크스페이스 모두 `engines`, `packageManager`, `"allowScripts": { "esbuild": true }`를 둔다.
+- 두 워크스페이스 모두 `engines`, `packageManager`, `volta`(루트와 같은 값, `extends` 대신 값 직접 기재), `"allowScripts": { "esbuild": true }`를 둔다. Volta는 가장 가까운 `package.json`의 `volta`만 읽으므로, 워크스페이스 폴더나 하위 배포 저장소에서도 같은 버전이 선택되게 하려면 각 파일에 둔다.
 
 `frontend/vite.config.ts`
 
@@ -694,7 +695,7 @@ workout-memo는 확정한 이슈를 큐에 넣으면 PC에서 테스트 → 구�
 
 1. **값 확정:** 0장의 자리표시자를 사용자에게 받는다. 확인: 표가 모두 채워졌다.
 2. **계정·원격:** 사용할 GitHub 계정을 확인하고, 필요하면 10.3의 래퍼를 준비한다. 확인: `api user --jq .login` = `<owner>`.
-3. **런타임:** Node 24.21.0 / npm 11.19.0을 고른다(nvm·Volta 등 사용자 도구로. 시스템 Node를 임의로 바꾸지 않는다). 확인: `node -v`, `npm -v`.
+3. **런타임:** Node 24.21.0 / npm 11.19.0을 고른다(nvm·Volta 등 사용자 도구로. 시스템 Node를 임의로 바꾸지 않는다). Volta는 루트와 각 워크스페이스 `package.json`의 `volta` 필드로 고정한다. 확인: 루트와 각 워크스페이스 폴더에서 `node -v`, `npm -v`.
 4. **골격 파일:** 4.2 구조와 5장의 설정 파일, `.env.example`, `compose.yaml`, Dockerfile, nginx.conf, `database/migrations/001_initial.sql`(최소 테이블)을 만든다.
 5. **의존성 설치(사용자 확인 필수):** 3.1의 패키지 목록을 보여주고 1장 1번 절차로 승인받은 뒤 설치한다. 확인: `package-lock.json`, 각 워크스페이스 잠금 파일이 생겼다.
 6. **최소 기능:** `createApp(pool)`, `GET /api/health`, 기준 화면 1개, 단위 테스트 1개, DB 통합 테스트 1개, UI 테스트 1개를 만든다.
