@@ -39,7 +39,9 @@ export function createApp(pool: Pool, options: { today?: () => string } = {}) {
         return;
       }
       const error =
-        typeof err === 'object' && err !== null ? (err as { code?: unknown; type?: unknown }) : {};
+        typeof err === 'object' && err !== null
+          ? (err as { code?: unknown; type?: unknown; status?: unknown })
+          : {};
       // express.json() rejects malformed or oversized bodies before any route runs.
       if (error.type === 'entity.parse.failed') {
         res.status(400).json({ error: '요청 본문의 JSON 형식이 올바르지 않습니다' });
@@ -47,6 +49,12 @@ export function createApp(pool: Pool, options: { today?: () => string } = {}) {
       }
       if (error.type === 'entity.too.large') {
         res.status(413).json({ error: '요청 본문이 너무 큽니다' });
+        return;
+      }
+      // Other client errors raised before routing (unsupported charset or encoding, aborted
+      // request) keep their 4xx status instead of turning into a logged 500.
+      if (typeof error.status === 'number' && error.status >= 400 && error.status < 500) {
+        res.status(error.status).json({ error: '요청을 처리할 수 없습니다' });
         return;
       }
       if (error.code === '23505') {
