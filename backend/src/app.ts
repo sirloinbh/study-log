@@ -1,6 +1,7 @@
 import express from 'express';
 import type { Pool } from 'pg';
 import { types } from 'pg';
+import { textbookRoutes } from './textbooks.js';
 import { ZodError } from 'zod';
 
 // DATE columns stay YYYY-MM-DD strings so the service time zone never shifts them.
@@ -23,6 +24,7 @@ export function createApp(pool: Pool, options: { today?: () => string } = {}) {
   const app = express();
   app.disable('x-powered-by');
   app.use(express.json({ limit: '256kb' }));
+  app.use('/api/textbooks', textbookRoutes(pool));
   app.get('/api/health', async (_req, res) => {
     await pool.query('SELECT 1');
     res.json({ ok: true, service: 'study-log', today: today() });
