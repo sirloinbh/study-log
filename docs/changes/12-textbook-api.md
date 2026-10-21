@@ -27,13 +27,13 @@
 
 ## 검증
 
-| 명령                    | 환경                             | 결과                                                                                                                                           |
-| ----------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run check` 1회차   | 로컬, `TEST_DATABASE_URL` 미설정 | exit 1 — `textbooks.test.ts` 404 테스트가 `fetch failed: bad port`로 실패. 임의 포트가 fetch 금지 포트로 배정된 기존 helper 문제로, #56에 등록 |
-| `npm run check` 2회차   | 같은 환경                        | exit 0. backend tests 11, pass 9, fail 0, skipped 2(DB 통합), 스킬 4 pass, 빌드 통과                                                           |
-| GitHub Actions `verify` | Postgres 17 + 마이그레이션 적용  | PR에서 확인                                                                                                                                    |
+| 명령                                              | 환경                             | 결과                                                                                                                                           |
+| ------------------------------------------------- | -------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run check` 1회차                             | 로컬, `TEST_DATABASE_URL` 미설정 | exit 1 — `textbooks.test.ts` 404 테스트가 `fetch failed: bad port`로 실패. 임의 포트가 fetch 금지 포트로 배정된 기존 helper 문제로, #56에 등록 |
+| `npm run check` 2회차                             | 같은 환경                        | exit 0. backend tests 11, pass 9, fail 0, skipped 2(DB 통합), 스킬 4 pass, 빌드 통과                                                           |
+| GitHub Actions `verify` (PR #57, run 39601039827) | Postgres 17 + 마이그레이션 적용  | pass — backend tests 11, pass 11, skipped 0 (DB 통합 실제 실행), 스킬 4 pass. `docker-build` pass                                              |
 
 ## 한계·후속
 
-- 로컬에 PostgreSQL이 없어 DB 통합 테스트는 CI에서만 확인한다.
+- 로컬에 PostgreSQL이 없어 DB 통합 테스트는 CI에서만 확인했다.
 - 화면은 #21, 목차는 #13에서 추가한다. 테스트 포트 간헐 실패는 #56.
