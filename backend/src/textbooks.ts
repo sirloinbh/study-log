@@ -8,23 +8,31 @@ const text = (label: string, max: number) =>
     .trim()
     .max(max, `${label} 길이는 ${max}자 이하여야 합니다`);
 
-const textbookInput = z.object({
-  title: z
-    .string({
-      required_error: '제목을 입력하세요',
-      invalid_type_error: '제목 형식이 올바르지 않습니다',
-    })
-    .trim()
-    .min(1, '제목을 입력하세요')
-    .max(200, '제목 길이는 200자 이하여야 합니다'),
-  author: text('저자', 200).default(''),
-  edition: text('판본', 50).default(''),
-});
+const textbookInput = z.object(
+  {
+    title: z
+      .string({
+        required_error: '제목을 입력하세요',
+        invalid_type_error: '제목 형식이 올바르지 않습니다',
+      })
+      .trim()
+      .min(1, '제목을 입력하세요')
+      .max(200, '제목 길이는 200자 이하여야 합니다'),
+    author: text('저자', 200).default(''),
+    edition: text('판본', 50).default(''),
+  },
+  {
+    required_error: '교재 내용을 JSON 객체로 보내세요',
+    invalid_type_error: '교재 내용을 JSON 객체로 보내세요',
+  },
+);
 
-const idParam = z.coerce
-  .number({ invalid_type_error: '교재 ID가 올바르지 않습니다' })
-  .int('교재 ID가 올바르지 않습니다')
-  .positive('교재 ID가 올바르지 않습니다');
+// Only plain positive integers that stay exact in JS and fit the bigint column; "1e3", "0x10"
+// or 20-digit ids would otherwise reach Postgres and fail as a 500.
+const idParam = z
+  .string()
+  .regex(/^[1-9]\d{0,14}$/, '교재 ID가 올바르지 않습니다')
+  .transform(Number);
 
 const columns = 'id::int AS id, title, author, edition';
 
@@ -46,7 +54,7 @@ export function textbookRoutes(pool: Pool) {
   });
 
   router.post('/', async (req, res) => {
-    const book = textbookInput.parse(req.body ?? {});
+    const book = textbookInput.parse(req.body);
     const { rows } = await pool.query(
       `INSERT INTO textbooks (title, author, edition) VALUES ($1, $2, $3) RETURNING ${columns}`,
       [book.title, book.author, book.edition],
@@ -56,7 +64,7 @@ export function textbookRoutes(pool: Pool) {
 
   router.put('/:id', async (req, res) => {
     const id = idParam.parse(req.params.id);
-    const book = textbookInput.parse(req.body ?? {});
+    const book = textbookInput.parse(req.body);
     const { rows } = await pool.query(
       `UPDATE textbooks SET title = $2, author = $3, edition = $4, updated_at = now()
        WHERE id = $1 RETURNING ${columns}`,
