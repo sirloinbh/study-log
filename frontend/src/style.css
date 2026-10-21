@@ -162,6 +162,123 @@ nav button.active {
   border-radius: var(--radius-card);
   padding: 12px 16px;
 }
+.secondary,
+.danger {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--card-line);
+  border-radius: var(--radius-button);
+  padding: 8px 12px;
+  font-size: 12px;
+}
+.danger {
+  background: var(--danger-bg);
+  border-color: var(--danger-bg);
+}
+.study-logs {
+  display: grid;
+  gap: 20px;
+  max-width: 960px;
+}
+.study-logs h2 {
+  margin: 0 0 16px;
+  font-size: 16px;
+}
+.log-form {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+}
+.log-form label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.log-form input,
+.log-form select,
+.log-form textarea {
+  width: 100%;
+  border: 1px solid var(--card-line);
+  border-radius: var(--radius-button);
+  background: var(--surface);
+  color: var(--text);
+  padding: 9px 10px;
+}
+.log-form textarea {
+  resize: vertical;
+}
+.log-form .wide {
+  grid-column: 1 / -1;
+}
+.duration {
+  margin: 0;
+  color: var(--muted);
+}
+.duration strong {
+  color: var(--text);
+}
+.actions {
+  display: flex;
+  gap: 8px;
+}
+.study-logs [role='status'],
+.study-logs [role='alert'] {
+  margin: 16px 0 0;
+}
+.log-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+.log-list li {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  padding: 14px 16px;
+  display: grid;
+  gap: 8px;
+}
+.log-list li.editing {
+  border-color: var(--accent);
+}
+.log-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 14px;
+}
+.log-date {
+  font-weight: 600;
+}
+.badge {
+  border-radius: 999px;
+  padding: 2px 10px;
+  font-size: 11px;
+  background: var(--soft);
+}
+.badge.done {
+  background: var(--primary);
+  color: var(--on-primary);
+}
+.badge.stopped {
+  background: var(--danger-bg);
+}
+.log-memo {
+  margin: 0;
+  color: var(--muted);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.log-actions {
+  display: flex;
+  gap: 8px;
+}
 @media (max-width: 760px) {
   aside {
     position: static;
@@ -183,5 +300,11 @@ nav button.active {
   .content {
     margin-left: 0;
     padding: 20px 16px;
+  }
+  .log-form {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .log-form label:first-child {
+    grid-column: 1 / -1;
   }
 }
