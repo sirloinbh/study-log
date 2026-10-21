@@ -56,3 +56,12 @@
 - 테스트(`backend/test/study-logs.test.ts`): 객체가 아닌 본문·깨진 JSON·JSON 문자열·초과 크기 본문 테스트와, 비정상 ID 7종 × 조회·수정·삭제 테스트를 추가했다. `backend/test/helpers.ts`에 원문 본문 전송용 `rawBody`를 추가했다.
   - 수정 전 소스로 실행하면 새 테스트 2건이 실패하고, 수정 후에는 통과한다.
 - 보완 후 검증: 로컬 `npm run check` exit 0. backend tests 16, pass 14, fail 0, skipped 2(DB 통합 2건, `TEST_DATABASE_URL` 미설정). 스킬 4 pass, 빌드 통과. DB 통합 테스트와 마이그레이션 2회 적용은 CI에서 확인한다.
+
+## 자동 코드 리뷰 2차 (PR #55)
+
+- 1차 반영 확인: 본문 스키마 메시지, ID 정규식, 400·413 처리, CI 마이그레이션 2회 적용이 의도대로 동작한다. #57과의 충돌은 `helpers.ts` 텍스트 충돌뿐이다.
+- 지적(low): 다른 body-parser 4xx 오류가 여전히 500으로 응답했다. 예: `charset=latin1` → `charset.unsupported`, 지원하지 않는 `Content-Encoding` → `encoding.unsupported`, 중단된 요청.
+  - 반영: `app.ts` 오류 처리에서 `status`가 400~499인 오류는 그 상태 코드와 "요청을 처리할 수 없습니다"로 응답한다.
+  - 테스트: `study-logs.test.ts`에 `charset=latin1` 요청이 415로 응답하는 검사를 추가했다. `helpers.ts`에 `contentType` 옵션을 추가했다.
+- 리뷰는 최대 2회이므로 3차 리뷰는 하지 않는다. 최종 head의 CI로 병합 여부를 판단한다.
+- 보완 후 검증: 로컬 `npm run check` exit 0. backend tests 16, pass 14, fail 0, skipped 2(DB 통합 2건, `TEST_DATABASE_URL` 미설정). 스킬 4 pass, 빌드 통과. DB 통합 테스트와 마이그레이션 2회 적용은 CI에서 확인한다.

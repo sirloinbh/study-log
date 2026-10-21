@@ -6,7 +6,7 @@ export async function withApi(
   run: (
     call: (
       path: string,
-      init?: { method?: string; body?: unknown; rawBody?: string },
+      init?: { method?: string; body?: unknown; rawBody?: string; contentType?: string },
     ) => Promise<{ status: number; data: Record<string, unknown> }>,
   ) => Promise<void>,
   options: { today?: () => string } = {},
@@ -25,7 +25,7 @@ export async function withApi(
         headers:
           init.body === undefined && init.rawBody === undefined
             ? {}
-            : { 'content-type': 'application/json' },
+            : { 'content-type': init.contentType ?? 'application/json' },
         body: init.rawBody ?? (init.body === undefined ? undefined : JSON.stringify(init.body)),
       });
       // 204 responses have no body.

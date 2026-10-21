@@ -81,6 +81,13 @@ test('bodies that are not a JSON object are rejected in Korean before touching t
     });
     assert.equal(tooLarge.status, 413);
     assert.equal(tooLarge.data.error, '요청 본문이 너무 큽니다');
+    const unsupported = await call('/api/study-logs', {
+      method: 'POST',
+      rawBody: JSON.stringify(valid),
+      contentType: 'application/json; charset=latin1',
+    });
+    assert.equal(unsupported.status, 415);
+    assert.equal(unsupported.data.error, '요청을 처리할 수 없습니다');
   });
 });
 
