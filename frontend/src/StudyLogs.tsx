@@ -26,7 +26,7 @@ export function StudyLogs({ today }: { today: string }) {
   const [logs, setLogs] = useState<StudyLog[] | undefined>(undefined);
   const [loadError, setLoadError] = useState<string | undefined>(undefined);
   const [notice, setNotice] = useState<Notice>(undefined);
-  // One request at a time: every action button is disabled while a save or delete is pending.
+  // One request at a time: fields and action buttons are disabled while a save or delete is pending.
   const [busy, setBusy] = useState(false);
   const [deletingId, setDeletingId] = useState<number | undefined>(undefined);
   const [reload, setReload] = useState(0);
@@ -61,10 +61,12 @@ export function StudyLogs({ today }: { today: string }) {
     setEditingId(undefined);
   };
 
-  const fail = (error: RequestError) => {
+  // `id` is the log the failed request targeted.
+  const fail = (error: RequestError, id?: number) => {
     setNotice({ kind: 'alert', text: error.message });
-    // The log may have been deleted elsewhere; show the server's current list.
-    if (error.status === 404 && editingId !== undefined) leaveEdit();
+    // The log may have been deleted elsewhere; show the server's current list. Only a 404 on the
+    // log being edited ends the edit, so unsaved changes to another log survive.
+    if (error.status === 404 && id !== undefined && id === editingId) leaveEdit();
     setReload((count) => count + 1);
   };
 
@@ -89,7 +91,7 @@ export function StudyLogs({ today }: { today: string }) {
       else leaveEdit();
       setReload((count) => count + 1);
     } catch (error) {
-      fail(error as RequestError);
+      fail(error as RequestError, editingId);
     } finally {
       setBusy(false);
     }
@@ -120,7 +122,7 @@ export function StudyLogs({ today }: { today: string }) {
       if (editingId === id) leaveEdit();
       setReload((count) => count + 1);
     } catch (error) {
-      fail(error as RequestError);
+      fail(error as RequestError, id);
     } finally {
       setDeletingId(undefined);
       setBusy(false);
@@ -138,21 +140,34 @@ export function StudyLogs({ today }: { today: string }) {
               id="study-log-date"
               type="date"
               required
+              disabled={busy}
               value={form.studyDate}
               onChange={change('studyDate')}
             />
           </label>
           <label>
             시작
-            <input type="time" required value={form.startTime} onChange={change('startTime')} />
+            <input
+              type="time"
+              required
+              disabled={busy}
+              value={form.startTime}
+              onChange={change('startTime')}
+            />
           </label>
           <label>
             종료
-            <input type="time" required value={form.endTime} onChange={change('endTime')} />
+            <input
+              type="time"
+              required
+              disabled={busy}
+              value={form.endTime}
+              onChange={change('endTime')}
+            />
           </label>
           <label>
             상태
-            <select value={form.status} onChange={change('status')}>
+            <select disabled={busy} value={form.status} onChange={change('status')}>
               {(Object.keys(statusLabels) as StudyStatus[]).map((status) => (
                 <option key={status} value={status}>
                   {statusLabels[status]}
@@ -162,7 +177,13 @@ export function StudyLogs({ today }: { today: string }) {
           </label>
           <label className="wide">
             메모
-            <textarea rows={3} maxLength={10000} value={form.memo} onChange={change('memo')} />
+            <textarea
+              rows={3}
+              maxLength={10000}
+              disabled={busy}
+              value={form.memo}
+              onChange={change('memo')}
+            />
           </label>
           <p className="duration wide" aria-live="polite">
             학습 시간 <strong>{minutes === undefined ? '—' : formatMinutes(minutes)}</strong>

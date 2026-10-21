@@ -304,6 +304,54 @@ uiTest(
   },
 );
 
+uiTest('a 404 when deleting another log keeps the current edit', async () => {
+  const evening: Log = {
+    ...morning,
+    id: 2,
+    studyDate: '2026-10-20',
+    startTime: '20:00',
+    endTime: '21:00',
+    durationMinutes: 60,
+    memo: '',
+  };
+  const api = fakeApi([morning, evening]);
+  const ui = mount(api.fetch);
+  await ui.settle();
+  const [first, second] = ui.find((n) => n.type === 'li');
+  assert.match(ui.text(first), /2026-10-21/);
+  await ui.click('수정', first);
+  await ui.fill('메모', '수정 중인 메모');
+  // The evening log disappears on the server before it is deleted here.
+  api.logs.splice(1, 1);
+  await ui.click('삭제', second);
+  await ui.click('삭제 확인');
+  assert.match(ui.text(ui.find((n) => n.props.role === 'alert')), /학습 기록을 찾을 수 없습니다/);
+  assert.match(ui.text(ui.find((n) => n.type === 'h2')), /학습 기록 수정/);
+  assert.equal(ui.field('메모'), '수정 중인 메모');
+  assert.equal(ui.find((n) => n.type === 'li').length, 1);
+});
+
+uiTest('fields are locked while a save is in flight', async () => {
+  let release = () => {};
+  const hold = new Promise<void>((r) => (release = r));
+  const api = fakeApi();
+  const ui = mount(async (path, init) => {
+    if (init?.method === 'POST') await hold;
+    return api.fetch(path, init);
+  });
+  await ui.settle();
+  await ui.fill('시작', '13:00');
+  await ui.fill('종료', '14:00');
+  await ui.submit();
+  const disabled = ui
+    .find((n) => ['input', 'select', 'textarea'].includes(String(n.type)))
+    .map((n) => n.props.disabled);
+  assert.deepEqual(disabled, [true, true, true, true, true]);
+  release();
+  await ui.settle();
+  assert.match(ui.text(ui.find((n) => n.props.role === 'status')), /저장했습니다/);
+});
+
 uiTest('list buttons name the log they act on', async () => {
   const ui = mount(fakeApi([morning]).fetch);
   await ui.settle();
