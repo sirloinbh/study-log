@@ -3,6 +3,7 @@ import type { Pool } from 'pg';
 import { types } from 'pg';
 import { ZodError } from 'zod';
 import { studyLogRoutes } from './study-logs.js';
+import { contentExerciseRoutes, exerciseRoutes } from './exercises.js';
 import { textbookContentRoutes } from './textbook-contents.js';
 import { textbookRoutes } from './textbooks.js';
 
@@ -31,7 +32,9 @@ export function createApp(pool: Pool, options: { today?: () => string } = {}) {
     res.json({ ok: true, service: 'study-log', today: today() });
   });
   app.use('/api/study-logs', studyLogRoutes(pool));
+  app.use('/api/textbooks/:textbookId/contents/:contentId/exercises', contentExerciseRoutes(pool));
   app.use('/api/textbooks/:textbookId/contents', textbookContentRoutes(pool));
+  app.use('/api/exercises', exerciseRoutes(pool));
   app.use('/api/textbooks', textbookRoutes(pool));
   app.use('/api', (_req, res) => {
     res.status(404).json({ error: '요청한 API를 찾을 수 없습니다' });
