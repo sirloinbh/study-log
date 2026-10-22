@@ -10,6 +10,9 @@ import {
 
 type Notice = { kind: 'status' | 'alert'; text: string } | undefined;
 
+// Same breakpoint as style.css, where the list and detail stack.
+const singleColumn = '(max-width: 760px)';
+
 export function Textbooks() {
   const [form, setForm] = useState<TextbookForm>(emptyTextbookForm);
   const [editingId, setEditingId] = useState<number | undefined>(undefined);
@@ -92,8 +95,10 @@ export function Textbooks() {
   const select = (id: number) => {
     setSelectedId(id);
     setConfirmingDelete(false);
-    // On a phone the detail sits below the list; bring it into view.
-    document.getElementById('textbook-detail')?.focus?.();
+    // On a phone the detail sits below the list; bring it into view. Side by side on a wider
+    // screen it is already visible, so keyboard focus stays in the list.
+    if (globalThis.matchMedia?.(singleColumn).matches)
+      document.getElementById('textbook-detail')?.focus?.();
   };
 
   const edit = (book: Textbook) => {
