@@ -176,12 +176,14 @@ nav button.active {
   background: var(--danger-bg);
   border-color: var(--danger-bg);
 }
-.study-logs {
+.study-logs,
+.textbooks {
   display: grid;
   gap: 20px;
   max-width: 960px;
 }
-.study-logs h2 {
+.study-logs h2,
+.textbooks h2 {
   margin: 0 0 16px;
   font-size: 16px;
 }
@@ -224,11 +226,49 @@ nav button.active {
   gap: 8px;
 }
 .study-logs [role='status'],
-.study-logs [role='alert'] {
+.study-logs [role='alert'],
+.textbooks [role='status'],
+.textbooks [role='alert'] {
   margin: 16px 0 0;
 }
-.study-logs [role='status']:empty {
+.study-logs [role='status']:empty,
+.textbooks [role='status']:empty {
   margin: 0;
+}
+.textbook-form .title {
+  grid-column: span 2;
+}
+.textbook-browser {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.book-title {
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  padding: 0;
+  font-weight: 600;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.log-list li .status {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.detail {
+  display: grid;
+  gap: 12px;
+  margin: 0 0 16px;
+}
+.detail dt {
+  font-size: 12px;
+  color: var(--muted);
+}
+.detail dd {
+  margin: 2px 0 0;
+  overflow-wrap: anywhere;
 }
 .log-list {
   list-style: none;
@@ -310,6 +350,12 @@ nav button.active {
   }
   .log-form label:first-child {
     grid-column: 1 / -1;
+  }
+  .textbook-browser {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .book-title {
+    min-height: 44px;
   }
   .secondary,
   .danger,
