@@ -62,6 +62,21 @@ const studyLogInput = z
         .default('planned'),
       textbookId: referenceId('교재'),
       contentId: referenceId('목차'),
+      understanding: z
+        .number({ invalid_type_error: '이해도는 1~5 사이 정수로 입력하세요' })
+        .int('이해도는 1~5 사이 정수로 입력하세요')
+        .min(1, '이해도는 1~5 사이 정수로 입력하세요')
+        .max(5, '이해도는 1~5 사이 정수로 입력하세요')
+        .nullable()
+        .default(null),
+      difficulties: z
+        .string({ invalid_type_error: '어려웠던 부분 형식이 올바르지 않습니다' })
+        .max(2000, '어려웠던 부분은 2000자 이하로 입력하세요')
+        .default(''),
+      goalAchieved: z
+        .boolean({ invalid_type_error: '목표 달성 여부 형식이 올바르지 않습니다' })
+        .nullable()
+        .default(null),
     },
     {
       required_error: '학습 기록 내용을 JSON 객체로 보내세요',
@@ -105,7 +120,8 @@ const select = (source: string) => `SELECT l.id::int AS id, l.study_date AS "stu
   to_char(l.start_time, 'HH24:MI') AS "startTime", to_char(l.end_time, 'HH24:MI') AS "endTime",
   l.duration_minutes AS "durationMinutes", l.memo, l.status,
   l.textbook_id::int AS "textbookId", t.title AS "textbookTitle",
-  l.content_id::int AS "contentId", c.number AS "contentNumber", c.title AS "contentTitle"
+  l.content_id::int AS "contentId", c.number AS "contentNumber", c.title AS "contentTitle",
+  l.understanding, l.difficulties, l.goal_achieved AS "goalAchieved"
   FROM ${source} l
   LEFT JOIN textbooks t ON t.id = l.textbook_id
   LEFT JOIN textbook_contents c ON c.id = l.content_id`;
@@ -164,8 +180,8 @@ export function studyLogRoutes(pool: Pool) {
       pool.query(
         `WITH saved AS (
            INSERT INTO study_logs (study_date, start_time, end_time, duration_minutes, memo, status,
-             textbook_id, content_id)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *)
+             textbook_id, content_id, understanding, difficulties, goal_achieved)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *)
          ${select('saved')}`,
         [
           log.studyDate,
@@ -176,6 +192,9 @@ export function studyLogRoutes(pool: Pool) {
           log.status,
           log.textbookId,
           log.contentId,
+          log.understanding,
+          log.difficulties,
+          log.goalAchieved,
         ],
       ),
     );
@@ -191,6 +210,7 @@ export function studyLogRoutes(pool: Pool) {
         `WITH saved AS (
            UPDATE study_logs SET study_date = $2, start_time = $3, end_time = $4,
              duration_minutes = $5, memo = $6, status = $7, textbook_id = $8, content_id = $9,
+             understanding = $10, difficulties = $11, goal_achieved = $12,
              updated_at = now()
            WHERE id = $1 RETURNING *)
          ${select('saved')}`,
@@ -204,6 +224,9 @@ export function studyLogRoutes(pool: Pool) {
           log.status,
           log.textbookId,
           log.contentId,
+          log.understanding,
+          log.difficulties,
+          log.goalAchieved,
         ],
       ),
     );
