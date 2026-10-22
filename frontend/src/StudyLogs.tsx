@@ -7,6 +7,8 @@ import {
   previewMinutes,
   statusLabels,
   studiedLabel,
+  reflectionLabel,
+  understandingLabels,
   type StudyLog,
   type StudyLogForm,
   type StudyStatus,
@@ -90,6 +92,16 @@ export function StudyLogs({ today }: { today: string }) {
     setForm((current) => ({ ...current, [field]: event.target.value }));
   };
 
+  // The select values '', '1'…'5', 'true' and 'false' map to null, a number and a boolean.
+  const assess =
+    (field: 'understanding' | 'goalAchieved') => (event: { target: { value: string } }) => {
+      setNotice(undefined);
+      const { value } = event.target;
+      const parsed =
+        value === '' ? null : field === 'understanding' ? Number(value) : value === 'true';
+      setForm((current) => ({ ...current, [field]: parsed }));
+    };
+
   // Picking another textbook clears the chapter, which belonged to the previous one.
   const pick = (field: 'textbookId' | 'contentId') => (event: { target: { value: string } }) => {
     setNotice(undefined);
@@ -156,6 +168,9 @@ export function StudyLogs({ today }: { today: string }) {
       status: log.status,
       textbookId: log.textbookId,
       contentId: log.contentId,
+      understanding: log.understanding,
+      difficulties: log.difficulties,
+      goalAchieved: log.goalAchieved,
     });
     // On a phone the form sits above the list; bring it into view.
     document.getElementById('study-log-date')?.focus?.();
@@ -251,6 +266,43 @@ export function StudyLogs({ today }: { today: string }) {
               ))}
             </select>
           </label>
+          <label className="half">
+            이해도
+            <select
+              disabled={busy}
+              value={form.understanding ?? ''}
+              onChange={assess('understanding')}
+            >
+              <option value="">선택 안 함</option>
+              {Object.entries(understandingLabels).map(([score, label]) => (
+                <option key={score} value={score}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="half">
+            목표 달성
+            <select
+              disabled={busy}
+              value={form.goalAchieved === null ? '' : String(form.goalAchieved)}
+              onChange={assess('goalAchieved')}
+            >
+              <option value="">선택 안 함</option>
+              <option value="true">달성</option>
+              <option value="false">미달성</option>
+            </select>
+          </label>
+          <label className="wide">
+            어려웠던 부분
+            <textarea
+              rows={2}
+              maxLength={2000}
+              disabled={busy}
+              value={form.difficulties}
+              onChange={change('difficulties')}
+            />
+          </label>
           <label className="wide">
             메모
             <textarea
@@ -310,6 +362,8 @@ export function StudyLogs({ today }: { today: string }) {
                   <span className={`badge ${log.status}`}>{statusLabels[log.status]}</span>
                 </div>
                 {log.textbookTitle !== null && <p className="log-studied">{studiedLabel(log)}</p>}
+                {reflectionLabel(log) && <p className="log-studied">{reflectionLabel(log)}</p>}
+                {log.difficulties && <p className="log-memo">어려웠던 부분: {log.difficulties}</p>}
                 {log.memo && <p className="log-memo">{log.memo}</p>}
                 <div className="log-actions">
                   {deletingId === log.id ? (
