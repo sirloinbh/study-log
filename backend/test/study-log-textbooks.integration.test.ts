@@ -83,7 +83,17 @@ test(
         const refused = await call('/api/study-logs', { method: 'POST', body });
         assert.equal(refused.status, 400);
         assert.equal(refused.data.error, message);
+        // Updating to the same references is refused too and leaves the log as it was.
+        const refusedUpdate = await call(`/api/study-logs/${log.id}`, { method: 'PUT', body });
+        assert.equal(refusedUpdate.status, 400);
+        assert.equal(refusedUpdate.data.error, message);
       }
+      const unchanged = (await call(`/api/study-logs/${log.id}`)).data.studyLog as Log;
+      assert.equal(unchanged.contentId, section);
+
+      // A textbook without logs filters to an empty list.
+      const unused = await newBook('기록 없음');
+      assert.deepEqual((await call(`/api/study-logs?textbookId=${unused}`)).data.studyLogs, []);
 
       // Filter by textbook, alone and with a date.
       const ofLinear = (await call(`/api/study-logs?textbookId=${linear}`)).data.studyLogs as Log[];
