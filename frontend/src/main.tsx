@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { NotebookPen, Settings2 } from 'lucide-react';
+import { BookOpen, NotebookPen, Settings2 } from 'lucide-react';
 import './style.css';
 import { healthText, type Health } from './health';
 import { StudyLogs } from './StudyLogs';
+import { Textbooks } from './Textbooks';
 
 const pages = [
   {
@@ -11,6 +12,12 @@ const pages = [
     label: '학습 기록',
     icon: NotebookPen,
     description: '오늘 공부한 시간과 내용을 기록하고 최근 기록을 확인합니다',
+  },
+  {
+    key: 'textbooks',
+    label: '교재',
+    icon: BookOpen,
+    description: '공부할 교재를 등록하고 제목·저자·판본을 관리합니다',
   },
   { key: 'settings', label: '설정', icon: Settings2, description: '앱 환경과 데이터 관리' },
 ];
@@ -74,6 +81,7 @@ export function App() {
           </p>
         )}
         {current.key === 'logs' && health.state === 'ok' && <StudyLogs today={health.today} />}
+        {current.key === 'textbooks' && health.state === 'ok' && <Textbooks />}
         {current.key === 'settings' && (
           <section className="card empty">
             <h2>아직 설정 항목이 없습니다</h2>
