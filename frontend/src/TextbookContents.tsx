@@ -19,13 +19,14 @@ type Editor = {
 export function TextbookContents({ textbookId }: { textbookId: number }) {
   const [loaded, setLoaded] = useState<{ textbookId: number; tree: ContentNode[] }>();
   const [loadError, setLoadError] = useState<{ textbookId: number; message: string }>();
-  const [reload, setReload] = useState(0);
   const [editor, setEditor] = useState<Editor>();
   const [deleting, setDeleting] = useState<{ textbookId: number; id: number }>();
   const [notice, setNotice] = useState<Notice>(undefined);
-  // One request at a time: fields and buttons are disabled while a change is pending.
+  // One request at a time: fields and buttons stay disabled while a change and the reload after
+  // it are pending, so the next change never starts from an outdated tree.
   const [busy, setBusy] = useState(false);
 
+  // The first load. Reloads after a change happen inside that change (see `run`).
   useEffect(() => {
     let current = true;
     requestJson<{ contents: ContentNode[] }>(`/api/textbooks/${textbookId}/contents`)
@@ -40,7 +41,7 @@ export function TextbookContents({ textbookId }: { textbookId: number }) {
     return () => {
       current = false;
     };
-  }, [textbookId, reload]);
+  }, [textbookId]);
 
   const tree = loaded?.textbookId === textbookId ? loaded.tree : undefined;
   const error = loadError?.textbookId === textbookId ? loadError.message : undefined;
@@ -50,18 +51,33 @@ export function TextbookContents({ textbookId }: { textbookId: number }) {
 
   const say = (kind: 'status' | 'alert', text: string) => setNotice({ kind, text, textbookId });
 
-  // Runs one change; on failure shows the server's message and reloads the server's tree. A 404
-  // closes the editor only when it is about the entry being edited (`targetId`) or the textbook.
-  const run = async (change: () => Promise<void>, targetId?: number) => {
+  // Loads the server's tree; a failure is shown next to the tree already on screen.
+  const refresh = async () => {
+    try {
+      const data = await requestJson<{ contents: ContentNode[] }>(
+        `/api/textbooks/${textbookId}/contents`,
+      );
+      setLoaded({ textbookId, tree: data.contents });
+      setLoadError(undefined);
+    } catch (failure) {
+      setLoadError({ textbookId, message: (failure as RequestError).message });
+    }
+  };
+
+  // Runs one change and then reloads the tree, both while busy. On failure shows the server's
+  // message. A 404 closes the editor only when it is about the entry being edited (`targetId`)
+  // or the textbook.
+  const run = async (change: () => Promise<boolean | void>, targetId?: number) => {
     if (busy) return;
     setBusy(true);
     try {
-      await change();
+      // A change that already returned the new tree (reorder) answers true.
+      if (!(await change())) await refresh();
     } catch (failure) {
       const { message, status } = failure as RequestError;
       say('alert', message);
       if (status === 404 && (targetId === undefined || targetId === open?.id)) setEditor(undefined);
-      setReload((count) => count + 1);
+      await refresh();
     } finally {
       setBusy(false);
     }
@@ -109,7 +125,6 @@ export function TextbookContents({ textbookId }: { textbookId: number }) {
         });
       say('status', open.id === undefined ? '추가했습니다' : '수정했습니다');
       setEditor(undefined);
-      setReload((count) => count + 1);
     }, open.id);
   };
 
@@ -124,7 +139,6 @@ export function TextbookContents({ textbookId }: { textbookId: number }) {
       }
       say('status', '삭제했습니다');
       if (open?.id === node.id) setEditor(undefined);
-      setReload((count) => count + 1);
     }, node.id);
 
   // Swaps the entry with its neighbour and saves the siblings' new order.
@@ -138,6 +152,7 @@ export function TextbookContents({ textbookId }: { textbookId: number }) {
       );
       setLoaded({ textbookId, tree: data.contents });
       setNotice(undefined);
+      return true;
     });
 
   const change = (field: 'number' | 'title') => (event: { target: { value: string } }) => {
@@ -199,7 +214,7 @@ export function TextbookContents({ textbookId }: { textbookId: number }) {
                       type="button"
                       className="secondary"
                       disabled={busy}
-                      aria-label={`${label} 아래에 추가`}
+                      aria-label={`${label} 하위 추가`}
                       onClick={() => startAdd(node)}
                     >
                       하위 추가
