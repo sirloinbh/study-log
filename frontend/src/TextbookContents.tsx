@@ -16,13 +16,15 @@ type Editor = {
 
 // State is tagged with its textbook, so switching textbooks never shows or edits the previous
 // textbook's contents, even before the new ones arrive. `onTree` hears each tree shown (undefined
-// while loading), so the exercises card picks from the same contents.
+// while loading, with `failed` when the first load failed), so the exercises card picks from the
+// same contents. It must be a stable function such as a state setter: a new function on every
+// render would rerun the effect below and, with a state update in it, render forever.
 export function TextbookContents({
   textbookId,
   onTree,
 }: {
   textbookId: number;
-  onTree?: (shown: { textbookId: number; tree?: ContentNode[] }) => void;
+  onTree?: (shown: { textbookId: number; tree?: ContentNode[]; failed: boolean }) => void;
 }) {
   const [loaded, setLoaded] = useState<{ textbookId: number; tree: ContentNode[] }>();
   const [loadError, setLoadError] = useState<{ textbookId: number; message: string }>();
@@ -57,8 +59,8 @@ export function TextbookContents({
   const shown = notice?.textbookId === textbookId ? notice : undefined;
 
   useEffect(() => {
-    onTree?.({ textbookId, tree });
-  }, [onTree, textbookId, tree]);
+    onTree?.({ textbookId, tree, failed: tree === undefined && error !== undefined });
+  }, [onTree, textbookId, tree, error]);
 
   const say = (kind: 'status' | 'alert', text: string) => setNotice({ kind, text, textbookId });
 

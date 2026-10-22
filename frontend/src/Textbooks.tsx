@@ -30,7 +30,11 @@ export function Textbooks() {
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [reload, setReload] = useState(0);
   // The contents tree the contents card shows, shared with the exercises card.
-  const [contents, setContents] = useState<{ textbookId: number; tree?: ContentNode[] }>();
+  const [contents, setContents] = useState<{
+    textbookId: number;
+    tree?: ContentNode[];
+    failed: boolean;
+  }>();
 
   useEffect(() => {
     // A slower, older response must not overwrite the list a newer request returned.
@@ -297,6 +301,7 @@ export function Textbooks() {
             key={selected.id}
             textbook={selected}
             tree={contents?.textbookId === selected.id ? contents.tree : undefined}
+            treeFailed={contents?.textbookId === selected.id && contents.failed}
           />
         </section>
       )}

@@ -34,6 +34,10 @@ const contents: Record<number, Tree[]> = {
 type Options = {
   // Every exercise request answers this error instead (after the list is first shown).
   reject?: { method: string; status: number; error: string };
+  // Loading the contents tree fails.
+  failContents?: boolean;
+  // Changes (non-GET exercise requests) wait for this promise.
+  holdChange?: Promise<void>;
 };
 
 // In-memory exercises API with the textbook list and contents; records exercise requests.
@@ -53,8 +57,12 @@ function fakeApi(initial: Exercise[] = [], options: Options = {}) {
     if (path.startsWith('/api/study-logs')) return reply(200, { studyLogs: [] });
     if (path === '/api/textbooks') return reply(200, { textbooks: books });
     const tree = path.match(/^\/api\/textbooks\/(\d+)\/contents$/);
-    if (tree) return reply(200, { contents: contents[Number(tree[1])] });
+    if (tree)
+      return options.failContents
+        ? reply(500, { error: '서버 오류가 발생했습니다' })
+        : reply(200, { contents: contents[Number(tree[1])] });
     requests.push({ method, path, body });
+    if (method !== 'GET') await options.holdChange;
     if (options.reject?.method === method)
       return reply(options.reject.status, { error: options.reject.error });
     const list = path.match(/^\/api\/textbooks\/(\d+)\/contents\/(\d+)\/exercises$/);
@@ -127,7 +135,7 @@ uiTest('the first chapter is picked and its exercises are listed in order', asyn
   assert.deepEqual(listed(ui), ['문제 3:벡터 u를 구하라.', '2번째 문제:증명하라.']);
   // Only the important one has the badge.
   assert.deepEqual(
-    ui.find((n) => n.props.className === 'badge done', card(ui)).map((n) => ui.text(n)),
+    ui.find((n) => n.props.className === 'badge important', card(ui)).map((n) => ui.text(n)),
     ['중요'],
   );
   // Picking a section lists its exercises, with line breaks kept in the body.
@@ -182,6 +190,74 @@ uiTest('the body takes focus when the form opens and again after each add', asyn
   await ui.submit(form(ui));
   // Once the save and the reload are done and the field is enabled again.
   assert.deepEqual(focused, ['exercise-body', 'exercise-body']);
+});
+
+uiTest('deleting another exercise leaves focus where it is', async () => {
+  const focused: string[] = [];
+  const document = { getElementById: (id: string) => ({ focus: () => focused.push(id) }) };
+  const ui = await openBook(fakeApi(problems), '선형대수', { document });
+  await ui.click('수정', item(ui, '문제 3'));
+  assert.equal(focused.length, 1);
+  await ui.click('삭제', item(ui, '2번째 문제'));
+  await ui.click('삭제 확인', item(ui, '2번째 문제'));
+  assert.deepEqual(listed(ui), ['문제 3:벡터 u를 구하라.']);
+  assert.equal(focused.length, 1);
+  // The edit stays open with its input.
+  assert.equal(ui.field('문제 본문'), '벡터 u를 구하라.');
+});
+
+uiTest('a failed contents load says the chapters cannot be picked', async () => {
+  const ui = await openBook(fakeApi([], { failContents: true }));
+  assert.match(ui.text(card(ui)), /목차를 불러오지 못해 단원을 고를 수 없습니다/);
+  assert.doesNotMatch(ui.text(card(ui)), /불러오는 중/);
+});
+
+uiTest('switching textbooks shows nothing of the previous one', async () => {
+  const ui = await openBook(fakeApi(problems));
+  await ui.click('문제 추가', card(ui));
+  await ui.fill('문제 본문', '쓰던 문제');
+  await ui.click('미적분');
+  assert.equal(form(ui), undefined);
+  assert.deepEqual(listed(ui), []);
+  assert.match(ui.text(card(ui)), /목차를 먼저 추가하면/);
+});
+
+uiTest('picking another chapter hides the open form until coming back', async () => {
+  const ui = await openBook(fakeApi(problems));
+  await ui.click('문제 추가', card(ui));
+  await ui.fill('문제 본문', '쓰던 문제');
+  await ui.fill('단원', '11');
+  assert.equal(form(ui), undefined);
+  assert.deepEqual(listed(ui), ['문제 1:u·v =\n  1']);
+  await ui.fill('단원', '10');
+  assert.equal(ui.field('문제 본문'), '쓰던 문제');
+});
+
+uiTest('buttons and the chapter picker are locked while a change is pending', async () => {
+  let release = () => {};
+  const api = fakeApi(problems, { holdChange: new Promise<void>((r) => (release = r)) });
+  const ui = await openBook(api);
+  await ui.click('삭제', item(ui, '문제 3'));
+  await ui.click('삭제 확인', item(ui, '문제 3'));
+  const controls = ui.find((n) => n.type === 'button' || n.type === 'select', card(ui));
+  const copies = controls.filter((n) => ui.text(n) === '질문 복사');
+  const others = controls.filter((n) => ui.text(n) !== '질문 복사');
+  assert.ok(others.length > 0 && others.every((n) => n.props.disabled), 'locked while pending');
+  // Copying only reads, so it stays available.
+  assert.ok(copies.length > 0 && copies.every((n) => !n.props.disabled));
+  release();
+  await ui.settle();
+  assert.deepEqual(listed(ui), ['1번째 문제:증명하라.']);
+});
+
+uiTest('deleting an exercise already gone reports it and reloads', async () => {
+  const api = fakeApi(problems);
+  const ui = await openBook(api);
+  await ui.click('삭제', item(ui, '문제 3'));
+  api.rows.splice(0, 1);
+  await ui.click('삭제 확인', item(ui, '문제 3'));
+  assert.match(alertText(ui), /연습문제를 찾을 수 없습니다/);
+  assert.deepEqual(listed(ui), ['1번째 문제:증명하라.']);
 });
 
 uiTest('editing replaces the exercise with PUT and closes the form', async () => {
