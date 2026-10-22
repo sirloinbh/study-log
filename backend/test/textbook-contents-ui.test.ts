@@ -27,6 +27,10 @@ const books = [
 type Options = {
   // DELETE answers this error instead of deleting.
   rejectDelete?: { status: number; error: string };
+  // PUT /order answers this error instead of reordering.
+  rejectOrder?: { status: number; error: string };
+  // Every GET after the first waits for this promise.
+  holdReload?: Promise<void>;
 };
 
 // In-memory /api/textbooks/:id/contents with the API's ordering rules; records content requests.
@@ -34,6 +38,7 @@ function fakeApi(initial: Row[] = [], options: Options = {}) {
   const rows = [...initial];
   const requests: { method: string; path: string; body?: unknown }[] = [];
   let nextId = 100;
+  let gets = 0;
   const reply = (status: number, body?: unknown) => ({
     ok: status < 400,
     status,
@@ -60,7 +65,10 @@ function fakeApi(initial: Row[] = [], options: Options = {}) {
     requests.push({ method, path, body });
     const textbookId = Number(match[1]);
     const target = match[2];
-    if (method === 'GET') return reply(200, { contents: treeOf(textbookId) });
+    if (method === 'GET') {
+      if (++gets > 1) await options.holdReload;
+      return reply(200, { contents: treeOf(textbookId) });
+    }
     if (method === 'POST') {
       const row = {
         id: nextId++,
@@ -73,6 +81,8 @@ function fakeApi(initial: Row[] = [], options: Options = {}) {
       return reply(201, { content: row });
     }
     if (target === 'order') {
+      if (options.rejectOrder)
+        return reply(options.rejectOrder.status, { error: options.rejectOrder.error });
       // Rows are kept in sibling order, so reordering means moving them to the given order.
       const moved = body.ids.map((id: number) => rows.find((row) => row.id === id)!);
       const rest = rows.filter((row) => !body.ids.includes(row.id));
@@ -288,13 +298,56 @@ uiTest('row buttons name the entry they act on', async () => {
   assert.deepEqual(labels, [
     '극한 위로 이동',
     '극한 아래로 이동',
-    '극한 아래에 추가',
+    '극한 하위 추가',
     '극한 목차 수정',
     '극한 목차 삭제',
   ]);
 });
 
-uiTest('content labels and select options follow the tree', () => {
+uiTest('buttons stay locked until the tree is reloaded after a change', async () => {
+  let release = () => {};
+  const api = fakeApi(outline, { holdReload: new Promise<void>((r) => (release = r)) });
+  const ui = await openBook(api);
+  await ui.click('장 추가');
+  await ui.fill('번호', '3');
+  await ui.fill('목차 제목', '행렬식');
+  await ui.submit(ui.find((n) => n.props.className === 'log-form content-form')[0]);
+  // Saved, but the reload is still pending: moving now would start from the old tree.
+  const moves = ui
+    .find(
+      (n) => n.type === 'button' && ['위로', '아래로', '장 추가'].includes(ui.text(n)),
+      card(ui),
+    )
+    .map((n) => n.props.disabled);
+  assert.ok(moves.length > 0 && moves.every(Boolean), 'all disabled while reloading');
+  release();
+  await ui.settle();
+  assert.equal(shape(ui), '1 벡터[1.1 덧셈|1.2 내적]|2 행렬|3 행렬식');
+  assert.equal(
+    ui.find((n) => n.type === 'button' && ui.text(n) === '위로', row(ui, '3 행렬식'))[0].props
+      .disabled,
+    false,
+  );
+});
+
+uiTest('a refused reorder shows the server message and reloads the tree', async () => {
+  const api = fakeApi(outline, {
+    rejectOrder: { status: 400, error: '같은 상위 목차의 모든 항목을 한 번씩 보내야 합니다' },
+  });
+  const ui = await openBook(api);
+  await ui.click('아래로', row(ui, '1 벡터'));
+  assert.match(
+    ui.text(ui.find((n) => n.props.role === 'alert', card(ui))),
+    /같은 상위 목차의 모든 항목을 한 번씩 보내야 합니다/,
+  );
+  assert.deepEqual(
+    api.requests.map((r) => r.method),
+    ['GET', 'PUT', 'GET'],
+  );
+  assert.equal(shape(ui), '1 벡터[1.1 덧셈|1.2 내적]|2 행렬');
+});
+
+uiTest('content labels show the number before the title when there is one', () => {
   const logic = loadFrontendModule<{
     contentLabel(node: { number: string; title: string }): string;
   }>('textbook.ts');
