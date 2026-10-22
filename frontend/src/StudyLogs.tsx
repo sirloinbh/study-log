@@ -92,7 +92,6 @@ export function StudyLogs({ today }: { today: string }) {
     setForm((current) => ({ ...current, [field]: event.target.value }));
   };
 
-  // Picking another textbook clears the chapter, which belonged to the previous one.
   // The select values '', '1'…'5', 'true' and 'false' map to null, a number and a boolean.
   const assess =
     (field: 'understanding' | 'goalAchieved') => (event: { target: { value: string } }) => {
@@ -103,6 +102,7 @@ export function StudyLogs({ today }: { today: string }) {
       setForm((current) => ({ ...current, [field]: parsed }));
     };
 
+  // Picking another textbook clears the chapter, which belonged to the previous one.
   const pick = (field: 'textbookId' | 'contentId') => (event: { target: { value: string } }) => {
     setNotice(undefined);
     const id = event.target.value === '' ? null : Number(event.target.value);
