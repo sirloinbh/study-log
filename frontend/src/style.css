@@ -265,6 +265,58 @@ nav button.active {
   margin: 0;
   overflow-wrap: anywhere;
 }
+.contents-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.contents-head h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.content-form {
+  margin-bottom: 12px;
+}
+.content-form .title {
+  grid-column: span 3;
+}
+.content-form-heading {
+  margin: 0;
+  font-weight: 600;
+}
+.content-tree {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+.content-tree .content-tree {
+  margin-top: 6px;
+  padding-left: 20px;
+  border-left: 1px solid var(--line);
+}
+.content-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  padding: 8px 12px;
+}
+.content-row.editing {
+  border-color: var(--accent);
+}
+.content-label {
+  overflow-wrap: anywhere;
+}
+.log-actions {
+  flex-wrap: wrap;
+}
 .detail {
   display: grid;
   gap: 12px;
@@ -361,6 +413,12 @@ nav button.active {
   }
   .textbook-browser {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .content-form .title {
+    grid-column: 1 / -1;
+  }
+  .content-tree .content-tree {
+    padding-left: 12px;
   }
   .book-title {
     min-height: 44px;
