@@ -61,7 +61,8 @@ const newHooks = (): Hooks => ({ states: [], effectDeps: [], cursor: 0 });
 // Hook state is kept per component and dropped when the component is no longer rendered,
 // so switching pages starts the new page fresh like an unmount would. Each component may
 // appear at most once in the tree.
-export function mount(fetchImpl: FetchImpl) {
+// `globals` adds or replaces browser globals (document, matchMedia) the screen sees.
+export function mount(fetchImpl: FetchImpl, globals: Record<string, unknown> = {}) {
   let hooks = new Map<unknown, Hooks>();
   let rendered = new Map<unknown, Hooks>();
   let active = newHooks();
@@ -104,6 +105,7 @@ export function mount(fetchImpl: FetchImpl) {
     document: { getElementById: () => ({}) },
     fetch: fetchImpl,
     console,
+    ...globals,
   });
   moduleLoader(context, (name) => {
     if (name === 'react') return react;

@@ -67,8 +67,8 @@ const linear: Book = {
 const calculus: Book = { id: 2, title: '미적분학', author: '', edition: '' };
 
 // Opens the app on the 교재 page.
-async function open(api: { fetch: Parameters<typeof mount>[0] }) {
-  const ui = mount(api.fetch);
+async function open(api: { fetch: Parameters<typeof mount>[0] }, globals = {}) {
+  const ui = mount(api.fetch, globals);
   await ui.settle();
   await ui.click('교재');
   return ui;
@@ -271,6 +271,34 @@ uiTest('leaving a page and coming back starts it fresh', async () => {
   assert.equal(ui.field('시작'), '');
   await ui.click('교재');
   assert.equal(ui.field('제목'), '');
+});
+
+uiTest('selecting moves focus to the detail only when it is stacked below the list', async () => {
+  for (const [narrow, expected] of [
+    [false, []],
+    [true, ['textbook-detail']],
+  ] as const) {
+    const focused: string[] = [];
+    const ui = await open(fakeApi([linear]), {
+      document: { getElementById: (id: string) => ({ focus: () => focused.push(id) }) },
+      matchMedia: (query: string) => ({ matches: narrow && query === '(max-width: 760px)' }),
+    });
+    await ui.click('선형대수와 그 응용');
+    assert.deepEqual(focused, expected, narrow ? 'phone width' : 'desktop width');
+  }
+});
+
+uiTest('a 404 when deleting reports it, reloads and clears the detail', async () => {
+  const api = fakeApi([linear]);
+  const ui = await open(api);
+  await ui.click('선형대수와 그 응용');
+  await ui.click('삭제', detail(ui));
+  // The textbook disappears on the server before the delete is confirmed here.
+  api.books.splice(0, 1);
+  await ui.click('삭제 확인');
+  assert.match(ui.text(ui.find((n) => n.props.role === 'alert')), /교재를 찾을 수 없습니다/);
+  assert.equal(items(ui).length, 0);
+  assert.match(ui.text(detail(ui)), /목록에서 교재를 선택하세요/);
 });
 
 uiTest('textbook meta joins author and edition and skips blanks', () => {
