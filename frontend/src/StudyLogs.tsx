@@ -6,10 +6,12 @@ import {
   formatMinutes,
   previewMinutes,
   statusLabels,
+  studiedLabel,
   type StudyLog,
   type StudyLogForm,
   type StudyStatus,
 } from './study-logs';
+import { contentOptions, type ContentNode, type Textbook } from './textbook';
 
 type Notice = { kind: 'status' | 'alert'; text: string } | undefined;
 
@@ -48,10 +50,55 @@ export function StudyLogs({ today }: { today: string }) {
     };
   }, [reload]);
 
+  // Textbooks to link a log to. Without them the log is simply saved unlinked.
+  const [textbooks, setTextbooks] = useState<Textbook[]>([]);
+  useEffect(() => {
+    let current = true;
+    requestJson<{ textbooks: Textbook[] }>('/api/textbooks')
+      .then((data) => current && setTextbooks(data.textbooks))
+      .catch(() => current && setTextbooks([]));
+    return () => {
+      current = false;
+    };
+  }, []);
+
+  // Chapters of the selected textbook, flattened for the select. Kept with the textbook they
+  // belong to, so a previous textbook's chapters never show while the new ones load.
+  const [loadedChapters, setLoadedChapters] = useState<{
+    textbookId: number;
+    options: { id: number; label: string }[];
+  }>();
+  useEffect(() => {
+    const textbookId = form.textbookId;
+    if (textbookId === null) return;
+    let current = true;
+    requestJson<{ contents: ContentNode[] }>(`/api/textbooks/${textbookId}/contents`)
+      .then(
+        (data) =>
+          current && setLoadedChapters({ textbookId, options: contentOptions(data.contents) }),
+      )
+      .catch(() => current && setLoadedChapters({ textbookId, options: [] }));
+    return () => {
+      current = false;
+    };
+  }, [form.textbookId]);
+  const chapters = loadedChapters?.textbookId === form.textbookId ? loadedChapters.options : [];
+
   const minutes = previewMinutes(form.startTime, form.endTime);
   const change = (field: keyof StudyLogForm) => (event: { target: { value: string } }) => {
     setNotice(undefined);
     setForm((current) => ({ ...current, [field]: event.target.value }));
+  };
+
+  // Picking another textbook clears the chapter, which belonged to the previous one.
+  const pick = (field: 'textbookId' | 'contentId') => (event: { target: { value: string } }) => {
+    setNotice(undefined);
+    const id = event.target.value === '' ? null : Number(event.target.value);
+    setForm((current) =>
+      field === 'textbookId'
+        ? { ...current, textbookId: id, contentId: null }
+        : { ...current, contentId: id },
+    );
   };
 
   const leaveEdit = () => {
@@ -107,6 +154,8 @@ export function StudyLogs({ today }: { today: string }) {
       endTime: log.endTime,
       memo: log.memo,
       status: log.status,
+      textbookId: log.textbookId,
+      contentId: log.contentId,
     });
     // On a phone the form sits above the list; bring it into view.
     document.getElementById('study-log-date')?.focus?.();
@@ -174,6 +223,34 @@ export function StudyLogs({ today }: { today: string }) {
               ))}
             </select>
           </label>
+          <label className="half">
+            교재
+            <select disabled={busy} value={form.textbookId ?? ''} onChange={pick('textbookId')}>
+              <option value="">선택 안 함</option>
+              {textbooks.map((book) => (
+                <option key={book.id} value={book.id}>
+                  {book.title}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="half">
+            장/절
+            <select
+              disabled={busy || form.textbookId === null}
+              value={form.contentId ?? ''}
+              onChange={pick('contentId')}
+            >
+              <option value="">
+                {form.textbookId === null ? '교재를 먼저 선택' : '선택 안 함'}
+              </option>
+              {chapters.map((chapter) => (
+                <option key={chapter.id} value={chapter.id}>
+                  {chapter.label}
+                </option>
+              ))}
+            </select>
+          </label>
           <label className="wide">
             메모
             <textarea
@@ -232,6 +309,7 @@ export function StudyLogs({ today }: { today: string }) {
                   <strong>{formatMinutes(log.durationMinutes)}</strong>
                   <span className={`badge ${log.status}`}>{statusLabels[log.status]}</span>
                 </div>
+                {log.textbookTitle !== null && <p className="log-studied">{studiedLabel(log)}</p>}
                 {log.memo && <p className="log-memo">{log.memo}</p>}
                 <div className="log-actions">
                   {deletingId === log.id ? (

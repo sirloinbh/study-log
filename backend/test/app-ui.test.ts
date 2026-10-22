@@ -5,7 +5,7 @@ import { frontendMissing, mount } from './ui-harness.js';
 const healthy = async (path: string) => ({
   ok: true,
   json: async () =>
-    path === '/api/health' ? { ok: true, today: '2026-10-19' } : { studyLogs: [] },
+    path === '/api/health' ? { ok: true, today: '2026-10-19' } : { studyLogs: [], textbooks: [] },
 });
 
 const uiTest = frontendMissing ? test.skip : test;

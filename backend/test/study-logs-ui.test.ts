@@ -12,7 +12,42 @@ type Log = {
   durationMinutes: number;
   memo: string;
   status: string;
+  textbookId: number | null;
+  textbookTitle: string | null;
+  contentId: number | null;
+  contentNumber: string | null;
+  contentTitle: string | null;
 };
+
+// Textbooks and chapters the form can link a log to (served, not recorded).
+const textbooks = [
+  { id: 1, title: '선형대수', author: '', edition: '' },
+  { id: 2, title: '미적분', author: '', edition: '' },
+];
+const contents: Record<number, unknown[]> = {
+  1: [
+    {
+      id: 11,
+      parentId: null,
+      number: '1',
+      title: '벡터',
+      children: [{ id: 12, parentId: 11, number: '1.2', title: '내적', children: [] }],
+    },
+  ],
+  2: [{ id: 21, parentId: null, number: '', title: '극한', children: [] }],
+};
+const chapterOf: Record<number, { number: string; title: string }> = {
+  11: { number: '1', title: '벡터' },
+  12: { number: '1.2', title: '내적' },
+  21: { number: '', title: '극한' },
+};
+
+// The names the API joins onto a saved log.
+const named = (body: { textbookId: number | null; contentId: number | null }) => ({
+  textbookTitle: textbooks.find((book) => book.id === body.textbookId)?.title ?? null,
+  contentNumber: body.contentId === null ? null : chapterOf[body.contentId].number,
+  contentTitle: body.contentId === null ? null : chapterOf[body.contentId].title,
+});
 
 // In-memory stand-in for /api/study-logs that records every request the screen sends.
 type Options = {
@@ -48,6 +83,9 @@ function fakeApi(initial: Log[] = [], options: Options = {}) {
     const method = init.method ?? 'GET';
     const body = init.body === undefined ? undefined : JSON.parse(init.body);
     if (path === '/api/health') return reply(200, { ok: true, today: '2026-10-22' });
+    if (path === '/api/textbooks') return reply(200, { textbooks });
+    const chapters = path.match(/^\/api\/textbooks\/(\d+)\/contents$/);
+    if (chapters) return reply(200, { contents: contents[Number(chapters[1])] ?? [] });
     requests.push({ method, path, body });
     if (offline) throw new TypeError('fetch failed');
     if (reject && method !== 'GET') return reply(reject.status, { error: reject.error });
@@ -60,14 +98,24 @@ function fakeApi(initial: Log[] = [], options: Options = {}) {
       return reply(200, { studyLogs: sorted });
     }
     if (method === 'POST') {
-      const log = { id: nextId++, ...body, durationMinutes: minutes(body.startTime, body.endTime) };
+      const log = {
+        id: nextId++,
+        ...body,
+        ...named(body),
+        durationMinutes: minutes(body.startTime, body.endTime),
+      };
       logs.push(log);
       return reply(201, { studyLog: log });
     }
     const index = logs.findIndex((log) => log.id === id);
     if (index < 0) return reply(404, { error: '학습 기록을 찾을 수 없습니다' });
     if (method === 'PUT') {
-      logs[index] = { id, ...body, durationMinutes: minutes(body.startTime, body.endTime) };
+      logs[index] = {
+        id,
+        ...body,
+        ...named(body),
+        durationMinutes: minutes(body.startTime, body.endTime),
+      };
       return reply(200, { studyLog: logs[index] });
     }
     await holdDelete;
@@ -85,6 +133,11 @@ const morning: Log = {
   durationMinutes: 90,
   memo: '선형대수 2장 행렬 곱',
   status: 'done',
+  textbookId: null,
+  textbookTitle: null,
+  contentId: null,
+  contentNumber: null,
+  contentTitle: null,
 };
 
 uiTest('recent logs show date, time range, computed duration, status and memo', async () => {
@@ -134,6 +187,8 @@ uiTest('entering a session previews its duration and saving adds it to the list'
       endTime: '00:50',
       memo: '미적분 3장',
       status: 'in_progress',
+      textbookId: null,
+      contentId: null,
     },
   });
   // The list is reloaded from the server after saving.
@@ -187,6 +242,8 @@ uiTest('editing a log fills the form and saves it with PUT', async () => {
       endTime: '11:00',
       memo: '선형대수 2장 행렬 곱',
       status: 'done',
+      textbookId: null,
+      contentId: null,
     },
   });
   assert.match(ui.text(ui.find((n) => n.type === 'li')[0]), /09:00–11:00.*2시간/);
@@ -346,7 +403,7 @@ uiTest('fields are locked while a save is in flight', async () => {
   const disabled = ui
     .find((n) => ['input', 'select', 'textarea'].includes(String(n.type)))
     .map((n) => n.props.disabled);
-  assert.deepEqual(disabled, [true, true, true, true, true]);
+  assert.deepEqual(disabled, [true, true, true, true, true, true, true]);
   release();
   await ui.settle();
   assert.match(ui.text(ui.find((n) => n.props.role === 'status')), /저장했습니다/);
@@ -362,6 +419,101 @@ uiTest('list buttons name the log they act on', async () => {
     '2026-10-21 09:00–10:30 기록 수정',
     '2026-10-21 09:00–10:30 기록 삭제',
   ]);
+});
+
+const optionsOf = (ui: ReturnType<typeof mount>, label: string) =>
+  ui
+    .find((n) => n.type === 'label' && ui.text(n).startsWith(label))
+    .flatMap((n) => ui.find((c) => c.type === 'option', n))
+    .map((n) => ui.text(n));
+
+uiTest('a log can be linked to a textbook and one of its chapters', async () => {
+  const api = fakeApi();
+  const ui = mount(api.fetch);
+  await ui.settle();
+  assert.deepEqual(optionsOf(ui, '교재'), ['선택 안 함', '선형대수', '미적분']);
+  // Without a textbook there is no chapter to pick.
+  const chapterSelect = () =>
+    ui
+      .find((n) => n.type === 'label' && ui.text(n).startsWith('장/절'))
+      .flatMap((n) => ui.find((c) => c.type === 'select', n))[0];
+  assert.equal(chapterSelect().props.disabled, true);
+  assert.deepEqual(optionsOf(ui, '장/절'), ['교재를 먼저 선택']);
+
+  await ui.fill('교재', '1');
+  assert.equal(chapterSelect().props.disabled, false);
+  // Sections are indented under their chapter.
+  assert.deepEqual(optionsOf(ui, '장/절'), ['선택 안 함', '1 벡터', '  1.2 내적']);
+  await ui.fill('장/절', '12');
+  await ui.fill('시작', '09:00');
+  await ui.fill('종료', '10:00');
+  await ui.submit();
+
+  const post = api.requests.find((request) => request.method === 'POST')?.body as {
+    textbookId: number;
+    contentId: number;
+  };
+  assert.deepEqual([post.textbookId, post.contentId], [1, 12]);
+  assert.match(ui.text(ui.find((n) => n.type === 'li')[0]), /선형대수 · 1\.2 내적/);
+  // The next entry keeps neither link.
+  assert.equal(ui.field('교재'), '');
+  assert.equal(ui.field('장/절'), '');
+});
+
+uiTest('picking another textbook clears the chapter of the previous one', async () => {
+  const api = fakeApi();
+  const ui = mount(api.fetch);
+  await ui.settle();
+  await ui.fill('교재', '1');
+  await ui.fill('장/절', '11');
+  await ui.fill('교재', '2');
+  assert.equal(ui.field('장/절'), '');
+  assert.deepEqual(optionsOf(ui, '장/절'), ['선택 안 함', '극한']);
+  await ui.fill('교재', '');
+  assert.equal(ui.field('장/절'), '');
+  assert.deepEqual(optionsOf(ui, '장/절'), ['교재를 먼저 선택']);
+});
+
+uiTest('editing a linked log fills in its textbook and chapter', async () => {
+  const linked: Log = {
+    ...morning,
+    textbookId: 1,
+    textbookTitle: '선형대수',
+    contentId: 11,
+    contentNumber: '1',
+    contentTitle: '벡터',
+  };
+  const api = fakeApi([linked]);
+  const ui = mount(api.fetch);
+  await ui.settle();
+  assert.match(ui.text(ui.find((n) => n.type === 'li')[0]), /선형대수 · 1 벡터/);
+  await ui.click('수정', ui.find((n) => n.type === 'li')[0]);
+  assert.equal(ui.field('교재'), 1);
+  assert.equal(ui.field('장/절'), 11);
+  await ui.fill('장/절', '');
+  await ui.submit();
+  const put = api.requests.find((request) => request.method === 'PUT');
+  assert.equal((put?.body as { textbookId: number }).textbookId, 1);
+  assert.equal((put?.body as { contentId: number | null }).contentId, null);
+  assert.match(ui.text(ui.find((n) => n.type === 'li')[0]), /선형대수/);
+  assert.doesNotMatch(ui.text(ui.find((n) => n.type === 'li')[0]), /벡터/);
+});
+
+uiTest('studied label shows the textbook and the chapter when there is one', () => {
+  const logic = loadFrontendModule<{
+    studiedLabel(log: Record<string, unknown>): string;
+  }>('study-logs.ts');
+  const none = { textbookTitle: null, contentNumber: null, contentTitle: null };
+  assert.equal(logic.studiedLabel(none), '');
+  assert.equal(logic.studiedLabel({ ...none, textbookTitle: '선형대수' }), '선형대수');
+  assert.equal(
+    logic.studiedLabel({ textbookTitle: '선형대수', contentNumber: '1.2', contentTitle: '내적' }),
+    '선형대수 · 1.2 내적',
+  );
+  assert.equal(
+    logic.studiedLabel({ textbookTitle: '미적분', contentNumber: '', contentTitle: '극한' }),
+    '미적분 · 극한',
+  );
 });
 
 uiTest('duration preview follows the API rule and formats hours and minutes', () => {

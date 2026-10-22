@@ -193,16 +193,23 @@ export function textbookContentRoutes(pool: Pool) {
     res.json({ content: rows[0] });
   });
 
-  // Removes the entry with everything below it and closes the gap among its siblings.
+  // Removes the entry with everything below it and closes the gap among its siblings. Study logs
+  // that point to the entry or anything below it block the deletion.
   router.delete('/:id', async (req, res) => {
     const textbookId = textbookOf(req.params);
     const id = contentIdParam.parse(req.params.id);
     const reply = await writeContents(pool, textbookId, async (client) => {
-      const { rows } = await client.query<{ parentId: number | null; position: number }>(
-        `DELETE FROM textbook_contents WHERE id = $1 AND textbook_id = $2
-         RETURNING parent_id::int AS "parentId", position`,
-        [id, textbookId],
-      );
+      let rows: { parentId: number | null; position: number }[];
+      try {
+        ({ rows } = await client.query<{ parentId: number | null; position: number }>(
+          `DELETE FROM textbook_contents WHERE id = $1 AND textbook_id = $2
+           RETURNING parent_id::int AS "parentId", position`,
+          [id, textbookId],
+        ));
+      } catch (error) {
+        if ((error as { code?: string }).code !== '23503') throw error;
+        return { status: 409, body: { error: '학습 기록이 연결된 목차는 삭제할 수 없습니다' } };
+      }
       if (rows.length === 0) return { status: 404, body: contentNotFound };
       await client.query(
         `UPDATE textbook_contents SET position = position - 1
