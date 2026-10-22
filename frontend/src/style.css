@@ -314,6 +314,25 @@ nav button.active {
 .content-label {
   overflow-wrap: anywhere;
 }
+.exercise-picker,
+.exercise-form {
+  margin-bottom: 12px;
+}
+.exercise-form .check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  align-self: end;
+  min-height: 38px;
+}
+.exercise-form .check input {
+  width: auto;
+}
+.exercise-body {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
 .log-actions {
   flex-wrap: wrap;
 }
@@ -365,6 +384,10 @@ nav button.active {
 .badge.done {
   background: var(--primary);
   color: var(--on-primary);
+}
+.badge.important {
+  background: var(--accent);
+  color: var(--primary);
 }
 .badge.stopped {
   background: var(--danger-bg);
