@@ -6,7 +6,8 @@ CREATE TABLE IF NOT EXISTS exercises (
   textbook_id bigint NOT NULL,
   content_id bigint NOT NULL,
   number text NOT NULL DEFAULT '' CHECK (length(number) <= 20),
-  body text NOT NULL CHECK (length(btrim(body)) >= 1 AND length(body) <= 20000),
+  -- At least one non-whitespace character (tabs and line breaks count as whitespace, as in the API).
+  body text NOT NULL CHECK (body ~ '\S' AND length(body) <= 20000),
   important boolean NOT NULL DEFAULT false,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now(),

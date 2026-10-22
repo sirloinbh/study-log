@@ -133,6 +133,12 @@ test(
           '23514',
         ],
         [
+          // Line breaks and tabs only: as blank to the database as to the API.
+          `INSERT INTO exercises (textbook_id, content_id, body) VALUES ($1, $2, $3)`,
+          [calculus, otherChapter, '\n\t \n'],
+          '23514',
+        ],
+        [
           `INSERT INTO exercises (textbook_id, content_id, number, body) VALUES ($1, $2, repeat('1', 21), 'x')`,
           [calculus, otherChapter],
           '23514',
