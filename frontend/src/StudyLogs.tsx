@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from 'react';
+import { requestJson, type RequestError } from './api';
 import {
   crossesMidnight,
   emptyForm,
   formatMinutes,
   previewMinutes,
-  requestJson,
   statusLabels,
-  type RequestError,
   type StudyLog,
   type StudyLogForm,
   type StudyStatus,
