@@ -54,11 +54,17 @@ export function loadFrontendModule<T>(file: string): T {
   })(file) as T;
 }
 
+type Hooks = { states: unknown[]; effectDeps: unknown[][]; cursor: number };
+const newHooks = (): Hooks => ({ states: [], effectDeps: [], cursor: 0 });
+
 // Minimal React stand-in: renders function components and supports useState/useEffect.
+// Hook state is kept per component and dropped when the component is no longer rendered,
+// so switching pages starts the new page fresh like an unmount would. Each component may
+// appear at most once in the tree.
 export function mount(fetchImpl: FetchImpl) {
-  const states: unknown[] = [];
-  const effectDeps: unknown[][] = [];
-  let cursor = 0;
+  let hooks = new Map<unknown, Hooks>();
+  let rendered = new Map<unknown, Hooks>();
+  let active = newHooks();
   let pending: (() => void)[] = [];
   let element: Node | undefined;
   const react = {
@@ -72,7 +78,8 @@ export function mount(fetchImpl: FetchImpl) {
       props: { ...(props ?? {}), children: children.flat() },
     }),
     useState(initial: unknown) {
-      const index = cursor++;
+      const { states } = active;
+      const index = active.cursor++;
       if (!(index in states))
         states[index] = typeof initial === 'function' ? (initial as () => unknown)() : initial;
       return [
@@ -84,7 +91,8 @@ export function mount(fetchImpl: FetchImpl) {
       ];
     },
     useEffect(effect: () => void, deps?: unknown[]) {
-      const index = cursor++;
+      const { effectDeps } = active;
+      const index = active.cursor++;
       const previous = effectDeps[index];
       if (!deps || !previous || deps.some((d, i) => d !== previous[i])) {
         effectDeps[index] = deps ?? [];
@@ -108,13 +116,19 @@ export function mount(fetchImpl: FetchImpl) {
     if (Array.isArray(node)) return node.map(resolve);
     if (!node || typeof node !== 'object') return node;
     const { type, props } = node as Node;
-    if (typeof type === 'function') return resolve(type(props));
+    if (typeof type === 'function') {
+      active = hooks.get(type) ?? newHooks();
+      active.cursor = 0;
+      rendered.set(type, active);
+      return resolve(type(props));
+    }
     return { type, props: { ...props, children: props.children.map(resolve) } };
   };
   let tree: unknown;
   const render = () => {
-    cursor = 0;
+    rendered = new Map();
     tree = resolve(element);
+    hooks = rendered;
   };
   const settle = async () => {
     for (let i = 0; i < 8; i++) {
