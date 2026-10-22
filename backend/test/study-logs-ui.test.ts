@@ -17,6 +17,9 @@ type Log = {
   contentId: number | null;
   contentNumber: string | null;
   contentTitle: string | null;
+  understanding: number | null;
+  difficulties: string;
+  goalAchieved: boolean | null;
 };
 
 // Textbooks and chapters the form can link a log to (served, not recorded).
@@ -138,6 +141,9 @@ const morning: Log = {
   contentId: null,
   contentNumber: null,
   contentTitle: null,
+  understanding: null,
+  difficulties: '',
+  goalAchieved: null,
 };
 
 uiTest('recent logs show date, time range, computed duration, status and memo', async () => {
@@ -189,6 +195,9 @@ uiTest('entering a session previews its duration and saving adds it to the list'
       status: 'in_progress',
       textbookId: null,
       contentId: null,
+      understanding: null,
+      difficulties: '',
+      goalAchieved: null,
     },
   });
   // The list is reloaded from the server after saving.
@@ -244,6 +253,9 @@ uiTest('editing a log fills the form and saves it with PUT', async () => {
       status: 'done',
       textbookId: null,
       contentId: null,
+      understanding: null,
+      difficulties: '',
+      goalAchieved: null,
     },
   });
   assert.match(ui.text(ui.find((n) => n.type === 'li')[0]), /09:00–11:00.*2시간/);
@@ -403,7 +415,7 @@ uiTest('fields are locked while a save is in flight', async () => {
   const disabled = ui
     .find((n) => ['input', 'select', 'textarea'].includes(String(n.type)))
     .map((n) => n.props.disabled);
-  assert.deepEqual(disabled, [true, true, true, true, true, true, true]);
+  assert.deepEqual(disabled, [true, true, true, true, true, true, true, true, true, true]);
   release();
   await ui.settle();
   assert.match(ui.text(ui.find((n) => n.props.role === 'status')), /저장했습니다/);
@@ -497,6 +509,75 @@ uiTest('editing a linked log fills in its textbook and chapter', async () => {
   assert.equal((put?.body as { contentId: number | null }).contentId, null);
   assert.match(ui.text(ui.find((n) => n.type === 'li')[0]), /선형대수/);
   assert.doesNotMatch(ui.text(ui.find((n) => n.type === 'li')[0]), /벡터/);
+});
+
+uiTest('the self-assessment is saved with the log and shown in the list', async () => {
+  const api = fakeApi();
+  const ui = mount(api.fetch);
+  await ui.settle();
+  assert.deepEqual(optionsOf(ui, '이해도'), [
+    '선택 안 함',
+    '1 · 거의 모름',
+    '2 · 조금 이해',
+    '3 · 보통',
+    '4 · 대부분 이해',
+    '5 · 완전히 이해',
+  ]);
+  await ui.fill('시작', '09:00');
+  await ui.fill('종료', '10:00');
+  await ui.fill('이해도', '4');
+  await ui.fill('목표 달성', 'false');
+  await ui.fill('어려웠던 부분', '고유값 분해');
+  await ui.submit();
+  const post = api.requests.find((request) => request.method === 'POST')?.body as Record<
+    string,
+    unknown
+  >;
+  assert.deepEqual(
+    [post.understanding, post.goalAchieved, post.difficulties],
+    [4, false, '고유값 분해'],
+  );
+  const item = ui.text(ui.find((n) => n.type === 'li')[0]);
+  assert.match(item, /이해도 4\/5 · 목표 미달성/);
+  assert.match(item, /어려웠던 부분: 고유값 분해/);
+  // The next entry starts unanswered.
+  assert.equal(ui.field('이해도'), '');
+  assert.equal(ui.field('목표 달성'), '');
+  assert.equal(ui.field('어려웠던 부분'), '');
+});
+
+uiTest('editing a log fills in and can clear its self-assessment', async () => {
+  const assessed: Log = { ...morning, understanding: 5, goalAchieved: true, difficulties: '없음' };
+  const api = fakeApi([assessed]);
+  const ui = mount(api.fetch);
+  await ui.settle();
+  assert.match(ui.text(ui.find((n) => n.type === 'li')[0]), /이해도 5\/5 · 목표 달성/);
+  await ui.click('수정', ui.find((n) => n.type === 'li')[0]);
+  assert.equal(ui.field('이해도'), 5);
+  assert.equal(ui.field('목표 달성'), 'true');
+  assert.equal(ui.field('어려웠던 부분'), '없음');
+  await ui.fill('이해도', '');
+  await ui.fill('목표 달성', '');
+  await ui.submit();
+  const put = api.requests.find((request) => request.method === 'PUT')?.body as Record<
+    string,
+    unknown
+  >;
+  assert.deepEqual([put.understanding, put.goalAchieved], [null, null]);
+  assert.doesNotMatch(ui.text(ui.find((n) => n.type === 'li')[0]), /이해도|목표/);
+});
+
+uiTest('reflection label joins whichever answers were given', () => {
+  const logic = loadFrontendModule<{
+    reflectionLabel(log: { understanding: number | null; goalAchieved: boolean | null }): string;
+  }>('study-logs.ts');
+  assert.equal(logic.reflectionLabel({ understanding: null, goalAchieved: null }), '');
+  assert.equal(logic.reflectionLabel({ understanding: 3, goalAchieved: null }), '이해도 3/5');
+  assert.equal(logic.reflectionLabel({ understanding: null, goalAchieved: false }), '목표 미달성');
+  assert.equal(
+    logic.reflectionLabel({ understanding: 1, goalAchieved: true }),
+    '이해도 1/5 · 목표 달성',
+  );
 });
 
 uiTest('studied label shows the textbook and the chapter when there is one', () => {

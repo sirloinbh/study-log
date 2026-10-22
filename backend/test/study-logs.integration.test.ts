@@ -47,6 +47,9 @@ test(
           contentId: null,
           contentNumber: null,
           contentTitle: null,
+          understanding: null,
+          difficulties: '',
+          goalAchieved: null,
         },
       );
 
