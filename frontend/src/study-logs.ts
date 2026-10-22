@@ -1,3 +1,5 @@
+import { contentLabel } from './textbook';
+
 export type StudyStatus = 'planned' | 'in_progress' | 'done' | 'stopped';
 
 export type StudyLog = {
@@ -8,9 +10,24 @@ export type StudyLog = {
   durationMinutes: number;
   memo: string;
   status: StudyStatus;
+  textbookId: number | null;
+  textbookTitle: string | null;
+  contentId: number | null;
+  contentNumber: string | null;
+  contentTitle: string | null;
 };
 
-export type StudyLogForm = Omit<StudyLog, 'id' | 'durationMinutes'>;
+export type StudyLogForm = Pick<
+  StudyLog,
+  'studyDate' | 'startTime' | 'endTime' | 'memo' | 'status' | 'textbookId' | 'contentId'
+>;
+
+// "선형대수 · 1.2 내적" for a log linked to a textbook (and chapter); empty otherwise.
+export function studiedLabel(log: StudyLog) {
+  if (log.textbookTitle === null) return '';
+  if (log.contentTitle === null) return log.textbookTitle;
+  return `${log.textbookTitle} · ${contentLabel({ number: log.contentNumber ?? '', title: log.contentTitle })}`;
+}
 
 export const statusLabels: Record<StudyStatus, string> = {
   planned: '계획',
@@ -25,6 +42,8 @@ export const emptyForm = (studyDate: string): StudyLogForm => ({
   endTime: '',
   memo: '',
   status: 'planned',
+  textbookId: null,
+  contentId: null,
 });
 
 const clock = /^([01]\d|2[0-3]):[0-5]\d$/;

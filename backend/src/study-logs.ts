@@ -33,6 +33,18 @@ const clock = (label: string) =>
     })
     .regex(/^([01]\d|2[0-3]):[0-5]\d$/, `${label}은 HH:MM 형식으로 입력하세요`);
 
+// Optional reference ids in the body: a positive integer within the id limit, or null.
+const referenceId = (label: string) => {
+  const message = `${label} ID가 올바르지 않습니다`;
+  return z
+    .number({ invalid_type_error: message })
+    .int(message)
+    .min(1, message)
+    .max(999_999_999_999_999, message)
+    .nullable()
+    .default(null);
+};
+
 const studyLogInput = z
   .object(
     {
@@ -48,6 +60,8 @@ const studyLogInput = z
           errorMap: () => ({ message: '상태는 계획, 진행 중, 완료, 중단 중에서 선택하세요' }),
         })
         .default('planned'),
+      textbookId: referenceId('교재'),
+      contentId: referenceId('목차'),
     },
     {
       required_error: '학습 기록 내용을 JSON 객체로 보내세요',
@@ -57,6 +71,10 @@ const studyLogInput = z
   .refine((log) => log.startTime !== log.endTime, {
     message: '종료 시각은 시작 시각과 달라야 합니다',
     path: ['endTime'],
+  })
+  .refine((log) => log.contentId === null || log.textbookId !== null, {
+    message: '목차를 고르려면 교재를 먼저 선택하세요',
+    path: ['contentId'],
   });
 
 // Only plain positive integers that stay exact in JS and fit the bigint column; "1e3", "0x10"
@@ -68,6 +86,11 @@ const idParam = z
 
 const listQuery = z.object({
   date: studyDate.optional(),
+  textbookId: z
+    .string()
+    .regex(/^[1-9]\d{0,14}$/, '교재 ID가 올바르지 않습니다')
+    .transform(Number)
+    .optional(),
   limit: z.coerce
     .number({ invalid_type_error: '조회 개수가 올바르지 않습니다' })
     .int('조회 개수가 올바르지 않습니다')
@@ -76,73 +99,117 @@ const listQuery = z.object({
     .default(20),
 });
 
-const columns = `id::int AS id, study_date AS "studyDate",
-  to_char(start_time, 'HH24:MI') AS "startTime", to_char(end_time, 'HH24:MI') AS "endTime",
-  duration_minutes AS "durationMinutes", memo, status`;
+// `source` is study_logs or a CTE of written rows; the textbook and chapter names come along so
+// the list can show them without more requests.
+const select = (source: string) => `SELECT l.id::int AS id, l.study_date AS "studyDate",
+  to_char(l.start_time, 'HH24:MI') AS "startTime", to_char(l.end_time, 'HH24:MI') AS "endTime",
+  l.duration_minutes AS "durationMinutes", l.memo, l.status,
+  l.textbook_id::int AS "textbookId", t.title AS "textbookTitle",
+  l.content_id::int AS "contentId", c.number AS "contentNumber", c.title AS "contentTitle"
+  FROM ${source} l
+  LEFT JOIN textbooks t ON t.id = l.textbook_id
+  LEFT JOIN textbook_contents c ON c.id = l.content_id`;
 
 const notFound = { error: '학습 기록을 찾을 수 없습니다' };
+
+// A reference that does not exist (or a chapter of another textbook) fails its foreign key.
+const missingReference: Record<string, string> = {
+  study_logs_textbook_fkey: '교재를 찾을 수 없습니다',
+  study_logs_content_fkey: '목차를 찾을 수 없습니다',
+};
+
+async function write<T>(run: () => Promise<T>) {
+  try {
+    return { ok: true as const, value: await run() };
+  } catch (error) {
+    const { code, constraint } = error as { code?: string; constraint?: string };
+    const message = code === '23503' && constraint ? missingReference[constraint] : undefined;
+    if (!message) throw error;
+    return { ok: false as const, error: message };
+  }
+}
 
 export function studyLogRoutes(pool: Pool) {
   const router = Router();
 
-  // With ?date the day's entries in time order; otherwise the most recent entries.
+  // With ?date the day's entries in time order; otherwise the most recent entries. ?textbookId
+  // narrows either list to one textbook.
   router.get('/', async (req, res) => {
-    const { date, limit } = listQuery.parse(req.query);
+    const { date, limit, textbookId } = listQuery.parse(req.query);
+    const params: unknown[] = [];
+    const where: string[] = [];
+    if (date) where.push(`l.study_date = $${params.push(date)}`);
+    if (textbookId !== undefined) where.push(`l.textbook_id = $${params.push(textbookId)}`);
+    const filter = where.length ? `WHERE ${where.join(' AND ')}` : '';
     const { rows } = date
-      ? await pool.query(
-          `SELECT ${columns} FROM study_logs WHERE study_date = $1 ORDER BY start_time, id`,
-          [date],
-        )
+      ? await pool.query(`${select('study_logs')} ${filter} ORDER BY l.start_time, l.id`, params)
       : await pool.query(
-          `SELECT ${columns} FROM study_logs ORDER BY study_date DESC, start_time DESC, id DESC LIMIT $1`,
-          [limit],
+          `${select('study_logs')} ${filter}
+           ORDER BY l.study_date DESC, l.start_time DESC, l.id DESC LIMIT $${params.push(limit)}`,
+          params,
         );
     res.json({ studyLogs: rows });
   });
 
   router.get('/:id', async (req, res) => {
     const id = idParam.parse(req.params.id);
-    const { rows } = await pool.query(`SELECT ${columns} FROM study_logs WHERE id = $1`, [id]);
+    const { rows } = await pool.query(`${select('study_logs')} WHERE l.id = $1`, [id]);
     if (rows.length === 0) return void res.status(404).json(notFound);
     res.json({ studyLog: rows[0] });
   });
 
   router.post('/', async (req, res) => {
     const log = studyLogInput.parse(req.body);
-    const { rows } = await pool.query(
-      `INSERT INTO study_logs (study_date, start_time, end_time, duration_minutes, memo, status)
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING ${columns}`,
-      [
-        log.studyDate,
-        log.startTime,
-        log.endTime,
-        studyMinutes(log.startTime, log.endTime),
-        log.memo,
-        log.status,
-      ],
+    const result = await write(() =>
+      pool.query(
+        `WITH saved AS (
+           INSERT INTO study_logs (study_date, start_time, end_time, duration_minutes, memo, status,
+             textbook_id, content_id)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING *)
+         ${select('saved')}`,
+        [
+          log.studyDate,
+          log.startTime,
+          log.endTime,
+          studyMinutes(log.startTime, log.endTime),
+          log.memo,
+          log.status,
+          log.textbookId,
+          log.contentId,
+        ],
+      ),
     );
-    res.status(201).json({ studyLog: rows[0] });
+    if (!result.ok) return void res.status(400).json({ error: result.error });
+    res.status(201).json({ studyLog: result.value.rows[0] });
   });
 
   router.put('/:id', async (req, res) => {
     const id = idParam.parse(req.params.id);
     const log = studyLogInput.parse(req.body);
-    const { rows } = await pool.query(
-      `UPDATE study_logs SET study_date = $2, start_time = $3, end_time = $4, duration_minutes = $5,
-         memo = $6, status = $7, updated_at = now()
-       WHERE id = $1 RETURNING ${columns}`,
-      [
-        id,
-        log.studyDate,
-        log.startTime,
-        log.endTime,
-        studyMinutes(log.startTime, log.endTime),
-        log.memo,
-        log.status,
-      ],
+    const result = await write(() =>
+      pool.query(
+        `WITH saved AS (
+           UPDATE study_logs SET study_date = $2, start_time = $3, end_time = $4,
+             duration_minutes = $5, memo = $6, status = $7, textbook_id = $8, content_id = $9,
+             updated_at = now()
+           WHERE id = $1 RETURNING *)
+         ${select('saved')}`,
+        [
+          id,
+          log.studyDate,
+          log.startTime,
+          log.endTime,
+          studyMinutes(log.startTime, log.endTime),
+          log.memo,
+          log.status,
+          log.textbookId,
+          log.contentId,
+        ],
+      ),
     );
-    if (rows.length === 0) return void res.status(404).json(notFound);
-    res.json({ studyLog: rows[0] });
+    if (!result.ok) return void res.status(400).json({ error: result.error });
+    if (result.value.rows.length === 0) return void res.status(404).json(notFound);
+    res.json({ studyLog: result.value.rows[0] });
   });
 
   router.delete('/:id', async (req, res) => {

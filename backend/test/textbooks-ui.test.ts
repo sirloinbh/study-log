@@ -67,9 +67,14 @@ const linear: Book = {
 const calculus: Book = { id: 2, title: '미적분학', author: '', edition: '' };
 
 // Opens the app on the 교재 page.
-async function open(api: { fetch: Parameters<typeof mount>[0] }, globals = {}) {
+async function open(
+  api: { fetch: Parameters<typeof mount>[0]; requests: unknown[] },
+  globals = {},
+) {
   const ui = mount(api.fetch, globals);
   await ui.settle();
+  // The study log page that opens first also loads textbooks; count only this page's requests.
+  api.requests.length = 0;
   await ui.click('교재');
   return ui;
 }

@@ -74,10 +74,17 @@ export function textbookRoutes(pool: Pool) {
     res.json({ textbook: rows[0] });
   });
 
-  // Contents and exercises cascade; linked study logs will block deletion once #14 adds them.
+  // Contents and exercises cascade; study logs that point to the textbook or one of its chapters
+  // block the deletion (foreign keys with RESTRICT).
   router.delete('/:id', async (req, res) => {
     const id = idParam.parse(req.params.id);
-    const { rowCount } = await pool.query('DELETE FROM textbooks WHERE id = $1', [id]);
+    let rowCount: number | null;
+    try {
+      ({ rowCount } = await pool.query('DELETE FROM textbooks WHERE id = $1', [id]));
+    } catch (error) {
+      if ((error as { code?: string }).code !== '23503') throw error;
+      return void res.status(409).json({ error: '학습 기록이 연결된 교재는 삭제할 수 없습니다' });
+    }
     if (!rowCount) return void res.status(404).json(notFound);
     res.status(204).end();
   });
