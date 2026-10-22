@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { requestJson, type RequestError } from './api';
+import { Exercises } from './Exercises';
 import { TextbookContents } from './TextbookContents';
 import {
   emptyTextbookForm,
   limits,
   textbookMeta,
+  type ContentNode,
   type Textbook,
   type TextbookForm,
 } from './textbook';
@@ -27,6 +29,12 @@ export function Textbooks() {
   const [selectedId, setSelectedId] = useState<number | undefined>(undefined);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [reload, setReload] = useState(0);
+  // The contents tree the contents card shows, shared with the exercises card.
+  const [contents, setContents] = useState<{
+    textbookId: number;
+    tree?: ContentNode[];
+    failed: boolean;
+  }>();
 
   useEffect(() => {
     // A slower, older response must not overwrite the list a newer request returned.
@@ -284,7 +292,17 @@ export function Textbooks() {
       </div>
       {selected && (
         <section className="card" aria-label={`${selected.title} 목차`}>
-          <TextbookContents key={selected.id} textbookId={selected.id} />
+          <TextbookContents key={selected.id} textbookId={selected.id} onTree={setContents} />
+        </section>
+      )}
+      {selected && (
+        <section className="card" aria-label={`${selected.title} 연습문제`}>
+          <Exercises
+            key={selected.id}
+            textbook={selected}
+            tree={contents?.textbookId === selected.id ? contents.tree : undefined}
+            treeFailed={contents?.textbookId === selected.id && contents.failed}
+          />
         </section>
       )}
     </div>
