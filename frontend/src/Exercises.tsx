@@ -13,13 +13,21 @@ import { contentOptions, type ContentNode, type Textbook } from './textbook';
 
 type Notice = { kind: 'status' | 'alert'; text: string; contentId: number } | undefined;
 
-// The open editor: a new exercise (`id` undefined) or an edit of `id`. `round` counts the adds, so
-// the body takes focus again for the next exercise.
-type Editor = { contentId: number; id?: number; round: number; form: ExerciseForm };
+// The open editor: a new exercise (`id` undefined) or an edit of `id`.
+type Editor = { contentId: number; id?: number; form: ExerciseForm };
 
 // Exercises of one chapter or section, picked from the textbook's contents. State is tagged with
 // its chapter, so picking another one never shows or edits the previous chapter's exercises.
-export function Exercises({ textbook, tree }: { textbook: Textbook; tree?: ContentNode[] }) {
+// `treeFailed` means the contents could not be loaded, so there is nothing to pick from.
+export function Exercises({
+  textbook,
+  tree,
+  treeFailed,
+}: {
+  textbook: Textbook;
+  tree?: ContentNode[];
+  treeFailed?: boolean;
+}) {
   const [chosen, setChosen] = useState<number>();
   const [loaded, setLoaded] = useState<{ contentId: number; exercises: Exercise[] }>();
   const [loadError, setLoadError] = useState<{ contentId: number; message: string }>();
@@ -28,6 +36,8 @@ export function Exercises({ textbook, tree }: { textbook: Textbook; tree?: Conte
   const [notice, setNotice] = useState<Notice>(undefined);
   // One request at a time, including the reload after a change, like the contents card.
   const [busy, setBusy] = useState(false);
+  // Set when the editor opens and after each add; the body takes focus once the field is enabled.
+  const [wantFocus, setWantFocus] = useState(false);
 
   const options = tree ? contentOptions(tree) : [];
   // The picked chapter, or the first one when nothing is picked or it was deleted.
@@ -63,12 +73,13 @@ export function Exercises({ textbook, tree }: { textbook: Textbook; tree?: Conte
   const deletingId = mine(deleting)?.id;
   const shown = mine(notice);
 
-  // Focuses the body when the editor opens and after each add. Not `autoFocus`: after an add the
-  // field is still disabled until the reload finishes, and a disabled field cannot take focus.
-  const focusKey = open && !busy ? `${open.id ?? 'new'}-${open.round}` : undefined;
+  // Not `autoFocus`: after an add the field is still disabled until the reload finishes, and a
+  // disabled field cannot take focus. Other changes (a delete) leave focus where it is.
   useEffect(() => {
-    if (focusKey) document.getElementById('exercise-body')?.focus?.();
-  }, [focusKey]);
+    if (!wantFocus || busy) return;
+    setWantFocus(false);
+    document.getElementById('exercise-body')?.focus?.();
+  }, [wantFocus, busy]);
 
   const say = (kind: 'status' | 'alert', text: string) =>
     contentId !== undefined && setNotice({ kind, text, contentId });
@@ -110,7 +121,8 @@ export function Exercises({ textbook, tree }: { textbook: Textbook; tree?: Conte
     if (contentId === undefined) return;
     setDeleting(undefined);
     setNotice(undefined);
-    setEditor({ contentId, round: 0, form: emptyExerciseForm() });
+    setEditor({ contentId, form: emptyExerciseForm() });
+    setWantFocus(true);
   };
 
   const startEdit = (exercise: Exercise) => {
@@ -119,9 +131,9 @@ export function Exercises({ textbook, tree }: { textbook: Textbook; tree?: Conte
     setEditor({
       contentId: exercise.contentId,
       id: exercise.id,
-      round: 0,
       form: { number: exercise.number, body: exercise.body, important: exercise.important },
     });
+    setWantFocus(true);
   };
 
   const save = (event: { preventDefault(): void }) => {
@@ -132,7 +144,8 @@ export function Exercises({ textbook, tree }: { textbook: Textbook; tree?: Conte
         await requestJson(url, { method: 'POST', body: open.form });
         say('status', '추가했습니다');
         // Stays open, empty, for typing the next exercise.
-        setEditor({ ...open, round: open.round + 1, form: emptyExerciseForm() });
+        setEditor({ ...open, form: emptyExerciseForm() });
+        setWantFocus(true);
       } else {
         await requestJson(`/api/exercises/${open.id}`, { method: 'PUT', body: open.form });
         say('status', '수정했습니다');
@@ -195,7 +208,9 @@ export function Exercises({ textbook, tree }: { textbook: Textbook; tree?: Conte
           문제 추가
         </button>
       </div>
-      {tree === undefined ? (
+      {treeFailed ? (
+        <p className="status">목차를 불러오지 못해 단원을 고를 수 없습니다</p>
+      ) : tree === undefined ? (
         <p className="status">목차를 불러오는 중…</p>
       ) : options.length === 0 ? (
         <p className="status">목차를 먼저 추가하면 장·절별로 문제를 입력할 수 있습니다</p>
@@ -293,7 +308,7 @@ export function Exercises({ textbook, tree }: { textbook: Textbook; tree?: Conte
                 <li key={exercise.id} className={open?.id === exercise.id ? 'editing' : ''}>
                   <div className="log-head">
                     <span className="log-date">{label}</span>
-                    {exercise.important && <span className="badge done">중요</span>}
+                    {exercise.important && <span className="badge important">중요</span>}
                   </div>
                   <p className="exercise-body">{exercise.body}</p>
                   <div className="log-actions">

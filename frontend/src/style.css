@@ -385,6 +385,10 @@ nav button.active {
   background: var(--primary);
   color: var(--on-primary);
 }
+.badge.important {
+  background: var(--accent);
+  color: var(--primary);
+}
 .badge.stopped {
   background: var(--danger-bg);
 }
