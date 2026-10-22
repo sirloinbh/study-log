@@ -15,7 +15,7 @@ Copy-Item .env.example .env
 docker compose up --build -d
 ```
 
-접속: http://localhost:8092 . `.env`의 비밀번호를 바꾼 뒤 실행하세요. 데이터는 `study-log-data` 볼륨에 저장되며 `docker compose down -v`는 데이터를 삭제합니다.
+접속: http://localhost:8102 . `.env`의 비밀번호를 바꾼 뒤 실행하세요. 데이터는 `study-log-data` 볼륨에 저장되며 `docker compose down -v`는 데이터를 삭제합니다.
 
 개발 실행:
 
@@ -24,7 +24,7 @@ docker compose up -d db
 npm run dev
 ```
 
-Vite http://localhost:5172, API http://localhost:3012/api/health, 호스트 DB 포트 55442.
+Vite http://localhost:5202, API http://localhost:3102/api/health, 호스트 DB 포트 15402.
 
 ## 검증
 
