@@ -42,6 +42,11 @@ test(
           durationMinutes: 120,
           memo: '선형대수 2장',
           status: 'done',
+          textbookId: null,
+          textbookTitle: null,
+          contentId: null,
+          contentNumber: null,
+          contentTitle: null,
         },
       );
 
