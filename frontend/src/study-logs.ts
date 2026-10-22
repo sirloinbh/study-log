@@ -15,12 +15,43 @@ export type StudyLog = {
   contentId: number | null;
   contentNumber: string | null;
   contentTitle: string | null;
+  understanding: number | null;
+  difficulties: string;
+  goalAchieved: boolean | null;
 };
 
 export type StudyLogForm = Pick<
   StudyLog,
-  'studyDate' | 'startTime' | 'endTime' | 'memo' | 'status' | 'textbookId' | 'contentId'
+  | 'studyDate'
+  | 'startTime'
+  | 'endTime'
+  | 'memo'
+  | 'status'
+  | 'textbookId'
+  | 'contentId'
+  | 'understanding'
+  | 'difficulties'
+  | 'goalAchieved'
 >;
+
+// Self-assessed understanding, 1 (low) to 5 (high).
+export const understandingLabels: Record<number, string> = {
+  1: '1 · 거의 모름',
+  2: '2 · 조금 이해',
+  3: '3 · 보통',
+  4: '4 · 대부분 이해',
+  5: '5 · 완전히 이해',
+};
+
+// "이해도 4/5 · 목표 달성" from whichever answers were given; empty when none.
+export function reflectionLabel(log: Pick<StudyLog, 'understanding' | 'goalAchieved'>) {
+  return [
+    log.understanding === null ? '' : `이해도 ${log.understanding}/5`,
+    log.goalAchieved === null ? '' : log.goalAchieved ? '목표 달성' : '목표 미달성',
+  ]
+    .filter(Boolean)
+    .join(' · ');
+}
 
 // "선형대수 · 1.2 내적" for a log linked to a textbook (and chapter); empty otherwise.
 export function studiedLabel(log: StudyLog) {
@@ -44,6 +75,9 @@ export const emptyForm = (studyDate: string): StudyLogForm => ({
   status: 'planned',
   textbookId: null,
   contentId: null,
+  understanding: null,
+  difficulties: '',
+  goalAchieved: null,
 });
 
 const clock = /^([01]\d|2[0-3]):[0-5]\d$/;
