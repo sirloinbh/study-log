@@ -184,8 +184,9 @@ export function mount(fetchImpl: FetchImpl, globals: Record<string, unknown> = {
     find((n) => n.type === 'label' && text(n).startsWith(label)).flatMap((n) =>
       find((c) => ['input', 'select', 'textarea'].includes(String(c.type)), n),
     )[0]?.props.value;
-  const submit = async () => {
-    const [form] = find((n) => n.type === 'form');
+  // Submits the first form, or the first form inside `scope` when a page has several.
+  const submit = async (...scope: unknown[]) => {
+    const [form] = find((n) => n.type === 'form', ...scope);
     assert.ok(form, 'form');
     void (form.props.onSubmit as (e: { preventDefault(): void }) => unknown)({
       preventDefault() {},
