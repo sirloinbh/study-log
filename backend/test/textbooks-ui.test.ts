@@ -32,6 +32,8 @@ function fakeApi(initial: Book[] = [], options: Options = {}) {
     const body = init.body === undefined ? undefined : JSON.parse(init.body);
     if (path === '/api/health') return reply(200, { ok: true, today: '2026-10-22' });
     if (path.startsWith('/api/study-logs')) return reply(200, { studyLogs: [] });
+    // The selected textbook's contents card (tested in textbook-contents-ui.test.ts).
+    if (path.endsWith('/contents')) return reply(200, { contents: [] });
     requests.push({ method, path, body });
     if (reject && method !== 'GET') return reply(reject.status, { error: reject.error });
     if (method === 'GET') {
