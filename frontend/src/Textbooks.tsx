@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { requestJson, type RequestError } from './api';
+import { TextbookContents } from './TextbookContents';
 import {
   emptyTextbookForm,
   limits,
@@ -281,6 +282,11 @@ export function Textbooks() {
           )}
         </section>
       </div>
+      {selected && (
+        <section className="card" aria-label={`${selected.title} 목차`}>
+          <TextbookContents key={selected.id} textbookId={selected.id} />
+        </section>
+      )}
     </div>
   );
 }
