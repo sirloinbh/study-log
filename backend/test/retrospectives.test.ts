@@ -45,6 +45,10 @@ test('invalid periods and bodies are Korean 400s before touching the DB', async 
     ['GET', '/api/retrospectives/period?kind=yearly', undefined, /주간 또는 월간/],
     ['GET', '/api/retrospectives/period?date=2026-13-01', undefined, /존재하지 않는 날짜/],
     ['GET', '/api/retrospectives?limit=0', undefined, /1 이상/],
+    // A week around these would leave the years the database stores: a 400, not a 500.
+    ['GET', '/api/retrospectives/period?date=0001-01-01', undefined, /1900년부터 9998년까지/],
+    ['GET', '/api/retrospectives/period?date=9999-12-31', undefined, /1900년부터 9998년까지/],
+    ['PUT', '/api/retrospectives/monthly/9999-12-01', { body: '회고' }, /1900년부터 9998년까지/],
   ];
   await withApi(untouchedPool, async (call) => {
     for (const [method, path, body, message] of cases) {

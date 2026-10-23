@@ -5,6 +5,7 @@ import {
   kindLabels,
   periodTitle,
   retrospectiveLimit,
+  shiftDays,
   shiftPeriod,
   type Retrospective,
   type RetrospectiveKind,
@@ -75,6 +76,15 @@ export function Retrospectives({ today }: { today: string }) {
   const text = draft && draft.key === draftKey ? draft.text : (period?.retrospective?.body ?? '');
   const thisPeriod = period && today >= period.from && today <= period.to;
 
+  // The date to open in the other kind: a week's Wednesday, so the month is the one most of the
+  // week falls in; for a month, today when it is this month, otherwise its 1st.
+  const switchDate = (shown: RetrospectivePeriod) =>
+    shown.kind === 'weekly'
+      ? shiftDays(shown.from, 3)
+      : today >= shown.from && today <= shown.to
+        ? today
+        : shown.from;
+
   const go = (nextKind: RetrospectiveKind, nextDate: string) => {
     setKind(nextKind);
     setDate(nextDate);
@@ -99,10 +109,12 @@ export function Retrospectives({ today }: { today: string }) {
     event.preventDefault();
     if (!period) return;
     void change(async () => {
-      await requestJson(`/api/retrospectives/${period.kind}/${period.from}`, {
-        method: 'PUT',
-        body: { body: text },
-      });
+      const data = await requestJson<{ retrospective: Retrospective }>(
+        `/api/retrospectives/${period.kind}/${period.from}`,
+        { method: 'PUT', body: { body: text } },
+      );
+      // Show the saved text at once, not the old one until the reload comes back.
+      setPeriods((all) => ({ ...all, [key]: { ...period, retrospective: data.retrospective } }));
       setDraft(undefined);
       setNotice({ kind: 'status', text: '저장했습니다' });
     });
@@ -120,6 +132,7 @@ export function Retrospectives({ today }: { today: string }) {
         throw failure;
       }
       setWantFocus('retro-heading');
+      setPeriods((all) => ({ ...all, [key]: { ...period, retrospective: null } }));
       setDraft(undefined);
       setNotice({ kind: 'status', text: '삭제했습니다' });
     });
@@ -136,7 +149,7 @@ export function Retrospectives({ today }: { today: string }) {
                 className={value === kind ? 'primary' : 'secondary'}
                 aria-pressed={value === kind}
                 disabled={busy}
-                onClick={() => go(value, period?.from ?? date)}
+                onClick={() => go(value, period ? switchDate(period) : date)}
               >
                 {kindLabels[value]}
               </button>
@@ -173,14 +186,18 @@ export function Retrospectives({ today }: { today: string }) {
             </button>
           </div>
         </div>
-        {error ? (
+        {/* A failed reload keeps the period already shown (and any typing) under the error. */}
+        {error && (
           <p role="alert" className="error">
             회고를 불러오지 못했습니다: {error}
           </p>
-        ) : !period ? (
-          <p role="status" className="status">
-            불러오는 중…
-          </p>
+        )}
+        {!period ? (
+          !error && (
+            <p role="status" className="status">
+              불러오는 중…
+            </p>
+          )
         ) : (
           <>
             <h2 id="retro-heading" tabIndex={-1}>
