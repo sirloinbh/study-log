@@ -41,8 +41,13 @@ type Options = {
 };
 
 // In-memory exercises API with the textbook list and contents; records exercise requests.
-function fakeApi(initial: Exercise[] = [], options: Options = {}) {
+function fakeApi(
+  initial: Exercise[] = [],
+  options: Options = {},
+  initialAnswers: Record<number, string> = {},
+) {
   const rows = [...initial];
+  const answers = new Map(Object.entries(initialAnswers).map(([id, body]) => [Number(id), body]));
   const requests: { method: string; path: string; body?: unknown }[] = [];
   let nextId = 100;
   const reply = (status: number, body?: unknown) => ({
@@ -76,6 +81,19 @@ function fakeApi(initial: Exercise[] = [], options: Options = {}) {
       rows.push(row);
       return reply(201, { exercise: row });
     }
+    const ofAnswer = path.match(/^\/api\/exercises\/(\d+)\/answer$/);
+    if (ofAnswer) {
+      const id = Number(ofAnswer[1]);
+      if (!rows.some((r) => r.id === id))
+        return reply(404, { error: '연습문제를 찾을 수 없습니다' });
+      if (method === 'PUT') answers.set(id, body.body);
+      if (method === 'DELETE') {
+        if (!answers.delete(id)) return reply(404, { error: '정답을 찾을 수 없습니다' });
+        return reply(204);
+      }
+      const saved = answers.get(id);
+      return reply(200, { answer: saved === undefined ? null : { exerciseId: id, body: saved } });
+    }
     const one = path.match(/^\/api\/exercises\/(\d+)$/);
     assert.ok(one, 'unexpected request ' + path);
     const index = rows.findIndex((r) => r.id === Number(one[1]));
@@ -87,7 +105,7 @@ function fakeApi(initial: Exercise[] = [], options: Options = {}) {
     rows.splice(index, 1);
     return reply(204);
   };
-  return { fetch, requests, rows };
+  return { fetch, requests, rows, answers };
 }
 
 const problems: Exercise[] = [
@@ -377,7 +395,12 @@ uiTest('exercise buttons name the exercise they act on', async () => {
   const labels = ui
     .find((n) => n.type === 'button' && typeof n.props['aria-label'] === 'string', card(ui))
     .map((n) => n.props['aria-label']);
-  assert.deepEqual(labels, ['1번째 문제 질문 복사', '1번째 문제 수정', '1번째 문제 삭제']);
+  assert.deepEqual(labels, [
+    '1번째 문제 질문 복사',
+    '1번째 문제 정답 보기',
+    '1번째 문제 수정',
+    '1번째 문제 삭제',
+  ]);
 });
 
 uiTest('the question leaves out a blank number and blank lines around the body', () => {
@@ -406,4 +429,108 @@ uiTest('the question leaves out a blank number and blank lines around the body',
     [10, 11],
   );
   assert.equal(logic.contentPath(contents[1], 99), undefined);
+});
+
+const answerPanel = (ui: Ui) => ui.find((n) => n.props.className === 'exercise-answer', card(ui));
+
+uiTest('an answer is typed in from the problem and shown with its line breaks', async () => {
+  const api = fakeApi(problems);
+  const ui = await openBook(api);
+  assert.equal(answerPanel(ui).length, 0);
+  await ui.click('정답 보기', item(ui, '문제 3'));
+  assert.match(ui.text(answerPanel(ui)[0]), /입력한 정답이 없습니다/);
+  await ui.click('정답 입력', item(ui, '문제 3'));
+  await ui.fill('정답', 'u = (1,\n  2)');
+  await ui.submit(item(ui, '문제 3'));
+  assert.deepEqual(
+    api.requests.find((r) => r.method === 'PUT'),
+    { method: 'PUT', path: '/api/exercises/1/answer', body: { body: 'u = (1,\n  2)' } },
+  );
+  const [panel] = answerPanel(ui);
+  assert.equal(
+    ui.text(ui.find((n) => n.props.className === 'exercise-body', panel)[0]),
+    'u = (1,\n  2)',
+  );
+  assert.equal(ui.find((n) => n.type === 'form', panel).length, 0);
+  assert.match(ui.text(card(ui)), /정답을 저장했습니다/);
+});
+
+uiTest('a saved answer is edited in place and saving it blank deletes it', async () => {
+  const api = fakeApi(problems, {}, { 1: '정답은 3' });
+  const ui = await openBook(api);
+  await ui.click('정답 보기', item(ui, '문제 3'));
+  assert.match(ui.text(answerPanel(ui)[0]), /정답은 3/);
+  await ui.click('정답 수정', item(ui, '문제 3'));
+  assert.equal(ui.field('정답'), '정답은 3');
+  // Cancelling keeps the saved answer.
+  await ui.click('취소', answerPanel(ui)[0]);
+  assert.match(ui.text(answerPanel(ui)[0]), /정답은 3/);
+  await ui.click('정답 수정', item(ui, '문제 3'));
+  await ui.fill('정답', '  \n ');
+  await ui.submit(item(ui, '문제 3'));
+  assert.deepEqual(
+    api.requests.filter((r) => r.method !== 'GET').map((r) => [r.method, r.path]),
+    [['DELETE', '/api/exercises/1/answer']],
+  );
+  assert.equal(api.answers.size, 0);
+  assert.match(ui.text(answerPanel(ui)[0]), /입력한 정답이 없습니다/);
+  assert.match(ui.text(card(ui)), /정답을 지웠습니다/);
+});
+
+uiTest('one answer is open at a time and picking a chapter closes it', async () => {
+  const api = fakeApi(problems, {}, { 1: '첫 정답', 2: '둘째 정답' });
+  const ui = await openBook(api);
+  await ui.click('정답 보기', item(ui, '문제 3'));
+  await ui.click('정답 보기', item(ui, '2번째 문제'));
+  assert.equal(answerPanel(ui).length, 1);
+  assert.match(ui.text(item(ui, '2번째 문제')), /둘째 정답/);
+  assert.doesNotMatch(ui.text(item(ui, '문제 3')), /첫 정답/);
+  const [toggle] = ui.find(
+    (n) => n.props['aria-label'] === '2번째 문제 정답 닫기',
+    item(ui, '2번째 문제'),
+  );
+  assert.equal(toggle.props['aria-expanded'], true);
+  await ui.click('정답 닫기', item(ui, '2번째 문제'));
+  assert.equal(answerPanel(ui).length, 0);
+  // Another chapter closes it; coming back and opening it loads the answer saved since.
+  await ui.click('정답 보기', item(ui, '2번째 문제'));
+  await ui.fill('단원', '11');
+  assert.equal(answerPanel(ui).length, 0);
+  api.answers.set(2, '다른 곳에서 고친 정답');
+  await ui.fill('단원', '10');
+  assert.equal(answerPanel(ui).length, 0);
+  await ui.click('정답 보기', item(ui, '2번째 문제'));
+  assert.match(ui.text(item(ui, '2번째 문제')), /다른 곳에서 고친 정답/);
+});
+
+uiTest('clearing an answer already deleted elsewhere counts as cleared', async () => {
+  const api = fakeApi(problems, {}, { 1: '정답은 3' });
+  const ui = await openBook(api);
+  await ui.click('정답 보기', item(ui, '문제 3'));
+  await ui.click('정답 수정', item(ui, '문제 3'));
+  api.answers.delete(1);
+  await ui.fill('정답', '');
+  await ui.submit(item(ui, '문제 3'));
+  assert.equal(alertText(ui), '');
+  assert.match(ui.text(answerPanel(ui)[0]), /입력한 정답이 없습니다/);
+  assert.match(ui.text(card(ui)), /정답을 지웠습니다/);
+});
+
+uiTest('a failed answer load or save is reported in the card', async () => {
+  const options: Options = {};
+  const api = fakeApi(problems, options);
+  const ui = await openBook(api);
+  options.reject = { method: 'GET', status: 500, error: '서버 오류가 발생했습니다' };
+  await ui.click('정답 보기', item(ui, '문제 3'));
+  assert.match(ui.text(answerPanel(ui)[0]), /정답을 불러오지 못했습니다: 서버 오류가 발생했습니다/);
+  options.reject = undefined;
+  await ui.click('정답 닫기', item(ui, '문제 3'));
+  await ui.click('정답 보기', item(ui, '문제 3'));
+  await ui.click('정답 입력', item(ui, '문제 3'));
+  await ui.fill('정답', '답');
+  // Deleted elsewhere before saving: the message shows and the exercise leaves the list.
+  api.rows.splice(0, 1);
+  await ui.submit(item(ui, '문제 3'));
+  assert.match(alertText(ui), /연습문제를 찾을 수 없습니다/);
+  assert.deepEqual(listed(ui), ['1번째 문제:증명하라.']);
 });

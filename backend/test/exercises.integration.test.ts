@@ -157,3 +157,92 @@ test(
     });
   },
 );
+
+test(
+  'an exercise has at most one answer, replaced on save and gone with the exercise',
+  { skip: !url },
+  async (t) => {
+    const pool = new Pool({ connectionString: url });
+    const prefix = '[통합테스트 정답]';
+    const cleanup = () => pool.query('DELETE FROM textbooks WHERE title LIKE $1', [`${prefix}%`]);
+    await cleanup();
+    t.after(async () => {
+      await cleanup();
+      await pool.end();
+    });
+
+    await withApi(pool, async (call) => {
+      const book = (
+        (await call('/api/textbooks', { method: 'POST', body: { title: `${prefix} 선형대수` } }))
+          .data.textbook as { id: number }
+      ).id;
+      const chapter = (
+        (await call(`/api/textbooks/${book}/contents`, { method: 'POST', body: { title: '행렬' } }))
+          .data.content as { id: number }
+      ).id;
+      const addExercise = async (body: string) =>
+        (
+          (
+            await call(`/api/textbooks/${book}/contents/${chapter}/exercises`, {
+              method: 'POST',
+              body: { body },
+            })
+          ).data.exercise as Exercise
+        ).id;
+      const first = await addExercise('역행렬을 구하시오');
+      const second = await addExercise('행렬식을 구하시오');
+      const answer = (id: number) => `/api/exercises/${id}/answer`;
+
+      assert.deepEqual((await call(answer(first))).data, { answer: null });
+
+      const body = 'A⁻¹ = [[-2, 1],\n        [1.5, -0.5]]';
+      const saved = await call(answer(first), { method: 'PUT', body: { body } });
+      assert.equal(saved.status, 200);
+      assert.deepEqual(saved.data, { answer: { exerciseId: first, body } });
+      assert.deepEqual((await call(answer(first))).data, { answer: { exerciseId: first, body } });
+
+      // Saving again replaces the answer instead of adding a second one.
+      await call(answer(first), { method: 'PUT', body: { body: '고친 정답' } });
+      const rows = await pool.query('SELECT body FROM exercise_answers WHERE exercise_id = $1', [
+        first,
+      ]);
+      assert.deepEqual(rows.rows, [{ body: '고친 정답' }]);
+      // The other exercise is untouched.
+      assert.deepEqual((await call(answer(second))).data, { answer: null });
+
+      assert.equal((await call(answer(first), { method: 'DELETE' })).status, 204);
+      assert.deepEqual((await call(answer(first))).data, { answer: null });
+      const again = await call(answer(first), { method: 'DELETE' });
+      assert.equal(again.status, 404);
+      assert.equal(again.data.error, '정답을 찾을 수 없습니다');
+
+      // A missing exercise has no answer to read or save.
+      const missing = 999999999;
+      assert.equal((await call(answer(missing))).status, 404);
+      const orphan = await call(answer(missing), { method: 'PUT', body: { body: '답' } });
+      assert.equal(orphan.status, 404);
+      assert.equal(orphan.data.error, '연습문제를 찾을 수 없습니다');
+
+      // The database refuses a blank answer and a second answer for the same exercise.
+      await call(answer(second), { method: 'PUT', body: { body: '정답' } });
+      for (const [sql, params, code] of [
+        [
+          `INSERT INTO exercise_answers (exercise_id, body) VALUES ($1, $2)`,
+          [first, '\n\t '],
+          '23514',
+        ],
+        [`INSERT INTO exercise_answers (exercise_id, body) VALUES ($1, 'x')`, [second], '23505'],
+      ] as const) {
+        await assert.rejects(pool.query(sql, [...params]), { code }, sql.slice(0, 60));
+      }
+
+      // Deleting the exercise deletes its answer.
+      assert.equal((await call(`/api/exercises/${second}`, { method: 'DELETE' })).status, 204);
+      const left = await pool.query(
+        'SELECT count(*)::int AS n FROM exercise_answers WHERE exercise_id = $1',
+        [second],
+      );
+      assert.equal(left.rows[0].n, 0);
+    });
+  },
+);
