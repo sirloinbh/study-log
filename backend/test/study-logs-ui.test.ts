@@ -166,6 +166,33 @@ uiTest('recent logs show date, time range, computed duration, status and memo', 
   ]);
 });
 
+uiTest(
+  'a memo is written in Markdown with a preview and shown rendered in the list (#16)',
+  async () => {
+    const api = fakeApi([{ ...morning, memo: '# 행렬\n- 곱셈' }]);
+    const ui = mount(api.fetch);
+    await ui.settle();
+    // The list hands the memo to the Markdown renderer, cut to a few lines.
+    const [item] = ui.find((n) => n.type === 'li');
+    const [listed] = ui.find((n) => n.type === 'markdown', item);
+    assert.deepEqual(listed.props.children, ['# 행렬\n- 곱셈']);
+    assert.ok(ui.find((n) => n.props.className === 'memo clamp', item).length);
+
+    const preview = () => ui.find((n) => n.props['aria-label'] === '메모 미리보기');
+    assert.equal(preview().length, 0, 'no preview for an empty memo');
+    assert.match(ui.text(), /마크다운을 쓸 수 있습니다/);
+    await ui.fill('메모', '## 오늘\n**굵게**');
+    const [shown] = preview();
+    assert.ok(shown, 'preview while writing');
+    const [rendered] = ui.find((n) => n.type === 'markdown', shown);
+    assert.deepEqual(rendered.props.children, ['## 오늘\n**굵게**']);
+    // The preview is not cut short like the list.
+    assert.ok(ui.find((n) => n.props.className === 'memo', shown).length);
+    await ui.fill('메모', '  \n ');
+    assert.equal(preview().length, 0, 'no preview for a blank memo');
+  },
+);
+
 uiTest('an empty history says so instead of showing an empty list', async () => {
   const ui = mount(fakeApi().fetch);
   await ui.settle();
