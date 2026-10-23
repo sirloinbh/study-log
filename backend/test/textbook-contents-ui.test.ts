@@ -369,3 +369,53 @@ uiTest('a double submit in the same tick adds the chapter once', async () => {
   assert.equal(api.requests.filter((r) => r.method === 'POST').length, 1);
   assert.equal(shape(ui), '벡터');
 });
+
+// #86: records focused ids; an id with no element in the rendered tree (a typo) fails.
+const focusRecorder = () => {
+  const focused: string[] = [];
+  const state: { ui?: ReturnType<typeof mount> } = {};
+  const document = {
+    getElementById: (id: string) => {
+      if (state.ui && state.ui.find((n) => n.props.id === id).length !== 1)
+        throw new Error(`no element #${id} to focus`);
+      return { focus: () => focused.push(id) };
+    },
+  };
+  return { focused, document, state };
+};
+// Clicks the button with this accessible name.
+const press = async (ui: ReturnType<typeof mount>, name: string) => {
+  const [button] = ui.find((n) => n.type === 'button' && n.props['aria-label'] === name);
+  assert.ok(button, 'button ' + name);
+  assert.ok(!button.props.disabled, 'button ' + name + ' is disabled');
+  void (button.props.onClick as () => unknown)();
+  await ui.settle();
+};
+
+uiTest(
+  'contents delete focus: confirm, back on cancel, button on failure, heading after',
+  async () => {
+    const options: Options = {};
+    const { focused, document, state } = focusRecorder();
+    const api = fakeApi(outline, options);
+    const ui = mount(api.fetch, { document });
+    state.ui = ui;
+    await ui.settle();
+    await ui.click('교재');
+    await ui.click('선형대수');
+    await press(ui, '2 행렬 목차 삭제');
+    assert.equal(focused.at(-1), 'content-delete-confirm-4');
+    await press(ui, '2 행렬 목차 삭제 취소');
+    assert.equal(focused.at(-1), 'content-delete-4');
+    // Study logs still point at it: the entry stays with its delete button.
+    options.rejectDelete = { status: 409, error: '학습 기록이 연결된 목차는 삭제할 수 없습니다' };
+    await press(ui, '2 행렬 목차 삭제');
+    await press(ui, '2 행렬 목차 삭제 확인');
+    assert.equal(focused.at(-1), 'content-delete-4');
+    options.rejectDelete = undefined;
+    await press(ui, '2 행렬 목차 삭제');
+    await press(ui, '2 행렬 목차 삭제 확인');
+    assert.equal(shape(ui), '1 벡터[1.1 덧셈|1.2 내적]');
+    assert.equal(focused.at(-1), 'contents-heading');
+  },
+);
