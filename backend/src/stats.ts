@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod';
+import { isCalendarDate } from './study-logs.js';
 
 export const statPeriods = ['week', 'month', '3months', 'all'] as const;
 export type StatPeriod = (typeof statPeriods)[number];
@@ -81,6 +82,59 @@ const dailyMinutes = async (pool: Pool, from: string, to: string) =>
 export const heatmapWeeks = 53;
 export const heatmapStart = (today: string) => addDays(weekStart(today), -7 * (heatmapWeeks - 1));
 
+// The study pattern of a set of sessions (#20): minutes per hour of the day, spread over the
+// hours actually studied (20:30 to 22:00 gives 30 minutes to 20h and 60 to 21h; past midnight
+// continues at 0h), and minutes per weekday of the session's date (Sunday first, #96).
+export function studyPattern(
+  sessions: { studyDate: string; startTime: string; durationMinutes: number }[],
+) {
+  const byHour = Array<number>(24).fill(0);
+  const byWeekday = Array<number>(7).fill(0);
+  for (const session of sessions) {
+    byWeekday[toDate(session.studyDate).getUTCDay()] += session.durationMinutes;
+    let minute = Number(session.startTime.slice(0, 2)) * 60 + Number(session.startTime.slice(3, 5));
+    let left = session.durationMinutes;
+    while (left > 0) {
+      const hour = Math.floor(minute / 60) % 24;
+      const inHour = Math.min(left, 60 - (minute % 60));
+      byHour[hour] += inHour;
+      left -= inHour;
+      minute += inHour;
+    }
+  }
+  // The busiest hour and weekday, the earliest on a tie; none without any study.
+  const top = (values: number[]) => {
+    const most = Math.max(...values);
+    return most > 0 ? values.indexOf(most) : null;
+  };
+  return {
+    totalMinutes: byWeekday.reduce((sum, minutes) => sum + minutes, 0),
+    byHour,
+    byWeekday,
+    topHour: top(byHour),
+    topWeekday: top(byWeekday),
+  };
+}
+
+// The dates of a pattern request, within the years the other date APIs accept and at most
+// `maxSeriesDays` long, like the stats series.
+const patternQuery = z
+  .object({
+    from: z
+      .string({ invalid_type_error: '시작일 형식이 올바르지 않습니다' })
+      .regex(/^\d{4}-\d{2}-\d{2}$/, '시작일은 YYYY-MM-DD 형식으로 입력하세요')
+      .refine(isCalendarDate, '존재하지 않는 날짜입니다')
+      .optional(),
+    to: z
+      .string({ invalid_type_error: '종료일 형식이 올바르지 않습니다' })
+      .regex(/^\d{4}-\d{2}-\d{2}$/, '종료일은 YYYY-MM-DD 형식으로 입력하세요')
+      .refine(isCalendarDate, '존재하지 않는 날짜입니다')
+      .optional(),
+  })
+  .refine((query) => !query.from || !query.to || query.from <= query.to, {
+    message: '시작일은 종료일보다 늦을 수 없습니다',
+  });
+
 // Study time statistics (#47): /api/stats/study-time?period=week|month|3months|all
 export function statsRoutes(pool: Pool, today: () => string) {
   const router = Router();
@@ -124,6 +178,26 @@ export function statsRoutes(pool: Pool, today: () => string) {
     const to = today();
     const from = heatmapStart(to);
     res.json({ from, to, daily: await dailyMinutes(pool, from, to) });
+  });
+
+  // The study pattern from ?from to ?to (#20); by default the last 3 months up to today.
+  router.get('/patterns', async (req, res) => {
+    const query = patternQuery.parse(req.query);
+    const to = query.to ?? today();
+    const from = query.from ?? periodStart('3months', to);
+    if (toDate(to).getTime() - toDate(from).getTime() >= maxSeriesDays * 86_400_000)
+      return void res.status(400).json({ error: '기간은 10년 이내로 지정하세요' });
+    const { rows } = await pool.query<{
+      studyDate: string;
+      startTime: string;
+      durationMinutes: number;
+    }>(
+      `SELECT study_date AS "studyDate", to_char(start_time, 'HH24:MI') AS "startTime",
+         duration_minutes AS "durationMinutes"
+       FROM study_logs WHERE status <> 'planned' AND study_date BETWEEN $1 AND $2`,
+      [from, to],
+    );
+    res.json({ from, to, ...studyPattern(rows) });
   });
 
   return router;
