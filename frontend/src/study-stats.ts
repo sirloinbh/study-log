@@ -85,3 +85,43 @@ export const barWidth = (value: number, values: number[]) => {
   const most = Math.max(...values);
   return most > 0 ? `${Math.round((value / most) * 100)}%` : '0%';
 };
+
+// Study time chart (#49): one bar per day, week (from its Sunday) or month.
+export const chartUnits = ['day', 'week', 'month'] as const;
+export type ChartUnit = (typeof chartUnits)[number];
+export const chartUnitLabels: Record<ChartUnit, string> = { day: '일', week: '주', month: '월' };
+// Bars that stay readable for each period: days for a week or month, weeks for three months,
+// months for everything.
+export const defaultChartUnit: Record<StatPeriod, ChartUnit> = {
+  week: 'day',
+  month: 'day',
+  '3months': 'week',
+  all: 'month',
+};
+
+export type ChartBar = { key: string; label: string; minutes: number; hours: number };
+
+const monthDay = (date: string) => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
+
+export function chartBars(stats: StudyTimeStats, unit: ChartUnit): ChartBar[] {
+  const bar = (key: string, label: string, minutes: number) => ({
+    key,
+    label,
+    minutes,
+    hours: Math.round((minutes / 60) * 10) / 10,
+  });
+  if (unit === 'day') return stats.daily.map((d) => bar(d.date, monthDay(d.date), d.minutes));
+  if (unit === 'week')
+    return stats.weekly.map((w) => bar(w.weekStart, `${monthDay(w.weekStart)}~`, w.minutes));
+  return stats.monthly.map((m) =>
+    bar(m.month, `${m.month.slice(2, 4)}.${m.month.slice(5, 7)}`, m.minutes),
+  );
+}
+
+// The bar with the most study time, the earliest on a tie; none when nothing was studied.
+export function busiestBar(bars: ChartBar[]) {
+  return bars.reduce<ChartBar | undefined>(
+    (best, bar) => (bar.minutes > (best?.minutes ?? 0) ? bar : best),
+    undefined,
+  );
+}

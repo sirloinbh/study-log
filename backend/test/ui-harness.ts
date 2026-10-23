@@ -125,6 +125,23 @@ export function mount(
       return { createRoot: () => ({ render: (v: Node) => (element = v) }) };
     if (name === 'lucide-react') return new Proxy({}, { get: () => () => null });
     if (name in modules) return modules[name];
+    // Each chart part becomes an element named after it ('recharts:Bar'), keeping its props. No
+    // `then`, so the module can come from a dynamic import without being taken for a promise.
+    if (name === 'recharts')
+      return new Proxy(
+        {},
+        {
+          get: (_, part) =>
+            part === '__esModule'
+              ? true
+              : part === 'then'
+                ? undefined
+                : (props: Record<string, unknown>) => ({
+                    type: 'recharts:' + String(part),
+                    props: { ...props, children: props.children ?? [] },
+                  }),
+        },
+      );
     // Keeps the Markdown source as a 'markdown' element; markdown.test.ts renders the real one.
     if (name === 'react-markdown')
       return {

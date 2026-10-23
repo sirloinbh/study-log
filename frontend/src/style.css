@@ -501,6 +501,29 @@ nav button.active {
   overflow-x: auto;
   padding-bottom: 4px;
 }
+/* Study time chart (#49): bars take the primary colour through currentColor. */
+.study-chart {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.chart-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.chart-head h2 {
+  margin: 0;
+}
+.chart-box {
+  color: var(--primary);
+  min-width: 0;
+}
+.chart-box .recharts-cartesian-axis-tick-value {
+  fill: var(--muted);
+}
 .heatmap {
   display: flex;
   gap: 3px;
