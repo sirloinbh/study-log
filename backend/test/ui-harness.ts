@@ -62,7 +62,12 @@ const newHooks = (): Hooks => ({ states: [], effectDeps: [], cursor: 0 });
 // so switching pages starts the new page fresh like an unmount would. Each component may
 // appear at most once in the tree.
 // `globals` adds or replaces browser globals (document, matchMedia) the screen sees.
-export function mount(fetchImpl: FetchImpl, globals: Record<string, unknown> = {}) {
+// `modules` stands in for packages a test hands in by name (PDF.js).
+export function mount(
+  fetchImpl: FetchImpl,
+  globals: Record<string, unknown> = {},
+  modules: Record<string, unknown> = {},
+) {
   let hooks = new Map<unknown, Hooks>();
   let rendered = new Map<unknown, Hooks>();
   let active = newHooks();
@@ -119,6 +124,7 @@ export function mount(fetchImpl: FetchImpl, globals: Record<string, unknown> = {
     if (name === 'react-dom/client')
       return { createRoot: () => ({ render: (v: Node) => (element = v) }) };
     if (name === 'lucide-react') return new Proxy({}, { get: () => () => null });
+    if (name in modules) return modules[name];
     // Keeps the Markdown source as a 'markdown' element; markdown.test.ts renders the real one.
     if (name === 'react-markdown')
       return {

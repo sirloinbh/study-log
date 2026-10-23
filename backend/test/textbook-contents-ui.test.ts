@@ -135,8 +135,12 @@ const outline: Row[] = [
 ];
 
 // Opens the 교재 page and selects a textbook; only content requests from here on are counted.
-async function openBook(api: ReturnType<typeof fakeApi>, title = '선형대수') {
-  const ui = mount(api.fetch);
+async function openBook(
+  api: ReturnType<typeof fakeApi>,
+  title = '선형대수',
+  modules: Record<string, unknown> = {},
+) {
+  const ui = mount(api.fetch, {}, modules);
   await ui.settle();
   await ui.click('교재');
   await ui.click(title);
@@ -515,4 +519,157 @@ uiTest('a refused paste shows the server message and keeps the text', async () =
   await ui.submit(pasteForm(ui));
   assert.match(ui.text(card(ui)), /목차는 10단계까지입니다/);
   assert.equal(ui.field('목차 텍스트'), '1 벡터');
+});
+
+// A stand-in for PDF.js: a document with the given bookmarks and page text, or a failure.
+function fakePdfjs(doc: {
+  outline: unknown[] | null;
+  pages?: unknown[][];
+  fail?: string;
+  // The document opens only after this promise settles.
+  hold?: Promise<void>;
+}) {
+  const seen = { opened: [] as number[], destroyed: 0 };
+  const GlobalWorkerOptions: { workerSrc?: string } = {};
+  const pdfjs = {
+    __esModule: true,
+    GlobalWorkerOptions,
+    getDocument: ({ data }: { data: Uint8Array }) => {
+      seen.opened.push(data.length);
+      return {
+        promise: (doc.hold ?? Promise.resolve()).then(() => {
+          if (doc.fail) throw new Error(doc.fail);
+          return {
+            numPages: doc.pages?.length ?? 0,
+            getOutline: async () => doc.outline,
+            getPage: async (n: number) => ({
+              getTextContent: async () => ({ items: doc.pages![n - 1] }),
+            }),
+          };
+        }),
+        destroy: async () => void seen.destroyed++,
+      };
+    },
+  };
+  const modules = {
+    'pdfjs-dist': pdfjs,
+    'pdfjs-dist/build/pdf.worker.min.mjs?url': { __esModule: true, default: '/pdf.worker.mjs' },
+  };
+  return { modules, seen, GlobalWorkerOptions };
+}
+
+const pdfFile = (size = 4) => ({ size, arrayBuffer: async () => new ArrayBuffer(size) });
+const pickPdf = async (ui: Ui, file: unknown) => {
+  const [input] = ui.find((n) => n.type === 'input' && n.props.type === 'file', pasteForm(ui));
+  assert.ok(input, 'PDF picker');
+  const target = { files: [file], value: 'C:\fakepath\book.pdf' };
+  (input.props.onChange as (e: unknown) => void)({ target });
+  assert.equal(target.value, '', 'cleared so the same file can be picked again');
+  await ui.settle();
+  await ui.settle();
+};
+const statusText = (ui: Ui) => ui.text(ui.find((n) => n.props.role === 'status', card(ui))[0]);
+const alertText = (ui: Ui) => ui.text(ui.find((n) => n.props.role === 'alert', card(ui))[0]);
+
+uiTest('a PDF with bookmarks fills the paste box with them, indented by level (#23)', async () => {
+  const pdf = fakePdfjs({
+    outline: [
+      { title: '1 벡터', items: [{ title: '1.1 내적', items: [] }] },
+      { title: '2 행렬', items: [] },
+    ],
+  });
+  const ui = await openBook(fakeApi(), '선형대수', pdf.modules);
+  await ui.click('목차 붙여넣기');
+  await ui.fill('목차 텍스트', '지워질 글');
+  await pickPdf(ui, pdfFile(4));
+  assert.deepEqual(pdf.seen.opened, [4]);
+  assert.equal(pdf.GlobalWorkerOptions.workerSrc, '/pdf.worker.mjs');
+  assert.equal(pdf.seen.destroyed, 1, 'the document is closed after reading');
+  assert.equal(ui.field('목차 텍스트'), '1 벡터\n  1.1 내적\n2 행렬');
+  assert.equal(shape(ui, preview(ui)), '1 벡터[1.1 내적]|2 행렬');
+  assert.match(statusText(ui), /PDF 책갈피에서 목차 3줄을 가져왔습니다/);
+});
+
+uiTest('a PDF without bookmarks gives the text of its first pages', async () => {
+  const piece = (str: string, x: number, y: number) => ({
+    str,
+    transform: [10, 0, 0, 10, x, y],
+    height: 10,
+    width: str.length * 5,
+  });
+  const pdf = fakePdfjs({
+    outline: null,
+    pages: [[piece('목차', 50, 700)], [piece('1 벡터', 50, 700), piece('12', 300, 700)]],
+  });
+  const ui = await openBook(fakeApi(), '선형대수', pdf.modules);
+  await ui.click('목차 붙여넣기');
+  await pickPdf(ui, pdfFile());
+  assert.equal(ui.field('목차 텍스트'), '목차\n1 벡터  12');
+  assert.equal(shape(ui, preview(ui)), '1 벡터');
+  assert.match(statusText(ui), /책갈피 목차가 없어 앞 2쪽의 글을 가져왔습니다/);
+});
+
+uiTest('an unreadable, empty or too large PDF says so and keeps the text', async () => {
+  const broken = fakePdfjs({ outline: null, fail: 'Invalid PDF structure.' });
+  let ui = await openBook(fakeApi(), '선형대수', broken.modules);
+  await ui.click('목차 붙여넣기');
+  await ui.fill('목차 텍스트', '1 벡터');
+  await pickPdf(ui, pdfFile());
+  assert.match(alertText(ui), /PDF를 읽지 못했습니다: Invalid PDF structure\./);
+  assert.equal(broken.seen.destroyed, 1);
+  assert.equal(ui.field('목차 텍스트'), '1 벡터');
+
+  const scanned = fakePdfjs({ outline: [], pages: [[]] });
+  ui = await openBook(fakeApi(), '선형대수', scanned.modules);
+  await ui.click('목차 붙여넣기');
+  await pickPdf(ui, pdfFile());
+  assert.match(alertText(ui), /PDF에서 글을 찾지 못했습니다/);
+
+  const big = fakePdfjs({ outline: [] });
+  ui = await openBook(fakeApi(), '선형대수', big.modules);
+  await ui.click('목차 붙여넣기');
+  await pickPdf(ui, pdfFile(50 * 1024 * 1024 + 1));
+  assert.match(alertText(ui), /50MB 이하/);
+  assert.deepEqual(big.seen.opened, [], 'not read at all');
+});
+
+uiTest('a PDF still being read is dropped when the box is closed or an editor opens', async () => {
+  let release = () => {};
+  const hold = new Promise<void>((resolve) => (release = resolve));
+  const pdf = fakePdfjs({ outline: [{ title: '1 벡터', items: [] }], hold });
+  const ui = await openBook(fakeApi(outline), '선형대수', pdf.modules);
+  await ui.click('목차 붙여넣기');
+  await pickPdf(ui, pdfFile());
+  // While reading: announced, and the box and save are locked.
+  assert.match(statusText(ui), /PDF를 읽는 중/);
+  assert.ok(
+    ui.find((n) => n.type === 'textarea', pasteForm(ui))[0].props.disabled,
+    'box locked while reading',
+  );
+  await ui.click('취소', pasteForm(ui));
+  assert.equal(pasteForm(ui), undefined);
+  assert.equal(statusText(ui), '', 'the reading notice goes with the box');
+  release();
+  await ui.settle();
+  await ui.settle();
+  assert.equal(pasteForm(ui), undefined, 'the late result does not reopen the box');
+  assert.equal(statusText(ui), '');
+  assert.equal(pdf.seen.destroyed, 1, 'the document is still closed');
+
+  // Opening the chapter editor during a read keeps only the editor.
+  let releaseAgain = () => {};
+  const again = fakePdfjs({
+    outline: [{ title: '2 행렬', items: [] }],
+    hold: new Promise<void>((resolve) => (releaseAgain = resolve)),
+  });
+  const ui2 = await openBook(fakeApi(outline), '선형대수', again.modules);
+  await ui2.click('목차 붙여넣기');
+  await pickPdf(ui2, pdfFile());
+  await ui2.click('장 추가');
+  releaseAgain();
+  await ui2.settle();
+  await ui2.settle();
+  assert.equal(pasteForm(ui2), undefined);
+  assert.equal(ui2.find((n) => n.props.className === 'log-form content-form').length, 1);
+  assert.doesNotMatch(statusText(ui2), /가져왔습니다/);
 });
