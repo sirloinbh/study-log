@@ -11,8 +11,9 @@ test(
   { skip: !url },
   async (t) => {
     const pool = new Pool({ connectionString: url });
-    // A far-future date keeps these rows apart from anything else in the test DB.
-    const day = '2099-01-15';
+    // The last possible date keeps these rows apart from anything else in the test DB, and keeps
+    // them the most recent while other test files add logs in parallel (?limit=1 below).
+    const day = '9999-12-31';
     const cleanup = () => pool.query('DELETE FROM study_logs WHERE study_date = $1', [day]);
     await cleanup();
     t.after(async () => {
