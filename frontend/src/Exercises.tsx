@@ -7,6 +7,7 @@ import {
   exerciseLimits,
   questionText,
   type Exercise,
+  type ExerciseAnswer,
   type ExerciseForm,
 } from './exercise';
 import { contentOptions, type ContentNode, type Textbook } from './textbook';
@@ -15,6 +16,16 @@ type Notice = { kind: 'status' | 'alert'; text: string; contentId: number } | un
 
 // The open editor: a new exercise (`id` undefined) or an edit of `id`.
 type Editor = { contentId: number; id?: number; form: ExerciseForm };
+
+// The one exercise whose answer is shown. `body` is undefined while loading and null when no
+// answer is saved; `draft` is set while the answer is being typed.
+type AnswerPanel = {
+  contentId: number;
+  id: number;
+  body?: string | null;
+  error?: string;
+  draft?: string;
+};
 
 // Exercises of one chapter or section, picked from the textbook's contents. State is tagged with
 // its chapter, so picking another one never shows or edits the previous chapter's exercises.
@@ -33,6 +44,7 @@ export function Exercises({
   const [loadError, setLoadError] = useState<{ contentId: number; message: string }>();
   const [editor, setEditor] = useState<Editor>();
   const [deleting, setDeleting] = useState<{ contentId: number; id: number }>();
+  const [answer, setAnswer] = useState<AnswerPanel>();
   const [notice, setNotice] = useState<Notice>(undefined);
   // One request at a time, including the reload after a change, like the contents card.
   const [busy, setBusy] = useState(false);
@@ -72,6 +84,22 @@ export function Exercises({
   const open = mine(editor);
   const deletingId = mine(deleting)?.id;
   const shown = mine(notice);
+  const answerShown = mine(answer);
+
+  // Loads the answer when its panel opens. Updates only the panel it was loaded for.
+  const answerId = answer?.id;
+  useEffect(() => {
+    if (answerId === undefined) return;
+    let current = true;
+    const update = (change: Partial<AnswerPanel>) =>
+      current && setAnswer((panel) => (panel?.id === answerId ? { ...panel, ...change } : panel));
+    requestJson<{ answer: ExerciseAnswer | null }>(`/api/exercises/${answerId}/answer`)
+      .then((data) => update({ body: data.answer?.body ?? null, error: undefined }))
+      .catch((failure: RequestError) => update({ error: failure.message }));
+    return () => {
+      current = false;
+    };
+  }, [answerId]);
 
   // Not `autoFocus`: after an add the field is still disabled until the reload finishes, and a
   // disabled field cannot take focus. Other changes (a delete) leave focus where it is.
@@ -164,6 +192,50 @@ export function Exercises({
       say('status', '삭제했습니다');
       if (open?.id === exercise.id) setEditor(undefined);
     }, exercise.id);
+
+  // Opens the answer of `exercise`, closing any other one, or closes it when it is open.
+  const toggleAnswer = (exercise: Exercise) => {
+    setNotice(undefined);
+    setAnswer(
+      answerShown?.id === exercise.id
+        ? undefined
+        : { contentId: exercise.contentId, id: exercise.id },
+    );
+  };
+
+  const changeAnswer = (event: { target: { value: string } }) => {
+    setNotice(undefined);
+    setAnswer((panel) => panel && { ...panel, draft: event.target.value });
+  };
+
+  // Saves the typed answer. Saving it blank deletes the saved answer instead.
+  const saveAnswer = (event: { preventDefault(): void }) => {
+    event.preventDefault();
+    const panel = answerShown;
+    if (panel?.draft === undefined) return;
+    const draft = panel.draft;
+    const path = `/api/exercises/${panel.id}/answer`;
+    void run(async () => {
+      let body: string | null;
+      if (draft.trim()) {
+        const data = await requestJson<{ answer: ExerciseAnswer }>(path, {
+          method: 'PUT',
+          body: { body: draft },
+        });
+        body = data.answer.body;
+        say('status', '정답을 저장했습니다');
+      } else if (panel.body) {
+        await requestJson(path, { method: 'DELETE' });
+        body = null;
+        say('status', '정답을 지웠습니다');
+      } else {
+        body = null;
+      }
+      setAnswer((current) =>
+        current?.id === panel.id ? { ...current, body, draft: undefined } : current,
+      );
+    });
+  };
 
   // Copies the problem as a question for an AI. Without clipboard access (an older browser, or
   // permission refused) it says so, and the body stays on screen to select by hand.
@@ -311,6 +383,68 @@ export function Exercises({
                     {exercise.important && <span className="badge important">중요</span>}
                   </div>
                   <p className="exercise-body">{exercise.body}</p>
+                  {answerShown?.id === exercise.id && (
+                    <div className="exercise-answer">
+                      {answerShown.draft !== undefined ? (
+                        <form className="log-form answer-form" onSubmit={saveAnswer}>
+                          <label className="wide">
+                            정답
+                            <textarea
+                              id="answer-body"
+                              autoFocus
+                              rows={4}
+                              maxLength={exerciseLimits.answer}
+                              disabled={busy}
+                              value={answerShown.draft}
+                              onChange={changeAnswer}
+                            />
+                          </label>
+                          <p className="wide status">비워 두고 저장하면 정답을 지웁니다</p>
+                          <div className="actions wide">
+                            <button type="submit" className="primary" disabled={busy}>
+                              정답 저장
+                            </button>
+                            <button
+                              type="button"
+                              className="secondary"
+                              disabled={busy}
+                              onClick={() =>
+                                setAnswer((panel) => panel && { ...panel, draft: undefined })
+                              }
+                            >
+                              취소
+                            </button>
+                          </div>
+                        </form>
+                      ) : answerShown.error ? (
+                        <p role="alert" className="error">
+                          정답을 불러오지 못했습니다: {answerShown.error}
+                        </p>
+                      ) : answerShown.body === undefined ? (
+                        <p className="status">정답을 불러오는 중…</p>
+                      ) : (
+                        <>
+                          <p className="answer-label">정답</p>
+                          {answerShown.body === null ? (
+                            <p className="status">입력한 정답이 없습니다</p>
+                          ) : (
+                            <p className="exercise-body">{answerShown.body}</p>
+                          )}
+                          <button
+                            type="button"
+                            className="secondary"
+                            disabled={busy}
+                            aria-label={`${label} 정답 ${answerShown.body === null ? '입력' : '수정'}`}
+                            onClick={() =>
+                              setAnswer((panel) => panel && { ...panel, draft: panel.body ?? '' })
+                            }
+                          >
+                            {answerShown.body === null ? '정답 입력' : '정답 수정'}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
                   <div className="log-actions">
                     {deletingId === exercise.id ? (
                       <>
@@ -342,6 +476,16 @@ export function Exercises({
                           onClick={() => copy(exercise, label)}
                         >
                           질문 복사
+                        </button>
+                        <button
+                          type="button"
+                          className="secondary"
+                          disabled={busy}
+                          aria-expanded={answerShown?.id === exercise.id}
+                          aria-label={`${label} 정답 ${answerShown?.id === exercise.id ? '닫기' : '보기'}`}
+                          onClick={() => toggleAnswer(exercise)}
+                        >
+                          {answerShown?.id === exercise.id ? '정답 닫기' : '정답 보기'}
                         </button>
                         <button
                           type="button"

@@ -100,3 +100,79 @@ test('the body keeps its line breaks and the number is trimmed', async () => {
     assert.deepEqual(sent[0], [1, 2, '3.1', body, false]);
   });
 });
+
+const answer = '/api/exercises/1/answer';
+
+test('invalid answers are rejected with Korean messages before touching the DB', async () => {
+  const cases: [unknown, RegExp][] = [
+    [{}, /정답을 입력하세요/],
+    [{ body: ' \n\t ' }, /정답을 입력하세요/],
+    [{ body: 7 }, /정답 형식이 올바르지 않습니다/],
+    [{ body: 'x'.repeat(20001) }, /정답은 20000자 이하로 입력하세요/],
+    [['x'], /정답 내용을 JSON 객체로 보내세요/],
+  ];
+  await withApi(untouchedPool, async (call) => {
+    for (const [body, message] of cases) {
+      const { status, data } = await call(answer, { method: 'PUT', body });
+      assert.equal(status, 400, JSON.stringify(body).slice(0, 60));
+      assert.match(String(data.error), message);
+    }
+    for (const init of [{}, { method: 'PUT', body: { body: '답' } }, { method: 'DELETE' }]) {
+      const { status, data } = await call('/api/exercises/01/answer', init);
+      assert.equal(status, 400, JSON.stringify(init));
+      assert.match(String(data.error), /연습문제 ID가 올바르지 않습니다/);
+    }
+  });
+});
+
+test('the answer of a missing exercise answers a Korean 404', async () => {
+  await withApi(emptyPool, async (call) => {
+    for (const init of [{}, { method: 'DELETE' }]) {
+      const { status, data } = await call(answer, init);
+      assert.equal(status, 404, JSON.stringify(init));
+      assert.equal(data.error, '연습문제를 찾을 수 없습니다');
+    }
+  });
+  const foreignKeyPool = {
+    query: async () => {
+      throw Object.assign(new Error('violates foreign key'), { code: '23503' });
+    },
+  } as unknown as Pool;
+  await withApi(foreignKeyPool, async (call) => {
+    const { status, data } = await call(answer, { method: 'PUT', body: { body: '답' } });
+    assert.equal(status, 404);
+    assert.equal(data.error, '연습문제를 찾을 수 없습니다');
+  });
+  // The exercise exists but has no answer to delete.
+  const noAnswerPool = {
+    query: async (sql: string) =>
+      sql.startsWith('DELETE') ? { rows: [], rowCount: 0 } : { rows: [{}], rowCount: 1 },
+  } as unknown as Pool;
+  await withApi(noAnswerPool, async (call) => {
+    const { status, data } = await call(answer, { method: 'DELETE' });
+    assert.equal(status, 404);
+    assert.equal(data.error, '정답을 찾을 수 없습니다');
+  });
+});
+
+test('an exercise without an answer reads as null and the answer keeps its line breaks', async () => {
+  const sent: unknown[][] = [];
+  const pool = {
+    query: async (sql: string, params: unknown[]) => {
+      sent.push(params);
+      return sql.startsWith('SELECT')
+        ? { rows: [{ body: null }], rowCount: 1 }
+        : { rows: [{ exerciseId: 1, body: params[1] }], rowCount: 1 };
+    },
+  } as unknown as Pool;
+  await withApi(pool, async (call) => {
+    const read = await call(answer);
+    assert.equal(read.status, 200);
+    assert.deepEqual(read.data, { answer: null });
+    const body = '  x = 2\n\n  (풀이 생략)\n';
+    const saved = await call(answer, { method: 'PUT', body: { body } });
+    assert.equal(saved.status, 200);
+    assert.deepEqual(sent[1], [1, body]);
+    assert.deepEqual(saved.data, { answer: { exerciseId: 1, body } });
+  });
+});
