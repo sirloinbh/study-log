@@ -76,3 +76,39 @@ test('missing textbooks answer a Korean 404 for read, update and delete', async 
     }
   });
 });
+
+// #58: PostgreSQL refuses a NUL character in text as an invalid byte sequence (22021).
+test('a NUL character in the input is a Korean 400, not a logged server error', async () => {
+  const nulPool = {
+    query: async () => {
+      throw Object.assign(new Error('invalid byte sequence for encoding "UTF8": 0x00'), {
+        code: '22021',
+      });
+    },
+    connect: async () => ({
+      query: async (sql: string) => {
+        if (/^(BEGIN|ROLLBACK)/.test(sql)) return { rows: [], rowCount: 0 };
+        throw Object.assign(new Error('invalid byte sequence for encoding "UTF8": 0x00'), {
+          code: '22021',
+        });
+      },
+      release: () => {},
+    }),
+  } as unknown as Pool;
+  const logged: unknown[] = [];
+  const original = console.error;
+  console.error = (...args: unknown[]) => void logged.push(args);
+  try {
+    await withApi(nulPool, async (call) => {
+      const { status, data } = await call('/api/textbooks', {
+        method: 'POST',
+        body: { title: 'a\u0000b' },
+      });
+      assert.equal(status, 400);
+      assert.equal(data.error, '입력에 사용할 수 없는 문자(NUL)가 있습니다');
+    });
+  } finally {
+    console.error = original;
+  }
+  assert.deepEqual(logged, []);
+});
