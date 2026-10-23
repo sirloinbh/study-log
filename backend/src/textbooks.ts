@@ -34,7 +34,7 @@ const idParam = z
   .regex(/^[1-9]\d{0,14}$/, '교재 ID가 올바르지 않습니다')
   .transform(Number);
 
-const columns = 'id::int AS id, title, author, edition';
+const columns = 'id, title, author, edition';
 
 const notFound = { error: '교재를 찾을 수 없습니다' };
 

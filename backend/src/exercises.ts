@@ -81,7 +81,7 @@ const textbookListQuery = z.object({
     .optional(),
 });
 
-const columns = `id::int AS id, textbook_id::int AS "textbookId", content_id::int AS "contentId",
+const columns = `id, textbook_id AS "textbookId", content_id AS "contentId",
   number, body, important`;
 
 const contentNotFound = { error: '목차를 찾을 수 없습니다' };
@@ -232,7 +232,7 @@ export function exerciseRoutes(pool: Pool) {
       const { rows } = await pool.query(
         `INSERT INTO exercise_answers (exercise_id, body) VALUES ($1, $2)
          ON CONFLICT (exercise_id) DO UPDATE SET body = EXCLUDED.body, updated_at = now()
-         RETURNING exercise_id::int AS "exerciseId", body`,
+         RETURNING exercise_id AS "exerciseId", body`,
         [id, body],
       );
       res.json({ answer: rows[0] });
