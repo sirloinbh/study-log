@@ -12,6 +12,9 @@ import {
 } from './exercise';
 import { contentOptions, type ContentNode, type Textbook } from './textbook';
 
+// The API's answer for a chapter that does not exist (or belongs to another textbook).
+const contentMissing = '목차를 찾을 수 없습니다';
+
 type Notice = { kind: 'status' | 'alert'; text: string; contentId: number } | undefined;
 
 // The open editor: a new exercise (`id` undefined) or an edit of `id`.
@@ -31,19 +34,22 @@ type AnswerPanel = {
 // its chapter, so picking another one never shows or edits the previous chapter's exercises.
 // `treeFailed` means the contents could not be loaded, so there is nothing to pick from.
 // `reloadKey` changes when exercises were changed elsewhere (the important card); `onChanged` is
-// called after each change made here.
+// called after each change made here. `onContentMissing` is called when the server says the
+// picked chapter no longer exists (deleted elsewhere), so the contents tree can be reloaded (#74).
 export function Exercises({
   textbook,
   tree,
   treeFailed,
   reloadKey,
   onChanged,
+  onContentMissing,
 }: {
   textbook: Textbook;
   tree?: ContentNode[];
   treeFailed?: boolean;
   reloadKey?: number;
   onChanged?: () => void;
+  onContentMissing?: () => void;
 }) {
   const [chosen, setChosen] = useState<number>();
   const [loaded, setLoaded] = useState<{ contentId: number; exercises: Exercise[] }>();
@@ -56,12 +62,22 @@ export function Exercises({
   const [busy, setBusy] = useState(false);
   // Set when the editor opens and after each add; the body takes focus once the field is enabled.
   const [wantFocus, setWantFocus] = useState(false);
+  // The chapter the server reported missing; once the reloaded tree no longer has it, the card
+  // says so next to the first chapter it fell back to.
+  const [lost, setLost] = useState<number>();
 
   const options = tree ? contentOptions(tree) : [];
   // The picked chapter, or the first one when nothing is picked or it was deleted.
   const contentId = options.some((option) => option.id === chosen) ? chosen : options[0]?.id;
 
   const url = `/api/textbooks/${textbook.id}/contents/${contentId}/exercises`;
+
+  // A 404 about the chapter itself, not about one exercise.
+  const noteMissing = (failure: RequestError, id: number) => {
+    if (failure.status !== 404 || failure.message !== contentMissing) return;
+    setLost(id);
+    onContentMissing?.();
+  };
 
   useEffect(() => {
     if (contentId === undefined) return;
@@ -75,11 +91,15 @@ export function Exercises({
         setLoadError(undefined);
       })
       .catch((error: RequestError) => {
-        if (current) setLoadError({ contentId, message: error.message });
+        if (!current) return;
+        setLoadError({ contentId, message: error.message });
+        noteMissing(error, contentId);
       });
     return () => {
       current = false;
     };
+    // noteMissing only reads props and setters; the load reruns for chapter and reload changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [textbook.id, contentId, reloadKey]);
 
   // `contentId` is undefined when there are no contents yet; nothing tagged matches it then.
@@ -91,6 +111,9 @@ export function Exercises({
   const deletingId = mine(deleting)?.id;
   const shown = mine(notice);
   const answerShown = mine(answer);
+  // The reported chapter is gone from the reloaded tree.
+  const chapterGone =
+    lost !== undefined && tree !== undefined && !options.some((option) => option.id === lost);
 
   // Loads the answer when its panel opens. Updates only the panel it was loaded for.
   const answerId = answer?.id;
@@ -140,6 +163,7 @@ export function Exercises({
       const { message, status } = failure as RequestError;
       say('alert', message);
       if (status === 404 && targetId !== undefined && targetId === open?.id) setEditor(undefined);
+      if (contentId !== undefined) noteMissing(failure as RequestError, contentId);
     } finally {
       await refresh();
       setBusy(false);
@@ -150,6 +174,7 @@ export function Exercises({
   const pick = (event: { target: { value: string } }) => {
     setChosen(Number(event.target.value));
     setNotice(undefined);
+    setLost(undefined);
     // Closed rather than hidden, so coming back loads the answer again instead of an old copy.
     setAnswer(undefined);
   };
@@ -388,7 +413,11 @@ export function Exercises({
       )}
       {/* Always mounted so screen readers announce each new message. */}
       <p role="status" className="status">
-        {shown?.kind === 'status' ? shown.text : ''}
+        {shown?.kind === 'status'
+          ? shown.text
+          : chapterGone
+            ? `선택한 단원이 다른 곳에서 삭제되었습니다. ${options.length ? '첫 단원을 보여 줍니다' : ''}`.trim()
+            : ''}
       </p>
       {shown?.kind === 'alert' && (
         <p role="alert" className="error">
