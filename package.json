@@ -42,6 +42,8 @@
     "npm": "11.19.0"
   },
   "overrides": {
-    "@napi-rs/canvas": "1.0.10"
+    "@napi-rs/canvas": "1.0.10",
+    "immer": "11.1.21",
+    "react-is": "19.3.0"
   }
 }
