@@ -96,6 +96,7 @@ nav button {
   padding: 12px 14px;
   border-radius: var(--radius-card);
   text-align: left;
+  white-space: nowrap;
 }
 nav button.active {
   background: var(--soft);
@@ -177,13 +178,15 @@ nav button.active {
   border-color: var(--danger-bg);
 }
 .study-logs,
-.textbooks {
+.textbooks,
+.keywords {
   display: grid;
   gap: 20px;
   max-width: 960px;
 }
 .study-logs h2,
-.textbooks h2 {
+.textbooks h2,
+.keywords h2 {
   margin: 0 0 16px;
   font-size: 16px;
 }
@@ -236,11 +239,14 @@ nav button.active {
 .study-logs [role='status'],
 .study-logs [role='alert'],
 .textbooks [role='status'],
-.textbooks [role='alert'] {
+.textbooks [role='alert'],
+.keywords [role='status'],
+.keywords [role='alert'] {
   margin: 16px 0 0;
 }
 .study-logs [role='status']:empty,
-.textbooks [role='status']:empty {
+.textbooks [role='status']:empty,
+.keywords [role='status']:empty {
   margin: 0;
 }
 .textbook-form .title {
@@ -422,6 +428,15 @@ nav button.active {
   display: flex;
   gap: 8px;
 }
+.keyword-form .keyword-field {
+  grid-column: span 3;
+}
+.keyword-list .keyword-form {
+  width: 100%;
+}
+.keyword-results .log-head {
+  justify-content: space-between;
+}
 @media (max-width: 760px) {
   aside {
     position: static;
@@ -436,6 +451,10 @@ nav button.active {
   nav {
     grid-auto-flow: column;
     overflow-x: auto;
+  }
+  /* Four menu items fit side by side at 390px. */
+  nav button {
+    padding-inline: 9px;
   }
   .shell {
     flex-direction: column;
@@ -452,6 +471,9 @@ nav button.active {
   }
   .textbook-browser {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .keyword-form .keyword-field {
+    grid-column: 1 / -1;
   }
   .content-form .title {
     grid-column: 1 / -1;
