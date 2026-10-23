@@ -292,6 +292,23 @@ nav button.active {
 .content-form {
   margin-bottom: 12px;
 }
+/* Pasting a table of contents (#23): the preview scrolls on its own so a long book stays usable. */
+.toc-preview {
+  border: 1px dashed var(--card-line);
+  border-radius: var(--radius-button);
+  padding: 8px 12px;
+  max-height: 360px;
+  overflow: auto;
+}
+.toc-preview h4 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.toc-paste ul.error {
+  margin: 0;
+  padding-left: 1.2em;
+}
 .content-form .title {
   grid-column: span 3;
 }
