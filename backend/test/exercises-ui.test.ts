@@ -1,6 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { frontendMissing, loadFrontendModule, mount, type FetchInit } from './ui-harness.js';
+import {
+  frontendMissing,
+  loadFrontendModule,
+  mount,
+  type FetchInit,
+  type Node,
+} from './ui-harness.js';
 
 const uiTest = frontendMissing ? test.skip : test;
 
@@ -748,4 +754,23 @@ uiTest('a missing exercise does not reload the contents', async () => {
   assert.match(alertText(ui), /연습문제를 찾을 수 없습니다/);
   assert.equal(api.treeLoads(), loadsBefore);
   assert.doesNotMatch(ui.text(card(ui)), /단원이 다른 곳에서 삭제/);
+});
+
+// #75: two submits in the same tick, before the screen re-renders with `busy`, send one request.
+const submitTwice = async (ui: Ui, form: Node) => {
+  const onSubmit = form.props.onSubmit as (event: { preventDefault(): void }) => unknown;
+  const event = { preventDefault() {} };
+  void onSubmit(event);
+  void onSubmit(event);
+  await ui.settle();
+};
+
+uiTest('a double submit in the same tick adds the exercise once', async () => {
+  const api = fakeApi();
+  const ui = await openBook(api);
+  await ui.click('문제 추가', card(ui));
+  await ui.fill('문제 본문', '한 번만');
+  await submitTwice(ui, form(ui));
+  assert.equal(api.requests.filter((r) => r.method === 'POST').length, 1);
+  assert.deepEqual(listed(ui), ['1번째 문제:한 번만']);
 });

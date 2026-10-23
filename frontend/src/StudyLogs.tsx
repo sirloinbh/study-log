@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useBusy } from './busy';
 import { requestJson, type RequestError } from './api';
 import {
   crossesMidnight,
@@ -30,7 +31,7 @@ export function StudyLogs({ today }: { today: string }) {
   const [loadError, setLoadError] = useState<string | undefined>(undefined);
   const [notice, setNotice] = useState<Notice>(undefined);
   // One request at a time: fields and action buttons are disabled while a save or delete is pending.
-  const [busy, setBusy] = useState(false);
+  const { busy, begin, end } = useBusy();
   const [deletingId, setDeletingId] = useState<number | undefined>(undefined);
   const [reload, setReload] = useState(0);
 
@@ -140,8 +141,7 @@ export function StudyLogs({ today }: { today: string }) {
 
   const save = async (event: { preventDefault(): void }) => {
     event.preventDefault();
-    if (busy) return;
-    setBusy(true);
+    if (!begin()) return;
     try {
       await requestJson(
         editingId === undefined ? '/api/study-logs' : `/api/study-logs/${editingId}`,
@@ -161,7 +161,7 @@ export function StudyLogs({ today }: { today: string }) {
     } catch (error) {
       fail(error as RequestError, editingId);
     } finally {
-      setBusy(false);
+      end();
     }
   };
 
@@ -187,8 +187,7 @@ export function StudyLogs({ today }: { today: string }) {
   };
 
   const remove = async (id: number) => {
-    if (busy) return;
-    setBusy(true);
+    if (!begin()) return;
     try {
       await requestJson(`/api/study-logs/${id}`, { method: 'DELETE' });
       setNotice({ kind: 'status', text: '삭제했습니다' });
@@ -203,7 +202,7 @@ export function StudyLogs({ today }: { today: string }) {
       );
     } finally {
       setDeletingId(undefined);
-      setBusy(false);
+      end();
     }
   };
 
