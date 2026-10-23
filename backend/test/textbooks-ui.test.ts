@@ -321,15 +321,25 @@ uiTest('textbook meta joins author and edition and skips blanks', () => {
 
 // #65: the focused delete button is swapped out at each step; focus follows the flow instead of
 // dropping to the page.
+// Records focused ids. `rendered` must be set to the mounted UI, so an id with no element in the
+// rendered tree (a typo) fails instead of being focused.
 const focusRecorder = () => {
   const focused: string[] = [];
-  const document = { getElementById: (id: string) => ({ focus: () => focused.push(id) }) };
-  return { focused, document };
+  const state: { ui?: ReturnType<typeof mount> } = {};
+  const document = {
+    getElementById: (id: string) => {
+      if (state.ui && state.ui.find((n) => n.props.id === id).length !== 1)
+        throw new Error(`no element #${id} to focus`);
+      return { focus: () => focused.push(id) };
+    },
+  };
+  return { focused, document, state };
 };
 
 uiTest('focus follows the delete flow: confirm, back on cancel, the list after', async () => {
-  const { focused, document } = focusRecorder();
+  const { focused, document, state } = focusRecorder();
   const ui = await open(fakeApi([linear]), { document });
+  state.ui = ui;
   await ui.click('선형대수와 그 응용');
   await ui.click('삭제', detail(ui));
   assert.equal(focused.at(-1), 'textbook-delete-confirm');
@@ -347,8 +357,9 @@ uiTest('a failed textbook delete puts focus back on delete, a 404 on the list', 
     [{ status: 500, error: '서버 오류가 발생했습니다' }, 'textbook-delete'],
     [{ status: 404, error: '교재를 찾을 수 없습니다' }, 'textbook-list'],
   ] as const) {
-    const { focused, document } = focusRecorder();
+    const { focused, document, state } = focusRecorder();
     const ui = await open(fakeApi([linear], { reject }), { document });
+    state.ui = ui;
     await ui.click('선형대수와 그 응용');
     await ui.click('삭제', detail(ui));
     await ui.click('삭제 확인', detail(ui));
