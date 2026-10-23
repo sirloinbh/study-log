@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useBusy } from './busy';
 import { requestJson, type RequestError } from './api';
 import { contentLabel, type ContentNode } from './textbook';
+import { parseToc, tocLimits, tocProblems, tocTree, type TocTree } from './toc';
 
 type Notice = { kind: 'status' | 'alert'; text: string; textbookId: number } | undefined;
 
@@ -34,6 +35,8 @@ export function TextbookContents({
   const [loadError, setLoadError] = useState<{ textbookId: number; message: string }>();
   const [editor, setEditor] = useState<Editor>();
   const [deleting, setDeleting] = useState<{ textbookId: number; id: number }>();
+  // The pasted table of contents being previewed (#23).
+  const [paste, setPaste] = useState<{ textbookId: number; text: string }>();
   const [notice, setNotice] = useState<Notice>(undefined);
   // One request at a time: fields and buttons stay disabled while a change and the reload after
   // it are pending, so the next change never starts from an outdated tree.
@@ -70,6 +73,9 @@ export function TextbookContents({
   const open = editor?.textbookId === textbookId ? editor : undefined;
   const deletingId = deleting?.textbookId === textbookId ? deleting.id : undefined;
   const shown = notice?.textbookId === textbookId ? notice : undefined;
+  const pasting = paste?.textbookId === textbookId ? paste : undefined;
+  const pasted = pasting ? parseToc(pasting.text) : [];
+  const pasteProblems = tocProblems(pasted);
 
   useEffect(() => {
     onTree?.({ textbookId, tree, failed: tree === undefined && error !== undefined });
@@ -109,6 +115,7 @@ export function TextbookContents({
   };
 
   const startAdd = (parent?: ContentNode) => {
+    setPaste(undefined);
     setDeleting(undefined);
     setNotice(undefined);
     setEditor({
@@ -121,6 +128,7 @@ export function TextbookContents({
   };
 
   const startEdit = (node: ContentNode) => {
+    setPaste(undefined);
     setDeleting(undefined);
     setNotice(undefined);
     setEditor({
@@ -152,6 +160,45 @@ export function TextbookContents({
       setEditor(undefined);
     }, open.id);
   };
+
+  const startPaste = () => {
+    setEditor(undefined);
+    setDeleting(undefined);
+    setNotice(undefined);
+    setPaste({ textbookId, text: '' });
+  };
+
+  // Saves every previewed entry at once, after the chapters already there.
+  const savePaste = (event: { preventDefault(): void }) => {
+    event.preventDefault();
+    if (!pasted.length || pasteProblems.length) return;
+    void run(async () => {
+      const data = await requestJson<{ contents: ContentNode[] }>(
+        `/api/textbooks/${textbookId}/contents/bulk`,
+        {
+          method: 'POST',
+          body: { entries: pasted.map(({ level, number, title }) => ({ level, number, title })) },
+        },
+      );
+      setLoaded({ textbookId, tree: data.contents });
+      say('status', `목차 ${pasted.length}개를 추가했습니다`);
+      setPaste(undefined);
+      return true;
+    });
+  };
+
+  const renderPreview = (nodes: TocTree[]) => (
+    <ul className="content-tree">
+      {nodes.map((node) => (
+        <li key={node.line}>
+          <div className="content-row">
+            <span className="content-label">{contentLabel(node)}</span>
+          </div>
+          {node.children.length > 0 && renderPreview(node.children)}
+        </li>
+      ))}
+    </ul>
+  );
 
   const remove = (node: ContentNode) =>
     run(async () => {
@@ -297,15 +344,77 @@ export function TextbookContents({
         <h3 id="contents-heading" tabIndex={-1}>
           목차
         </h3>
-        <button
-          type="button"
-          className="secondary"
-          disabled={busy || tree === undefined}
-          onClick={() => startAdd()}
-        >
-          장 추가
-        </button>
+        <div className="log-actions">
+          <button
+            type="button"
+            className="secondary"
+            disabled={busy || tree === undefined}
+            onClick={startPaste}
+          >
+            목차 붙여넣기
+          </button>
+          <button
+            type="button"
+            className="secondary"
+            disabled={busy || tree === undefined}
+            onClick={() => startAdd()}
+          >
+            장 추가
+          </button>
+        </div>
       </div>
+      {pasting && (
+        <form className="log-form content-form toc-paste" onSubmit={savePaste}>
+          <label className="wide">
+            목차 텍스트
+            <textarea
+              autoFocus
+              rows={8}
+              maxLength={tocLimits.text}
+              disabled={busy}
+              value={pasting.text}
+              aria-describedby="toc-paste-hint"
+              onChange={(event) => setPaste({ textbookId, text: event.target.value })}
+            />
+          </label>
+          <p id="toc-paste-hint" className="hint wide">
+            한 줄에 하나씩 붙여넣으세요. 1, 1.1, Chapter 1, 제1장 같은 번호로 단계를 나누고, 번호가
+            없는 줄은 들여쓰기를 따릅니다. 쪽 번호는 빠집니다. 미리보기가 다르면 글을 고치세요.
+          </p>
+          {pasted.length > 0 && (
+            <section className="toc-preview wide" aria-label="목차 미리보기">
+              <h4>
+                미리보기 · {pasted.length}개{tree?.length ? ' (기존 목차 뒤에 추가)' : ''}
+              </h4>
+              {renderPreview(tocTree(pasted))}
+            </section>
+          )}
+          {pasteProblems.length > 0 && (
+            <ul className="error wide" role="alert">
+              {pasteProblems.map((problem) => (
+                <li key={problem}>{problem}</li>
+              ))}
+            </ul>
+          )}
+          <div className="actions wide">
+            <button
+              type="submit"
+              className="primary"
+              disabled={busy || !pasted.length || pasteProblems.length > 0}
+            >
+              {pasted.length ? `${pasted.length}개 저장` : '저장'}
+            </button>
+            <button
+              type="button"
+              className="secondary"
+              disabled={busy}
+              onClick={() => setPaste(undefined)}
+            >
+              취소
+            </button>
+          </div>
+        </form>
+      )}
       {open && (
         // Keyed by its target so the title field takes focus again for each new add or edit.
         <form

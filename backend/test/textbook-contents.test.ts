@@ -43,6 +43,36 @@ test('invalid contents are rejected with Korean messages before touching the DB'
     ['PUT', `${base}/order`, { ids: [] }, /순서를 바꿀 목차 ID 목록을 보내세요/],
     ['PUT', `${base}/order`, { ids: [1, 2, 1] }, /목차 ID가 중복되었습니다/],
     ['PUT', `${base}/order`, { ids: [1, -2] }, /목차 ID가 올바르지 않습니다/],
+    // A pasted table of contents (#23).
+    ['POST', `${base}/bulk`, {}, /등록할 목차 목록을 보내세요/],
+    ['POST', `${base}/bulk`, { entries: [] }, /등록할 목차가 없습니다/],
+    ['POST', `${base}/bulk`, { entries: [{ title: '벡터' }] }, /목차 단계를 보내세요/],
+    ['POST', `${base}/bulk`, { entries: [{ level: 1, title: '벡터' }] }, /첫 목차는 맨 위 단계/],
+    [
+      'POST',
+      `${base}/bulk`,
+      {
+        entries: [
+          { level: 0, title: '벡터' },
+          { level: 2, title: '내적' },
+        ],
+      },
+      /2번째 목차가 위 목차보다 두 단계 이상 깊습니다/,
+    ],
+    ['POST', `${base}/bulk`, { entries: [{ level: 10, title: '깊음' }] }, /10단계까지/],
+    [
+      'POST',
+      `${base}/bulk`,
+      { entries: [{ level: 0.5, title: '벡터' }] },
+      /단계가 올바르지 않습니다/,
+    ],
+    ['POST', `${base}/bulk`, { entries: [{ level: 0, title: ' ' }] }, /목차 제목을 입력하세요/],
+    [
+      'POST',
+      `${base}/bulk`,
+      { entries: Array.from({ length: 501 }, () => ({ level: 0, title: '장' })) },
+      /한 번에 500개까지/,
+    ],
   ];
   await withApi(untouchedPool, async (call) => {
     for (const [method, path, body, message] of cases) {
@@ -85,6 +115,7 @@ test('contents of a missing textbook answer a Korean 404 and writes roll back', 
       [base, {}],
       [base, { method: 'POST', body: { title: '행렬' } }],
       [`${base}/order`, { method: 'PUT', body: { ids: [1] } }],
+      [`${base}/bulk`, { method: 'POST', body: { entries: [{ level: 0, title: '행렬' }] } }],
       [`${base}/1`, { method: 'DELETE' }],
     ] as const) {
       const { status, data } = await call(path, init);
@@ -95,10 +126,10 @@ test('contents of a missing textbook answer a Korean 404 and writes roll back', 
     assert.equal(updated.status, 404);
     assert.equal(updated.data.error, '목차를 찾을 수 없습니다');
   });
-  // Three write transactions: each locks the textbook, finds nothing and rolls back.
-  assert.equal(statements.filter((sql) => sql === 'ROLLBACK').length, 3);
+  // Four write transactions: each locks the textbook, finds nothing and rolls back.
+  assert.equal(statements.filter((sql) => sql === 'ROLLBACK').length, 4);
   assert.equal(statements.filter((sql) => sql === 'COMMIT').length, 0);
-  assert.equal(released(), 3);
+  assert.equal(released(), 4);
 });
 
 // #68: a failed transaction whose ROLLBACK also fails (a dropped connection) must destroy the
