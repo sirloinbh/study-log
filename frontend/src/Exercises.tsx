@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useBusy } from './busy';
+import { ExerciseTranslation } from './ExerciseTranslation';
 import { requestJson, type RequestError } from './api';
 import {
   contentPath,
@@ -58,6 +59,8 @@ export function Exercises({
   const [editor, setEditor] = useState<Editor>();
   const [deleting, setDeleting] = useState<{ contentId: number; id: number }>();
   const [answer, setAnswer] = useState<AnswerPanel>();
+  // The one exercise whose Korean translation is shown (#31).
+  const [translating, setTranslating] = useState<{ contentId: number; id: number }>();
   const [notice, setNotice] = useState<Notice>(undefined);
   // One request at a time, including the reload after a change, like the contents card.
   const { busy, begin, end } = useBusy();
@@ -113,6 +116,7 @@ export function Exercises({
   const deletingId = mine(deleting)?.id;
   const shown = mine(notice);
   const answerShown = mine(answer);
+  const translationShown = mine(translating)?.id;
   // The reported chapter is gone from the reloaded tree.
   const chapterGone =
     lost !== undefined && tree !== undefined && !options.some((option) => option.id === lost);
@@ -457,6 +461,9 @@ export function Exercises({
                     {exercise.important && <span className="badge important">중요</span>}
                   </div>
                   <p className="exercise-body">{exercise.body}</p>
+                  {translationShown === exercise.id && (
+                    <ExerciseTranslation exerciseId={exercise.id} label={label} />
+                  )}
                   {answerShown?.id === exercise.id && (
                     <div className="exercise-answer">
                       {answerShown.draft !== undefined ? (
@@ -564,6 +571,22 @@ export function Exercises({
                           onClick={() => toggleAnswer(exercise)}
                         >
                           {answerShown?.id === exercise.id ? '정답 닫기' : '정답 보기'}
+                        </button>
+                        <button
+                          type="button"
+                          className="secondary"
+                          disabled={busy}
+                          aria-expanded={translationShown === exercise.id}
+                          aria-label={`${label} 번역 ${translationShown === exercise.id ? '닫기' : '보기'}`}
+                          onClick={() =>
+                            setTranslating(
+                              translationShown === exercise.id
+                                ? undefined
+                                : { contentId: exercise.contentId, id: exercise.id },
+                            )
+                          }
+                        >
+                          {translationShown === exercise.id ? '번역 닫기' : '번역 보기'}
                         </button>
                         <button
                           type="button"
