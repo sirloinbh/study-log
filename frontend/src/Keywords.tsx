@@ -94,7 +94,10 @@ export function Keywords({ today }: { today: string }) {
     } catch (failure) {
       const { message, status } = failure as RequestError;
       setNotice({ kind: 'alert', text: message });
-      if (status === 404 && targetId !== undefined && targetId === editor?.id) setEditor(undefined);
+      if (status === 404 && targetId !== undefined && targetId === editor?.id) {
+        setEditor(undefined);
+        setWantFocus('keyword-day');
+      }
     } finally {
       await reloadDay();
       if (results) await runSearch(results.path);
@@ -143,7 +146,9 @@ export function Keywords({ today }: { today: string }) {
       try {
         await requestJson(`/api/keywords/${keyword.id}`, { method: 'DELETE' });
       } finally {
+        // The confirm button goes away whether or not the delete worked.
         setDeletingId(undefined);
+        setWantFocus('keyword-day');
       }
       if (editor?.id === keyword.id) setEditor(undefined);
       setWantFocus('keyword-day');

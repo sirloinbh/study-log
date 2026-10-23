@@ -240,14 +240,18 @@ uiTest('deleting needs a confirmation', async () => {
 });
 
 uiTest('saving an edit of a keyword deleted elsewhere closes the editor', async () => {
+  const focused: string[] = [];
+  const document = { getElementById: (id: string) => ({ focus: () => focused.push(id) }) };
   const api = fakeApi(stored);
-  const ui = await openKeywords(api);
+  const ui = await openKeywords(api, { document });
   await ui.click('수정', item(ui, '대각화'));
   api.rows.splice(1, 1);
   await ui.submit(ui.find((n) => n.props.className === 'editing', dayCard(ui))[0]);
   assert.match(alertText(ui), /키워드를 찾을 수 없습니다/);
   assert.equal(ui.find((n) => n.props.className === 'editing', dayCard(ui)).length, 0);
   assert.deepEqual(listed(ui, dayCard(ui)), ['고유값:Ax = λx']);
+  // The closed editor's buttons are gone; focus goes to the day heading.
+  assert.deepEqual(focused, ['keyword-day']);
 });
 
 uiTest('search lists matches across dates and a date opens that day', async () => {
