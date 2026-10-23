@@ -87,6 +87,11 @@ uiTest('the dashboard opens on this week with the four metric cards', async () =
   assert.match(ui.text(), /2026-10-19 ~ 2026-10-23/);
   assert.match(ui.text(), /5일 중 3일 공부/);
   assert.match(ui.text(), /공부한 날만 1시간 35분/);
+  // The cards hold more than the period (the all-time total), so their group is named neutrally.
+  assert.equal(
+    ui.find((n) => n.props.className === 'metric-grid')[0].props['aria-label'],
+    '학습 시간 지표',
+  );
 });
 
 uiTest('picking a period asks for it and relabels the period card', async () => {
@@ -115,7 +120,8 @@ uiTest("a slow answer for the previous period is not shown as the new one's", as
   let release = () => {};
   const api = fakeApi({ hold: { periods: ['week'], until: new Promise((r) => (release = r)) } });
   const ui = await openStats(api);
-  assert.match(ui.text(), /불러오는 중/);
+  // Announced while waiting, so the change to the cards is not silent.
+  assert.match(ui.text(ui.find((n) => n.props.role === 'status').at(-1)), /불러오는 중/);
   await ui.click('이번 달');
   release();
   await ui.settle();

@@ -51,9 +51,11 @@ export function Stats() {
           통계를 불러오지 못했습니다: {error}
         </p>
       ) : !stats ? (
-        <p className="status">불러오는 중…</p>
+        <p role="status" className="status">
+          불러오는 중…
+        </p>
       ) : (
-        <section className="metric-grid" aria-label={`${label} 학습 시간`}>
+        <section className="metric-grid" aria-label="학습 시간 지표">
           <article className="card metric">
             <h2>총 학습 시간</h2>
             <p className="metric-value">{formatMinutes(stats.cumulativeMinutes)}</p>
