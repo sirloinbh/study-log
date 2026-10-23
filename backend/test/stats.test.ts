@@ -12,16 +12,17 @@ import {
 } from '../src/stats.js';
 import { withApi } from './helpers.js';
 
-test('weeks start on Monday', () => {
-  // 2026-10-23 is a Friday; 2026-10-19 a Monday; 2026-10-25 a Sunday.
-  assert.equal(weekStart('2026-10-23'), '2026-10-19');
-  assert.equal(weekStart('2026-10-19'), '2026-10-19');
-  assert.equal(weekStart('2026-10-25'), '2026-10-19');
-  assert.equal(weekStart('2027-01-01'), '2026-12-28');
+test('weeks start on Sunday (#96)', () => {
+  // 2026-10-23 is a Friday; 2026-10-18 and 2026-10-25 are Sundays; 2026-10-24 a Saturday.
+  assert.equal(weekStart('2026-10-23'), '2026-10-18');
+  assert.equal(weekStart('2026-10-18'), '2026-10-18');
+  assert.equal(weekStart('2026-10-24'), '2026-10-18');
+  assert.equal(weekStart('2026-10-25'), '2026-10-25');
+  assert.equal(weekStart('2027-01-01'), '2026-12-27');
 });
 
 test('period starts follow the service calendar (#47)', () => {
-  assert.equal(periodStart('week', '2026-10-23'), '2026-10-19');
+  assert.equal(periodStart('week', '2026-10-23'), '2026-10-18');
   assert.equal(periodStart('month', '2026-10-23'), '2026-10-01');
   // Three months back from the 23rd, the next day: 10-23 spans 07-24 to 10-23.
   assert.equal(periodStart('3months', '2026-10-23'), '2026-07-24');
@@ -52,10 +53,11 @@ test('daily minutes are summed by key in order', () => {
     { date: '2026-10-25', minutes: 30 },
     { date: '2026-11-01', minutes: 40 },
   ];
+  // Sundays 10-18, 10-25 and 11-01 each open a week.
   assert.deepEqual(bucket(daily, weekStart), [
-    { key: '2026-10-12', minutes: 10 },
-    { key: '2026-10-19', minutes: 50 },
-    { key: '2026-10-26', minutes: 40 },
+    { key: '2026-10-18', minutes: 30 },
+    { key: '2026-10-25', minutes: 30 },
+    { key: '2026-11-01', minutes: 40 },
   ]);
   assert.deepEqual(
     bucket(daily, (date) => date.slice(0, 7)),
@@ -100,11 +102,11 @@ test('without any logs the totals are zero and averages do not divide by zero', 
   );
 });
 
-test('the heatmap starts on the Monday 52 weeks before this week (#50)', () => {
-  // Friday 2026-10-23: this week starts Monday 10-19; 52 weeks earlier is 2025-10-20.
+test('the heatmap starts on the Sunday 52 weeks before this week (#50, #96)', () => {
+  // Friday 2026-10-23: this week starts Sunday 10-18; 52 weeks earlier is 2025-10-19.
   assert.equal(heatmapWeeks, 53);
-  assert.equal(heatmapStart('2026-10-23'), '2025-10-20');
-  assert.equal(weekStart(heatmapStart('2026-10-23')), '2025-10-20');
-  // On a Monday the current week is one day long; still 53 columns.
-  assert.equal(heatmapStart('2026-10-19'), '2025-10-20');
+  assert.equal(heatmapStart('2026-10-23'), '2025-10-19');
+  assert.equal(weekStart(heatmapStart('2026-10-23')), '2025-10-19');
+  // On a Sunday the current week is one day long; still 53 columns.
+  assert.equal(heatmapStart('2026-10-18'), '2025-10-19');
 });

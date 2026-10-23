@@ -10,11 +10,11 @@ export function shiftMonth(month: string, delta: number) {
 export const monthTitle = (month: string) =>
   `${Number(month.slice(0, 4))}년 ${Number(month.slice(5, 7))}월`;
 
-// The month's days in rows of seven, Monday first; the slots before the 1st are null.
+// The month's days in rows of seven, Sunday first (#96); the slots before the 1st are null.
 export function calendarCells(days: CalendarDay[]) {
   if (days.length === 0) return [];
   const weekday = new Date(`${days[0].date}T00:00:00Z`).getUTCDay();
-  return [...Array<null>((weekday + 6) % 7).fill(null), ...days];
+  return [...Array<null>(weekday).fill(null), ...days];
 }
 
 // A short amount for a small day cell: "45분", "1.5시간", "2시간"; nothing for no study.
