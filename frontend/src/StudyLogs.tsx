@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useBusy } from './busy';
 import { Calendar } from './Calendar';
+import { Memo } from './Memo';
 import { StudyLogSearch } from './StudyLogSearch';
 import { requestJson, type RequestError } from './api';
 import {
@@ -327,8 +328,18 @@ export function StudyLogs({ today }: { today: string }) {
               disabled={busy}
               value={form.memo}
               onChange={change('memo')}
+              aria-describedby="memo-hint"
             />
           </label>
+          <p id="memo-hint" className="hint wide">
+            마크다운을 쓸 수 있습니다: # 제목, - 목록, **굵게**, `코드`, [링크](주소)
+          </p>
+          {form.memo.trim() && (
+            <section className="memo-preview wide" aria-label="메모 미리보기">
+              <h3>미리보기</h3>
+              <Memo text={form.memo} />
+            </section>
+          )}
           <p className="duration wide" aria-live="polite">
             학습 시간 <strong>{minutes === undefined ? '—' : formatMinutes(minutes)}</strong>
             {crossesMidnight(form.startTime, form.endTime) ? ' (다음 날 종료)' : ''}
@@ -382,7 +393,7 @@ export function StudyLogs({ today }: { today: string }) {
                 {log.textbookTitle !== null && <p className="log-studied">{studiedLabel(log)}</p>}
                 {reflectionLabel(log) && <p className="log-studied">{reflectionLabel(log)}</p>}
                 {log.difficulties && <p className="log-memo">어려웠던 부분: {log.difficulties}</p>}
-                {log.memo && <p className="log-memo">{log.memo}</p>}
+                {log.memo && <Memo text={log.memo} clamp />}
                 <div className="log-actions">
                   {deletingId === log.id ? (
                     <>
