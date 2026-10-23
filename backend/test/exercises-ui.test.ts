@@ -477,7 +477,7 @@ uiTest('a saved answer is edited in place and saving it blank deletes it', async
   assert.match(ui.text(card(ui)), /정답을 지웠습니다/);
 });
 
-uiTest('one answer is open at a time and it stays with its chapter', async () => {
+uiTest('one answer is open at a time and picking a chapter closes it', async () => {
   const api = fakeApi(problems, {}, { 1: '첫 정답', 2: '둘째 정답' });
   const ui = await openBook(api);
   await ui.click('정답 보기', item(ui, '문제 3'));
@@ -490,13 +490,30 @@ uiTest('one answer is open at a time and it stays with its chapter', async () =>
     item(ui, '2번째 문제'),
   );
   assert.equal(toggle.props['aria-expanded'], true);
-  // Another chapter shows none; coming back shows it again.
-  await ui.fill('단원', '11');
-  assert.equal(answerPanel(ui).length, 0);
-  await ui.fill('단원', '10');
-  assert.match(ui.text(item(ui, '2번째 문제')), /둘째 정답/);
   await ui.click('정답 닫기', item(ui, '2번째 문제'));
   assert.equal(answerPanel(ui).length, 0);
+  // Another chapter closes it; coming back and opening it loads the answer saved since.
+  await ui.click('정답 보기', item(ui, '2번째 문제'));
+  await ui.fill('단원', '11');
+  assert.equal(answerPanel(ui).length, 0);
+  api.answers.set(2, '다른 곳에서 고친 정답');
+  await ui.fill('단원', '10');
+  assert.equal(answerPanel(ui).length, 0);
+  await ui.click('정답 보기', item(ui, '2번째 문제'));
+  assert.match(ui.text(item(ui, '2번째 문제')), /다른 곳에서 고친 정답/);
+});
+
+uiTest('clearing an answer already deleted elsewhere counts as cleared', async () => {
+  const api = fakeApi(problems, {}, { 1: '정답은 3' });
+  const ui = await openBook(api);
+  await ui.click('정답 보기', item(ui, '문제 3'));
+  await ui.click('정답 수정', item(ui, '문제 3'));
+  api.answers.delete(1);
+  await ui.fill('정답', '');
+  await ui.submit(item(ui, '문제 3'));
+  assert.equal(alertText(ui), '');
+  assert.match(ui.text(answerPanel(ui)[0]), /입력한 정답이 없습니다/);
+  assert.match(ui.text(card(ui)), /정답을 지웠습니다/);
 });
 
 uiTest('a failed answer load or save is reported in the card', async () => {

@@ -143,6 +143,8 @@ export function Exercises({
   const pick = (event: { target: { value: string } }) => {
     setChosen(Number(event.target.value));
     setNotice(undefined);
+    // Closed rather than hidden, so coming back loads the answer again instead of an old copy.
+    setAnswer(undefined);
   };
 
   const startAdd = () => {
@@ -225,7 +227,12 @@ export function Exercises({
         body = data.answer.body;
         say('status', '정답을 저장했습니다');
       } else if (panel.body) {
-        await requestJson(path, { method: 'DELETE' });
+        try {
+          await requestJson(path, { method: 'DELETE' });
+        } catch (failure) {
+          // Already deleted elsewhere: the answer is gone as asked. A missing exercise still fails.
+          if ((failure as RequestError).message !== '정답을 찾을 수 없습니다') throw failure;
+        }
         body = null;
         say('status', '정답을 지웠습니다');
       } else {
