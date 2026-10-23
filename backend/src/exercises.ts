@@ -55,6 +55,32 @@ const answerInput = z.object(
   },
 );
 
+const importantInput = z.object(
+  {
+    important: z.boolean({
+      required_error: '중요 표시 여부를 보내세요',
+      invalid_type_error: '중요 표시 형식이 올바르지 않습니다',
+    }),
+  },
+  {
+    required_error: '중요 표시 여부를 JSON 객체로 보내세요',
+    invalid_type_error: '중요 표시 여부를 JSON 객체로 보내세요',
+  },
+);
+
+// Filters for a textbook's exercises: one chapter (with its sections) and the important mark.
+const textbookListQuery = z.object({
+  contentId: z
+    .string()
+    .regex(/^[1-9]\d{0,14}$/, '목차 ID가 올바르지 않습니다')
+    .transform(Number)
+    .optional(),
+  important: z
+    .enum(['true', 'false'], { message: '중요 표시 조건이 올바르지 않습니다' })
+    .transform((value) => value === 'true')
+    .optional(),
+});
+
 const columns = `id::int AS id, textbook_id::int AS "textbookId", content_id::int AS "contentId",
   number, body, important`;
 
@@ -104,6 +130,44 @@ export function contentExerciseRoutes(pool: Pool) {
   return router;
 }
 
+// Exercises across a textbook (#27): /api/textbooks/:textbookId/exercises?contentId=&important=
+// Ordered as the contents are (chapter, then its sections), then in the order they were added.
+export function textbookExerciseRoutes(pool: Pool) {
+  const router = Router({ mergeParams: true });
+
+  router.get('/', async (req, res) => {
+    const textbookId = textbookIdParam.parse((req.params as Record<string, string>).textbookId);
+    const { contentId, important } = textbookListQuery.parse(req.query);
+    const found = await pool.query(
+      `SELECT EXISTS (SELECT 1 FROM textbooks WHERE id = $1) AS textbook,
+         EXISTS (SELECT 1 FROM textbook_contents WHERE id = $2 AND textbook_id = $1) AS content`,
+      [textbookId, contentId ?? null],
+    );
+    const { textbook, content } = found.rows[0] as { textbook: boolean; content: boolean };
+    if (!textbook) return void res.status(404).json({ error: '교재를 찾을 수 없습니다' });
+    if (contentId !== undefined && !content) return void res.status(404).json(contentNotFound);
+    // Walks the tree from the top-level chapters, or from the one chapter asked for, keeping the
+    // sibling positions on the way down so the rows come out in contents order.
+    const { rows } = await pool.query(
+      `WITH RECURSIVE tree AS (
+         SELECT id AS node, ARRAY[position] AS path FROM textbook_contents
+         WHERE textbook_id = $1 AND (CASE WHEN $2::bigint IS NULL THEN parent_id IS NULL
+                                          ELSE id = $2 END)
+         UNION ALL
+         SELECT c.id, t.path || c.position FROM textbook_contents c
+         JOIN tree t ON c.textbook_id = $1 AND c.parent_id = t.node
+       )
+       SELECT ${columns} FROM exercises JOIN tree ON tree.node = content_id
+       WHERE textbook_id = $1 AND ($3::boolean IS NULL OR important = $3)
+       ORDER BY tree.path, id`,
+      [textbookId, contentId ?? null, important ?? null],
+    );
+    res.json({ exercises: rows });
+  });
+
+  return router;
+}
+
 // Reading, editing and deleting one exercise and its answer: /api/exercises/:id(/answer)
 export function exerciseRoutes(pool: Pool) {
   const router = Router();
@@ -123,6 +187,18 @@ export function exerciseRoutes(pool: Pool) {
       `UPDATE exercises SET number = $2, body = $3, important = $4, updated_at = now()
        WHERE id = $1 RETURNING ${columns}`,
       [id, exercise.number, exercise.body, exercise.important],
+    );
+    if (rows.length === 0) return void res.status(404).json(notFound);
+    res.json({ exercise: rows[0] });
+  });
+
+  // Marks or unmarks the exercise as important (#27), leaving the rest as it is.
+  router.patch('/:id/important', async (req, res) => {
+    const id = exerciseIdParam.parse(req.params.id);
+    const { important } = importantInput.parse(req.body);
+    const { rows } = await pool.query(
+      `UPDATE exercises SET important = $2, updated_at = now() WHERE id = $1 RETURNING ${columns}`,
+      [id, important],
     );
     if (rows.length === 0) return void res.status(404).json(notFound);
     res.json({ exercise: rows[0] });

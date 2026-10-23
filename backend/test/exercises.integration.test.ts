@@ -246,3 +246,98 @@ test(
     });
   },
 );
+
+test(
+  'important exercises are marked, and listed by textbook or chapter in contents order',
+  { skip: !url },
+  async (t) => {
+    const pool = new Pool({ connectionString: url });
+    const prefix = '[통합테스트 중요 문제]';
+    const cleanup = () => pool.query('DELETE FROM textbooks WHERE title LIKE $1', [`${prefix}%`]);
+    await cleanup();
+    t.after(async () => {
+      await cleanup();
+      await pool.end();
+    });
+
+    await withApi(pool, async (call) => {
+      const newBook = async (title: string) =>
+        (
+          (await call('/api/textbooks', { method: 'POST', body: { title: `${prefix} ${title}` } }))
+            .data.textbook as { id: number }
+        ).id;
+      const book = await newBook('선형대수');
+      const other = await newBook('미적분');
+      const addContent = async (bookId: number, title: string, parentId?: number) =>
+        (
+          (
+            await call(`/api/textbooks/${bookId}/contents`, {
+              method: 'POST',
+              body: { title, parentId },
+            })
+          ).data.content as { id: number }
+        ).id;
+      const vectors = await addContent(book, '벡터');
+      const matrices = await addContent(book, '행렬');
+      const dot = await addContent(book, '내적', vectors);
+      const limits = await addContent(other, '극한');
+      const add = async (bookId: number, contentId: number, number: string, important = false) =>
+        (
+          (
+            await call(`/api/textbooks/${bookId}/contents/${contentId}/exercises`, {
+              method: 'POST',
+              body: { number, body: `${number}번 문제`, important },
+            })
+          ).data.exercise as Exercise
+        ).id;
+      // Added out of contents order on purpose.
+      const m1 = await add(book, matrices, 'm1');
+      const d1 = await add(book, dot, 'd1', true);
+      const v1 = await add(book, vectors, 'v1');
+      await add(book, vectors, 'v2');
+      await add(other, limits, 'l1', true);
+
+      const mark = (id: number, important: boolean) =>
+        call(`/api/exercises/${id}/important`, { method: 'PATCH', body: { important } });
+      const marked = await mark(m1, true);
+      assert.equal(marked.status, 200);
+      assert.equal((marked.data.exercise as Exercise).important, true);
+      assert.equal((await mark(v1, true)).status, 200);
+      // Marking leaves the rest as it was.
+      assert.equal(
+        ((await call(`/api/exercises/${m1}`)).data.exercise as Exercise).body,
+        'm1번 문제',
+      );
+
+      const numbers = async (query: string) =>
+        ((await call(`/api/textbooks/${book}/exercises${query}`)).data.exercises as Exercise[]).map(
+          (e) => e.number,
+        );
+      // Chapter 벡터, its section 내적, then chapter 행렬; nothing from the other textbook.
+      assert.deepEqual(await numbers('?important=true'), ['v1', 'd1', 'm1']);
+      assert.deepEqual(await numbers(''), ['v1', 'v2', 'd1', 'm1']);
+      assert.deepEqual(await numbers(`?important=true&contentId=${vectors}`), ['v1', 'd1']);
+      assert.deepEqual(await numbers(`?important=true&contentId=${dot}`), ['d1']);
+      assert.deepEqual(await numbers('?important=false'), ['v2']);
+
+      assert.equal((await mark(d1, false)).status, 200);
+      assert.deepEqual(await numbers('?important=true'), ['v1', 'm1']);
+
+      // Moving a chapter changes the list order with it.
+      const moved = await call(`/api/textbooks/${book}/contents/order`, {
+        method: 'PUT',
+        body: { ids: [matrices, vectors] },
+      });
+      assert.equal(moved.status, 200);
+      assert.deepEqual(await numbers('?important=true'), ['m1', 'v1']);
+
+      const otherChapter = await call(`/api/textbooks/${book}/exercises?contentId=${limits}`);
+      assert.equal(otherChapter.status, 404);
+      assert.equal(otherChapter.data.error, '목차를 찾을 수 없습니다');
+      const missing = await call('/api/textbooks/999999999/exercises');
+      assert.equal(missing.status, 404);
+      assert.equal(missing.data.error, '교재를 찾을 수 없습니다');
+      assert.equal((await mark(999999999, true)).status, 404);
+    });
+  },
+);

@@ -38,6 +38,8 @@ type Options = {
   failContents?: boolean;
   // Changes (non-GET exercise requests) wait for this promise.
   holdChange?: Promise<void>;
+  // Loading the important card fails.
+  failImportant?: boolean;
 };
 
 // In-memory exercises API with the textbook list and contents; records exercise requests.
@@ -46,9 +48,12 @@ function fakeApi(
   options: Options = {},
   initialAnswers: Record<number, string> = {},
 ) {
-  const rows = [...initial];
+  // Copies, so a change in one test never reaches the shared fixtures.
+  const rows = initial.map((row) => ({ ...row }));
   const answers = new Map(Object.entries(initialAnswers).map(([id, body]) => [Number(id), body]));
   const requests: { method: string; path: string; body?: unknown }[] = [];
+  // Loads of the important card, kept apart so `requests` stays the exercises card's.
+  const importantLoads: string[] = [];
   let nextId = 100;
   const reply = (status: number, body?: unknown) => ({
     ok: status < 400,
@@ -66,6 +71,24 @@ function fakeApi(
       return options.failContents
         ? reply(500, { error: '서버 오류가 발생했습니다' })
         : reply(200, { contents: contents[Number(tree[1])] });
+    const across = path.match(/^\/api\/textbooks\/(\d+)\/exercises\?(.*)$/);
+    if (across) {
+      importantLoads.push(path);
+      if (options.failImportant) return reply(500, { error: '서버 오류가 발생했습니다' });
+      const query = new URLSearchParams(across[2]);
+      // The picked chapter and its sections, in contents order.
+      const flat = (nodes: Tree[]): Tree[] => nodes.flatMap((n) => [n, ...flat(n.children)]);
+      const all = flat(contents[Number(across[1])]);
+      const top = query.get('contentId');
+      const scope = top ? flat([all.find((n) => n.id === Number(top))!]) : all;
+      return reply(200, {
+        exercises: scope.flatMap((node) =>
+          rows.filter(
+            (r) => r.contentId === node.id && (query.get('important') !== 'true' || r.important),
+          ),
+        ),
+      });
+    }
     requests.push({ method, path, body });
     if (method !== 'GET') await options.holdChange;
     if (options.reject?.method === method)
@@ -94,6 +117,13 @@ function fakeApi(
       const saved = answers.get(id);
       return reply(200, { answer: saved === undefined ? null : { exerciseId: id, body: saved } });
     }
+    const mark = path.match(/^\/api\/exercises\/(\d+)\/important$/);
+    if (mark) {
+      const row = rows.find((r) => r.id === Number(mark[1]));
+      if (!row) return reply(404, { error: '연습문제를 찾을 수 없습니다' });
+      row.important = body.important;
+      return reply(200, { exercise: row });
+    }
     const one = path.match(/^\/api\/exercises\/(\d+)$/);
     assert.ok(one, 'unexpected request ' + path);
     const index = rows.findIndex((r) => r.id === Number(one[1]));
@@ -105,7 +135,7 @@ function fakeApi(
     rows.splice(index, 1);
     return reply(204);
   };
-  return { fetch, requests, rows, answers };
+  return { fetch, requests, rows, answers, importantLoads };
 }
 
 const problems: Exercise[] = [
@@ -398,6 +428,7 @@ uiTest('exercise buttons name the exercise they act on', async () => {
   assert.deepEqual(labels, [
     '1번째 문제 질문 복사',
     '1번째 문제 정답 보기',
+    '1번째 문제 중요 표시',
     '1번째 문제 수정',
     '1번째 문제 삭제',
   ]);
@@ -533,4 +564,114 @@ uiTest('a failed answer load or save is reported in the card', async () => {
   await ui.submit(item(ui, '문제 3'));
   assert.match(alertText(ui), /연습문제를 찾을 수 없습니다/);
   assert.deepEqual(listed(ui), ['1번째 문제:증명하라.']);
+});
+
+const importantCard = (ui: Ui) => ui.find((n) => n.props.className === 'important-exercises')[0];
+// Each important exercise as "label:body", in list order.
+const importantListed = (ui: Ui) =>
+  ui
+    .find((n) => n.type === 'li', importantCard(ui))
+    .map(
+      (li) =>
+        ui.text(ui.find((n) => n.props.className === 'log-date', li)[0]) +
+        ':' +
+        ui.text(ui.find((n) => n.props.className === 'exercise-body', li)[0]),
+    );
+
+uiTest('marking an exercise important shows it in the important card', async () => {
+  const api = fakeApi(problems);
+  const ui = await openBook(api);
+  assert.deepEqual(importantListed(ui), ['1 벡터 · 문제 3:벡터 u를 구하라.']);
+  await ui.click('중요 표시', item(ui, '2번째 문제'));
+  assert.deepEqual(
+    api.requests.find((r) => r.method === 'PATCH'),
+    {
+      method: 'PATCH',
+      path: '/api/exercises/2/important',
+      body: { important: true },
+    },
+  );
+  assert.deepEqual(
+    ui.find((n) => n.props.className === 'badge important', card(ui)).map((n) => ui.text(n)),
+    ['중요', '중요'],
+  );
+  assert.match(ui.text(card(ui)), /중요 문제로 표시했습니다/);
+  // The important card reloads after the change.
+  assert.deepEqual(importantListed(ui), [
+    '1 벡터 · 문제 3:벡터 u를 구하라.',
+    '1 벡터 · 번호 없는 문제:증명하라.',
+  ]);
+  await ui.click('중요 해제', item(ui, '문제 3'));
+  assert.match(ui.text(card(ui)), /중요 표시를 해제했습니다/);
+  assert.deepEqual(importantListed(ui), ['1 벡터 · 번호 없는 문제:증명하라.']);
+});
+
+uiTest('marking an exercise being edited keeps the edit in step', async () => {
+  const api = fakeApi(problems);
+  const ui = await openBook(api);
+  await ui.click('수정', item(ui, '2번째 문제'));
+  await ui.click('중요 표시', item(ui, '2번째 문제'));
+  const [check] = ui.find((n) => n.props.type === 'checkbox', form(ui));
+  assert.equal(check.props.checked, true);
+  await ui.submit(form(ui));
+  assert.deepEqual(api.requests.find((r) => r.method === 'PUT')?.body, {
+    number: '',
+    body: '증명하라.',
+    important: true,
+  });
+});
+
+uiTest('the important card spans the textbook or one chapter with its sections', async () => {
+  const rows: Exercise[] = [
+    { id: 1, textbookId: 1, contentId: 20, number: '9', body: '행렬 문제', important: true },
+    { id: 2, textbookId: 1, contentId: 11, number: '2', body: '내적 문제', important: true },
+    { id: 3, textbookId: 1, contentId: 10, number: '1', body: '벡터 문제', important: true },
+    { id: 4, textbookId: 1, contentId: 10, number: '5', body: '안 중요', important: false },
+  ];
+  const api = fakeApi(rows);
+  const ui = await openBook(api);
+  // Contents order: chapter 1, its section 1.2, then chapter 2.
+  assert.deepEqual(importantListed(ui), [
+    '1 벡터 · 문제 1:벡터 문제',
+    '1 벡터 > 1.2 내적 · 문제 2:내적 문제',
+    '2 행렬 · 문제 9:행렬 문제',
+  ]);
+  await ui.fill('범위', '10');
+  assert.equal(api.importantLoads.at(-1), '/api/textbooks/1/exercises?important=true&contentId=10');
+  assert.deepEqual(importantListed(ui), [
+    '1 벡터 · 문제 1:벡터 문제',
+    '1 벡터 > 1.2 내적 · 문제 2:내적 문제',
+  ]);
+  await ui.fill('범위', '11');
+  assert.deepEqual(importantListed(ui), ['1 벡터 > 1.2 내적 · 문제 2:내적 문제']);
+  await ui.fill('범위', '0');
+  assert.equal(api.importantLoads.at(-1), '/api/textbooks/1/exercises?important=true');
+});
+
+uiTest('unmarking in the important card reloads the exercises card', async () => {
+  const api = fakeApi(problems);
+  const ui = await openBook(api);
+  const before = api.requests.length;
+  await ui.click('중요 해제', importantCard(ui));
+  assert.deepEqual(
+    api.requests.slice(before).map((r) => [r.method, r.path]),
+    [
+      ['PATCH', '/api/exercises/1/important'],
+      ['GET', '/api/textbooks/1/contents/10/exercises'],
+    ],
+  );
+  assert.deepEqual(api.requests[before].body, { important: false });
+  assert.match(ui.text(importantCard(ui)), /1 벡터 · 문제 3 중요 표시를 해제했습니다/);
+  assert.match(ui.text(importantCard(ui)), /중요 표시한 문제가 없습니다/);
+  assert.equal(ui.find((n) => n.props.className === 'badge important', card(ui)).length, 0);
+});
+
+uiTest('a failed important load is reported in its card', async () => {
+  const ui = await openBook(fakeApi(problems, { failImportant: true }));
+  assert.match(
+    ui.text(importantCard(ui)),
+    /중요 문제를 불러오지 못했습니다: 서버 오류가 발생했습니다/,
+  );
+  // The exercises card still works.
+  assert.deepEqual(listed(ui), ['문제 3:벡터 u를 구하라.', '2번째 문제:증명하라.']);
 });

@@ -3,7 +3,7 @@ import type { Pool } from 'pg';
 import { types } from 'pg';
 import { ZodError } from 'zod';
 import { studyLogRoutes } from './study-logs.js';
-import { contentExerciseRoutes, exerciseRoutes } from './exercises.js';
+import { contentExerciseRoutes, exerciseRoutes, textbookExerciseRoutes } from './exercises.js';
 import { textbookContentRoutes } from './textbook-contents.js';
 import { textbookRoutes } from './textbooks.js';
 
@@ -34,6 +34,7 @@ export function createApp(pool: Pool, options: { today?: () => string } = {}) {
   app.use('/api/study-logs', studyLogRoutes(pool));
   app.use('/api/textbooks/:textbookId/contents/:contentId/exercises', contentExerciseRoutes(pool));
   app.use('/api/textbooks/:textbookId/contents', textbookContentRoutes(pool));
+  app.use('/api/textbooks/:textbookId/exercises', textbookExerciseRoutes(pool));
   app.use('/api/exercises', exerciseRoutes(pool));
   app.use('/api/textbooks', textbookRoutes(pool));
   app.use('/api', (_req, res) => {
