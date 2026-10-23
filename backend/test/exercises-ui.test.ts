@@ -873,6 +873,8 @@ uiTest('a translation is made on request and shown with its answer', async () =>
     api.requests.filter((r) => r.path.endsWith('/translation')).map((r) => r.method),
     ['GET', 'POST'],
   );
+  // A JSON body: the API refuses a paid request that is not JSON.
+  assert.deepEqual(api.requests.find((r) => r.method === 'POST')?.body, {});
   const text = ui.text(translationPanel(ui));
   assert.match(text, /번역: 벡터 u를 구하라\./);
   assert.match(text, /정답 번역번역: u = \(1,\n {2}2\)/);

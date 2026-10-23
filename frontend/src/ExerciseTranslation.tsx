@@ -41,7 +41,8 @@ export function ExerciseTranslation({ exerciseId, label }: { exerciseId: number;
     try {
       const data = await requestJson<{ translation: Translation }>(
         `/api/exercises/${id}/translation`,
-        { method: 'POST' },
+        // A JSON body: the API takes nothing else for this paid request.
+        { method: 'POST', body: {} },
       );
       setLoaded({ exerciseId: id, translation: data.translation });
       setLoadError(undefined);
