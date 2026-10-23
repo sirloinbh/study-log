@@ -33,10 +33,16 @@ const periodOf = (kind: string, date: string) => {
 // The retrospective API in memory; records period requests and writes.
 function fakeApi(
   initial: Retro[] = [],
-  options: { failPeriod?: boolean; failReload?: boolean } = {},
+  options: {
+    failPeriod?: boolean;
+    failReload?: boolean;
+    // The pattern answered for every period; undefined answers a 500.
+    pattern?: Record<string, unknown> | null;
+  } = {},
 ) {
   const rows = initial.map((row) => ({ ...row }));
   const periods: string[] = [];
+  const patterns: string[] = [];
   const writes: { method: string; path: string; body?: unknown }[] = [];
   let nextId = 100;
   const reply = (status: number, body?: unknown) => ({
@@ -49,6 +55,13 @@ function fakeApi(
     if (path === '/api/health') return reply(200, { ok: true, today });
     if (path.startsWith('/api/study-logs')) return reply(200, { studyLogs: [] });
     if (path === '/api/textbooks') return reply(200, { textbooks: [] });
+    const pattern = path.match(/^\/api\/stats\/patterns\?from=(.+)&to=(.+)$/);
+    if (pattern) {
+      patterns.push(`${pattern[1]}~${pattern[2]}`);
+      return options.pattern === null
+        ? reply(500, { error: '서버 오류가 발생했습니다' })
+        : reply(200, { from: pattern[1], to: pattern[2], ...(options.pattern ?? emptyPattern) });
+    }
     const period = path.match(/^\/api\/retrospectives\/period\?kind=(\w+)&date=(.+)$/);
     if (period) {
       periods.push(`${period[1]}:${period[2]}`);
@@ -91,8 +104,16 @@ function fakeApi(
     else rows[index] = saved;
     return reply(200, { retrospective: saved });
   };
-  return { fetch, periods, writes, rows };
+  return { fetch, periods, writes, rows, patterns };
 }
+
+const emptyPattern = {
+  totalMinutes: 0,
+  byHour: Array(24).fill(0),
+  byWeekday: Array(7).fill(0),
+  topHour: null,
+  topWeekday: null,
+};
 
 type Ui = ReturnType<typeof mount>;
 const writer = (ui: Ui) => ui.find((n) => n.props['aria-label'] === '회고 작성')[0];
@@ -259,4 +280,64 @@ uiTest('switching to monthly opens the month most of the week falls in', async (
   await ui.click('이번 달', writer(ui));
   await ui.click('주간', writer(ui));
   assert.equal(heading(ui), '2026년 10월 18일 ~ 10월 24일 주간 회고');
+});
+
+const pattern = (ui: Ui) => ui.find((n) => n.props['aria-label'] === '학습 패턴', writer(ui))[0];
+
+uiTest("the retrospective shows the period's study pattern", async () => {
+  const byHour = Array(24).fill(0);
+  byHour[20] = 30;
+  byHour[21] = 105;
+  byHour[0] = 60;
+  const api = fakeApi([], {
+    pattern: {
+      totalMinutes: 195,
+      byHour,
+      byWeekday: [90, 0, 0, 105, 0, 0, 0],
+      topHour: 21,
+      topWeekday: 3,
+    },
+  });
+  const ui = await open(api);
+  assert.deepEqual(api.patterns, ['2026-10-18~2026-10-24']);
+  assert.match(
+    ui.text(pattern(ui)),
+    /가장 많이 공부한 시간대는 21시~22시\(1시간 45분\), 요일은 수요일\(1시간 45분\)입니다/,
+  );
+  // Weekday bars from Sunday, widths relative to the busiest day.
+  const bars = ui.find((n) => n.props.className === 'pattern-bar', pattern(ui));
+  assert.deepEqual(
+    bars.map((n) => (n.props.style as { width: string }).width),
+    ['86%', '0%', '0%', '100%', '0%', '0%', '0%'],
+  );
+  const hours = ui.find(
+    (n) => n.props.className === 'pattern-hour' || n.props.className === 'pattern-hour top',
+    pattern(ui),
+  );
+  assert.equal(hours.length, 24);
+  assert.equal(hours[21].props.className, 'pattern-hour top');
+  assert.equal(hours[0].props.title, '0시~1시: 1시간');
+  // Moving to another week asks for its pattern.
+  await ui.click('이전', writer(ui));
+  assert.equal(api.patterns.at(-1), '2026-10-11~2026-10-17');
+});
+
+uiTest('a period without study or a failed pattern says so', async () => {
+  const quiet = await open(fakeApi());
+  assert.match(ui2text(quiet), /학습 기록이 없어 패턴을 볼 수 없습니다/);
+  const failing = await open(fakeApi([], { pattern: null }));
+  assert.match(ui2text(failing), /학습 패턴을 불러오지 못했습니다: 서버 오류가 발생했습니다/);
+});
+
+const ui2text = (ui: Ui) => ui.text(pattern(ui));
+
+uiTest('pattern helpers: hour labels and bar widths', () => {
+  const stats = loadFrontendModule<{
+    hourLabel(hour: number): string;
+    barWidth(value: number, values: number[]): string;
+  }>('study-stats.ts');
+  assert.equal(stats.hourLabel(23), '23시~0시');
+  assert.equal(stats.hourLabel(0), '0시~1시');
+  assert.equal(stats.barWidth(30, [0, 30, 60]), '50%');
+  assert.equal(stats.barWidth(0, [0, 0]), '0%');
 });

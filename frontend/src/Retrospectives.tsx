@@ -12,6 +12,7 @@ import {
   type RetrospectivePeriod,
 } from './retrospective';
 import { formatMinutes } from './study-logs';
+import { StudyPattern } from './StudyPattern';
 
 type Notice = { kind: 'status' | 'alert'; text: string } | undefined;
 
@@ -288,6 +289,7 @@ export function Retrospectives({ today }: { today: string }) {
             {period.retrospective && (
               <p className="status">마지막 저장 {period.retrospective.updatedAt}</p>
             )}
+            <StudyPattern from={period.from} to={period.to} reloadKey={reload} />
           </>
         )}
         {/* Always mounted so screen readers announce each new message. */}
