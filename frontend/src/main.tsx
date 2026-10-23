@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { BookOpen, ChartColumn, NotebookPen, Settings2, Tags } from 'lucide-react';
+import { BookOpen, ChartColumn, NotebookPen, NotebookText, Settings2, Tags } from 'lucide-react';
 import './style.css';
 import { healthText, type Health } from './health';
 import { Keywords } from './Keywords';
+import { Retrospectives } from './Retrospectives';
 import { Stats } from './Stats';
 import { StudyLogs } from './StudyLogs';
 import { Textbooks } from './Textbooks';
@@ -32,6 +33,12 @@ const pages = [
     label: '통계',
     icon: ChartColumn,
     description: '기간별 학습 시간과 하루 평균을 한눈에 봅니다',
+  },
+  {
+    key: 'retrospectives',
+    label: '회고',
+    icon: NotebookText,
+    description: '한 주와 한 달의 공부를 돌아보며 회고를 남깁니다',
   },
   { key: 'settings', label: '설정', icon: Settings2, description: '앱 환경과 데이터 관리' },
 ];
@@ -98,6 +105,9 @@ export function App() {
         {current.key === 'textbooks' && health.state === 'ok' && <Textbooks />}
         {current.key === 'keywords' && health.state === 'ok' && <Keywords today={health.today} />}
         {current.key === 'stats' && health.state === 'ok' && <Stats />}
+        {current.key === 'retrospectives' && health.state === 'ok' && (
+          <Retrospectives today={health.today} />
+        )}
         {current.key === 'settings' && (
           <section className="card empty">
             <h2>아직 설정 항목이 없습니다</h2>
