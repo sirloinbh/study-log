@@ -10,6 +10,7 @@ import { studyLogRoutes } from './study-logs.js';
 import { contentExerciseRoutes, exerciseRoutes, textbookExerciseRoutes } from './exercises.js';
 import { textbookContentRoutes } from './textbook-contents.js';
 import { textbookRoutes } from './textbooks.js';
+import { claudeTranslator, type Translator } from './translation.js';
 
 // DATE columns stay YYYY-MM-DD strings so the service time zone never shifts them.
 types.setTypeParser(1082, (value) => value);
@@ -35,7 +36,10 @@ export function serviceDate(now = new Date()) {
   }).format(now);
 }
 
-export function createApp(pool: Pool, options: { today?: () => string } = {}) {
+export function createApp(
+  pool: Pool,
+  options: { today?: () => string; translator?: Translator } = {},
+) {
   const today = options.today ?? (() => serviceDate());
   const app = express();
   app.disable('x-powered-by');
@@ -53,7 +57,7 @@ export function createApp(pool: Pool, options: { today?: () => string } = {}) {
   app.use('/api/textbooks/:textbookId/contents/:contentId/exercises', contentExerciseRoutes(pool));
   app.use('/api/textbooks/:textbookId/contents', textbookContentRoutes(pool));
   app.use('/api/textbooks/:textbookId/exercises', textbookExerciseRoutes(pool));
-  app.use('/api/exercises', exerciseRoutes(pool));
+  app.use('/api/exercises', exerciseRoutes(pool, options.translator ?? claudeTranslator()));
   app.use('/api/textbooks', textbookRoutes(pool));
   app.use('/api', (_req, res) => {
     res.status(404).json({ error: '요청한 API를 찾을 수 없습니다' });
