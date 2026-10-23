@@ -109,3 +109,84 @@
     - 위의 50000자 자르기
     - 문서의 "첫 줄" 표현: 코드와 맞게 "첫 항목보다 앞"으로 고쳤다.
   - 보완점이 없어 2차 리뷰는 하지 않았다.
+
+## PDF 목차 추출 (브랜치 `feat/23-toc-pdf`)
+
+### 결정
+
+- 사용자가 `pdfjs-dist` 설치를 허락했다([결정 코멘트](https://github.com/sirloinbh/study-log/issues/23#issuecomment-6360592804)).
+- PDF는 서버로 올리지 않고 브라우저에서만 읽는다. 읽은 글은 기존 붙여넣기 칸에 들어가며, 같은 미리보기로 고친 뒤 저장한다.
+- 책갈피(아웃라인)가 있으면 책갈피를 단계별 들여쓰기로 가져온다. 없으면 앞 20쪽의 글을 줄 단위로 가져오고, 목차가 아닌 줄은 사용자가 지운다.
+- 50MB를 넘는 PDF는 읽지 않는다. 스캔본처럼 글자가 없는 PDF는 그렇다고 알린다(OCR은 #29).
+
+### 설치 전 확인(글로벌 공급망 규칙)
+
+- `pdfjs-dist@6.4.299`
+  - 2026-10-03 게시, 게시자는 GitHub Actions(SLSA provenance 있음)
+  - 관리자는 Mozilla pdf.js 팀, 저장소는 `github.com/mozilla/pdf.js`
+  - install script 없음
+  - 버전을 정확히 고정하고 `--ignore-scripts`로 설치했다.
+- 선택 의존성 `@napi-rs/canvas`(Node에서만 쓰는 네이티브 모듈)
+  - 범위 `^1.0.10`의 최신 1.0.13은 2026-10-21 게시라 14일이 지나지 않았다.
+  - 그래서 루트와 `frontend/package.json`의 `overrides`로 1.0.10(2026-10-01 게시)에 고정했다.
+  - 플랫폼별 바이너리 11개도 1.0.10이고 모두 GitHub Actions 게시다. install script는 없다.
+  - 로더 `js-binding.js`의 `child_process`는 Linux에서 musl을 판별하는 `ldd --version` 호출뿐이다. 브라우저 번들에는 들어가지 않는다.
+- 잠금 파일
+  - 루트: 13개 추가, 기존 항목 변경 없음, 모두 `registry.npmjs.org`
+  - `frontend/package-lock.json`: 임시 폴더에서 `--package-lock-only --ignore-scripts`로 다시 만들었다. 추가된 13개 항목이 루트와 버전·integrity가 같고, 삭제된 줄이 없다.
+- 보안: 텍스트만 읽고 그리지 않는다. PDF.js 6에는 CVE-2024-4367의 원인이던 `eval` 경로가 없다. 워커를 포함해 빌드 결과에 `eval`·`new Function`이 없음을 확인했다.
+
+### 변경
+
+- `frontend/src/pdf-toc.ts`(새 파일)
+  - `outlineText`: 책갈피를 2칸씩 들여 쓴 줄로 바꾼다.
+  - `pageText`: 쪽의 글 조각을 줄로 다시 묶는다. 글자 크기 절반보다 가까운 기준선은 같은 줄로 본다. 넓은 간격은 두 칸으로 바꿔 쪽 번호가 빠지게 하고, 왼쪽 여백은 들여쓰기로 옮긴다.
+- `frontend/src/pdf-import.ts`(새 파일): `readPdfToc`
+  - PDF.js와 워커를 처음 쓸 때 동적으로 불러온다.
+  - 책갈피가 있으면 책갈피를, 없으면 앞 20쪽의 글을 읽는다.
+  - 끝나면 문서를 닫는다.
+- `frontend/src/TextbookContents.tsx`
+  - 붙여넣기 창에 "PDF에서 가져오기" 파일 선택을 넣었다.
+  - 읽는 동안 "PDF를 읽는 중…"이 보이고 입력과 저장이 잠긴다.
+  - 결과 안내: 책갈피 N줄, 또는 앞 N쪽. 실패, 글 없음, 50MB 초과도 알린다.
+  - 같은 파일을 다시 고를 수 있게 선택값을 비운다.
+- `frontend/src/vite-env.d.ts`(새 파일): 워커 주소를 가져오는 `?url` import용 Vite 타입
+- `backend/test/ui-harness.ts`: 테스트가 패키지 대역(PDF.js)을 이름으로 넘길 수 있게 `mount(fetch, globals, modules)`로 바꿨다.
+- 번들
+  - 메인 JS는 gzip 126.14 kB → 129.58 kB다(붙여넣기·파서 코드 포함).
+  - PDF.js(gzip 144.80 kB)와 워커(1.26 MB)는 PDF를 고를 때만 받는 별도 파일이다.
+
+### 테스트
+
+- `backend/test/pdf-toc.test.ts`(새 파일)
+  - 책갈피를 들여 쓴 줄로 바꾸고, 공백을 정리하고, 빈 제목을 버린다. 파서가 이를 단계대로 묶는다.
+  - 순서가 뒤섞인 글 조각을 위에서 아래 줄로 다시 묶는다. 쪽 번호 간격, 들여쓰기, 빈 조각, 빈 쪽을 처리한다.
+- `backend/test/textbook-contents-ui.test.ts`(PDF.js 대역)
+  - 책갈피 PDF: 칸 내용 바꿈, 워커 주소, 문서 닫힘, 미리보기, 안내
+  - 책갈피 없는 PDF: 쪽 글과 "앞 2쪽" 안내
+  - 읽기 실패(문서 닫힘, 글 유지), 글 없음, 50MB 초과(읽지 않음)
+
+### 검증
+
+| 명령                   | 환경                                                        | 결과                                                        |
+| ---------------------- | ----------------------------------------------------------- | ----------------------------------------------------------- |
+| `npm run check`        | 로컬, `TEST_DATABASE_URL` 미설정                            | exit 0. backend tests 248, pass 230, fail 0, skipped 18(DB) |
+| `npm test` (기본 병렬) | 로컬 Docker `postgres:17-alpine`, 마이그레이션 001~010 적용 | exit 0. tests 248, pass 248, fail 0, skipped 0              |
+
+- 브라우저: 실제 PDF.js로 확인했다. 확인용 교재를 만들어 쓰고 끝난 뒤 삭제했다.
+  - 확인용 PDF 2개는 패키지 없이 Python으로 직접 썼다.
+    - 한글 책갈피 4개(UTF-16) PDF
+    - 책갈피 없이 "Contents" 쪽(Helvetica, 오른쪽 끝 쪽 번호, 들여 쓴 절)이 있는 PDF
+  - 모바일 390×844, 책갈피 PDF
+    - "1 벡터 / 1.1 벡터의 덧셈 / 1.2 내적 / 2 행렬"이 들여쓰기와 함께 칸에 들어갔다.
+    - 미리보기 4개, "PDF 책갈피에서 목차 4줄을 가져왔습니다"가 보였다. 가로 스크롤은 없었다.
+  - PC 1440×900, 책갈피 없는 PDF
+    - "책갈피 목차가 없어 앞 1쪽의 글을 가져왔습니다"가 보였다.
+    - "Contents" 줄과 쪽 번호가 빠지고, Chapter 1[1.1, 1.2], Chapter 2[Exercises]로 미리보기됐다.
+    - 저장하면 "목차 5개를 추가했습니다"가 보였고, API 트리도 같았다.
+  - 스크린샷: [모바일 390×844 (책갈피)](assets/23-pdf-mobile-390x844.png), [PC 1440×900 (책갈피 없음)](assets/23-pdf-pc-1440x900.png)
+
+### 한계
+
+- 확인한 PDF는 손으로 만든 작은 파일이다. 실제 교재 PDF는 글 조각 배치가 다양해서, 책갈피가 없으면 줄 묶음이나 들여쓰기가 어긋날 수 있다. 그때는 칸에서 글을 고친다.
+- 두 단으로 된 목차 쪽은 두 단의 줄이 섞일 수 있다.
