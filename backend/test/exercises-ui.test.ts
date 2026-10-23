@@ -54,6 +54,8 @@ function fakeApi(
   const requests: { method: string; path: string; body?: unknown }[] = [];
   // Loads of the important card, kept apart so `requests` stays the exercises card's.
   const importantLoads: string[] = [];
+  // How many times the contents tree was loaded.
+  let treeLoads = 0;
   let nextId = 100;
   const reply = (status: number, body?: unknown) => ({
     ok: status < 400,
@@ -67,10 +69,12 @@ function fakeApi(
     if (path.startsWith('/api/study-logs')) return reply(200, { studyLogs: [] });
     if (path === '/api/textbooks') return reply(200, { textbooks: books });
     const tree = path.match(/^\/api\/textbooks\/(\d+)\/contents$/);
+    if (tree) treeLoads++;
     if (tree)
       return options.failContents
         ? reply(500, { error: '서버 오류가 발생했습니다' })
-        : reply(200, { contents: contents[Number(tree[1])] });
+        : // A copy, as from the server: a chapter removed later stays in the tree on screen.
+          reply(200, { contents: structuredClone(contents[Number(tree[1])]) });
     const across = path.match(/^\/api\/textbooks\/(\d+)\/exercises\?(.*)$/);
     if (across) {
       importantLoads.push(path);
@@ -96,6 +100,10 @@ function fakeApi(
     const list = path.match(/^\/api\/textbooks\/(\d+)\/contents\/(\d+)\/exercises$/);
     if (list) {
       const [textbookId, contentId] = [Number(list[1]), Number(list[2])];
+      // A chapter no longer in the contents (deleted elsewhere) is a 404, as from the API.
+      const nodes = (all: Tree[]): Tree[] => all.flatMap((n) => [n, ...nodes(n.children)]);
+      if (!nodes(contents[textbookId]).some((n) => n.id === contentId))
+        return reply(404, { error: '목차를 찾을 수 없습니다' });
       if (method === 'GET')
         return reply(200, {
           exercises: rows.filter((r) => r.textbookId === textbookId && r.contentId === contentId),
@@ -135,7 +143,7 @@ function fakeApi(
     rows.splice(index, 1);
     return reply(204);
   };
-  return { fetch, requests, rows, answers, importantLoads };
+  return { fetch, requests, rows, answers, importantLoads, treeLoads: () => treeLoads };
 }
 
 const problems: Exercise[] = [
@@ -674,4 +682,70 @@ uiTest('a failed important load is reported in its card', async () => {
   );
   // The exercises card still works.
   assert.deepEqual(listed(ui), ['문제 3:벡터 u를 구하라.', '2번째 문제:증명하라.']);
+});
+
+// #74: the picked chapter is deleted in another tab. Removes chapter `id` from textbook 1's
+// contents for the test and puts it back afterwards.
+async function withoutChapter(id: number, run: () => Promise<void>) {
+  const index = contents[1].findIndex((node) => node.id === id);
+  const [removed] = contents[1].splice(index, 1);
+  try {
+    await run();
+  } finally {
+    contents[1].splice(index, 0, removed);
+  }
+}
+
+uiTest('adding to a chapter deleted elsewhere reloads the contents and moves on', async () => {
+  const api = fakeApi(problems);
+  const ui = await openBook(api);
+  await ui.click('문제 추가', card(ui));
+  await ui.fill('문제 본문', '새 문제');
+  const loadsBefore = api.treeLoads();
+  await withoutChapter(10, async () => {
+    await ui.submit(form(ui));
+    // The contents card loaded the tree again, and chapter 10 (with its section) left the picker.
+    assert.equal(api.treeLoads(), loadsBefore + 1);
+    const picker = ui.find((n) => n.type === 'select', card(ui))[0];
+    assert.deepEqual(
+      ui.find((n) => n.type === 'option', picker).map((n) => n.props.value),
+      [20],
+    );
+    assert.equal(ui.field('단원'), 20);
+    assert.match(
+      ui.text(card(ui)),
+      /선택한 단원이 다른 곳에서 삭제되었습니다\. 첫 단원을 보여 줍니다/,
+    );
+    assert.match(ui.text(card(ui)), /이 단원에 입력한 문제가 없습니다/);
+    assert.doesNotMatch(ui.text(card(ui)), /연습문제를 불러오지 못했습니다/);
+    // Picking a chapter clears the message.
+    await ui.fill('단원', '20');
+    assert.doesNotMatch(ui.text(card(ui)), /삭제되었습니다/);
+  });
+});
+
+uiTest('opening a chapter deleted elsewhere reloads the contents too', async () => {
+  const api = fakeApi(problems);
+  const ui = await openBook(api);
+  const loadsBefore = api.treeLoads();
+  await withoutChapter(20, async () => {
+    // The picker still offers chapter 20 from the old tree.
+    await ui.fill('단원', '20');
+    assert.equal(api.treeLoads(), loadsBefore + 1);
+    assert.equal(ui.field('단원'), 10);
+    assert.match(ui.text(card(ui)), /선택한 단원이 다른 곳에서 삭제되었습니다/);
+    assert.deepEqual(listed(ui), ['문제 3:벡터 u를 구하라.', '2번째 문제:증명하라.']);
+  });
+});
+
+uiTest('a missing exercise does not reload the contents', async () => {
+  const api = fakeApi(problems);
+  const ui = await openBook(api);
+  const loadsBefore = api.treeLoads();
+  await ui.click('삭제', item(ui, '문제 3'));
+  api.rows.splice(0, 1);
+  await ui.click('삭제 확인', item(ui, '문제 3'));
+  assert.match(alertText(ui), /연습문제를 찾을 수 없습니다/);
+  assert.equal(api.treeLoads(), loadsBefore);
+  assert.doesNotMatch(ui.text(card(ui)), /단원이 다른 곳에서 삭제/);
 });

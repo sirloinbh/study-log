@@ -48,6 +48,8 @@ export function Textbooks() {
   }>();
   // Changes made in each exercise card, so the other one reloads.
   const [exerciseChanges, setExerciseChanges] = useState({ list: 0, important: 0 });
+  // Bumped when the exercises card finds its chapter deleted elsewhere: the contents reload.
+  const [contentsReload, setContentsReload] = useState(0);
   const changed = (card: 'list' | 'important') => () =>
     setExerciseChanges((counts) => ({ ...counts, [card]: counts[card] + 1 }));
 
@@ -320,7 +322,12 @@ export function Textbooks() {
       </div>
       {selected && (
         <section className="card" aria-label={`${selected.title} 목차`}>
-          <TextbookContents key={selected.id} textbookId={selected.id} onTree={setContents} />
+          <TextbookContents
+            key={selected.id}
+            textbookId={selected.id}
+            onTree={setContents}
+            reloadKey={contentsReload}
+          />
         </section>
       )}
       {selected && (
@@ -332,6 +339,7 @@ export function Textbooks() {
             treeFailed={contents?.textbookId === selected.id && contents.failed}
             reloadKey={exerciseChanges.important}
             onChanged={changed('list')}
+            onContentMissing={() => setContentsReload((count) => count + 1)}
           />
         </section>
       )}
