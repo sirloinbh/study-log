@@ -106,3 +106,11 @@
 - 한계: 촘촘한 목록 항목 안의 줄바꿈 한 번은 `<p>`가 없어 공백으로 접힌다. 마크다운 표준 동작이다.
 - 리뷰는 최대 2회이므로 3차 리뷰는 하지 않는다.
 - 반영 후 `npm run check`: exit 0. tests 234, pass 217, fail 0, skipped 17(DB)
+
+### CI 실패와 수정
+
+- 최종 head(16457f3)의 `docker-build`가 실패했다. 하위 저장소 단독 빌드용 `frontend/package-lock.json`에 새 패키지가 빠져 있어서 `npm ci`가 "Missing: react-markdown@10.1.0 from lock file"로 멈췄다.
+- 수정(커밋 "fix: add react-markdown to the frontend lock file")
+  - `frontend/package.json`·`package-lock.json`을 작업 폴더 밖 임시 폴더로 복사했다.
+  - 그 폴더에서 `npm install --package-lock-only --ignore-scripts`로 잠금 파일만 다시 만들었다. `node_modules`를 만들지 않고 패키지 코드도 실행하지 않는다.
+  - 새로 추가된 82개 항목은 위에서 확인한 루트 잠금 파일의 버전·integrity와 모두 같다. 기존 항목 변경과 install script는 없다.
