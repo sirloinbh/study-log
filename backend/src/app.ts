@@ -3,6 +3,7 @@ import type { Pool } from 'pg';
 import { types } from 'pg';
 import { ZodError } from 'zod';
 import { keywordRoutes } from './keywords.js';
+import { statsRoutes } from './stats.js';
 import { studyLogRoutes } from './study-logs.js';
 import { contentExerciseRoutes, exerciseRoutes, textbookExerciseRoutes } from './exercises.js';
 import { textbookContentRoutes } from './textbook-contents.js';
@@ -43,6 +44,7 @@ export function createApp(pool: Pool, options: { today?: () => string } = {}) {
   });
   app.use('/api/study-logs', studyLogRoutes(pool));
   app.use('/api/keywords', keywordRoutes(pool, today));
+  app.use('/api/stats', statsRoutes(pool, today));
   app.use('/api/textbooks/:textbookId/contents/:contentId/exercises', contentExerciseRoutes(pool));
   app.use('/api/textbooks/:textbookId/contents', textbookContentRoutes(pool));
   app.use('/api/textbooks/:textbookId/exercises', textbookExerciseRoutes(pool));
