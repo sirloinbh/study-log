@@ -121,11 +121,11 @@ const listQuery = z.object({
 
 // `source` is study_logs or a CTE of written rows; the textbook and chapter names come along so
 // the list can show them without more requests.
-const select = (source: string) => `SELECT l.id::int AS id, l.study_date AS "studyDate",
+const select = (source: string) => `SELECT l.id, l.study_date AS "studyDate",
   to_char(l.start_time, 'HH24:MI') AS "startTime", to_char(l.end_time, 'HH24:MI') AS "endTime",
   l.duration_minutes AS "durationMinutes", l.memo, l.status,
-  l.textbook_id::int AS "textbookId", t.title AS "textbookTitle",
-  l.content_id::int AS "contentId", c.number AS "contentNumber", c.title AS "contentTitle",
+  l.textbook_id AS "textbookId", t.title AS "textbookTitle",
+  l.content_id AS "contentId", c.number AS "contentNumber", c.title AS "contentTitle",
   l.understanding, l.difficulties, l.goal_achieved AS "goalAchieved"
   FROM ${source} l
   LEFT JOIN textbooks t ON t.id = l.textbook_id

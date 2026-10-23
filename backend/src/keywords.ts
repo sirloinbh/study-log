@@ -61,7 +61,7 @@ const idParam = z
   .regex(/^[1-9]\d{0,14}$/, '키워드 ID가 올바르지 않습니다')
   .transform(Number);
 
-const columns = `id::int AS id, keyword_date AS date, keyword, memo`;
+const columns = `id, keyword_date AS date, keyword, memo`;
 
 const notFound = { error: '키워드를 찾을 수 없습니다' };
 const duplicate = { error: '이 날짜에 이미 있는 키워드입니다' };

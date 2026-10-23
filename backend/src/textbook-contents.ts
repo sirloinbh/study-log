@@ -64,7 +64,7 @@ const orderInput = z.object(
 type Entry = { id: number; parentId: number | null; number: string; title: string };
 type Node = Entry & { children: Node[] };
 
-const columns = 'id::int AS id, parent_id::int AS "parentId", number, title';
+const columns = 'id, parent_id AS "parentId", number, title';
 
 const textbookNotFound = { error: '교재를 찾을 수 없습니다' };
 const contentNotFound = { error: '목차를 찾을 수 없습니다' };
@@ -166,7 +166,7 @@ export function textbookContentRoutes(pool: Pool) {
     const { parentId, ids } = orderInput.parse(req.body);
     const reply = await writeContents(pool, textbookId, async (client) => {
       const { rows } = await client.query<{ id: number }>(
-        `SELECT id::int AS id FROM textbook_contents
+        `SELECT id FROM textbook_contents
          WHERE textbook_id = $1 AND parent_id IS NOT DISTINCT FROM $2`,
         [textbookId, parentId],
       );
@@ -210,7 +210,7 @@ export function textbookContentRoutes(pool: Pool) {
       try {
         ({ rows } = await client.query<{ parentId: number | null; position: number }>(
           `DELETE FROM textbook_contents WHERE id = $1 AND textbook_id = $2
-           RETURNING parent_id::int AS "parentId", position`,
+           RETURNING parent_id AS "parentId", position`,
           [id, textbookId],
         ));
       } catch (error) {

@@ -11,6 +11,15 @@ import { textbookRoutes } from './textbooks.js';
 // DATE columns stay YYYY-MM-DD strings so the service time zone never shifts them.
 types.setTypeParser(1082, (value) => value);
 
+// BIGINT ids come back as JS numbers (#67). The API accepts ids of up to 15 digits, all exact as
+// numbers, so ids need no ::int cast that would fail past 2^31. A value a number cannot hold
+// exactly is refused rather than silently rounded.
+types.setTypeParser(20, (value) => {
+  const number = Number(value);
+  if (!Number.isSafeInteger(number)) throw new Error(`bigint ${value} does not fit a JS number`);
+  return number;
+});
+
 export const serviceTimeZone = 'Asia/Seoul';
 
 // "Today" follows the service time zone, not the server clock's zone.
