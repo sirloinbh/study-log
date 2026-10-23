@@ -61,6 +61,48 @@ const orderInput = z.object(
   asObject,
 );
 
+// A pasted table of contents (#23): entries in reading order, each one level deeper than the
+// entry it belongs to at most. Kept flat so validating deep input needs no recursion.
+export const bulkLimits = { entries: 500, levels: 10 } as const;
+const bulkInput = z.object(
+  {
+    entries: z
+      .array(
+        z.object(
+          {
+            level: z
+              .number({
+                required_error: '목차 단계를 보내세요',
+                invalid_type_error: '목차 단계가 올바르지 않습니다',
+              })
+              .int('목차 단계가 올바르지 않습니다')
+              .min(0, '목차 단계가 올바르지 않습니다')
+              .max(bulkLimits.levels - 1, `목차는 ${bulkLimits.levels}단계까지입니다`),
+            ...entryFields,
+          },
+          asObject,
+        ),
+        {
+          required_error: '등록할 목차 목록을 보내세요',
+          invalid_type_error: '등록할 목차 목록을 보내세요',
+        },
+      )
+      .min(1, '등록할 목차가 없습니다')
+      .max(bulkLimits.entries, `목차는 한 번에 ${bulkLimits.entries}개까지 등록할 수 있습니다`)
+      .superRefine((entries, ctx) => {
+        if (entries.length && entries[0].level !== 0)
+          ctx.addIssue({ code: 'custom', message: '첫 목차는 맨 위 단계여야 합니다' });
+        const skipped = entries.findIndex((e, i) => i > 0 && e.level > entries[i - 1].level + 1);
+        if (skipped > 0)
+          ctx.addIssue({
+            code: 'custom',
+            message: `${skipped + 1}번째 목차가 위 목차보다 두 단계 이상 깊습니다`,
+          });
+      }),
+  },
+  asObject,
+);
+
 type Entry = { id: number; parentId: number | null; number: string; title: string };
 type Node = Entry & { children: Node[] };
 
@@ -156,6 +198,36 @@ export function textbookContentRoutes(pool: Pool) {
         [textbookId, entry.parentId, entry.number, entry.title],
       );
       return { status: 201, body: { content: rows[0] } };
+    });
+    send(res, reply);
+  });
+
+  // Adds a whole pasted table of contents after the chapters already there, all or nothing.
+  router.post('/bulk', async (req, res) => {
+    const textbookId = textbookOf(req.params);
+    const { entries } = bulkInput.parse(req.body);
+    const reply = await writeContents(pool, textbookId, async (client) => {
+      const { rows } = await client.query<{ next: number }>(
+        `SELECT COALESCE(MAX(position) + 1, 0) AS next FROM textbook_contents
+         WHERE textbook_id = $1 AND parent_id IS NULL`,
+        [textbookId],
+      );
+      // The id of the latest entry at each level, and how many children each parent has so far.
+      const path: number[] = [];
+      const counts = new Map<number | null, number>([[null, rows[0].next]]);
+      for (const entry of entries) {
+        const parentId = entry.level === 0 ? null : path[entry.level - 1];
+        const position = counts.get(parentId) ?? 0;
+        const inserted = await client.query<{ id: number }>(
+          `INSERT INTO textbook_contents (textbook_id, parent_id, position, number, title)
+           VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+          [textbookId, parentId, position, entry.number, entry.title],
+        );
+        counts.set(parentId, position + 1);
+        path.length = entry.level;
+        path.push(inserted.rows[0].id);
+      }
+      return { status: 201, body: { contents: await loadTree(client, textbookId) } };
     });
     send(res, reply);
   });

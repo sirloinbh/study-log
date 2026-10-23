@@ -31,6 +31,8 @@ type Options = {
   rejectOrder?: { status: number; error: string };
   // Every GET after the first waits for this promise.
   holdReload?: Promise<void>;
+  // POST /bulk answers this error instead of adding.
+  rejectBulk?: { status: number; error: string };
 };
 
 // In-memory /api/textbooks/:id/contents with the API's ordering rules; records content requests.
@@ -68,6 +70,25 @@ function fakeApi(initial: Row[] = [], options: Options = {}) {
     if (method === 'GET') {
       if (++gets > 1) await options.holdReload;
       return reply(200, { contents: treeOf(textbookId) });
+    }
+    if (method === 'POST' && target === 'bulk') {
+      if (options.rejectBulk)
+        return reply(options.rejectBulk.status, { error: options.rejectBulk.error });
+      // Like the API: each entry goes under the latest entry one level up.
+      const path: number[] = [];
+      for (const entry of body.entries as { level: number; number: string; title: string }[]) {
+        const row = {
+          id: nextId++,
+          textbookId,
+          parentId: entry.level ? path[entry.level - 1] : null,
+          number: entry.number,
+          title: entry.title,
+        };
+        rows.push(row);
+        path.length = entry.level;
+        path.push(row.id);
+      }
+      return reply(201, { contents: treeOf(textbookId) });
     }
     if (method === 'POST') {
       const row = {
@@ -419,3 +440,79 @@ uiTest(
     assert.equal(focused.at(-1), 'contents-heading');
   },
 );
+
+const pasteForm = (ui: Ui) =>
+  ui.find((n) => n.props.className === 'log-form content-form toc-paste')[0];
+const preview = (ui: Ui) => ui.find((n) => n.props['aria-label'] === '목차 미리보기')[0];
+const saveButton = (ui: Ui) =>
+  ui.find((n) => n.type === 'button' && n.props.type === 'submit', pasteForm(ui))[0];
+
+uiTest('a pasted table of contents is previewed as a tree and saved at once (#23)', async () => {
+  const api = fakeApi(outline);
+  const ui = await openBook(api);
+  await ui.click('목차 붙여넣기');
+  assert.ok(pasteForm(ui), 'paste form');
+  assert.equal(preview(ui), undefined, 'no preview before any text');
+  assert.ok(saveButton(ui).props.disabled, 'nothing to save yet');
+
+  await ui.fill('목차 텍스트', '3 고유값 ....... 120\n3.1 특성방정식  125\n3.2 대각화\n4 이차형식');
+  assert.equal(shape(ui, preview(ui)), '3 고유값[3.1 특성방정식|3.2 대각화]|4 이차형식');
+  assert.match(ui.text(preview(ui)), /미리보기 · 4개 \(기존 목차 뒤에 추가\)/);
+  assert.equal(ui.text(saveButton(ui)), '4개 저장');
+
+  // Fixing the text fixes the preview.
+  await ui.fill('목차 텍스트', '3 고유값\n3.1 특성방정식\n4 이차형식');
+  assert.equal(shape(ui, preview(ui)), '3 고유값[3.1 특성방정식]|4 이차형식');
+  await ui.submit(pasteForm(ui));
+  assert.deepEqual(api.requests.at(-1), {
+    method: 'POST',
+    path: '/api/textbooks/1/contents/bulk',
+    body: {
+      entries: [
+        { level: 0, number: '3', title: '고유값' },
+        { level: 1, number: '3.1', title: '특성방정식' },
+        { level: 0, number: '4', title: '이차형식' },
+      ],
+    },
+  });
+  // The tree comes back with the save; no extra reload.
+  assert.equal(api.requests.filter((r) => r.method === 'GET').length, 1);
+  assert.equal(pasteForm(ui), undefined, 'the form closes');
+  assert.equal(shape(ui), '1 벡터[1.1 덧셈|1.2 내적]|2 행렬|3 고유값[3.1 특성방정식]|4 이차형식');
+  assert.match(ui.text(card(ui)), /목차 3개를 추가했습니다/);
+});
+
+uiTest('pasted text that cannot be saved says why and keeps the save locked', async () => {
+  const api = fakeApi();
+  const ui = await openBook(api);
+  await ui.click('목차 붙여넣기');
+  await ui.fill('목차 텍스트', `1 벡터\n2 ${'가'.repeat(201)}`);
+  assert.match(
+    ui.text(ui.find((n) => n.props.role === 'alert')[0]),
+    /2번째 줄: 제목이 200자를 넘습니다/,
+  );
+  assert.ok(saveButton(ui).props.disabled);
+  assert.doesNotMatch(
+    ui.text(preview(ui)),
+    /기존 목차 뒤에/,
+    'an empty textbook has nothing before',
+  );
+  await ui.submit(pasteForm(ui));
+  assert.equal(api.requests.filter((r) => r.method === 'POST').length, 0);
+  // Cancelling closes the form; opening the chapter editor closes it too.
+  await ui.click('취소', pasteForm(ui));
+  assert.equal(pasteForm(ui), undefined);
+  await ui.click('목차 붙여넣기');
+  await ui.click('장 추가');
+  assert.equal(pasteForm(ui), undefined);
+});
+
+uiTest('a refused paste shows the server message and keeps the text', async () => {
+  const api = fakeApi([], { rejectBulk: { status: 400, error: '목차는 10단계까지입니다' } });
+  const ui = await openBook(api);
+  await ui.click('목차 붙여넣기');
+  await ui.fill('목차 텍스트', '1 벡터');
+  await ui.submit(pasteForm(ui));
+  assert.match(ui.text(card(ui)), /목차는 10단계까지입니다/);
+  assert.equal(ui.field('목차 텍스트'), '1 벡터');
+});
