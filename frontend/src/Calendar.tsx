@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { requestJson, type RequestError } from './api';
+import { Memo } from './Memo';
 import {
   calendarCells,
   monthTitle,
@@ -164,7 +165,7 @@ export function Calendar({ today, reloadKey }: { today: string; reloadKey?: numb
                   <strong>{formatMinutes(log.durationMinutes)}</strong>
                   <span className={`badge ${log.status}`}>{statusLabels[log.status]}</span>
                 </div>
-                {log.memo && <p className="log-memo">{log.memo}</p>}
+                {log.memo && <Memo text={log.memo} />}
               </li>
             ))}
           </ul>

@@ -385,14 +385,14 @@ nav button.active {
   display: grid;
   gap: 10px;
 }
-.log-list li {
+.log-list > li {
   border: 1px solid var(--line);
   border-radius: var(--radius-card);
   padding: 14px 16px;
   display: grid;
   gap: 8px;
 }
-.log-list li.editing {
+.log-list > li.editing {
   border-color: var(--accent);
 }
 .log-head {
@@ -632,6 +632,79 @@ nav button.active {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+/* Markdown memos (#16): headings stay the size of the text so a memo does not outshout its log. */
+.memo {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.memo > :first-child {
+  margin-top: 0;
+}
+.memo > :last-child {
+  margin-bottom: 0;
+}
+.memo :is(p, ul, ol, pre, blockquote, h1, h2, h3, h4, h5, h6) {
+  margin: 0 0 6px;
+}
+.memo :is(h1, h2, h3, h4, h5, h6) {
+  font-size: 1em;
+  color: var(--text);
+}
+.memo :is(ul, ol) {
+  padding-left: 1.4em;
+}
+.memo ul {
+  list-style: disc;
+}
+.memo ol {
+  list-style: decimal;
+}
+.memo code {
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 0.92em;
+  background: var(--soft);
+  border-radius: 4px;
+  padding: 0 4px;
+}
+.memo pre {
+  overflow-x: auto;
+  background: var(--soft);
+  border-radius: var(--radius-button);
+  padding: 8px 10px;
+}
+.memo pre code {
+  padding: 0;
+}
+.memo blockquote {
+  border-left: 3px solid var(--line);
+  padding-left: 8px;
+}
+.memo a {
+  color: var(--primary);
+}
+.memo img {
+  max-width: 100%;
+}
+.memo.clamp {
+  max-height: 6.2em;
+  overflow: hidden;
+}
+.hint {
+  margin: -4px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.memo-preview {
+  border: 1px dashed var(--card-line);
+  border-radius: var(--radius-button);
+  padding: 8px 12px;
+}
+.memo-preview h3 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  color: var(--muted);
 }
 .study-pattern {
   margin-top: 20px;

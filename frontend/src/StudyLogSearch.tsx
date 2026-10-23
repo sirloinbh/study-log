@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useBusy } from './busy';
 import { requestJson, type RequestError } from './api';
+import { Memo } from './Memo';
 import {
   emptySearch,
   formatMinutes,
@@ -141,7 +142,7 @@ export function StudyLogSearch({
                   {log.difficulties && (
                     <p className="log-memo">어려웠던 부분: {log.difficulties}</p>
                   )}
-                  {log.memo && <p className="log-memo">{log.memo}</p>}
+                  {log.memo && <Memo text={log.memo} clamp />}
                 </li>
               ))}
             </ul>
