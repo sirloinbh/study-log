@@ -31,7 +31,10 @@ const periodOf = (kind: string, date: string) => {
 };
 
 // The retrospective API in memory; records period requests and writes.
-function fakeApi(initial: Retro[] = [], options: { failPeriod?: boolean } = {}) {
+function fakeApi(
+  initial: Retro[] = [],
+  options: { failPeriod?: boolean; failReload?: boolean } = {},
+) {
   const rows = initial.map((row) => ({ ...row }));
   const periods: string[] = [];
   const writes: { method: string; path: string; body?: unknown }[] = [];
@@ -50,6 +53,8 @@ function fakeApi(initial: Retro[] = [], options: { failPeriod?: boolean } = {}) 
     if (period) {
       periods.push(`${period[1]}:${period[2]}`);
       if (options.failPeriod) return reply(500, { error: '서버 오류가 발생했습니다' });
+      if (options.failReload && periods.length > 1)
+        return reply(500, { error: '서버 오류가 발생했습니다' });
       const { from, to } = periodOf(period[1], period[2]);
       return reply(200, {
         kind: period[1],
@@ -153,7 +158,8 @@ uiTest('weeks and months move, and an unsaved draft waits for its period', async
   await ui.click('이번 주', writer(ui));
   assert.equal(field(ui).props.value, '쓰다 만 회고');
   await ui.click('월간', writer(ui));
-  assert.equal(api.periods.at(-1), 'monthly:2026-10-18');
+  // The week's Wednesday picks the month (#19 review).
+  assert.equal(api.periods.at(-1), 'monthly:2026-10-21');
   assert.equal(heading(ui), '2026년 10월 월간 회고');
   await ui.click('다음', writer(ui));
   assert.equal(heading(ui), '2026년 11월 월간 회고');
@@ -226,4 +232,31 @@ uiTest('period helpers: moving and titles', () => {
     '2026년 12월 27일 ~ 2027년 1월 2일',
   );
   assert.equal(retro.periodTitle('monthly', '2026-03-01', '2026-03-31'), '2026년 3월');
+});
+
+uiTest('a save shows the saved text at once, even when the reload fails', async () => {
+  const api = fakeApi([], { failReload: true });
+  const ui = await open(api);
+  await type(ui, '새로 쓴 회고');
+  await ui.submit(writer(ui));
+  // The period reload after the save failed: the error shows above the form, and the form
+  // keeps the saved text.
+  assert.match(ui.text(writer(ui)), /회고를 불러오지 못했습니다/);
+  assert.equal(field(ui).props.value, '새로 쓴 회고');
+  assert.match(ui.text(writer(ui)), /수정 저장/);
+});
+
+uiTest('switching to monthly opens the month most of the week falls in', async () => {
+  const api = fakeApi();
+  const ui = await open(api);
+  // Back to the week of Sunday 2026-11-29 to Saturday 12-05: five of its days are in December.
+  for (const _ of [1, 2, 3, 4, 5, 6]) await ui.click('다음', writer(ui));
+  assert.equal(heading(ui), '2026년 11월 29일 ~ 12월 5일 주간 회고');
+  await ui.click('월간', writer(ui));
+  assert.equal(api.periods.at(-1), 'monthly:2026-12-02');
+  assert.equal(heading(ui), '2026년 12월 월간 회고');
+  // From this month back to weekly, the week of today.
+  await ui.click('이번 달', writer(ui));
+  await ui.click('주간', writer(ui));
+  assert.equal(heading(ui), '2026년 10월 18일 ~ 10월 24일 주간 회고');
 });
