@@ -89,6 +89,11 @@ function fakeApi(initial: Log[] = [], options: Options = {}) {
     if (path === '/api/textbooks') return reply(200, { textbooks });
     const chapters = path.match(/^\/api\/textbooks\/(\d+)\/contents$/);
     if (chapters) return reply(200, { contents: contents[Number(chapters[1])] ?? [] });
+    // The calendar card (tested in calendar-ui.test.ts) gets empty answers and is not recorded,
+    // so these tests see only the recent list's requests and items.
+    if (path.startsWith('/api/study-logs/calendar'))
+      return reply(200, { month: '2026-10', days: [] });
+    if (path.startsWith('/api/study-logs?date=')) return reply(200, { studyLogs: [] });
     requests.push({ method, path, body });
     if (offline) throw new TypeError('fetch failed');
     if (reject && method !== 'GET') return reply(reject.status, { error: reject.error });
@@ -424,8 +429,10 @@ uiTest('fields are locked while a save is in flight', async () => {
 uiTest('list buttons name the log they act on', async () => {
   const ui = mount(fakeApi([morning]).fetch);
   await ui.settle();
+  // Within the recent list; the calendar card has its own buttons.
+  const [list] = ui.find((n) => n.props.className === 'log-list');
   const labels = ui
-    .find((n) => n.type === 'button' && typeof n.props['aria-label'] === 'string')
+    .find((n) => n.type === 'button' && typeof n.props['aria-label'] === 'string', list)
     .map((n) => n.props['aria-label']);
   assert.deepEqual(labels, [
     '2026-10-21 09:00–10:30 기록 수정',

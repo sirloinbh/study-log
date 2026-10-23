@@ -2,6 +2,7 @@ import express from 'express';
 import type { Pool } from 'pg';
 import { types } from 'pg';
 import { ZodError } from 'zod';
+import { calendarRoutes } from './calendar.js';
 import { keywordRoutes } from './keywords.js';
 import { statsRoutes } from './stats.js';
 import { studyLogRoutes } from './study-logs.js';
@@ -42,6 +43,8 @@ export function createApp(pool: Pool, options: { today?: () => string } = {}) {
     await pool.query('SELECT 1');
     res.json({ ok: true, service: 'study-log', today: today() });
   });
+  // Before the study log routes, where 'calendar' would be read as a log id.
+  app.use('/api/study-logs/calendar', calendarRoutes(pool, today));
   app.use('/api/study-logs', studyLogRoutes(pool));
   app.use('/api/keywords', keywordRoutes(pool, today));
   app.use('/api/stats', statsRoutes(pool, today));
