@@ -12,9 +12,14 @@ export function studyMinutes(startTime: string, endTime: string) {
   return minutes < 0 ? minutes + 24 * 60 : minutes;
 }
 
+// Year 0000 is a valid JS date but not a PostgreSQL one, so it is refused here as well.
 export const isCalendarDate = (value: string) => {
   const date = new Date(`${value}T00:00:00Z`);
-  return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+  return (
+    value >= '0001-01-01' &&
+    !Number.isNaN(date.getTime()) &&
+    date.toISOString().slice(0, 10) === value
+  );
 };
 
 const studyDate = z

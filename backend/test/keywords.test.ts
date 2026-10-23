@@ -21,6 +21,8 @@ test('invalid keywords are rejected with Korean messages before touching the DB'
     [{ keyword: '고유값', memo: 'x'.repeat(2001) }, /메모는 2000자 이하로 입력하세요/],
     [{ keyword: '고유값', date: '2026/10/23' }, /날짜는 YYYY-MM-DD 형식으로 입력하세요/],
     [{ keyword: '고유값', date: '2026-02-30' }, /존재하지 않는 날짜입니다/],
+    // A JS date but not a PostgreSQL one: must be a 400, not a database error.
+    [{ keyword: '고유값', date: '0000-01-01' }, /존재하지 않는 날짜입니다/],
     [['고유값'], /키워드 내용을 JSON 객체로 보내세요/],
   ];
   await withApi(untouchedPool, async (call) => {
@@ -41,6 +43,7 @@ test('list filters and ids are checked before touching the DB', async () => {
   await withApi(untouchedPool, async (call) => {
     for (const [path, message] of [
       ['/api/keywords?date=2026-13-01', /존재하지 않는 날짜입니다/],
+      ['/api/keywords?date=0000-01-01', /존재하지 않는 날짜입니다/],
       ['/api/keywords?q=' + 'x'.repeat(51), /검색어는 50자 이하로 입력하세요/],
       ['/api/keywords?from=2026-10-23&to=2026-10-01', /시작일은 종료일보다 늦을 수 없습니다/],
       ['/api/keywords?limit=0', /조회 개수는 1 이상이어야 합니다/],

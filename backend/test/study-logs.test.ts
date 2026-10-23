@@ -29,6 +29,7 @@ test('invalid study logs are rejected with Korean messages before touching the D
     [{ startTime: '09:00', endTime: '10:00' }, /학습일을 입력하세요/],
     [{ ...valid, studyDate: '2026/10/21' }, /YYYY-MM-DD/],
     [{ ...valid, studyDate: '2026-02-30' }, /존재하지 않는 날짜/],
+    [{ ...valid, studyDate: '0000-01-01' }, /존재하지 않는 날짜/],
     [{ ...valid, startTime: '24:00' }, /시작 시각은 HH:MM/],
     [{ ...valid, endTime: '9:5' }, /종료 시각은 HH:MM/],
     [{ ...valid, endTime: '09:00' }, /종료 시각은 시작 시각과 달라야 합니다/],
