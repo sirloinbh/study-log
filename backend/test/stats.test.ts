@@ -8,6 +8,7 @@ import {
   heatmapWeeks,
   maxSeriesDays,
   periodStart,
+  studyPattern,
   weekStart,
 } from '../src/stats.js';
 import { withApi } from './helpers.js';
@@ -109,4 +110,76 @@ test('the heatmap starts on the Sunday 52 weeks before this week (#50, #96)', ()
   assert.equal(weekStart(heatmapStart('2026-10-23')), '2025-10-19');
   // On a Sunday the current week is one day long; still 53 columns.
   assert.equal(heatmapStart('2026-10-18'), '2025-10-19');
+});
+
+test('the study pattern spreads minutes over the hours studied and the session weekday (#20)', () => {
+  const pattern = studyPattern([
+    // Friday 2026-10-23: 20:30 to 22:00.
+    { studyDate: '2026-10-23', startTime: '20:30', durationMinutes: 90 },
+    // Sunday 2026-10-18: 23:30 past midnight to 01:00 — the weekday stays Sunday.
+    { studyDate: '2026-10-18', startTime: '23:30', durationMinutes: 90 },
+    // Friday again, inside one hour.
+    { studyDate: '2026-10-23', startTime: '07:10', durationMinutes: 20 },
+  ]);
+  assert.equal(pattern.totalMinutes, 200);
+  assert.equal(pattern.byHour[20], 30);
+  assert.equal(pattern.byHour[21], 60);
+  assert.equal(pattern.byHour[23], 30);
+  assert.equal(pattern.byHour[0], 60);
+  assert.equal(pattern.byHour[7], 20);
+  assert.equal(
+    pattern.byHour.reduce((sum, minutes) => sum + minutes, 0),
+    200,
+  );
+  assert.deepEqual(pattern.byWeekday, [90, 0, 0, 0, 0, 110, 0]);
+  // 21h and 0h both have 60 minutes: the earlier hour wins the tie.
+  assert.equal(pattern.topHour, 0);
+  assert.equal(pattern.topWeekday, 5);
+});
+
+test('no study means no busiest hour or weekday', () => {
+  const pattern = studyPattern([]);
+  assert.equal(pattern.totalMinutes, 0);
+  assert.equal(pattern.topHour, null);
+  assert.equal(pattern.topWeekday, null);
+});
+
+test('pattern dates are checked before touching the DB', async () => {
+  const untouchedPool = {
+    query: async () => {
+      throw new Error('DB must not be queried for invalid input');
+    },
+  } as unknown as Pool;
+  await withApi(untouchedPool, async (call) => {
+    for (const [query, message] of [
+      ['from=2026-10-23&to=2026-10-01', /시작일은 종료일보다 늦을 수 없습니다/],
+      ['from=2026-02-30', /존재하지 않는 날짜/],
+      ['to=2026/10/01', /종료일은 YYYY-MM-DD/],
+      ['from=2000-01-01&to=2026-10-23', /기간은 10년 이내로 지정하세요/],
+    ] as const) {
+      const { status, data } = await call(`/api/stats/patterns?${query}`);
+      assert.equal(status, 400, query);
+      assert.match(String(data.error), message);
+    }
+  });
+});
+
+test('without dates the pattern covers the last 3 months', async () => {
+  const sent: unknown[][] = [];
+  const pool = {
+    query: async (_sql: string, params: unknown[]) => {
+      sent.push(params);
+      return { rows: [] };
+    },
+  } as unknown as Pool;
+  await withApi(
+    pool,
+    async (call) => {
+      const { status, data } = await call('/api/stats/patterns');
+      assert.equal(status, 200);
+      assert.deepEqual(sent[0], ['2026-07-24', '2026-10-23']);
+      assert.deepEqual([data.from, data.to, data.topHour], ['2026-07-24', '2026-10-23', null]);
+    },
+    { today: () => '2026-10-23' },
+  );
 });
