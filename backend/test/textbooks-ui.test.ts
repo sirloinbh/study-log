@@ -321,7 +321,7 @@ uiTest('textbook meta joins author and edition and skips blanks', () => {
 
 // #65: the focused delete button is swapped out at each step; focus follows the flow instead of
 // dropping to the page.
-// Records focused ids. `rendered` must be set to the mounted UI, so an id with no element in the
+// Records focused ids. Set `state.ui` to the mounted UI, so an id with no element in the
 // rendered tree (a typo) fails instead of being focused.
 const focusRecorder = () => {
   const focused: string[] = [];
