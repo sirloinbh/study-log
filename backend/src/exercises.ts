@@ -38,11 +38,29 @@ const exerciseInput = z.object(
   },
 );
 
+// The answer body follows the exercise body: line breaks kept, not trimmed.
+const answerInput = z.object(
+  {
+    body: z
+      .string({
+        required_error: '정답을 입력하세요',
+        invalid_type_error: '정답 형식이 올바르지 않습니다',
+      })
+      .refine((body) => body.trim().length > 0, '정답을 입력하세요')
+      .refine((body) => body.length <= 20000, '정답은 20000자 이하로 입력하세요'),
+  },
+  {
+    required_error: '정답 내용을 JSON 객체로 보내세요',
+    invalid_type_error: '정답 내용을 JSON 객체로 보내세요',
+  },
+);
+
 const columns = `id::int AS id, textbook_id::int AS "textbookId", content_id::int AS "contentId",
   number, body, important`;
 
 const contentNotFound = { error: '목차를 찾을 수 없습니다' };
 const notFound = { error: '연습문제를 찾을 수 없습니다' };
+const answerNotFound = { error: '정답을 찾을 수 없습니다' };
 
 // Listing and adding the exercises of one chapter: /api/textbooks/:textbookId/contents/:contentId/exercises
 export function contentExerciseRoutes(pool: Pool) {
@@ -86,7 +104,7 @@ export function contentExerciseRoutes(pool: Pool) {
   return router;
 }
 
-// Reading, editing and deleting one exercise: /api/exercises/:id
+// Reading, editing and deleting one exercise and its answer: /api/exercises/:id(/answer)
 export function exerciseRoutes(pool: Pool) {
   const router = Router();
 
@@ -115,6 +133,49 @@ export function exerciseRoutes(pool: Pool) {
     const { rowCount } = await pool.query('DELETE FROM exercises WHERE id = $1', [id]);
     if (!rowCount) return void res.status(404).json(notFound);
     res.status(204).end();
+  });
+
+  // The answer of one exercise (#26): `{ answer: null }` until one is saved.
+  router.get('/:id/answer', async (req, res) => {
+    const id = exerciseIdParam.parse(req.params.id);
+    const { rows } = await pool.query(
+      `SELECT a.body FROM exercises e LEFT JOIN exercise_answers a ON a.exercise_id = e.id
+       WHERE e.id = $1`,
+      [id],
+    );
+    if (rows.length === 0) return void res.status(404).json(notFound);
+    const { body } = rows[0] as { body: string | null };
+    res.json({ answer: body === null ? null : { exerciseId: id, body } });
+  });
+
+  // Saves the answer, replacing the one already there.
+  router.put('/:id/answer', async (req, res) => {
+    const id = exerciseIdParam.parse(req.params.id);
+    const { body } = answerInput.parse(req.body);
+    try {
+      const { rows } = await pool.query(
+        `INSERT INTO exercise_answers (exercise_id, body) VALUES ($1, $2)
+         ON CONFLICT (exercise_id) DO UPDATE SET body = EXCLUDED.body, updated_at = now()
+         RETURNING exercise_id::int AS "exerciseId", body`,
+        [id, body],
+      );
+      res.json({ answer: rows[0] });
+    } catch (error) {
+      // The exercise does not exist (or was just deleted): its foreign key fails.
+      if ((error as { code?: string }).code !== '23503') throw error;
+      res.status(404).json(notFound);
+    }
+  });
+
+  router.delete('/:id/answer', async (req, res) => {
+    const id = exerciseIdParam.parse(req.params.id);
+    const { rowCount } = await pool.query('DELETE FROM exercise_answers WHERE exercise_id = $1', [
+      id,
+    ]);
+    if (rowCount) return void res.status(204).end();
+    // Nothing deleted: say whether the exercise or only its answer is missing.
+    const exercise = await pool.query('SELECT 1 FROM exercises WHERE id = $1', [id]);
+    res.status(404).json(exercise.rowCount ? answerNotFound : notFound);
   });
 
   return router;

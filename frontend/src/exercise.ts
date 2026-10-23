@@ -11,8 +11,10 @@ export type Exercise = {
 
 export type ExerciseForm = Pick<Exercise, 'number' | 'body' | 'important'>;
 
+export type ExerciseAnswer = { exerciseId: number; body: string };
+
 // Same limits as the API; the server still validates.
-export const exerciseLimits = { number: 20, body: 20000 } as const;
+export const exerciseLimits = { number: 20, body: 20000, answer: 20000 } as const;
 
 export const emptyExerciseForm = (): ExerciseForm => ({ number: '', body: '', important: false });
 
