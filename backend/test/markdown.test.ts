@@ -31,6 +31,8 @@ uiTest('a memo renders Markdown headings, lists, emphasis, code and links', asyn
     '<a href="https://example.com/a?b=1" target="_blank" rel="noopener noreferrer">강의</a>',
   ])
     assert.ok(html.includes(part), `${part} in ${html}`);
+  // A single Enter stays a line break inside the paragraph; the stylesheet shows it (pre-line).
+  assert.equal(await render('1줄\n2줄'), '<div class="memo"><p>1줄\n2줄</p></div>');
   assert.match(await render('짧은 메모'), /^<div class="memo"><p>짧은 메모<\/p><\/div>$/);
 });
 
