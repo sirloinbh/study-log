@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useBusy } from './busy';
 import { requestJson, type RequestError } from './api';
 import { Exercises } from './Exercises';
 import { ImportantExercises } from './ImportantExercises';
@@ -26,7 +27,7 @@ export function Textbooks() {
   const [loadError, setLoadError] = useState<string | undefined>(undefined);
   const [notice, setNotice] = useState<Notice>(undefined);
   // One request at a time: fields and action buttons are disabled while a save or delete is pending.
-  const [busy, setBusy] = useState(false);
+  const { busy, begin, end } = useBusy();
   const [selectedId, setSelectedId] = useState<number | undefined>(undefined);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [reload, setReload] = useState(0);
@@ -95,8 +96,7 @@ export function Textbooks() {
 
   const save = async (event: { preventDefault(): void }) => {
     event.preventDefault();
-    if (busy) return;
-    setBusy(true);
+    if (!begin()) return;
     try {
       const data = await requestJson<{ textbook: Textbook }>(
         editingId === undefined ? '/api/textbooks' : `/api/textbooks/${editingId}`,
@@ -114,7 +114,7 @@ export function Textbooks() {
     } catch (error) {
       fail(error as RequestError, editingId);
     } finally {
-      setBusy(false);
+      end();
     }
   };
 
@@ -137,8 +137,7 @@ export function Textbooks() {
   };
 
   const remove = async (id: number) => {
-    if (busy) return;
-    setBusy(true);
+    if (!begin()) return;
     try {
       await requestJson(`/api/textbooks/${id}`, { method: 'DELETE' });
       setNotice({ kind: 'status', text: '삭제했습니다' });
@@ -152,7 +151,7 @@ export function Textbooks() {
       setWantFocus((error as RequestError).status === 404 ? 'textbook-list' : 'textbook-delete');
     } finally {
       setConfirmingDelete(false);
-      setBusy(false);
+      end();
     }
   };
 

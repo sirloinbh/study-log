@@ -91,6 +91,13 @@ export function mount(fetchImpl: FetchImpl, globals: Record<string, unknown> = {
         },
       ];
     },
+    // Same slot as a state, holding one object that keeps its identity across renders.
+    useRef(initial: unknown) {
+      const { states } = active;
+      const index = active.cursor++;
+      if (!(index in states)) states[index] = { current: initial };
+      return states[index];
+    },
     useEffect(effect: () => void, deps?: unknown[]) {
       const { effectDeps } = active;
       const index = active.cursor++;

@@ -388,3 +388,18 @@ uiTest('after an edit, a cancel or a delete the day heading takes focus', async 
   await ui.click('삭제 확인', item(ui, '대각화'));
   assert.deepEqual(focused, ['keyword-day', 'keyword-day', 'keyword-day']);
 });
+
+// #75: two submits in the same tick, before the screen re-renders with `busy`, send one request.
+uiTest('a double submit in the same tick adds the keyword once', async () => {
+  const api = fakeApi();
+  const ui = await openKeywords(api);
+  await ui.fill('키워드', '고유값');
+  const [form] = ui.find((n) => n.type === 'form', section(ui, '키워드 입력'));
+  const onSubmit = form.props.onSubmit as (event: { preventDefault(): void }) => unknown;
+  void onSubmit({ preventDefault() {} });
+  void onSubmit({ preventDefault() {} });
+  await ui.settle();
+  assert.equal(api.requests.filter((r) => r.method === 'POST').length, 1);
+  // The second submit did not get a 409 for the same keyword either.
+  assert.equal(ui.find((n) => n.props.role === 'alert').length, 0);
+});
