@@ -97,6 +97,9 @@ async function writeContents(
   run: (client: PoolClient) => Promise<Reply>,
 ): Promise<Reply> {
   const client = await pool.connect();
+  // Set when even ROLLBACK fails (a dropped connection): the client is then destroyed instead of
+  // going back to the pool, where the next request would get the broken connection (#68).
+  let broken: Error | undefined;
   try {
     await client.query('BEGIN');
     const { rowCount } = await client.query('SELECT 1 FROM textbooks WHERE id = $1 FOR UPDATE', [
@@ -106,10 +109,14 @@ async function writeContents(
     await client.query(reply.status < 400 ? 'COMMIT' : 'ROLLBACK');
     return reply;
   } catch (error) {
-    await client.query('ROLLBACK').catch(() => {});
+    try {
+      await client.query('ROLLBACK');
+    } catch (rollbackError) {
+      broken = rollbackError instanceof Error ? rollbackError : new Error(String(rollbackError));
+    }
     throw error;
   } finally {
-    client.release();
+    client.release(broken);
   }
 }
 
