@@ -354,3 +354,18 @@ uiTest('content labels show the number before the title when there is one', () =
   assert.equal(logic.contentLabel({ number: '1.2', title: '내적' }), '1.2 내적');
   assert.equal(logic.contentLabel({ number: ' ', title: '부록' }), '부록');
 });
+
+// #75: two submits in the same tick, before the screen re-renders with `busy`, send one request.
+uiTest('a double submit in the same tick adds the chapter once', async () => {
+  const api = fakeApi();
+  const ui = await openBook(api);
+  await ui.click('장 추가');
+  await ui.fill('목차 제목', '벡터');
+  const [form] = ui.find((n) => n.props.className === 'log-form content-form');
+  const onSubmit = form.props.onSubmit as (event: { preventDefault(): void }) => unknown;
+  void onSubmit({ preventDefault() {} });
+  void onSubmit({ preventDefault() {} });
+  await ui.settle();
+  assert.equal(api.requests.filter((r) => r.method === 'POST').length, 1);
+  assert.equal(shape(ui), '벡터');
+});

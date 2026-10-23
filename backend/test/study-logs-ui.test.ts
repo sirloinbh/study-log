@@ -667,3 +667,19 @@ uiTest('a failed delete puts focus back on the delete button, a 404 on the list'
     assert.equal(focused.at(-1), target, String(reject.status));
   }
 });
+
+// #75: two submits in the same tick, before the screen re-renders with `busy`, send one request.
+uiTest('a double submit in the same tick saves the log once', async () => {
+  const api = fakeApi();
+  const ui = mount(api.fetch);
+  await ui.settle();
+  await ui.fill('시작', '09:00');
+  await ui.fill('종료', '10:00');
+  const [form] = ui.find((n) => n.type === 'form');
+  const onSubmit = form.props.onSubmit as (event: { preventDefault(): void }) => unknown;
+  void onSubmit({ preventDefault() {} });
+  void onSubmit({ preventDefault() {} });
+  await ui.settle();
+  assert.equal(api.requests.filter((r) => r.method === 'POST').length, 1);
+  assert.equal(api.logs.length, 1);
+});

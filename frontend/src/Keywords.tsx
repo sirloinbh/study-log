@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useBusy } from './busy';
 import { requestJson, type RequestError } from './api';
 import {
   emptyKeywordForm,
@@ -26,7 +27,7 @@ export function Keywords({ today }: { today: string }) {
   const [deletingId, setDeletingId] = useState<number>();
   const [notice, setNotice] = useState<Notice>(undefined);
   // One change at a time, including the reloads after it.
-  const [busy, setBusy] = useState(false);
+  const { busy, begin, end } = useBusy();
   // The element to focus once the change is done and the controls are enabled again.
   const [wantFocus, setWantFocus] = useState<string>();
   const [search, setSearch] = useState<KeywordSearch>({ q: '', from: '', to: '' });
@@ -87,8 +88,7 @@ export function Keywords({ today }: { today: string }) {
   // Runs one change, then reloads the day and the shown search results, all while busy. A 404
   // closes the editor when it is about the keyword being edited.
   const run = async (change: () => Promise<void>, targetId?: number) => {
-    if (busy) return;
-    setBusy(true);
+    if (!begin()) return;
     try {
       await change();
     } catch (failure) {
@@ -101,7 +101,7 @@ export function Keywords({ today }: { today: string }) {
     } finally {
       await reloadDay();
       if (results) await runSearch(results.path);
-      setBusy(false);
+      end();
     }
   };
 
@@ -157,9 +157,8 @@ export function Keywords({ today }: { today: string }) {
 
   const find = (event: { preventDefault(): void }) => {
     event.preventDefault();
-    if (busy) return;
-    setBusy(true);
-    void runSearch(searchPath(search)).finally(() => setBusy(false));
+    if (!begin()) return;
+    void runSearch(searchPath(search)).finally(end);
   };
 
   const changeForm = (field: keyof KeywordForm) => (event: { target: { value: string } }) => {

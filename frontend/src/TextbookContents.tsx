@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useBusy } from './busy';
 import { requestJson, type RequestError } from './api';
 import { contentLabel, type ContentNode } from './textbook';
 
@@ -36,7 +37,7 @@ export function TextbookContents({
   const [notice, setNotice] = useState<Notice>(undefined);
   // One request at a time: fields and buttons stay disabled while a change and the reload after
   // it are pending, so the next change never starts from an outdated tree.
-  const [busy, setBusy] = useState(false);
+  const { busy, begin, end } = useBusy();
 
   // The first load, and a reload asked for by another card. Reloads after a change made here
   // happen inside that change (see `run`). The tree on screen stays until the new one arrives.
@@ -85,8 +86,7 @@ export function TextbookContents({
   // message. A 404 closes the editor only when it is about the entry being edited (`targetId`)
   // or the textbook.
   const run = async (change: () => Promise<boolean | void>, targetId?: number) => {
-    if (busy) return;
-    setBusy(true);
+    if (!begin()) return;
     try {
       // A change that already returned the new tree (reorder) answers true.
       if (!(await change())) await refresh();
@@ -96,7 +96,7 @@ export function TextbookContents({
       if (status === 404 && (targetId === undefined || targetId === open?.id)) setEditor(undefined);
       await refresh();
     } finally {
-      setBusy(false);
+      end();
     }
   };
 
