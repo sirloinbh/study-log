@@ -13,7 +13,8 @@
     "pdfjs-dist": "6.4.299",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
-    "react-markdown": "10.1.0"
+    "react-markdown": "10.1.0",
+    "recharts": "3.10.1"
   },
   "devDependencies": {
     "@types/react": "^19.1.0",
@@ -34,6 +35,8 @@
     "esbuild": true
   },
   "overrides": {
-    "@napi-rs/canvas": "1.0.10"
+    "@napi-rs/canvas": "1.0.10",
+    "immer": "11.1.21",
+    "react-is": "19.3.0"
   }
 }
