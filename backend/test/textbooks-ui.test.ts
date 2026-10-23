@@ -318,3 +318,40 @@ uiTest('textbook meta joins author and edition and skips blanks', () => {
   assert.equal(logic.textbookMeta({ ...book, author: ' ' }), '3판');
   assert.equal(logic.textbookMeta({ ...book, author: '', edition: '' }), '');
 });
+
+// #65: the focused delete button is swapped out at each step; focus follows the flow instead of
+// dropping to the page.
+const focusRecorder = () => {
+  const focused: string[] = [];
+  const document = { getElementById: (id: string) => ({ focus: () => focused.push(id) }) };
+  return { focused, document };
+};
+
+uiTest('focus follows the delete flow: confirm, back on cancel, the list after', async () => {
+  const { focused, document } = focusRecorder();
+  const ui = await open(fakeApi([linear]), { document });
+  await ui.click('선형대수와 그 응용');
+  await ui.click('삭제', detail(ui));
+  assert.equal(focused.at(-1), 'textbook-delete-confirm');
+  await ui.click('취소', detail(ui));
+  assert.equal(focused.at(-1), 'textbook-delete');
+  await ui.click('삭제', detail(ui));
+  await ui.click('삭제 확인', detail(ui));
+  assert.equal(focused.at(-1), 'textbook-list');
+  const [heading] = ui.find((n) => n.props.id === 'textbook-list');
+  assert.equal(heading.props.tabIndex, -1);
+});
+
+uiTest('a failed textbook delete puts focus back on delete, a 404 on the list', async () => {
+  for (const [reject, target] of [
+    [{ status: 500, error: '서버 오류가 발생했습니다' }, 'textbook-delete'],
+    [{ status: 404, error: '교재를 찾을 수 없습니다' }, 'textbook-list'],
+  ] as const) {
+    const { focused, document } = focusRecorder();
+    const ui = await open(fakeApi([linear], { reject }), { document });
+    await ui.click('선형대수와 그 응용');
+    await ui.click('삭제', detail(ui));
+    await ui.click('삭제 확인', detail(ui));
+    assert.equal(focused.at(-1), target, String(reject.status));
+  }
+});
