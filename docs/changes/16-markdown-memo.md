@@ -113,4 +113,5 @@
 - 수정(커밋 "fix: add react-markdown to the frontend lock file")
   - `frontend/package.json`·`package-lock.json`을 작업 폴더 밖 임시 폴더로 복사했다.
   - 그 폴더에서 `npm install --package-lock-only --ignore-scripts`로 잠금 파일만 다시 만들었다. `node_modules`를 만들지 않고 패키지 코드도 실행하지 않는다.
+  - 원래 들여쓰기(4칸)를 유지해 다시 썼다. 기존 항목은 의존성 목록에 `react-markdown`이 더해지고, 운영 의존성이 쓰게 된 `@types/react`·`@types/estree`·`csstype`의 `"dev": true`가 빠진 것 말고는 그대로다.
   - 새로 추가된 82개 항목은 위에서 확인한 루트 잠금 파일의 버전·integrity와 모두 같다. 기존 항목 변경과 install script는 없다.
