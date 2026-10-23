@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { useBusy } from './busy';
 import { requestJson, type RequestError } from './api';
 import { contentLabel, type ContentNode } from './textbook';
+import { readPdfToc } from './pdf-import';
+import { pdfSizeLimit } from './pdf-toc';
 import { parseToc, tocLimits, tocProblems, tocTree, type TocTree } from './toc';
 
 type Notice = { kind: 'status' | 'alert'; text: string; textbookId: number } | undefined;
@@ -37,6 +39,8 @@ export function TextbookContents({
   const [deleting, setDeleting] = useState<{ textbookId: number; id: number }>();
   // The pasted table of contents being previewed (#23).
   const [paste, setPaste] = useState<{ textbookId: number; text: string }>();
+  // A PDF being read into the paste box.
+  const [reading, setReading] = useState(false);
   const [notice, setNotice] = useState<Notice>(undefined);
   // One request at a time: fields and buttons stay disabled while a change and the reload after
   // it are pending, so the next change never starts from an outdated tree.
@@ -166,6 +170,34 @@ export function TextbookContents({
     setDeleting(undefined);
     setNotice(undefined);
     setPaste({ textbookId, text: '' });
+  };
+
+  // Puts the table of contents read from a PDF into the paste box, to check and fix like pasted
+  // text. Replaces what is in the box.
+  const importPdf = async (file: { size: number; arrayBuffer(): Promise<ArrayBuffer> }) => {
+    const id = textbookId;
+    const tell = (kind: 'status' | 'alert', text: string) =>
+      setNotice({ kind, text, textbookId: id });
+    if (file.size > pdfSizeLimit) return tell('alert', 'PDF는 50MB 이하만 읽을 수 있습니다');
+    setNotice(undefined);
+    setReading(true);
+    try {
+      const toc = await readPdfToc(file);
+      const text = toc.lines.join('\n').slice(0, tocLimits.text);
+      if (!text.trim())
+        return tell('alert', 'PDF에서 글을 찾지 못했습니다. 스캔한 PDF의 글자는 읽을 수 없습니다');
+      setPaste({ textbookId: id, text });
+      tell(
+        'status',
+        toc.source === 'outline'
+          ? `PDF 책갈피에서 목차 ${toc.lines.length}줄을 가져왔습니다`
+          : `책갈피 목차가 없어 앞 ${toc.pages}쪽의 글을 가져왔습니다. 목차가 아닌 줄은 지우세요`,
+      );
+    } catch (failure) {
+      tell('alert', `PDF를 읽지 못했습니다: ${(failure as Error).message}`);
+    } finally {
+      setReading(false);
+    }
   };
 
   // Saves every previewed entry at once, after the chapters already there.
@@ -371,15 +403,31 @@ export function TextbookContents({
               autoFocus
               rows={8}
               maxLength={tocLimits.text}
-              disabled={busy}
+              disabled={busy || reading}
               value={pasting.text}
               aria-describedby="toc-paste-hint"
               onChange={(event) => setPaste({ textbookId, text: event.target.value })}
             />
           </label>
+          <label className="wide">
+            PDF에서 가져오기
+            <input
+              type="file"
+              accept="application/pdf,.pdf"
+              disabled={busy || reading}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                // Cleared so picking the same file again reads it again.
+                event.target.value = '';
+                if (file) void importPdf(file);
+              }}
+            />
+          </label>
+          {reading && <p className="status wide">PDF를 읽는 중…</p>}
           <p id="toc-paste-hint" className="hint wide">
-            한 줄에 하나씩 붙여넣으세요. 1, 1.1, Chapter 1, 제1장 같은 번호로 단계를 나누고, 번호가
-            없는 줄은 들여쓰기를 따릅니다. 쪽 번호는 빠집니다. 미리보기가 다르면 글을 고치세요.
+            한 줄에 하나씩 붙여넣거나 PDF에서 가져오세요(책갈피가 있으면 책갈피, 없으면 앞 20쪽의
+            글). 1, 1.1, Chapter 1, 제1장 같은 번호로 단계를 나누고, 번호가 없는 줄은 들여쓰기를
+            따릅니다. 쪽 번호는 빠집니다. 미리보기가 다르면 글을 고치세요.
           </p>
           {pasted.length > 0 && (
             <section className="toc-preview wide" aria-label="목차 미리보기">
@@ -400,7 +448,7 @@ export function TextbookContents({
             <button
               type="submit"
               className="primary"
-              disabled={busy || !pasted.length || pasteProblems.length > 0}
+              disabled={busy || reading || !pasted.length || pasteProblems.length > 0}
             >
               {pasted.length ? `${pasted.length}개 저장` : '저장'}
             </button>
