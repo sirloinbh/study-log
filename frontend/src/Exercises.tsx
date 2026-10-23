@@ -61,7 +61,6 @@ export function Exercises({
   const [notice, setNotice] = useState<Notice>(undefined);
   // One request at a time, including the reload after a change, like the contents card.
   const { busy, begin, end } = useBusy();
-  // Set when the editor opens and after each add; the body takes focus once the field is enabled.
   // The element to focus once the controls are enabled again: the body after an add, or along
   // the delete flow the confirm button, the delete button, or the card heading (#86).
   const [wantFocus, setWantFocus] = useState<string>();
