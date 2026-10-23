@@ -100,3 +100,19 @@ export function formatMinutes(total: number) {
   if (hours === 0) return `${minutes}분`;
   return minutes === 0 ? `${hours}시간` : `${hours}시간 ${minutes}분`;
 }
+
+export type StudyLogSearch = { q: string; from: string; to: string; textbookId: string };
+
+export const emptySearch = (): StudyLogSearch => ({ q: '', from: '', to: '', textbookId: '' });
+
+// The list request for a search (#18): blank conditions are left out, up to 100 results.
+export function studyLogSearchPath(search: StudyLogSearch) {
+  const params = [
+    ['q', search.q.trim()],
+    ['from', search.from],
+    ['to', search.to],
+    ['textbookId', search.textbookId],
+    ['limit', '100'],
+  ].filter(([, value]) => value);
+  return `/api/study-logs?${params.map(([key, value]) => `${key}=${encodeURIComponent(value)}`).join('&')}`;
+}

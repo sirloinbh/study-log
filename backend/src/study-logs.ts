@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod';
+import { likePattern } from './sql.js';
 
 export const studyStatuses = ['planned', 'in_progress', 'done', 'stopped'] as const;
 
@@ -104,20 +105,33 @@ const idParam = z
   .regex(/^[1-9]\d{0,14}$/, '학습 기록 ID가 올바르지 않습니다')
   .transform(Number);
 
-const listQuery = z.object({
-  date: studyDate.optional(),
-  textbookId: z
-    .string()
-    .regex(/^[1-9]\d{0,14}$/, '교재 ID가 올바르지 않습니다')
-    .transform(Number)
-    .optional(),
-  limit: z.coerce
-    .number({ invalid_type_error: '조회 개수가 올바르지 않습니다' })
-    .int('조회 개수가 올바르지 않습니다')
-    .min(1, '조회 개수는 1 이상이어야 합니다')
-    .max(100, '조회 개수는 100 이하여야 합니다')
-    .default(20),
-});
+// ?date for one day in time order; otherwise the most recent logs, narrowed by ?textbookId, ?q
+// (memo or difficulties, any case) and ?from/?to (#18). Every given condition applies.
+const listQuery = z
+  .object({
+    date: studyDate.optional(),
+    q: z
+      .string({ invalid_type_error: '검색어 형식이 올바르지 않습니다' })
+      .trim()
+      .max(50, '검색어는 50자 이하로 입력하세요')
+      .optional(),
+    from: studyDate.optional(),
+    to: studyDate.optional(),
+    textbookId: z
+      .string()
+      .regex(/^[1-9]\d{0,14}$/, '교재 ID가 올바르지 않습니다')
+      .transform(Number)
+      .optional(),
+    limit: z.coerce
+      .number({ invalid_type_error: '조회 개수가 올바르지 않습니다' })
+      .int('조회 개수가 올바르지 않습니다')
+      .min(1, '조회 개수는 1 이상이어야 합니다')
+      .max(100, '조회 개수는 100 이하여야 합니다')
+      .default(20),
+  })
+  .refine((query) => !query.from || !query.to || query.from <= query.to, {
+    message: '시작일은 종료일보다 늦을 수 없습니다',
+  });
 
 // `source` is study_logs or a CTE of written rows; the textbook and chapter names come along so
 // the list can show them without more requests.
@@ -153,14 +167,18 @@ async function write<T>(run: () => Promise<T>) {
 export function studyLogRoutes(pool: Pool) {
   const router = Router();
 
-  // With ?date the day's entries in time order; otherwise the most recent entries. ?textbookId
-  // narrows either list to one textbook.
   router.get('/', async (req, res) => {
-    const { date, limit, textbookId } = listQuery.parse(req.query);
+    const { date, limit, textbookId, q, from, to } = listQuery.parse(req.query);
     const params: unknown[] = [];
     const where: string[] = [];
     if (date) where.push(`l.study_date = $${params.push(date)}`);
     if (textbookId !== undefined) where.push(`l.textbook_id = $${params.push(textbookId)}`);
+    if (q) {
+      const pattern = `$${params.push(likePattern(q))}`;
+      where.push(`(l.memo ILIKE ${pattern} OR l.difficulties ILIKE ${pattern})`);
+    }
+    if (from) where.push(`l.study_date >= $${params.push(from)}`);
+    if (to) where.push(`l.study_date <= $${params.push(to)}`);
     const filter = where.length ? `WHERE ${where.join(' AND ')}` : '';
     const { rows } = date
       ? await pool.query(`${select('study_logs')} ${filter} ORDER BY l.start_time, l.id`, params)
