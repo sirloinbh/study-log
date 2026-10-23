@@ -13,6 +13,16 @@ export type ExerciseForm = Pick<Exercise, 'number' | 'body' | 'important'>;
 
 export type ExerciseAnswer = { exerciseId: number; body: string };
 
+// The Korean translation of an exercise and its answer (#31). `stale`: the exercise or its answer
+// changed after it was made.
+export type ExerciseTranslation = {
+  body: string;
+  answer: string | null;
+  model: string;
+  updatedAt: string;
+  stale: boolean;
+};
+
 // Same limits as the API; the server still validates.
 export const exerciseLimits = { number: 20, body: 20000, answer: 20000 } as const;
 
