@@ -30,7 +30,9 @@ test(
   async (t) => {
     const pool = new Pool({ connectionString: url });
     const cleanup = () =>
-      pool.query("DELETE FROM study_logs WHERE study_date BETWEEN '2096-01-01' AND '2096-12-31'");
+      pool.query(
+        "DELETE FROM study_logs WHERE study_date BETWEEN '2096-01-01' AND '2096-12-31' OR study_date = '0001-01-01'",
+      );
     await cleanup();
     t.after(async () => {
       await cleanup();
@@ -59,6 +61,7 @@ test(
         await add('2096-03-10', '23:00', '01:00', 'done'); // 120, past midnight
         await add('2096-01-05', '09:00', '09:30', 'done'); // 30, before the 3 months
         await add('2096-05-20', '09:00', '10:40', 'done'); // 100, after today
+        await add('0001-01-01', '09:00', '09:10', 'done'); // 10, long before: only in the total
 
         const week = await stats('week');
         assert.deepEqual(
@@ -97,11 +100,15 @@ test(
         ]);
 
         const all = await stats('all');
-        // Planned and future logs never count.
-        assert.equal(all.cumulativeMinutes, baseline + 365);
+        // Planned and future logs never count; the year-1 log counts in the all-time total.
+        assert.equal(all.cumulativeMinutes, baseline + 375);
         assert.equal(all.cumulativeMinutes, week.cumulativeMinutes);
         assert.equal(all.to, today);
-        assert.equal(all.totalMinutes, all.cumulativeMinutes);
+        // But the series stops about ten years back instead of reaching year 1.
+        assert.equal(all.from, '2086-05-17');
+        assert.equal(all.days, 3653);
+        assert.equal(all.daily.length, 3653);
+        assert.equal(all.totalMinutes, 365);
 
         // Without a period it is this week; an empty one is refused like any unknown one.
         assert.equal(((await call('/api/stats/study-time')).data as Stats).period, 'week');

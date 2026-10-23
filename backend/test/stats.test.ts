@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Pool } from 'pg';
-import { addDays, bucket, periodStart, weekStart } from '../src/stats.js';
+import { addDays, bucket, maxSeriesDays, periodStart, weekStart } from '../src/stats.js';
 import { withApi } from './helpers.js';
 
 test('weeks start on Monday', () => {
@@ -25,6 +25,11 @@ test('period starts follow the service calendar (#47)', () => {
   assert.equal(periodStart('all', '2026-10-23', '2025-03-01'), '2025-03-01');
   assert.equal(periodStart('all', '2026-10-23'), '2026-10-23');
   assert.equal(periodStart('all', '2026-10-23', '2026-12-01'), '2026-10-23');
+  // A log from long ago does not stretch the series past about ten years (security review).
+  const capped = periodStart('all', '2026-10-23', '0001-01-01');
+  assert.equal(capped, addDays('2026-10-23', -(maxSeriesDays - 1)));
+  assert.equal(capped, '2016-10-23');
+  assert.equal(periodStart('all', '2026-10-23', '2016-10-24'), '2016-10-24');
 });
 
 test('days add across month and year ends', () => {

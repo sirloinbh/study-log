@@ -25,13 +25,23 @@ export const addDays = (day: string, days: number) => {
 // Weeks start on Monday.
 export const weekStart = (day: string) => addDays(day, -((toDate(day).getUTCDay() + 6) % 7));
 
+// The longest series "all" returns, in days (about ten years). Study dates as early as year 1 are
+// accepted, so without a bound one such log would make every request build hundreds of
+// thousands of days. The all-time total still counts every log.
+export const maxSeriesDays = 3653;
+
 // The first day of a period ending today (#47). "Recent 3 months" starts the day after the same
 // day three months back (a day missing in that month counts as its last day), so it spans three
-// full months. "All" starts at the first counted log, or today when there is none.
+// full months. "All" starts at the first counted log, or today when there is none, but no more
+// than `maxSeriesDays` back.
 export function periodStart(period: StatPeriod, today: string, firstLog?: string) {
   if (period === 'week') return weekStart(today);
   if (period === 'month') return `${today.slice(0, 8)}01`;
-  if (period === 'all') return firstLog && firstLog < today ? firstLog : today;
+  if (period === 'all') {
+    const earliest = addDays(today, -(maxSeriesDays - 1));
+    if (!firstLog || firstLog >= today) return today;
+    return firstLog < earliest ? earliest : firstLog;
+  }
   const [year, month, day] = today.split('-').map(Number);
   const back = new Date(Date.UTC(year, month - 1 - 3, 1));
   const lastDay = new Date(Date.UTC(back.getUTCFullYear(), back.getUTCMonth() + 1, 0)).getUTCDate();
