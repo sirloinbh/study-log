@@ -618,3 +618,41 @@ uiTest('duration preview follows the API rule and formats hours and minutes', ()
     '23시간 59분',
   ]);
 });
+
+// #65: the focused delete button is swapped out at each step; focus follows the flow instead of
+// dropping to the page.
+const focusRecorder = () => {
+  const focused: string[] = [];
+  const document = { getElementById: (id: string) => ({ focus: () => focused.push(id) }) };
+  return { focused, document };
+};
+
+uiTest('focus follows the delete flow: confirm, back on cancel, the list after', async () => {
+  const { focused, document } = focusRecorder();
+  const ui = mount(fakeApi([morning]).fetch, { document });
+  await ui.settle();
+  const item = () => ui.find((n) => n.type === 'li')[0];
+  await ui.click('삭제', item());
+  assert.deepEqual(focused, ['study-log-delete-confirm-1']);
+  await ui.click('취소', item());
+  assert.deepEqual(focused.at(-1), 'study-log-delete-1');
+  await ui.click('삭제', item());
+  await ui.click('삭제 확인', item());
+  assert.deepEqual(focused.at(-1), 'study-log-list');
+  const [heading] = ui.find((n) => n.props.id === 'study-log-list');
+  assert.equal(heading.props.tabIndex, -1);
+});
+
+uiTest('a failed delete puts focus back on the delete button, a 404 on the list', async () => {
+  for (const [reject, target] of [
+    [{ status: 500, error: '서버 오류가 발생했습니다' }, 'study-log-delete-1'],
+    [{ status: 404, error: '학습 기록을 찾을 수 없습니다' }, 'study-log-list'],
+  ] as const) {
+    const { focused, document } = focusRecorder();
+    const ui = mount(fakeApi([morning], { reject }).fetch, { document });
+    await ui.settle();
+    await ui.click('삭제', ui.find((n) => n.type === 'li')[0]);
+    await ui.click('삭제 확인');
+    assert.equal(focused.at(-1), target, String(reject.status));
+  }
+});
