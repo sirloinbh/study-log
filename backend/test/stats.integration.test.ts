@@ -110,6 +110,21 @@ test(
         assert.equal(all.daily.length, 3653);
         assert.equal(all.totalMinutes, 365);
 
+        // The heatmap (#50): 53 weeks up to today, from a Monday, the same counting rules.
+        const heat = (await call('/api/stats/heatmap')).data as {
+          from: string;
+          to: string;
+          daily: { date: string; minutes: number }[];
+        };
+        assert.deepEqual([heat.from, heat.to], ['2095-05-16', today]);
+        // 52 full weeks plus Monday to Wednesday of this one.
+        assert.equal(heat.daily.length, 52 * 7 + 3);
+        const minutesOn = (date: string) => heat.daily.find((day) => day.date === date)?.minutes;
+        assert.equal(minutesOn(today), 90);
+        assert.equal(minutesOn('2096-03-10'), 120);
+        assert.equal(minutesOn('2096-01-05'), 30);
+        assert.equal(minutesOn('2096-05-20'), undefined);
+
         // Without a period it is this week; an empty one is refused like any unknown one.
         assert.equal(((await call('/api/stats/study-time')).data as Stats).period, 'week');
         assert.equal((await call('/api/stats/study-time?period=')).status, 400);

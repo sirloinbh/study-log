@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { frontendMissing, mount, type FetchInit } from './ui-harness.js';
+import { frontendMissing, loadFrontendModule, mount, type FetchInit } from './ui-harness.js';
 
 const uiTest = frontendMissing ? test.skip : test;
 
@@ -25,6 +25,8 @@ type Options = {
   totals?: Record<string, number>;
   // Requests for these periods wait for the promise.
   hold?: { periods: string[]; until: Promise<void> };
+  // The heatmap's days, from a Monday; undefined answers a 500.
+  heatmap?: { from: string; to: string; daily: { date: string; minutes: number }[] } | null;
 };
 
 // The stats API; records the periods asked for.
@@ -40,6 +42,10 @@ function fakeApi(options: Options = {}) {
     if (path === '/api/health') return reply(200, { ok: true, today: '2026-10-23' });
     if (path.startsWith('/api/study-logs')) return reply(200, { studyLogs: [] });
     if (path === '/api/textbooks') return reply(200, { textbooks: [] });
+    if (path === '/api/stats/heatmap')
+      return options.heatmap === null
+        ? reply(500, { error: '서버 오류가 발생했습니다' })
+        : reply(200, options.heatmap ?? { from: '2026-10-19', to: '2026-10-19', daily: [] });
     const match = path.match(/^\/api\/stats\/study-time\?period=(.+)$/);
     assert.ok(match, 'unexpected request ' + path);
     const period = match[1];
@@ -142,4 +148,95 @@ uiTest('a failed load is reported instead of empty cards', async () => {
   // Going back to a period that loads shows its cards again.
   await ui.click('이번 주');
   assert.equal(cards(ui).length, 4);
+});
+
+// Two weeks from Monday 2026-10-05 to Wednesday 2026-10-14, one day in each band and one future
+// slot short of a full second week.
+const twoWeeks = {
+  from: '2026-10-05',
+  to: '2026-10-14',
+  daily: [0, 10, 30, 59, 60, 119, 120, 0, 0, 45].map((minutes, index) => ({
+    date: `2026-10-${String(5 + index).padStart(2, '0')}`,
+    minutes,
+  })),
+};
+
+uiTest('the heatmap shows each day in its band with a tooltip, by week columns', async () => {
+  const ui = await openStats(fakeApi({ heatmap: twoWeeks }));
+  const weeks = ui.find((n) => n.props.className === 'heat-week');
+  assert.equal(weeks.length, 2);
+  const cells = (week: (typeof weeks)[number]) =>
+    ui
+      .find(
+        (n) => typeof n.props.className === 'string' && n.props.className.startsWith('heat-cell'),
+        week,
+      )
+      .map((n) => String(n.props.className).replace('heat-cell ', ''));
+  assert.deepEqual(cells(weeks[0]), [
+    'level-0',
+    'level-1',
+    'level-2',
+    'level-2',
+    'level-3',
+    'level-3',
+    'level-4',
+  ]);
+  // Monday to Wednesday, then the rest of this week is empty.
+  assert.deepEqual(cells(weeks[1]), [
+    'level-0',
+    'level-0',
+    'level-2',
+    'future',
+    'future',
+    'future',
+    'future',
+  ]);
+  const [ninetyNine] = ui.find((n) => n.props.title === '2026-10-10: 1시간 59분');
+  assert.ok(ninetyNine, 'tooltip of 2026-10-10');
+  // One summary for screen readers.
+  const [image] = ui.find((n) => n.props.role === 'img');
+  assert.equal(image.props['aria-label'], '2026-10-05부터 2026-10-14까지 7일 공부, 총 7시간 23분');
+  assert.match(ui.text(), /7일 공부 · 총 7시간 23분/);
+  assert.deepEqual(
+    ui
+      .find((n) => n.props.className === 'heat-legend')
+      .flatMap((list) => ui.find((n) => n.type === 'li', list).map((n) => ui.text(n))),
+    ['0분', '30분 미만', '30분~1시간', '1~2시간', '2시간 이상'],
+  );
+});
+
+uiTest('a failed heatmap load is reported and the metric cards stay', async () => {
+  const ui = await openStats(fakeApi({ heatmap: null }));
+  assert.match(ui.text(), /히트맵을 불러오지 못했습니다: 서버 오류가 발생했습니다/);
+  assert.equal(cards(ui).length, 4);
+});
+
+uiTest('heatmap levels, weeks and month labels', () => {
+  const logic = loadFrontendModule<{
+    heatLevel(minutes: number): number;
+    heatWeeks(daily: { date: string; minutes: number }[]): unknown[][];
+    monthLabel(week: ({ date: string; minutes: number } | null)[]): string;
+  }>('study-stats.ts');
+  assert.deepEqual(
+    [0, 1, 29, 30, 59, 60, 119, 120, 600].map(logic.heatLevel),
+    [0, 1, 1, 2, 2, 3, 3, 4, 4],
+  );
+  const days = (from: number, count: number) =>
+    Array.from({ length: count }, (_, i) => ({
+      date: `2026-09-${String(from + i).padStart(2, '0')}`,
+      minutes: 0,
+    }));
+  const weeks = logic.heatWeeks(days(21, 9));
+  assert.deepEqual(
+    Array.from(weeks, (week) => Array.from(week, (day) => day !== null).filter(Boolean).length),
+    [7, 2],
+  );
+  assert.equal(
+    logic.monthLabel([
+      { date: '2026-09-28', minutes: 0 },
+      { date: '2026-10-01', minutes: 0 },
+    ]),
+    '10월',
+  );
+  assert.equal(logic.monthLabel([{ date: '2026-09-21', minutes: 0 }, null]), '');
 });

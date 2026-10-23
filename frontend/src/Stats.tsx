@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
 import { requestJson, type RequestError } from './api';
+import { Heatmap } from './Heatmap';
 import { periodLabels, statPeriods, type StatPeriod, type StudyTimeStats } from './study-stats';
 import { formatMinutes } from './study-logs';
 
 // Study time dashboard (#48): metric cards for the all-time total, today, the picked period and
-// its daily average, from GET /api/stats/study-time (#47). Charts come with #49.
+// its daily average, from GET /api/stats/study-time (#47), and the last year's heatmap (#50).
+// Charts come with #49.
 export function Stats() {
   const [period, setPeriod] = useState<StatPeriod>('week');
   // Kept per period, so a slow answer for another period never replaces or hides this one's.
@@ -86,6 +88,7 @@ export function Stats() {
           </article>
         </section>
       )}
+      <Heatmap />
     </div>
   );
 }
