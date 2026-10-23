@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { requestJson, type RequestError } from './api';
 import { Exercises } from './Exercises';
+import { ImportantExercises } from './ImportantExercises';
 import { TextbookContents } from './TextbookContents';
 import {
   emptyTextbookForm,
@@ -35,6 +36,10 @@ export function Textbooks() {
     tree?: ContentNode[];
     failed: boolean;
   }>();
+  // Changes made in each exercise card, so the other one reloads.
+  const [exerciseChanges, setExerciseChanges] = useState({ list: 0, important: 0 });
+  const changed = (card: 'list' | 'important') => () =>
+    setExerciseChanges((counts) => ({ ...counts, [card]: counts[card] + 1 }));
 
   useEffect(() => {
     // A slower, older response must not overwrite the list a newer request returned.
@@ -302,6 +307,20 @@ export function Textbooks() {
             textbook={selected}
             tree={contents?.textbookId === selected.id ? contents.tree : undefined}
             treeFailed={contents?.textbookId === selected.id && contents.failed}
+            reloadKey={exerciseChanges.important}
+            onChanged={changed('list')}
+          />
+        </section>
+      )}
+      {selected && (
+        <section className="card" aria-label={`${selected.title} 중요 문제`}>
+          <ImportantExercises
+            key={selected.id}
+            textbook={selected}
+            tree={contents?.textbookId === selected.id ? contents.tree : undefined}
+            treeFailed={contents?.textbookId === selected.id && contents.failed}
+            reloadKey={exerciseChanges.list}
+            onChanged={changed('important')}
           />
         </section>
       )}

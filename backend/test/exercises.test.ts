@@ -176,3 +176,57 @@ test('an exercise without an answer reads as null and the answer keeps its line 
     assert.deepEqual(saved.data, { answer: { exerciseId: 1, body } });
   });
 });
+
+test('marking important takes a boolean and answers 404 for a missing exercise', async () => {
+  await withApi(untouchedPool, async (call) => {
+    for (const [body, message] of [
+      [{}, /중요 표시 여부를 보내세요/],
+      [{ important: 'true' }, /중요 표시 형식이 올바르지 않습니다/],
+      [[true], /중요 표시 여부를 JSON 객체로 보내세요/],
+    ] as const) {
+      const { status, data } = await call('/api/exercises/1/important', { method: 'PATCH', body });
+      assert.equal(status, 400, JSON.stringify(body));
+      assert.match(String(data.error), message);
+    }
+  });
+  await withApi(emptyPool, async (call) => {
+    const { status, data } = await call('/api/exercises/9/important', {
+      method: 'PATCH',
+      body: { important: true },
+    });
+    assert.equal(status, 404);
+    assert.equal(data.error, '연습문제를 찾을 수 없습니다');
+  });
+});
+
+test('textbook exercise filters are checked before touching the DB', async () => {
+  await withApi(untouchedPool, async (call) => {
+    for (const [path, message] of [
+      ['/api/textbooks/01/exercises', /교재 ID가 올바르지 않습니다/],
+      ['/api/textbooks/1/exercises?contentId=0', /목차 ID가 올바르지 않습니다/],
+      ['/api/textbooks/1/exercises?important=yes', /중요 표시 조건이 올바르지 않습니다/],
+    ] as const) {
+      const { status, data } = await call(path);
+      assert.equal(status, 400, path);
+      assert.match(String(data.error), message);
+    }
+  });
+});
+
+test('a missing textbook or chapter of a textbook exercise list answers a Korean 404', async () => {
+  for (const [found, path, message] of [
+    [{ textbook: false, content: false }, '/api/textbooks/9/exercises', '교재를 찾을 수 없습니다'],
+    [
+      { textbook: true, content: false },
+      '/api/textbooks/9/exercises?contentId=3',
+      '목차를 찾을 수 없습니다',
+    ],
+  ] as const) {
+    const pool = { query: async () => ({ rows: [found], rowCount: 1 }) } as unknown as Pool;
+    await withApi(pool, async (call) => {
+      const { status, data } = await call(path);
+      assert.equal(status, 404, path);
+      assert.equal(data.error, message);
+    });
+  }
+});
