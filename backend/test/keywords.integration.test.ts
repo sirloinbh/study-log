@@ -51,6 +51,8 @@ test(
             (k) => `${k.date.slice(-2)}:${k.keyword}`,
           );
         assert.deepEqual(await words(`date=${days[2]}`), ['03:고유값', '03:대각화']);
+        // A date asks for that day only; search filters are not applied on top.
+        assert.deepEqual(await words(`date=${days[2]}&q=없는말`), ['03:고유값', '03:대각화']);
         // Search covers keyword and memo, ignores case, newest date first.
         assert.deepEqual(await words(`q=고유&${range}`), ['03:고유값', '02:고유값']);
         assert.deepEqual(await words(`q=RANK&${range}`), ['02:Rank']);
