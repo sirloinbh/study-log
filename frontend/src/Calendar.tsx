@@ -19,7 +19,9 @@ export function Calendar({ today, reloadKey }: { today: string; reloadKey?: numb
   // Kept per month and per day, so a slow answer for another one never shows here.
   const [months, setMonths] = useState<Record<string, CalendarDay[]>>({});
   const [dayLogs, setDayLogs] = useState<Record<string, StudyLog[]>>({});
-  const [error, setError] = useState<string>();
+  // Failures, each tagged with the month or day it was for, so one never hides or clears the other.
+  const [monthError, setMonthError] = useState<{ month: string; message: string }>();
+  const [dayError, setDayError] = useState<{ date: string; message: string }>();
 
   useEffect(() => {
     let current = true;
@@ -27,9 +29,11 @@ export function Calendar({ today, reloadKey }: { today: string; reloadKey?: numb
       .then((data) => {
         if (!current) return;
         setMonths((all) => ({ ...all, [data.month]: data.days }));
-        setError(undefined);
+        setMonthError((failed) => (failed?.month === month ? undefined : failed));
       })
-      .catch((failure: RequestError) => current && setError(failure.message));
+      .catch(
+        (failure: RequestError) => current && setMonthError({ month, message: failure.message }),
+      );
     return () => {
       current = false;
     };
@@ -38,8 +42,15 @@ export function Calendar({ today, reloadKey }: { today: string; reloadKey?: numb
   useEffect(() => {
     let current = true;
     requestJson<{ studyLogs: StudyLog[] }>(`/api/study-logs?date=${selected}`)
-      .then((data) => current && setDayLogs((all) => ({ ...all, [selected]: data.studyLogs })))
-      .catch((failure: RequestError) => current && setError(failure.message));
+      .then((data) => {
+        if (!current) return;
+        setDayLogs((all) => ({ ...all, [selected]: data.studyLogs }));
+        setDayError((failed) => (failed?.date === selected ? undefined : failed));
+      })
+      .catch(
+        (failure: RequestError) =>
+          current && setDayError({ date: selected, message: failure.message }),
+      );
     return () => {
       current = false;
     };
@@ -47,6 +58,8 @@ export function Calendar({ today, reloadKey }: { today: string; reloadKey?: numb
 
   const days = months[month];
   const logs = dayLogs[selected];
+  const error = monthError?.month === month ? monthError.message : undefined;
+  const logsError = dayError?.date === selected ? dayError.message : undefined;
 
   const describe = (day: CalendarDay) =>
     `${day.date}, ${day.minutes ? `학습 ${formatMinutes(day.minutes)}` : '학습 없음'}, ` +
@@ -132,7 +145,11 @@ export function Calendar({ today, reloadKey }: { today: string; reloadKey?: numb
       )}
       <div className="calendar-logs">
         <h3>{selected} 일지</h3>
-        {logs === undefined ? (
+        {logsError ? (
+          <p role="alert" className="error">
+            일지를 불러오지 못했습니다: {logsError}
+          </p>
+        ) : logs === undefined ? (
           <p className="status">불러오는 중…</p>
         ) : logs.length === 0 ? (
           <p className="status">이 날짜의 기록이 없습니다</p>
