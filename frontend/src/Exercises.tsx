@@ -30,14 +30,20 @@ type AnswerPanel = {
 // Exercises of one chapter or section, picked from the textbook's contents. State is tagged with
 // its chapter, so picking another one never shows or edits the previous chapter's exercises.
 // `treeFailed` means the contents could not be loaded, so there is nothing to pick from.
+// `reloadKey` changes when exercises were changed elsewhere (the important card); `onChanged` is
+// called after each change made here.
 export function Exercises({
   textbook,
   tree,
   treeFailed,
+  reloadKey,
+  onChanged,
 }: {
   textbook: Textbook;
   tree?: ContentNode[];
   treeFailed?: boolean;
+  reloadKey?: number;
+  onChanged?: () => void;
 }) {
   const [chosen, setChosen] = useState<number>();
   const [loaded, setLoaded] = useState<{ contentId: number; exercises: Exercise[] }>();
@@ -74,7 +80,7 @@ export function Exercises({
     return () => {
       current = false;
     };
-  }, [textbook.id, contentId]);
+  }, [textbook.id, contentId, reloadKey]);
 
   // `contentId` is undefined when there are no contents yet; nothing tagged matches it then.
   const mine = <T extends { contentId: number }>(state: T | undefined) =>
@@ -137,6 +143,7 @@ export function Exercises({
     } finally {
       await refresh();
       setBusy(false);
+      onChanged?.();
     }
   };
 
@@ -193,6 +200,25 @@ export function Exercises({
       }
       say('status', '삭제했습니다');
       if (open?.id === exercise.id) setEditor(undefined);
+    }, exercise.id);
+
+  // Marks or unmarks the exercise as important. An open edit of it follows, so saving the edit
+  // does not undo the mark.
+  const markImportant = (exercise: Exercise) =>
+    run(async () => {
+      const important = !exercise.important;
+      await requestJson(`/api/exercises/${exercise.id}/important`, {
+        method: 'PATCH',
+        body: { important },
+      });
+      say('status', important ? '중요 문제로 표시했습니다' : '중요 표시를 해제했습니다');
+      setEditor(
+        (current) =>
+          current &&
+          (current.id === exercise.id
+            ? { ...current, form: { ...current.form, important } }
+            : current),
+      );
     }, exercise.id);
 
   // Opens the answer of `exercise`, closing any other one, or closes it when it is open.
@@ -493,6 +519,15 @@ export function Exercises({
                           onClick={() => toggleAnswer(exercise)}
                         >
                           {answerShown?.id === exercise.id ? '정답 닫기' : '정답 보기'}
+                        </button>
+                        <button
+                          type="button"
+                          className="secondary"
+                          disabled={busy}
+                          aria-label={`${label} ${exercise.important ? '중요 해제' : '중요 표시'}`}
+                          onClick={() => markImportant(exercise)}
+                        >
+                          {exercise.important ? '중요 해제' : '중요 표시'}
                         </button>
                         <button
                           type="button"
