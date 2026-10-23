@@ -27,7 +27,10 @@ const log = (id: number, studyDate: string, minutes: number, status = 'done'): L
 });
 
 // The study log API with the calendar; records calendar and day requests.
-function fakeApi(initial: Log[], options: { failCalendar?: boolean } = {}) {
+function fakeApi(
+  initial: Log[],
+  options: { failCalendar?: boolean; failMonths?: string[]; failDays?: string[] } = {},
+) {
   const logs = [...initial];
   const calendar: string[] = [];
   const reply = (status: number, body: unknown) => ({
@@ -42,7 +45,8 @@ function fakeApi(initial: Log[], options: { failCalendar?: boolean } = {}) {
     const month = path.match(/^\/api\/study-logs\/calendar\?month=(\d{4}-\d{2})$/);
     if (month) {
       calendar.push(path);
-      if (options.failCalendar) return reply(500, { error: '서버 오류가 발생했습니다' });
+      if (options.failCalendar || options.failMonths?.includes(month[1]))
+        return reply(500, { error: '서버 오류가 발생했습니다' });
       const [year, number] = month[1].split('-').map(Number);
       const last = new Date(Date.UTC(year, number, 0)).getUTCDate();
       const days = Array.from({ length: last }, (_, i) => {
@@ -61,6 +65,8 @@ function fakeApi(initial: Log[], options: { failCalendar?: boolean } = {}) {
     const day = path.match(/^\/api\/study-logs\?date=(.+)$/);
     if (day) {
       calendar.push(path);
+      if (options.failDays?.includes(day[1]))
+        return reply(500, { error: '서버 오류가 발생했습니다' });
       return reply(200, { studyLogs: logs.filter((l) => l.studyDate === day[1]) });
     }
     if (path.startsWith('/api/study-logs?limit=')) return reply(200, { studyLogs: logs });
@@ -194,4 +200,25 @@ uiTest('calendar helpers: months, Monday-first slots and short amounts', () => {
     '1.5시간',
     '2.1시간',
   ]);
+});
+
+uiTest('a failed day and a failed month are reported apart and never hide each other', async () => {
+  const api = fakeApi(logs, { failDays: ['2026-10-02'], failMonths: ['2026-09'] });
+  const ui = await open(api);
+  // Only the day failed: the month stays, the logs area says so instead of loading forever.
+  await ui.click('2', dayButton(ui, '2026-10-02'));
+  assert.match(ui.text(card(ui)), /일지를 불러오지 못했습니다: 서버 오류가 발생했습니다/);
+  assert.doesNotMatch(ui.text(card(ui)), /캘린더를 불러오지 못했습니다/);
+  assert.ok(dayButton(ui, '2026-10-01'), 'the month is still shown');
+  // Another day loads fine: its logs show and the day error is gone.
+  await ui.click('1', dayButton(ui, '2026-10-01'));
+  assert.doesNotMatch(ui.text(card(ui)), /일지를 불러오지 못했습니다/);
+  assert.match(ui.text(card(ui)), /메모 1/);
+  // A failed month is reported as the calendar; its day logs below are unaffected.
+  await ui.click('이전', card(ui));
+  assert.match(ui.text(card(ui)), /캘린더를 불러오지 못했습니다/);
+  assert.match(ui.text(card(ui)), /메모 1/);
+  // Back to a month that loads: the month error is not shown there.
+  await ui.click('다음', card(ui));
+  assert.doesNotMatch(ui.text(card(ui)), /캘린더를 불러오지 못했습니다/);
 });
