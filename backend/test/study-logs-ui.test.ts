@@ -621,15 +621,25 @@ uiTest('duration preview follows the API rule and formats hours and minutes', ()
 
 // #65: the focused delete button is swapped out at each step; focus follows the flow instead of
 // dropping to the page.
+// Records focused ids. `rendered` must be set to the mounted UI, so an id with no element in the
+// rendered tree (a typo) fails instead of being focused.
 const focusRecorder = () => {
   const focused: string[] = [];
-  const document = { getElementById: (id: string) => ({ focus: () => focused.push(id) }) };
-  return { focused, document };
+  const state: { ui?: ReturnType<typeof mount> } = {};
+  const document = {
+    getElementById: (id: string) => {
+      if (state.ui && state.ui.find((n) => n.props.id === id).length !== 1)
+        throw new Error(`no element #${id} to focus`);
+      return { focus: () => focused.push(id) };
+    },
+  };
+  return { focused, document, state };
 };
 
 uiTest('focus follows the delete flow: confirm, back on cancel, the list after', async () => {
-  const { focused, document } = focusRecorder();
+  const { focused, document, state } = focusRecorder();
   const ui = mount(fakeApi([morning]).fetch, { document });
+  state.ui = ui;
   await ui.settle();
   const item = () => ui.find((n) => n.type === 'li')[0];
   await ui.click('삭제', item());
@@ -648,8 +658,9 @@ uiTest('a failed delete puts focus back on the delete button, a 404 on the list'
     [{ status: 500, error: '서버 오류가 발생했습니다' }, 'study-log-delete-1'],
     [{ status: 404, error: '학습 기록을 찾을 수 없습니다' }, 'study-log-list'],
   ] as const) {
-    const { focused, document } = focusRecorder();
+    const { focused, document, state } = focusRecorder();
     const ui = mount(fakeApi([morning], { reject }).fetch, { document });
+    state.ui = ui;
     await ui.settle();
     await ui.click('삭제', ui.find((n) => n.type === 'li')[0]);
     await ui.click('삭제 확인');
