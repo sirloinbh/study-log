@@ -179,14 +179,16 @@ nav button.active {
 }
 .study-logs,
 .textbooks,
-.keywords {
+.keywords,
+.stats {
   display: grid;
   gap: 20px;
   max-width: 960px;
 }
 .study-logs h2,
 .textbooks h2,
-.keywords h2 {
+.keywords h2,
+.stats h2 {
   margin: 0 0 16px;
   font-size: 16px;
 }
@@ -437,6 +439,35 @@ nav button.active {
 .keyword-results .log-head {
   justify-content: space-between;
 }
+.period-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 16px;
+}
+.metric h2 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 500;
+}
+.metric-value {
+  margin: 0 0 6px;
+  font-size: 26px;
+  font-weight: 600;
+}
+.metric .status {
+  margin: 0;
+  font-size: 12px;
+  word-break: keep-all;
+}
+.metric .nowrap {
+  white-space: nowrap;
+}
 @media (max-width: 760px) {
   aside {
     position: static;
@@ -448,13 +479,20 @@ nav button.active {
   .logo {
     margin-bottom: 12px;
   }
+  /* Five menu items share the width at 390px: the icon above a smaller label (#48). */
   nav {
     grid-auto-flow: column;
+    grid-auto-columns: minmax(0, 1fr);
     overflow-x: auto;
   }
-  /* Four menu items fit side by side at 390px. */
   nav button {
-    padding-inline: 9px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 8px 2px;
+    font-size: 12px;
+    text-align: center;
   }
   .shell {
     flex-direction: column;
