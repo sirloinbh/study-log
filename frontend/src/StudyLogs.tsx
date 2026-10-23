@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useBusy } from './busy';
+import { Calendar } from './Calendar';
 import { requestJson, type RequestError } from './api';
 import {
   crossesMidnight,
@@ -439,6 +440,7 @@ export function StudyLogs({ today }: { today: string }) {
           </ul>
         )}
       </section>
+      <Calendar today={today} reloadKey={reload} />
     </div>
   );
 }
