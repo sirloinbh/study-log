@@ -522,7 +522,13 @@ uiTest('a refused paste shows the server message and keeps the text', async () =
 });
 
 // A stand-in for PDF.js: a document with the given bookmarks and page text, or a failure.
-function fakePdfjs(doc: { outline: unknown[] | null; pages?: unknown[][]; fail?: string }) {
+function fakePdfjs(doc: {
+  outline: unknown[] | null;
+  pages?: unknown[][];
+  fail?: string;
+  // The document opens only after this promise settles.
+  hold?: Promise<void>;
+}) {
   const seen = { opened: [] as number[], destroyed: 0 };
   const GlobalWorkerOptions: { workerSrc?: string } = {};
   const pdfjs = {
@@ -531,15 +537,16 @@ function fakePdfjs(doc: { outline: unknown[] | null; pages?: unknown[][]; fail?:
     getDocument: ({ data }: { data: Uint8Array }) => {
       seen.opened.push(data.length);
       return {
-        promise: doc.fail
-          ? Promise.reject(new Error(doc.fail))
-          : Promise.resolve({
-              numPages: doc.pages?.length ?? 0,
-              getOutline: async () => doc.outline,
-              getPage: async (n: number) => ({
-                getTextContent: async () => ({ items: doc.pages![n - 1] }),
-              }),
+        promise: (doc.hold ?? Promise.resolve()).then(() => {
+          if (doc.fail) throw new Error(doc.fail);
+          return {
+            numPages: doc.pages?.length ?? 0,
+            getOutline: async () => doc.outline,
+            getPage: async (n: number) => ({
+              getTextContent: async () => ({ items: doc.pages![n - 1] }),
             }),
+          };
+        }),
         destroy: async () => void seen.destroyed++,
       };
     },
@@ -624,4 +631,45 @@ uiTest('an unreadable, empty or too large PDF says so and keeps the text', async
   await pickPdf(ui, pdfFile(50 * 1024 * 1024 + 1));
   assert.match(alertText(ui), /50MB 이하/);
   assert.deepEqual(big.seen.opened, [], 'not read at all');
+});
+
+uiTest('a PDF still being read is dropped when the box is closed or an editor opens', async () => {
+  let release = () => {};
+  const hold = new Promise<void>((resolve) => (release = resolve));
+  const pdf = fakePdfjs({ outline: [{ title: '1 벡터', items: [] }], hold });
+  const ui = await openBook(fakeApi(outline), '선형대수', pdf.modules);
+  await ui.click('목차 붙여넣기');
+  await pickPdf(ui, pdfFile());
+  // While reading: announced, and the box and save are locked.
+  assert.match(statusText(ui), /PDF를 읽는 중/);
+  assert.ok(
+    ui.find((n) => n.type === 'textarea', pasteForm(ui))[0].props.disabled,
+    'box locked while reading',
+  );
+  await ui.click('취소', pasteForm(ui));
+  assert.equal(pasteForm(ui), undefined);
+  assert.equal(statusText(ui), '', 'the reading notice goes with the box');
+  release();
+  await ui.settle();
+  await ui.settle();
+  assert.equal(pasteForm(ui), undefined, 'the late result does not reopen the box');
+  assert.equal(statusText(ui), '');
+  assert.equal(pdf.seen.destroyed, 1, 'the document is still closed');
+
+  // Opening the chapter editor during a read keeps only the editor.
+  let releaseAgain = () => {};
+  const again = fakePdfjs({
+    outline: [{ title: '2 행렬', items: [] }],
+    hold: new Promise<void>((resolve) => (releaseAgain = resolve)),
+  });
+  const ui2 = await openBook(fakeApi(outline), '선형대수', again.modules);
+  await ui2.click('목차 붙여넣기');
+  await pickPdf(ui2, pdfFile());
+  await ui2.click('장 추가');
+  releaseAgain();
+  await ui2.settle();
+  await ui2.settle();
+  assert.equal(pasteForm(ui2), undefined);
+  assert.equal(ui2.find((n) => n.props.className === 'log-form content-form').length, 1);
+  assert.doesNotMatch(statusText(ui2), /가져왔습니다/);
 });
