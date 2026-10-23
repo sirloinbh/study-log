@@ -145,10 +145,16 @@ export function Keywords({ today }: { today: string }) {
     run(async () => {
       try {
         await requestJson(`/api/keywords/${keyword.id}`, { method: 'DELETE' });
+      } catch (failure) {
+        // Already gone elsewhere: like a delete. Otherwise the keyword stays with its delete
+        // button (#86).
+        setWantFocus(
+          (failure as RequestError).status === 404 ? 'keyword-day' : `keyword-delete-${keyword.id}`,
+        );
+        throw failure;
       } finally {
         // The confirm button goes away whether or not the delete worked.
         setDeletingId(undefined);
-        setWantFocus('keyword-day');
       }
       if (editor?.id === keyword.id) setEditor(undefined);
       setWantFocus('keyword-day');
@@ -315,6 +321,7 @@ export function Keywords({ today }: { today: string }) {
                         <button
                           type="button"
                           className="danger"
+                          id={`keyword-delete-confirm-${keyword.id}`}
                           disabled={busy}
                           aria-label={`${keyword.keyword} 삭제 확인`}
                           onClick={() => remove(keyword)}
@@ -326,7 +333,10 @@ export function Keywords({ today }: { today: string }) {
                           className="secondary"
                           disabled={busy}
                           aria-label={`${keyword.keyword} 삭제 취소`}
-                          onClick={() => setDeletingId(undefined)}
+                          onClick={() => {
+                            setDeletingId(undefined);
+                            setWantFocus(`keyword-delete-${keyword.id}`);
+                          }}
                         >
                           취소
                         </button>
@@ -353,9 +363,13 @@ export function Keywords({ today }: { today: string }) {
                         <button
                           type="button"
                           className="secondary"
+                          id={`keyword-delete-${keyword.id}`}
                           disabled={busy}
                           aria-label={`${keyword.keyword} 삭제`}
-                          onClick={() => setDeletingId(keyword.id)}
+                          onClick={() => {
+                            setDeletingId(keyword.id);
+                            setWantFocus(`keyword-delete-confirm-${keyword.id}`);
+                          }}
                         >
                           삭제
                         </button>

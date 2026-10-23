@@ -386,7 +386,13 @@ uiTest('after an edit, a cancel or a delete the day heading takes focus', async 
   await ui.click('취소', ui.find((n) => n.props.className === 'editing', dayCard(ui))[0]);
   await ui.click('삭제', item(ui, '대각화'));
   await ui.click('삭제 확인', item(ui, '대각화'));
-  assert.deepEqual(focused, ['keyword-day', 'keyword-day', 'keyword-day']);
+  // Save, cancel, then the delete flow: its confirm button and the heading after (#86).
+  assert.deepEqual(focused, [
+    'keyword-day',
+    'keyword-day',
+    'keyword-delete-confirm-2',
+    'keyword-day',
+  ]);
 });
 
 // #75: two submits in the same tick, before the screen re-renders with `busy`, send one request.
@@ -402,4 +408,47 @@ uiTest('a double submit in the same tick adds the keyword once', async () => {
   assert.equal(api.requests.filter((r) => r.method === 'POST').length, 1);
   // The second submit did not get a 409 for the same keyword either.
   assert.equal(ui.find((n) => n.props.role === 'alert').length, 0);
+});
+
+// #86: records focused ids; an id with no element in the rendered tree (a typo) fails.
+const focusRecorder = () => {
+  const focused: string[] = [];
+  const state: { ui?: ReturnType<typeof mount> } = {};
+  const document = {
+    getElementById: (id: string) => {
+      if (state.ui && state.ui.find((n) => n.props.id === id).length !== 1)
+        throw new Error(`no element #${id} to focus`);
+      return { focus: () => focused.push(id) };
+    },
+  };
+  return { focused, document, state };
+};
+// Clicks the button with this accessible name.
+const press = async (ui: ReturnType<typeof mount>, name: string) => {
+  const [button] = ui.find((n) => n.type === 'button' && n.props['aria-label'] === name);
+  assert.ok(button, 'button ' + name);
+  assert.ok(!button.props.disabled, 'button ' + name + ' is disabled');
+  void (button.props.onClick as () => unknown)();
+  await ui.settle();
+};
+
+uiTest('keyword delete focus: back on cancel and on a failure, heading on 404', async () => {
+  const options: Options = {};
+  const { focused, document, state } = focusRecorder();
+  const api = fakeApi(stored, options);
+  const ui = await openKeywords(api, { document });
+  state.ui = ui;
+  await press(ui, '대각화 삭제');
+  assert.equal(focused.at(-1), 'keyword-delete-confirm-2');
+  await press(ui, '대각화 삭제 취소');
+  assert.equal(focused.at(-1), 'keyword-delete-2');
+  options.reject = { method: 'DELETE', status: 500, error: '서버 오류가 발생했습니다' };
+  await press(ui, '대각화 삭제');
+  await press(ui, '대각화 삭제 확인');
+  assert.equal(focused.at(-1), 'keyword-delete-2');
+  options.reject = undefined;
+  api.rows.splice(1, 1);
+  await press(ui, '대각화 삭제');
+  await press(ui, '대각화 삭제 확인');
+  assert.equal(focused.at(-1), 'keyword-day');
 });
