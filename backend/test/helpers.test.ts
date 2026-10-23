@@ -33,11 +33,13 @@ test('it gives up after the given number of refused ports', async () => {
   assert.deepEqual(fake.closed, [6000, 6665, 6667]);
 });
 
-test('the blocked list holds the ports fetch reports as bad', async () => {
+test('every listed port is one Node fetch refuses as a bad port', async () => {
   for (const port of [6000, 6665, 6669, 10080]) assert.ok(fetchBlockedPorts.has(port), `${port}`);
-  // Node's fetch refuses a listed port before connecting.
-  await assert.rejects(fetch('http://127.0.0.1:6666/'), (error: Error) => {
-    assert.equal((error.cause as Error | undefined)?.message, 'bad port');
-    return true;
-  });
+  // Refused before connecting, so this is quick and does not depend on what listens there.
+  for (const port of fetchBlockedPorts) {
+    await assert.rejects(fetch(`http://127.0.0.1:${port}/`), (error: Error) => {
+      assert.equal((error.cause as Error | undefined)?.message, 'bad port', `${port}`);
+      return true;
+    });
+  }
 });
