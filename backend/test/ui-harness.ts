@@ -119,6 +119,15 @@ export function mount(fetchImpl: FetchImpl, globals: Record<string, unknown> = {
     if (name === 'react-dom/client')
       return { createRoot: () => ({ render: (v: Node) => (element = v) }) };
     if (name === 'lucide-react') return new Proxy({}, { get: () => () => null });
+    // Keeps the Markdown source as a 'markdown' element; markdown.test.ts renders the real one.
+    if (name === 'react-markdown')
+      return {
+        __esModule: true,
+        default: (props: { children: unknown[] }) => ({
+          type: 'markdown',
+          props: { children: props.children },
+        }),
+      };
     throw new Error('Unexpected import: ' + name);
   })('main.tsx');
   const resolve = (node: unknown): unknown => {
