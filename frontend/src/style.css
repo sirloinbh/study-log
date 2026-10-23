@@ -551,6 +551,62 @@ nav button.active {
   align-items: center;
   gap: 6px;
 }
+.calendar-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.calendar-head h2 {
+  margin: 0;
+}
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+.calendar-weekday {
+  text-align: center;
+  font-size: 12px;
+  color: var(--muted);
+}
+.calendar-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-height: 52px;
+  padding: 6px 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-button);
+  background: var(--surface);
+  color: var(--text);
+}
+.calendar-day.studied {
+  background: #eef3df;
+}
+.calendar-day.today .calendar-date {
+  font-weight: 700;
+  color: var(--primary);
+}
+.calendar-day[aria-pressed='true'] {
+  border-color: var(--primary);
+  box-shadow: inset 0 0 0 1px var(--primary);
+}
+.calendar-date {
+  font-size: 13px;
+}
+.calendar-minutes {
+  font-size: 11px;
+  color: var(--primary);
+  white-space: nowrap;
+}
+.calendar-logs h3 {
+  margin: 16px 0 8px;
+  font-size: 14px;
+}
 @media (max-width: 760px) {
   aside {
     position: static;
