@@ -648,6 +648,10 @@ nav button.active {
 .memo :is(p, ul, ol, pre, blockquote, h1, h2, h3, h4, h5, h6) {
   margin: 0 0 6px;
 }
+/* Memos written before Markdown (#16) broke lines with a single Enter; keep those breaks. */
+.memo p {
+  white-space: pre-line;
+}
 .memo :is(h1, h2, h3, h4, h5, h6) {
   font-size: 1em;
   color: var(--text);
