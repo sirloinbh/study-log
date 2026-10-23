@@ -25,7 +25,7 @@ type Options = {
   totals?: Record<string, number>;
   // Requests for these periods wait for the promise.
   hold?: { periods: string[]; until: Promise<void> };
-  // The heatmap's days, from a Monday; undefined answers a 500.
+  // The heatmap's days, from a Sunday; undefined answers a 500.
   heatmap?: { from: string; to: string; daily: { date: string; minutes: number }[] } | null;
 };
 
@@ -150,13 +150,13 @@ uiTest('a failed load is reported instead of empty cards', async () => {
   assert.equal(cards(ui).length, 4);
 });
 
-// Two weeks from Monday 2026-10-05 to Wednesday 2026-10-14, one day in each band and one future
+// Two weeks from Sunday 2026-10-04 to Tuesday 2026-10-13 (#96), one day in each band and one future
 // slot short of a full second week.
 const twoWeeks = {
-  from: '2026-10-05',
-  to: '2026-10-14',
+  from: '2026-10-04',
+  to: '2026-10-13',
   daily: [0, 10, 30, 59, 60, 119, 120, 0, 0, 45].map((minutes, index) => ({
-    date: `2026-10-${String(5 + index).padStart(2, '0')}`,
+    date: `2026-10-${String(4 + index).padStart(2, '0')}`,
     minutes,
   })),
 };
@@ -181,7 +181,7 @@ uiTest('the heatmap shows each day in its band with a tooltip, by week columns',
     'level-3',
     'level-4',
   ]);
-  // Monday to Wednesday, then the rest of this week is empty.
+  // Sunday to Tuesday, then the rest of this week is empty.
   assert.deepEqual(cells(weeks[1]), [
     'level-0',
     'level-0',
@@ -191,11 +191,11 @@ uiTest('the heatmap shows each day in its band with a tooltip, by week columns',
     'future',
     'future',
   ]);
-  const [ninetyNine] = ui.find((n) => n.props.title === '2026-10-10: 1시간 59분');
-  assert.ok(ninetyNine, 'tooltip of 2026-10-10');
+  const [ninetyNine] = ui.find((n) => n.props.title === '2026-10-09: 1시간 59분');
+  assert.ok(ninetyNine, 'tooltip of 2026-10-09');
   // One summary for screen readers.
   const [image] = ui.find((n) => n.props.role === 'img');
-  assert.equal(image.props['aria-label'], '2026-10-05부터 2026-10-14까지 7일 공부, 총 7시간 23분');
+  assert.equal(image.props['aria-label'], '2026-10-04부터 2026-10-13까지 7일 공부, 총 7시간 23분');
   assert.match(ui.text(), /7일 공부 · 총 7시간 23분/);
   assert.deepEqual(
     ui

@@ -46,7 +46,7 @@ export function heatLevel(minutes: number) {
   return 4;
 }
 
-// The days as week columns of seven (Monday first). `daily` starts on a Monday; the days after
+// The days as week columns of seven (Sunday first, #96). `daily` starts on a Sunday; the days after
 // the last one (the rest of this week) are null.
 export function heatWeeks(daily: DayMinutes[]) {
   const weeks: (DayMinutes | null)[][] = [];
