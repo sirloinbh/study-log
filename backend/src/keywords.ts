@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod';
+import { likePattern } from './sql.js';
 import { isCalendarDate } from './study-logs.js';
 
 const keywordDate = z
@@ -65,9 +66,6 @@ const columns = `id, keyword_date AS date, keyword, memo`;
 
 const notFound = { error: '키워드를 찾을 수 없습니다' };
 const duplicate = { error: '이 날짜에 이미 있는 키워드입니다' };
-
-// LIKE treats % and _ as wildcards; a search for "50%" means the characters themselves.
-const likePattern = (text: string) => `%${text.replace(/[\\%_]/g, (c) => `\\${c}`)}%`;
 
 const isDuplicate = (error: unknown) =>
   (error as { code?: string; constraint?: string }).code === '23505' &&
