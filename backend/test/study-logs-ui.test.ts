@@ -417,8 +417,10 @@ uiTest('fields are locked while a save is in flight', async () => {
   await ui.fill('시작', '13:00');
   await ui.fill('종료', '14:00');
   await ui.submit();
+  // The entry form's fields (the search card below has its own lock).
+  const [form] = ui.find((n) => n.type === 'form');
   const disabled = ui
-    .find((n) => ['input', 'select', 'textarea'].includes(String(n.type)))
+    .find((n) => ['input', 'select', 'textarea'].includes(String(n.type)), form)
     .map((n) => n.props.disabled);
   assert.deepEqual(disabled, [true, true, true, true, true, true, true, true, true, true]);
   release();
@@ -440,9 +442,13 @@ uiTest('list buttons name the log they act on', async () => {
   ]);
 });
 
+// Options of a field in the entry form (the search card has a textbook field too).
 const optionsOf = (ui: ReturnType<typeof mount>, label: string) =>
   ui
-    .find((n) => n.type === 'label' && ui.text(n).startsWith(label))
+    .find(
+      (n) => n.type === 'label' && ui.text(n).startsWith(label),
+      ui.find((n) => n.type === 'form')[0],
+    )
     .flatMap((n) => ui.find((c) => c.type === 'option', n))
     .map((n) => ui.text(n));
 

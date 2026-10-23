@@ -149,3 +149,42 @@ test('a NUL character in the input is a Korean 400, not a logged server error', 
   }
   assert.deepEqual(logged, []);
 });
+
+test('search conditions are checked before touching the DB (#18)', async () => {
+  const untouchedPool = {
+    query: async () => {
+      throw new Error('DB must not be queried for invalid input');
+    },
+  } as unknown as Pool;
+  await withApi(untouchedPool, async (call) => {
+    for (const [path, message] of [
+      ['/api/study-logs?q=' + 'x'.repeat(51), /검색어는 50자 이하로 입력하세요/],
+      ['/api/study-logs?from=2026-10-23&to=2026-10-01', /시작일은 종료일보다 늦을 수 없습니다/],
+      ['/api/study-logs?from=2026-02-30', /존재하지 않는 날짜/],
+      ['/api/study-logs?to=2026/10/01', /YYYY-MM-DD/],
+    ] as const) {
+      const { status, data } = await call(path);
+      assert.equal(status, 400, path);
+      assert.match(String(data.error), message);
+    }
+  });
+});
+
+test('search conditions combine, and wildcards in the words are plain characters', async () => {
+  const sent: { sql: string; params: unknown[] }[] = [];
+  const pool = {
+    query: async (sql: string, params: unknown[]) => {
+      sent.push({ sql, params });
+      return { rows: [], rowCount: 0 };
+    },
+  } as unknown as Pool;
+  await withApi(pool, async (call) => {
+    await call(
+      '/api/study-logs?q=' +
+        encodeURIComponent(' 50%_ ') +
+        '&from=2026-10-01&to=2026-10-31&textbookId=7&limit=100',
+    );
+    assert.deepEqual(sent[0].params, [7, '%50\\%\\_%', '2026-10-01', '2026-10-31', 100]);
+    assert.match(sent[0].sql, /l\.memo ILIKE \$2 OR l\.difficulties ILIKE \$2/);
+  });
+});
