@@ -47,7 +47,10 @@ export async function withApi(
       server.once('error', reject);
     });
     const address = server.address();
-    if (!address || typeof address === 'string') throw new Error('No TCP address');
+    if (!address || typeof address === 'string') {
+      await closeServer(server);
+      throw new Error('No TCP address');
+    }
     return { server, port: address.port, close: () => closeServer(server) };
   });
   try {
