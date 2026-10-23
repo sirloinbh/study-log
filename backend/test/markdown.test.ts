@@ -33,6 +33,9 @@ uiTest('a memo renders Markdown headings, lists, emphasis, code and links', asyn
     assert.ok(html.includes(part), `${part} in ${html}`);
   // A single Enter stays a line break inside the paragraph; the stylesheet shows it (pre-line).
   assert.equal(await render('1줄\n2줄'), '<div class="memo"><p>1줄\n2줄</p></div>');
+  // A hard break (two spaces or a backslash) is one <br>, not <br> and a second newline.
+  for (const hard of ['1줄  \n2줄', '1줄\\\n2줄'])
+    assert.equal(await render(hard), '<div class="memo"><p>1줄<br/>2줄</p></div>', hard);
   assert.match(await render('짧은 메모'), /^<div class="memo"><p>짧은 메모<\/p><\/div>$/);
 });
 
