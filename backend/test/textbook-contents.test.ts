@@ -100,3 +100,46 @@ test('contents of a missing textbook answer a Korean 404 and writes roll back', 
   assert.equal(statements.filter((sql) => sql === 'COMMIT').length, 0);
   assert.equal(released(), 3);
 });
+
+// #68: a failed transaction whose ROLLBACK also fails (a dropped connection) must destroy the
+// client instead of returning the broken connection to the pool.
+function failingPool(rollbackFails: boolean) {
+  const releases: unknown[][] = [];
+  const query = async (sql: string) => {
+    if (sql.startsWith('BEGIN')) return { rows: [], rowCount: 0 };
+    if (sql.startsWith('ROLLBACK')) {
+      if (rollbackFails) throw new Error('Connection terminated unexpectedly');
+      return { rows: [], rowCount: 0 };
+    }
+    throw new Error('Connection terminated unexpectedly');
+  };
+  const pool = {
+    query,
+    connect: async () => ({ query, release: (...args: unknown[]) => void releases.push(args) }),
+  };
+  return { pool: pool as unknown as Pool, releases };
+}
+
+test('a client whose ROLLBACK fails is destroyed, not returned to the pool', async () => {
+  const original = console.error;
+  console.error = () => {};
+  try {
+    for (const rollbackFails of [true, false]) {
+      const { pool, releases } = failingPool(rollbackFails);
+      await withApi(pool, async (call) => {
+        const { status } = await call(base, { method: 'POST', body: { title: '행렬' } });
+        assert.equal(status, 500);
+      });
+      assert.equal(releases.length, 1, 'released once');
+      const [reason] = releases[0];
+      if (rollbackFails) {
+        assert.ok(reason instanceof Error, 'released with the rollback error, so pg destroys it');
+        assert.match(reason.message, /Connection terminated/);
+      } else {
+        assert.equal(reason, undefined, 'a clean rollback returns the client to the pool');
+      }
+    }
+  } finally {
+    console.error = original;
+  }
+});
