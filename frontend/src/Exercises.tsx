@@ -61,8 +61,9 @@ export function Exercises({
   const [notice, setNotice] = useState<Notice>(undefined);
   // One request at a time, including the reload after a change, like the contents card.
   const { busy, begin, end } = useBusy();
-  // Set when the editor opens and after each add; the body takes focus once the field is enabled.
-  const [wantFocus, setWantFocus] = useState(false);
+  // The element to focus once the controls are enabled again: the body after an add, or along
+  // the delete flow the confirm button, the delete button, or the card heading (#86).
+  const [wantFocus, setWantFocus] = useState<string>();
   // The chapter the server reported missing; once the reloaded tree no longer has it, the card
   // says so next to the first chapter it fell back to.
   const [lost, setLost] = useState<number>();
@@ -132,11 +133,11 @@ export function Exercises({
   }, [answerId]);
 
   // Not `autoFocus`: after an add the field is still disabled until the reload finishes, and a
-  // disabled field cannot take focus. Other changes (a delete) leave focus where it is.
+  // disabled field cannot take focus.
   useEffect(() => {
     if (!wantFocus || busy) return;
-    setWantFocus(false);
-    document.getElementById('exercise-body')?.focus?.();
+    setWantFocus(undefined);
+    document.getElementById(wantFocus)?.focus?.();
   }, [wantFocus, busy]);
 
   const say = (kind: 'status' | 'alert', text: string) =>
@@ -184,7 +185,7 @@ export function Exercises({
     setDeleting(undefined);
     setNotice(undefined);
     setEditor({ contentId, form: emptyExerciseForm() });
-    setWantFocus(true);
+    setWantFocus('exercise-body');
   };
 
   const startEdit = (exercise: Exercise) => {
@@ -195,7 +196,7 @@ export function Exercises({
       id: exercise.id,
       form: { number: exercise.number, body: exercise.body, important: exercise.important },
     });
-    setWantFocus(true);
+    setWantFocus('exercise-body');
   };
 
   const save = (event: { preventDefault(): void }) => {
@@ -207,7 +208,7 @@ export function Exercises({
         say('status', '추가했습니다');
         // Stays open, empty, for typing the next exercise.
         setEditor({ ...open, form: emptyExerciseForm() });
-        setWantFocus(true);
+        setWantFocus('exercise-body');
       } else {
         await requestJson(`/api/exercises/${open.id}`, { method: 'PUT', body: open.form });
         say('status', '수정했습니다');
@@ -220,10 +221,19 @@ export function Exercises({
     run(async () => {
       try {
         await requestJson(`/api/exercises/${exercise.id}`, { method: 'DELETE' });
+      } catch (failure) {
+        // Already gone elsewhere: like a delete. Otherwise the exercise stays with its button.
+        setWantFocus(
+          (failure as RequestError).status === 404
+            ? 'exercise-heading'
+            : `exercise-delete-${exercise.id}`,
+        );
+        throw failure;
       } finally {
         setDeleting(undefined);
       }
       say('status', '삭제했습니다');
+      setWantFocus('exercise-heading');
       if (open?.id === exercise.id) setEditor(undefined);
     }, exercise.id);
 
@@ -328,7 +338,9 @@ export function Exercises({
   return (
     <div className="exercises">
       <div className="contents-head">
-        <h3>연습문제</h3>
+        <h3 id="exercise-heading" tabIndex={-1}>
+          연습문제
+        </h3>
         <button
           type="button"
           className="secondary"
@@ -512,6 +524,7 @@ export function Exercises({
                       <>
                         <button
                           type="button"
+                          id={`exercise-delete-confirm-${exercise.id}`}
                           className="danger"
                           disabled={busy}
                           aria-label={`${label} 삭제 확인`}
@@ -524,7 +537,10 @@ export function Exercises({
                           className="secondary"
                           disabled={busy}
                           aria-label={`${label} 삭제 취소`}
-                          onClick={() => setDeleting(undefined)}
+                          onClick={() => {
+                            setDeleting(undefined);
+                            setWantFocus(`exercise-delete-${exercise.id}`);
+                          }}
                         >
                           취소
                         </button>
@@ -571,10 +587,12 @@ export function Exercises({
                           type="button"
                           className="secondary"
                           disabled={busy}
+                          id={`exercise-delete-${exercise.id}`}
                           aria-label={`${label} 삭제`}
-                          onClick={() =>
-                            setDeleting({ contentId: exercise.contentId, id: exercise.id })
-                          }
+                          onClick={() => {
+                            setDeleting({ contentId: exercise.contentId, id: exercise.id });
+                            setWantFocus(`exercise-delete-confirm-${exercise.id}`);
+                          }}
                         >
                           삭제
                         </button>
