@@ -143,7 +143,10 @@ const untouchedPool = {
 test('translation ids are checked and a missing exercise is a 404 before translating', async () => {
   await withApi(untouchedPool, async (call) => {
     for (const method of ['GET', 'POST']) {
-      const { status, data } = await call('/api/exercises/0/translation', { method });
+      const { status, data } = await call('/api/exercises/0/translation', {
+        method,
+        body: method === 'POST' ? {} : undefined,
+      });
       assert.equal(status, 400, method);
       assert.match(String(data.error), /연습문제 ID가 올바르지 않습니다/);
     }
@@ -154,7 +157,10 @@ test('translation ids are checked and a missing exercise is a 404 before transla
     empty,
     async (call) => {
       for (const method of ['GET', 'POST']) {
-        const { status, data } = await call('/api/exercises/7/translation', { method });
+        const { status, data } = await call('/api/exercises/7/translation', {
+          method,
+          body: method === 'POST' ? {} : undefined,
+        });
         assert.equal(status, 404, method);
         assert.equal(data.error, '연습문제를 찾을 수 없습니다');
       }
@@ -180,7 +186,10 @@ test('a failed translation answers its status and saves nothing', async () => {
   await withApi(
     pool,
     async (call) => {
-      const { status, data } = await call('/api/exercises/7/translation', { method: 'POST' });
+      const { status, data } = await call('/api/exercises/7/translation', {
+        method: 'POST',
+        body: {},
+      });
       assert.equal(status, 429);
       assert.equal(data.error, '번역 요청이 많습니다. 잠시 뒤 다시 시도하세요');
     },
@@ -191,4 +200,55 @@ test('a failed translation answers its status and saves nothing', async () => {
     },
   );
   assert.deepEqual(sql, ['SELECT']);
+});
+
+test('translating takes only JSON, and one request per exercise at a time', async () => {
+  let release = () => {};
+  const held = new Promise<void>((resolve) => (release = resolve));
+  let calls = 0;
+  const pool = {
+    query: async (text: string) =>
+      text.trim().startsWith('SELECT e.body')
+        ? { rows: [{ body: 'Prove it.', answer: null }], rowCount: 1 }
+        : text.trim().startsWith('INSERT')
+          ? { rows: [], rowCount: 1 }
+          : { rows: [{ body: '증명하라.', answer: null, stale: false }], rowCount: 1 },
+  } as unknown as Pool;
+  await withApi(
+    pool,
+    async (call) => {
+      // A form post or a no-cors fetch from another site sends no JSON: refused before anything.
+      for (const init of [
+        { method: 'POST' },
+        { method: 'POST', rawBody: 'x=1', contentType: 'application/x-www-form-urlencoded' },
+        { method: 'POST', rawBody: '{}', contentType: 'text/plain' },
+      ]) {
+        const { status, data } = await call('/api/exercises/7/translation', init);
+        assert.equal(status, 415, JSON.stringify(init));
+        assert.equal(data.error, '번역 요청은 JSON으로 보내세요');
+      }
+      assert.equal(calls, 0);
+      // A second request while the first is translating is refused, not paid for again.
+      const first = call('/api/exercises/7/translation', { method: 'POST', body: {} });
+      while (calls === 0) await new Promise((r) => setImmediate(r));
+      const second = await call('/api/exercises/7/translation', { method: 'POST', body: {} });
+      assert.equal(second.status, 409);
+      assert.equal(second.data.error, '이 문제는 이미 번역하는 중입니다');
+      release();
+      assert.equal((await first).status, 200);
+      // Once done, the exercise can be translated again.
+      assert.equal(
+        (await call('/api/exercises/7/translation', { method: 'POST', body: {} })).status,
+        200,
+      );
+      assert.equal(calls, 2);
+    },
+    {
+      translator: async () => {
+        calls++;
+        if (calls === 1) await held;
+        return { body: '증명하라.', answer: null, model: 'claude-sonnet-5-5' };
+      },
+    },
+  );
 });

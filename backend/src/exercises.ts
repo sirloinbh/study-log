@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, type Response } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod';
 import { TranslationError, type Translator } from './translation.js';
@@ -177,6 +177,9 @@ const translationColumns = `t.body, t.answer, t.model,
 // /api/exercises/:id(/answer|/translation)
 export function exerciseRoutes(pool: Pool, translator: Translator) {
   const router = Router();
+  // Exercises being translated right now: a second request for one waits for the first instead of
+  // paying for the same translation twice.
+  const translating = new Set<number>();
 
   router.get('/:id', async (req, res) => {
     const id = exerciseIdParam.parse(req.params.id);
@@ -267,7 +270,22 @@ export function exerciseRoutes(pool: Pool, translator: Translator) {
   // Translates the exercise and its answer as they are now with Claude, replacing the previous
   // translation. Nothing is saved when the translation fails.
   router.post('/:id/translation', async (req, res) => {
+    // Only a JSON request, which another site's page cannot send without a CORS preflight this
+    // server never allows: translating costs money, so a form or a no-cors fetch must not start it.
+    if (!req.is('application/json'))
+      return void res.status(415).json({ error: '번역 요청은 JSON으로 보내세요' });
     const id = exerciseIdParam.parse(req.params.id);
+    if (translating.has(id))
+      return void res.status(409).json({ error: '이 문제는 이미 번역하는 중입니다' });
+    translating.add(id);
+    try {
+      await translate(id, res);
+    } finally {
+      translating.delete(id);
+    }
+  });
+
+  const translate = async (id: number, res: Response) => {
     const { rows } = await pool.query<{ body: string; answer: string | null }>(
       `SELECT e.body, a.body AS answer FROM exercises e
        LEFT JOIN exercise_answers a ON a.exercise_id = e.id WHERE e.id = $1`,
@@ -305,7 +323,7 @@ export function exerciseRoutes(pool: Pool, translator: Translator) {
     );
     if (saved.rows.length === 0) return void res.status(404).json(notFound);
     res.json({ translation: saved.rows[0] });
-  });
+  };
 
   router.delete('/:id/answer', async (req, res) => {
     const id = exerciseIdParam.parse(req.params.id);

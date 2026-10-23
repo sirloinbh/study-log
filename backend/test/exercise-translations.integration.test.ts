@@ -71,7 +71,7 @@ test(
         assert.equal(await read(), null, 'nothing translated yet');
 
         // Without an answer, only the problem is translated; line breaks are kept.
-        const first = await call(path, { method: 'POST' });
+        const first = await call(path, { method: 'POST', body: {} });
         assert.equal(first.status, 200);
         const made = first.data.translation as Translation;
         assert.deepEqual(
@@ -87,7 +87,8 @@ test(
           body: { body: '$A^{-1}$' },
         });
         assert.equal((await read())?.stale, true);
-        const again = (await call(path, { method: 'POST' })).data.translation as Translation;
+        const again = (await call(path, { method: 'POST', body: {} })).data
+          .translation as Translation;
         assert.deepEqual([again.answer, again.stale], ['번역: $A^{-1}$', false]);
         const rows = await pool.query(
           'SELECT count(*)::int AS n FROM exercise_translations WHERE exercise_id = $1',
@@ -101,13 +102,13 @@ test(
           body: { number: '1', body: 'Find the inverse of $B$.' },
         });
         assert.equal((await read())?.stale, true);
-        await call(path, { method: 'POST' });
+        await call(path, { method: 'POST', body: {} });
         await call(`/api/exercises/${exercise}/answer`, { method: 'DELETE' });
         assert.equal((await read())?.stale, true);
 
         // A failed translation keeps the one already there.
         fail = true;
-        const refused = await call(path, { method: 'POST' });
+        const refused = await call(path, { method: 'POST', body: {} });
         assert.equal(refused.status, 422);
         assert.equal((await read())?.body, '번역: Find the inverse of $B$.');
 
