@@ -19,12 +19,15 @@ type Editor = {
 // while loading, with `failed` when the first load failed), so the exercises card picks from the
 // same contents. It must be a stable function such as a state setter: a new function on every
 // render would rerun the effect below and, with a state update in it, render forever.
+// `reloadKey` changes when another card learned the tree is out of date (#74).
 export function TextbookContents({
   textbookId,
   onTree,
+  reloadKey,
 }: {
   textbookId: number;
   onTree?: (shown: { textbookId: number; tree?: ContentNode[]; failed: boolean }) => void;
+  reloadKey?: number;
 }) {
   const [loaded, setLoaded] = useState<{ textbookId: number; tree: ContentNode[] }>();
   const [loadError, setLoadError] = useState<{ textbookId: number; message: string }>();
@@ -35,7 +38,8 @@ export function TextbookContents({
   // it are pending, so the next change never starts from an outdated tree.
   const [busy, setBusy] = useState(false);
 
-  // The first load. Reloads after a change happen inside that change (see `run`).
+  // The first load, and a reload asked for by another card. Reloads after a change made here
+  // happen inside that change (see `run`). The tree on screen stays until the new one arrives.
   useEffect(() => {
     let current = true;
     requestJson<{ contents: ContentNode[] }>(`/api/textbooks/${textbookId}/contents`)
@@ -50,7 +54,7 @@ export function TextbookContents({
     return () => {
       current = false;
     };
-  }, [textbookId]);
+  }, [textbookId, reloadKey]);
 
   const tree = loaded?.textbookId === textbookId ? loaded.tree : undefined;
   const error = loadError?.textbookId === textbookId ? loadError.message : undefined;
