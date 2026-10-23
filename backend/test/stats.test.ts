@@ -1,7 +1,15 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Pool } from 'pg';
-import { addDays, bucket, maxSeriesDays, periodStart, weekStart } from '../src/stats.js';
+import {
+  addDays,
+  bucket,
+  heatmapStart,
+  heatmapWeeks,
+  maxSeriesDays,
+  periodStart,
+  weekStart,
+} from '../src/stats.js';
 import { withApi } from './helpers.js';
 
 test('weeks start on Monday', () => {
@@ -90,4 +98,13 @@ test('without any logs the totals are zero and averages do not divide by zero', 
     },
     { today: () => '2026-10-23' },
   );
+});
+
+test('the heatmap starts on the Monday 52 weeks before this week (#50)', () => {
+  // Friday 2026-10-23: this week starts Monday 10-19; 52 weeks earlier is 2025-10-20.
+  assert.equal(heatmapWeeks, 53);
+  assert.equal(heatmapStart('2026-10-23'), '2025-10-20');
+  assert.equal(weekStart(heatmapStart('2026-10-23')), '2025-10-20');
+  // On a Monday the current week is one day long; still 53 columns.
+  assert.equal(heatmapStart('2026-10-19'), '2025-10-20');
 });

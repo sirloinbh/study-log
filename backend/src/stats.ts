@@ -65,6 +65,22 @@ export function bucket(daily: Day[], keyOf: (date: string) => string) {
 // Planned sessions have not been studied yet, so they do not count; later dates neither.
 const counted = `status <> 'planned' AND study_date <= $1`;
 
+// Minutes studied on every day from `from` to `to`, a day without study as 0.
+const dailyMinutes = async (pool: Pool, from: string, to: string) =>
+  (
+    await pool.query<Day>(
+      `SELECT day::date AS date, COALESCE(sum(l.duration_minutes), 0)::int AS minutes
+       FROM generate_series($2::date, $1::date, interval '1 day') AS day
+       LEFT JOIN study_logs l ON l.study_date = day::date AND l.status <> 'planned'
+       GROUP BY day ORDER BY day`,
+      [to, from],
+    )
+  ).rows;
+
+// The heatmap's weeks (#50): this week and the 52 before it, each from Monday.
+export const heatmapWeeks = 53;
+export const heatmapStart = (today: string) => addDays(weekStart(today), -7 * (heatmapWeeks - 1));
+
 // Study time statistics (#47): /api/stats/study-time?period=week|month|3months|all
 export function statsRoutes(pool: Pool, today: () => string) {
   const router = Router();
@@ -79,13 +95,7 @@ export function statsRoutes(pool: Pool, today: () => string) {
     );
     const { first, cumulative } = totals.rows[0];
     const from = periodStart(period, to, first ?? undefined);
-    const { rows: daily } = await pool.query<Day>(
-      `SELECT day::date AS date, COALESCE(sum(l.duration_minutes), 0)::int AS minutes
-       FROM generate_series($2::date, $1::date, interval '1 day') AS day
-       LEFT JOIN study_logs l ON l.study_date = day::date AND l.status <> 'planned'
-       GROUP BY day ORDER BY day`,
-      [to, from],
-    );
+    const daily = await dailyMinutes(pool, from, to);
     const totalMinutes = daily.reduce((sum, day) => sum + day.minutes, 0);
     const studyDays = daily.filter((day) => day.minutes > 0).length;
     res.json({
@@ -107,6 +117,13 @@ export function statsRoutes(pool: Pool, today: () => string) {
         minutes,
       })),
     });
+  });
+
+  // Every day of the heatmap's weeks up to today (#50): /api/stats/heatmap
+  router.get('/heatmap', async (_req, res) => {
+    const to = today();
+    const from = heatmapStart(to);
+    res.json({ from, to, daily: await dailyMinutes(pool, from, to) });
   });
 
   return router;
