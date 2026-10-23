@@ -1,17 +1,26 @@
 import React, { useEffect, useState } from 'react';
 import { requestJson, type RequestError } from './api';
 import { Heatmap } from './Heatmap';
-import { periodLabels, statPeriods, type StatPeriod, type StudyTimeStats } from './study-stats';
+import { StudyTimeChart } from './StudyTimeChart';
+import {
+  periodLabels,
+  statPeriods,
+  type ChartUnit,
+  type StatPeriod,
+  type StudyTimeStats,
+} from './study-stats';
 import { formatMinutes } from './study-logs';
 
 // Study time dashboard (#48): metric cards for the all-time total, today, the picked period and
-// its daily average, from GET /api/stats/study-time (#47), and the last year's heatmap (#50).
-// Charts come with #49.
+// its daily average, from GET /api/stats/study-time (#47), the period's study time chart (#49)
+// and the last year's heatmap (#50).
 export function Stats() {
   const [period, setPeriod] = useState<StatPeriod>('week');
   // Kept per period, so a slow answer for another period never replaces or hides this one's.
   const [loaded, setLoaded] = useState<Partial<Record<StatPeriod, StudyTimeStats>>>({});
   const [loadError, setLoadError] = useState<{ period: StatPeriod; message: string }>();
+  // The chart unit picked for each period (#49).
+  const [chartUnits, setChartUnits] = useState<Partial<Record<StatPeriod, ChartUnit>>>({});
 
   useEffect(() => {
     let current = true;
@@ -87,6 +96,13 @@ export function Stats() {
             <p className="status">공부한 날만 {formatMinutes(stats.averageMinutesPerStudyDay)}</p>
           </article>
         </section>
+      )}
+      {stats && !error && (
+        <StudyTimeChart
+          stats={stats}
+          picked={chartUnits}
+          onPick={(key, unit) => setChartUnits((all) => ({ ...all, [key]: unit }))}
+        />
       )}
       <Heatmap />
     </div>
