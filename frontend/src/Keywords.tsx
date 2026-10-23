@@ -27,7 +27,8 @@ export function Keywords({ today }: { today: string }) {
   const [notice, setNotice] = useState<Notice>(undefined);
   // One change at a time, including the reloads after it.
   const [busy, setBusy] = useState(false);
-  const [wantFocus, setWantFocus] = useState(false);
+  // The element to focus once the change is done and the controls are enabled again.
+  const [wantFocus, setWantFocus] = useState<string>();
   const [search, setSearch] = useState<KeywordSearch>({ q: '', from: '', to: '' });
   // The last search run and its results; kept until the next search so changes can refresh it.
   const [results, setResults] = useState<{ path: string; keywords: Keyword[] }>();
@@ -50,11 +51,12 @@ export function Keywords({ today }: { today: string }) {
     };
   }, [date]);
 
-  // The keyword field takes focus again after each add, once it is enabled.
+  // After an add the keyword field takes focus again; after an edit or delete, whose buttons are
+  // gone, the day's heading does, so keyboard users keep their place.
   useEffect(() => {
     if (!wantFocus || busy) return;
-    setWantFocus(false);
-    document.getElementById('keyword-input')?.focus?.();
+    setWantFocus(undefined);
+    document.getElementById(wantFocus)?.focus?.();
   }, [wantFocus, busy]);
 
   const keywords = day?.date === date ? day.keywords : undefined;
@@ -77,6 +79,8 @@ export function Keywords({ today }: { today: string }) {
       setSearchError(undefined);
     } catch (failure) {
       setSearchError((failure as RequestError).message);
+      // Not refreshed later: its results no longer match the query in the form.
+      setResults(undefined);
     }
   };
 
@@ -98,7 +102,9 @@ export function Keywords({ today }: { today: string }) {
     }
   };
 
+  // A cleared date field is ignored; the list keeps showing the last picked date.
   const pickDate = (event: { target: { value: string } }) => {
+    if (!event.target.value) return;
     setDate(event.target.value);
     setEditor(undefined);
     setDeletingId(undefined);
@@ -111,7 +117,7 @@ export function Keywords({ today }: { today: string }) {
       await requestJson('/api/keywords', { method: 'POST', body: { date, ...form } });
       setForm(emptyKeywordForm());
       setNotice({ kind: 'status', text: '추가했습니다' });
-      setWantFocus(true);
+      setWantFocus('keyword-input');
     });
   };
 
@@ -124,6 +130,7 @@ export function Keywords({ today }: { today: string }) {
         body: { date: editor.date, ...editor.form },
       });
       setEditor(undefined);
+      setWantFocus('keyword-day');
       setNotice({
         kind: 'status',
         text: editor.date === date ? '수정했습니다' : `수정해서 ${editor.date}로 옮겼습니다`,
@@ -139,6 +146,7 @@ export function Keywords({ today }: { today: string }) {
         setDeletingId(undefined);
       }
       if (editor?.id === keyword.id) setEditor(undefined);
+      setWantFocus('keyword-day');
       setNotice({ kind: 'status', text: '삭제했습니다' });
     }, keyword.id);
 
@@ -227,7 +235,9 @@ export function Keywords({ today }: { today: string }) {
       </section>
 
       <section className="card" aria-label={`${date} 키워드`}>
-        <h2>{date === today ? `오늘 (${date})` : date}의 키워드</h2>
+        <h2 id="keyword-day" tabIndex={-1}>
+          {date === today ? `오늘 (${date})` : date}의 키워드
+        </h2>
         {error ? (
           <p role="alert" className="error">
             키워드를 불러오지 못했습니다: {error}
@@ -279,7 +289,10 @@ export function Keywords({ today }: { today: string }) {
                         type="button"
                         className="secondary"
                         disabled={busy}
-                        onClick={() => setEditor(undefined)}
+                        onClick={() => {
+                          setEditor(undefined);
+                          setWantFocus('keyword-day');
+                        }}
                       >
                         취소
                       </button>
@@ -368,16 +381,24 @@ export function Keywords({ today }: { today: string }) {
           </label>
           <label className="half">
             시작일
+            {/* The browser refuses a start after the end before asking the server. */}
             <input
               type="date"
               disabled={busy}
+              max={search.to || undefined}
               value={search.from}
               onChange={changeSearch('from')}
             />
           </label>
           <label className="half">
             종료일
-            <input type="date" disabled={busy} value={search.to} onChange={changeSearch('to')} />
+            <input
+              type="date"
+              disabled={busy}
+              min={search.from || undefined}
+              value={search.to}
+              onChange={changeSearch('to')}
+            />
           </label>
           <div className="actions wide">
             <button type="submit" className="primary" disabled={busy}>

@@ -332,3 +332,55 @@ uiTest('the search request leaves out blank fields', () => {
     '/api/keywords?q=50%25&to=2026-10-31',
   );
 });
+
+uiTest('clearing the date field keeps the last picked date', async () => {
+  const ui = await openKeywords(fakeApi(stored));
+  await ui.fill('날짜', '');
+  assert.equal(ui.field('날짜'), today);
+  assert.deepEqual(listed(ui, dayCard(ui)), ['고유값:Ax = λx', '대각화:']);
+});
+
+uiTest('a failed search is not brought back by a later change', async () => {
+  const options: Options = {};
+  const api = fakeApi(stored, options);
+  const ui = await openKeywords(api);
+  await ui.fill('검색어', '고유');
+  await ui.submit(searchCard(ui));
+  assert.equal(listed(ui, searchCard(ui)).length, 2);
+  await ui.fill('검색어', '행렬');
+  options.reject = { method: 'GET', status: 500, error: '서버 오류가 발생했습니다' };
+  await ui.submit(searchCard(ui));
+  options.reject = undefined;
+  assert.match(ui.text(searchCard(ui)), /검색하지 못했습니다/);
+  await ui.fill('키워드', '여인수');
+  await ui.submit(section(ui, '키워드 입력'));
+  // No results of the old "고유" search under the "행렬" query.
+  assert.deepEqual(listed(ui, searchCard(ui)), []);
+  assert.equal(
+    api.requests.filter((r) => r.path.includes('q=')).length,
+    2,
+    'the failed search is not re-run',
+  );
+});
+
+uiTest('the search dates cannot cross', async () => {
+  const ui = await openKeywords(fakeApi());
+  await ui.fill('시작일', '2026-10-10');
+  await ui.fill('종료일', '2026-10-20');
+  const [from, to] = ui.find((n) => n.type === 'input' && n.props.type === 'date', searchCard(ui));
+  assert.equal(from.props.max, '2026-10-20');
+  assert.equal(to.props.min, '2026-10-10');
+});
+
+uiTest('after an edit, a cancel or a delete the day heading takes focus', async () => {
+  const focused: string[] = [];
+  const document = { getElementById: (id: string) => ({ focus: () => focused.push(id) }) };
+  const ui = await openKeywords(fakeApi(stored), { document });
+  await ui.click('수정', item(ui, '대각화'));
+  await ui.submit(ui.find((n) => n.props.className === 'editing', dayCard(ui))[0]);
+  await ui.click('수정', item(ui, '대각화'));
+  await ui.click('취소', ui.find((n) => n.props.className === 'editing', dayCard(ui))[0]);
+  await ui.click('삭제', item(ui, '대각화'));
+  await ui.click('삭제 확인', item(ui, '대각화'));
+  assert.deepEqual(focused, ['keyword-day', 'keyword-day', 'keyword-day']);
+});
