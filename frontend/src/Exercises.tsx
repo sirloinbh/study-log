@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useBusy } from './busy';
 import { requestJson, type RequestError } from './api';
 import {
   contentPath,
@@ -59,7 +60,7 @@ export function Exercises({
   const [answer, setAnswer] = useState<AnswerPanel>();
   const [notice, setNotice] = useState<Notice>(undefined);
   // One request at a time, including the reload after a change, like the contents card.
-  const [busy, setBusy] = useState(false);
+  const { busy, begin, end } = useBusy();
   // Set when the editor opens and after each add; the body takes focus once the field is enabled.
   const [wantFocus, setWantFocus] = useState(false);
   // The chapter the server reported missing; once the reloaded tree no longer has it, the card
@@ -155,8 +156,7 @@ export function Exercises({
   // Runs one change and then reloads the list, both while busy. A 404 closes the editor only when
   // it is about the exercise being edited (`targetId`), so other unsaved input survives.
   const run = async (change: () => Promise<void>, targetId?: number) => {
-    if (busy) return;
-    setBusy(true);
+    if (!begin()) return;
     try {
       await change();
     } catch (failure) {
@@ -166,7 +166,7 @@ export function Exercises({
       if (contentId !== undefined) noteMissing(failure as RequestError, contentId);
     } finally {
       await refresh();
-      setBusy(false);
+      end();
       onChanged?.();
     }
   };

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useBusy } from './busy';
 import { requestJson, type RequestError } from './api';
 import { contentPath, type Exercise } from './exercise';
 import { contentLabel, contentOptions, type ContentNode, type Textbook } from './textbook';
@@ -33,7 +34,7 @@ export function ImportantExercises({
   const [loaded, setLoaded] = useState<{ scope: number; exercises: Exercise[] }>();
   const [loadError, setLoadError] = useState<{ scope: number; message: string }>();
   const [notice, setNotice] = useState<Notice>(undefined);
-  const [busy, setBusy] = useState(false);
+  const { busy, begin, end } = useBusy();
 
   const options = tree ? contentOptions(tree) : [];
   // The picked chapter, or the whole textbook when it was deleted.
@@ -62,8 +63,7 @@ export function ImportantExercises({
   const error = loadError?.scope === scope ? loadError.message : undefined;
 
   const unmark = async (exercise: Exercise, label: string) => {
-    if (busy) return;
-    setBusy(true);
+    if (!begin()) return;
     try {
       await requestJson(`/api/exercises/${exercise.id}/important`, {
         method: 'PATCH',
@@ -80,7 +80,7 @@ export function ImportantExercises({
       } catch (failure) {
         setLoadError({ scope, message: (failure as RequestError).message });
       }
-      setBusy(false);
+      end();
       onChanged?.();
     }
   };

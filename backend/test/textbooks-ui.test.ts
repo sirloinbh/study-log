@@ -366,3 +366,17 @@ uiTest('a failed textbook delete puts focus back on delete, a 404 on the list', 
     assert.equal(focused.at(-1), target, String(reject.status));
   }
 });
+
+// #75: two submits in the same tick, before the screen re-renders with `busy`, send one request.
+uiTest('a double submit in the same tick registers the textbook once', async () => {
+  const api = fakeApi();
+  const ui = await open(api);
+  await ui.fill('제목', '확률과 통계');
+  const [form] = ui.find((n) => n.type === 'form');
+  const onSubmit = form.props.onSubmit as (event: { preventDefault(): void }) => unknown;
+  void onSubmit({ preventDefault() {} });
+  void onSubmit({ preventDefault() {} });
+  await ui.settle();
+  assert.equal(api.requests.filter((r) => r.method === 'POST').length, 1);
+  assert.equal(items(ui).length, 1);
+});
