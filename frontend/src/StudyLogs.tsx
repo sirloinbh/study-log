@@ -34,6 +34,16 @@ export function StudyLogs({ today }: { today: string }) {
   const [deletingId, setDeletingId] = useState<number | undefined>(undefined);
   const [reload, setReload] = useState(0);
 
+  // The element to focus once the delete flow has re-rendered and the buttons are enabled again:
+  // the confirm button, the delete button after a cancel, or the list heading once the entry is
+  // gone (#65). Without it focus falls to the page when the focused button is swapped out.
+  const [wantFocus, setWantFocus] = useState<string>();
+  useEffect(() => {
+    if (!wantFocus || busy) return;
+    setWantFocus(undefined);
+    document.getElementById(wantFocus)?.focus?.();
+  }, [wantFocus, busy]);
+
   useEffect(() => {
     // A slower, older response must not overwrite the list a newer request returned.
     let current = true;
@@ -184,8 +194,13 @@ export function StudyLogs({ today }: { today: string }) {
       setNotice({ kind: 'status', text: '삭제했습니다' });
       if (editingId === id) leaveEdit();
       setReload((count) => count + 1);
+      setWantFocus('study-log-list');
     } catch (error) {
       fail(error as RequestError, id);
+      // Already gone elsewhere: like a delete. Otherwise the entry stays with its delete button.
+      setWantFocus(
+        (error as RequestError).status === 404 ? 'study-log-list' : `study-log-delete-${id}`,
+      );
     } finally {
       setDeletingId(undefined);
       setBusy(false);
@@ -339,7 +354,9 @@ export function StudyLogs({ today }: { today: string }) {
         )}
       </section>
       <section className="card">
-        <h2>최근 기록</h2>
+        <h2 id="study-log-list" tabIndex={-1}>
+          최근 기록
+        </h2>
         {loadError && (
           <p role="alert" className="error">
             최근 기록을 불러오지 못했습니다: {loadError}
@@ -370,6 +387,7 @@ export function StudyLogs({ today }: { today: string }) {
                     <>
                       <button
                         type="button"
+                        id={`study-log-delete-confirm-${log.id}`}
                         className="danger"
                         disabled={busy}
                         aria-label={`${describe(log)} 기록 삭제 확인`}
@@ -382,7 +400,10 @@ export function StudyLogs({ today }: { today: string }) {
                         className="secondary"
                         disabled={busy}
                         aria-label={`${describe(log)} 기록 삭제 취소`}
-                        onClick={() => setDeletingId(undefined)}
+                        onClick={() => {
+                          setDeletingId(undefined);
+                          setWantFocus(`study-log-delete-${log.id}`);
+                        }}
                       >
                         취소
                       </button>
@@ -400,10 +421,14 @@ export function StudyLogs({ today }: { today: string }) {
                       </button>
                       <button
                         type="button"
+                        id={`study-log-delete-${log.id}`}
                         className="secondary"
                         disabled={busy}
                         aria-label={`${describe(log)} 기록 삭제`}
-                        onClick={() => setDeletingId(log.id)}
+                        onClick={() => {
+                          setDeletingId(log.id);
+                          setWantFocus(`study-log-delete-confirm-${log.id}`);
+                        }}
                       >
                         삭제
                       </button>

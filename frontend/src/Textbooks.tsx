@@ -30,6 +30,16 @@ export function Textbooks() {
   const [selectedId, setSelectedId] = useState<number | undefined>(undefined);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [reload, setReload] = useState(0);
+
+  // The element to focus once the delete flow has re-rendered and the buttons are enabled again:
+  // the confirm button, the delete button after a cancel, or the list heading once the entry is
+  // gone (#65). Without it focus falls to the page when the focused button is swapped out.
+  const [wantFocus, setWantFocus] = useState<string>();
+  useEffect(() => {
+    if (!wantFocus || busy) return;
+    setWantFocus(undefined);
+    document.getElementById(wantFocus)?.focus?.();
+  }, [wantFocus, busy]);
   // The contents tree the contents card shows, shared with the exercises card.
   const [contents, setContents] = useState<{
     textbookId: number;
@@ -133,8 +143,11 @@ export function Textbooks() {
       if (editingId === id) leaveEdit();
       setSelectedId(undefined);
       setReload((count) => count + 1);
+      setWantFocus('textbook-list');
     } catch (error) {
       fail(error as RequestError, id);
+      // Already gone elsewhere: like a delete. Otherwise the detail stays with its delete button.
+      setWantFocus((error as RequestError).status === 404 ? 'textbook-list' : 'textbook-delete');
     } finally {
       setConfirmingDelete(false);
       setBusy(false);
@@ -198,7 +211,9 @@ export function Textbooks() {
       </section>
       <div className="textbook-browser">
         <section className="card">
-          <h2>교재 목록</h2>
+          <h2 id="textbook-list" tabIndex={-1}>
+            교재 목록
+          </h2>
           {loadError && (
             <p role="alert" className="error">
               교재 목록을 불러오지 못했습니다: {loadError}
@@ -251,6 +266,7 @@ export function Textbooks() {
                   <>
                     <button
                       type="button"
+                      id="textbook-delete-confirm"
                       className="danger"
                       disabled={busy}
                       aria-label={`${selected.title} 교재 삭제 확인`}
@@ -263,7 +279,10 @@ export function Textbooks() {
                       className="secondary"
                       disabled={busy}
                       aria-label={`${selected.title} 교재 삭제 취소`}
-                      onClick={() => setConfirmingDelete(false)}
+                      onClick={() => {
+                        setConfirmingDelete(false);
+                        setWantFocus('textbook-delete');
+                      }}
                     >
                       취소
                     </button>
@@ -281,10 +300,14 @@ export function Textbooks() {
                     </button>
                     <button
                       type="button"
+                      id="textbook-delete"
                       className="secondary"
                       disabled={busy}
                       aria-label={`${selected.title} 교재 삭제`}
-                      onClick={() => setConfirmingDelete(true)}
+                      onClick={() => {
+                        setConfirmingDelete(true);
+                        setWantFocus('textbook-delete-confirm');
+                      }}
                     >
                       삭제
                     </button>
