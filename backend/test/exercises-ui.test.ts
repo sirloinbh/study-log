@@ -254,16 +254,17 @@ uiTest('the body takes focus when the form opens and again after each add', asyn
   assert.deepEqual(focused, ['exercise-body', 'exercise-body']);
 });
 
-uiTest('deleting another exercise leaves focus where it is', async () => {
+uiTest('deleting another exercise keeps the edit open and focus follows the delete', async () => {
   const focused: string[] = [];
   const document = { getElementById: (id: string) => ({ focus: () => focused.push(id) }) };
   const ui = await openBook(fakeApi(problems), '선형대수', { document });
   await ui.click('수정', item(ui, '문제 3'));
-  assert.equal(focused.length, 1);
+  assert.deepEqual(focused, ['exercise-body']);
   await ui.click('삭제', item(ui, '2번째 문제'));
   await ui.click('삭제 확인', item(ui, '2번째 문제'));
   assert.deepEqual(listed(ui), ['문제 3:벡터 u를 구하라.']);
-  assert.equal(focused.length, 1);
+  // The confirm button, then the card heading once the exercise is gone (#86).
+  assert.deepEqual(focused, ['exercise-body', 'exercise-delete-confirm-2', 'exercise-heading']);
   // The edit stays open with its input.
   assert.equal(ui.field('문제 본문'), '벡터 u를 구하라.');
 });
@@ -774,3 +775,50 @@ uiTest('a double submit in the same tick adds the exercise once', async () => {
   assert.equal(api.requests.filter((r) => r.method === 'POST').length, 1);
   assert.deepEqual(listed(ui), ['1번째 문제:한 번만']);
 });
+
+// #86: records focused ids; an id with no element in the rendered tree (a typo) fails.
+const focusRecorder = () => {
+  const focused: string[] = [];
+  const state: { ui?: ReturnType<typeof mount> } = {};
+  const document = {
+    getElementById: (id: string) => {
+      if (state.ui && state.ui.find((n) => n.props.id === id).length !== 1)
+        throw new Error(`no element #${id} to focus`);
+      return { focus: () => focused.push(id) };
+    },
+  };
+  return { focused, document, state };
+};
+// Clicks the button with this accessible name.
+const press = async (ui: ReturnType<typeof mount>, name: string) => {
+  const [button] = ui.find((n) => n.type === 'button' && n.props['aria-label'] === name);
+  assert.ok(button, 'button ' + name);
+  assert.ok(!button.props.disabled, 'button ' + name + ' is disabled');
+  void (button.props.onClick as () => unknown)();
+  await ui.settle();
+};
+
+uiTest(
+  'exercise delete focus: confirm, back on cancel, button on failure, heading on 404',
+  async () => {
+    const options: Options = {};
+    const { focused, document, state } = focusRecorder();
+    const api = fakeApi(problems, options);
+    const ui = await openBook(api, '선형대수', { document });
+    state.ui = ui;
+    await press(ui, '2번째 문제 삭제');
+    assert.equal(focused.at(-1), 'exercise-delete-confirm-2');
+    await press(ui, '2번째 문제 삭제 취소');
+    assert.equal(focused.at(-1), 'exercise-delete-2');
+    options.reject = { method: 'DELETE', status: 500, error: '서버 오류가 발생했습니다' };
+    await press(ui, '2번째 문제 삭제');
+    await press(ui, '2번째 문제 삭제 확인');
+    assert.equal(focused.at(-1), 'exercise-delete-2');
+    options.reject = undefined;
+    api.rows.splice(1, 1);
+    await press(ui, '2번째 문제 삭제');
+    await press(ui, '2번째 문제 삭제 확인');
+    assert.match(alertText(ui), /연습문제를 찾을 수 없습니다/);
+    assert.equal(focused.at(-1), 'exercise-heading');
+  },
+);

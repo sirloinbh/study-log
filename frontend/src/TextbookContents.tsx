@@ -38,6 +38,14 @@ export function TextbookContents({
   // One request at a time: fields and buttons stay disabled while a change and the reload after
   // it are pending, so the next change never starts from an outdated tree.
   const { busy, begin, end } = useBusy();
+  // Along the delete flow: the confirm button, the delete button after a cancel, or the card
+  // heading once the entry is gone. Focused once the controls are enabled again (#86).
+  const [wantFocus, setWantFocus] = useState<string>();
+  useEffect(() => {
+    if (!wantFocus || busy) return;
+    setWantFocus(undefined);
+    document.getElementById(wantFocus)?.focus?.();
+  }, [wantFocus, busy]);
 
   // The first load, and a reload asked for by another card. Reloads after a change made here
   // happen inside that change (see `run`). The tree on screen stays until the new one arrives.
@@ -151,9 +159,19 @@ export function TextbookContents({
         await requestJson(`/api/textbooks/${textbookId}/contents/${node.id}`, {
           method: 'DELETE',
         });
+      } catch (failure) {
+        // Already gone elsewhere: like a delete. Otherwise (e.g. study logs still point at it)
+        // the entry stays with its delete button.
+        setWantFocus(
+          (failure as RequestError).status === 404
+            ? 'contents-heading'
+            : `content-delete-${node.id}`,
+        );
+        throw failure;
       } finally {
         setDeleting(undefined);
       }
+      setWantFocus('contents-heading');
       say('status', '삭제했습니다');
       if (open?.id === node.id) setEditor(undefined);
     }, node.id);
@@ -190,6 +208,7 @@ export function TextbookContents({
                   <>
                     <button
                       type="button"
+                      id={`content-delete-confirm-${node.id}`}
                       className="danger"
                       disabled={busy}
                       aria-label={`${label} 목차 삭제 확인`}
@@ -202,7 +221,10 @@ export function TextbookContents({
                       className="secondary"
                       disabled={busy}
                       aria-label={`${label} 목차 삭제 취소`}
-                      onClick={() => setDeleting(undefined)}
+                      onClick={() => {
+                        setDeleting(undefined);
+                        setWantFocus(`content-delete-${node.id}`);
+                      }}
                     >
                       취소
                     </button>
@@ -249,8 +271,12 @@ export function TextbookContents({
                       type="button"
                       className="secondary"
                       disabled={busy}
+                      id={`content-delete-${node.id}`}
                       aria-label={`${label} 목차 삭제`}
-                      onClick={() => setDeleting({ textbookId, id: node.id })}
+                      onClick={() => {
+                        setDeleting({ textbookId, id: node.id });
+                        setWantFocus(`content-delete-confirm-${node.id}`);
+                      }}
                     >
                       삭제
                     </button>
@@ -268,7 +294,9 @@ export function TextbookContents({
   return (
     <div className="contents">
       <div className="contents-head">
-        <h3>목차</h3>
+        <h3 id="contents-heading" tabIndex={-1}>
+          목차
+        </h3>
         <button
           type="button"
           className="secondary"
