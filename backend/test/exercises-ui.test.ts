@@ -46,6 +46,18 @@ type Options = {
   holdChange?: Promise<void>;
   // Loading the important card fails.
   failImportant?: boolean;
+  // Translations already made (#31), by exercise id.
+  translations?: Record<number, Translation>;
+  // Translating answers this error instead.
+  failTranslate?: { status: number; error: string };
+};
+
+type Translation = {
+  body: string;
+  answer: string | null;
+  model: string;
+  updatedAt: string;
+  stale: boolean;
 };
 
 // In-memory exercises API with the textbook list and contents; records exercise requests.
@@ -57,6 +69,9 @@ function fakeApi(
   // Copies, so a change in one test never reaches the shared fixtures.
   const rows = initial.map((row) => ({ ...row }));
   const answers = new Map(Object.entries(initialAnswers).map(([id, body]) => [Number(id), body]));
+  const translations = new Map(
+    Object.entries(options.translations ?? {}).map(([id, t]) => [Number(id), { ...t }]),
+  );
   const requests: { method: string; path: string; body?: unknown }[] = [];
   // Loads of the important card, kept apart so `requests` stays the exercises card's.
   const importantLoads: string[] = [];
@@ -130,6 +145,26 @@ function fakeApi(
       }
       const saved = answers.get(id);
       return reply(200, { answer: saved === undefined ? null : { exerciseId: id, body: saved } });
+    }
+    // Like the API with a stand-in translator: "번역: " before each text.
+    const ofTranslation = path.match(/^\/api\/exercises\/(\d+)\/translation$/);
+    if (ofTranslation) {
+      const id = Number(ofTranslation[1]);
+      const row = rows.find((r) => r.id === id);
+      if (!row) return reply(404, { error: '연습문제를 찾을 수 없습니다' });
+      if (method === 'POST') {
+        if (options.failTranslate)
+          return reply(options.failTranslate.status, { error: options.failTranslate.error });
+        const answer = answers.get(id);
+        translations.set(id, {
+          body: `번역: ${row.body}`,
+          answer: answer === undefined ? null : `번역: ${answer}`,
+          model: 'claude-sonnet-5-5',
+          updatedAt: '2026-10-23 17:00',
+          stale: false,
+        });
+      }
+      return reply(200, { translation: translations.get(id) ?? null });
     }
     const mark = path.match(/^\/api\/exercises\/(\d+)\/important$/);
     if (mark) {
@@ -443,6 +478,7 @@ uiTest('exercise buttons name the exercise they act on', async () => {
   assert.deepEqual(labels, [
     '1번째 문제 질문 복사',
     '1번째 문제 정답 보기',
+    '1번째 문제 번역 보기',
     '1번째 문제 중요 표시',
     '1번째 문제 수정',
     '1번째 문제 삭제',
@@ -822,3 +858,77 @@ uiTest(
     assert.equal(focused.at(-1), 'exercise-heading');
   },
 );
+
+// #31: the Korean translation panel.
+const translationPanel = (ui: Ui) =>
+  ui.find((n) => n.props.className === 'exercise-answer exercise-translation', card(ui))[0];
+
+uiTest('a translation is made on request and shown with its answer', async () => {
+  const api = fakeApi(problems, {}, { 1: 'u = (1,\n  2)' });
+  const ui = await openBook(api);
+  await ui.click('번역 보기', item(ui, '문제 3'));
+  assert.match(ui.text(translationPanel(ui)), /아직 번역하지 않았습니다/);
+  await ui.click('번역하기', translationPanel(ui));
+  assert.deepEqual(
+    api.requests.filter((r) => r.path.endsWith('/translation')).map((r) => r.method),
+    ['GET', 'POST'],
+  );
+  // A JSON body: the API refuses a paid request that is not JSON.
+  assert.deepEqual(api.requests.find((r) => r.method === 'POST')?.body, {});
+  const text = ui.text(translationPanel(ui));
+  assert.match(text, /번역: 벡터 u를 구하라\./);
+  assert.match(text, /정답 번역번역: u = \(1,\n {2}2\)/);
+  assert.match(text, /AI 번역\(claude-sonnet-5-5, 2026-10-23 17:00\)이라 틀릴 수 있습니다/);
+  assert.match(text, /번역했습니다/);
+  // Translating again replaces it.
+  assert.ok(
+    ui.find((n) => n.type === 'button' && ui.text(n) === '다시 번역', translationPanel(ui)).length,
+  );
+  // The panel closes from the same button.
+  await ui.click('번역 닫기', item(ui, '문제 3'));
+  assert.equal(translationPanel(ui), undefined);
+});
+
+uiTest('an out-of-date translation says so; a failed one says why', async () => {
+  const api = fakeApi(problems, {
+    translations: {
+      2: {
+        body: '증명하라 (옛 번역)',
+        answer: null,
+        model: 'claude-sonnet-5-5',
+        updatedAt: '2026-10-20 09:00',
+        stale: true,
+      },
+    },
+    failTranslate: {
+      status: 503,
+      error: '번역 API 키(ANTHROPIC_API_KEY)가 서버에 설정되지 않았습니다',
+    },
+  });
+  const ui = await openBook(api);
+  await ui.click('번역 보기', item(ui, '2번째 문제'));
+  assert.match(ui.text(translationPanel(ui)), /원문이나 정답이 번역한 뒤에 바뀌었습니다/);
+  assert.match(ui.text(translationPanel(ui)), /증명하라 \(옛 번역\)/);
+  await ui.click('다시 번역', translationPanel(ui));
+  assert.match(
+    alertText(ui),
+    /번역하지 못했습니다: 번역 API 키\(ANTHROPIC_API_KEY\)가 서버에 설정되지 않았습니다/,
+  );
+  // The old translation stays on screen.
+  assert.match(ui.text(translationPanel(ui)), /증명하라 \(옛 번역\)/);
+});
+
+uiTest('the translate button is locked while one is being made', async () => {
+  let release = () => {};
+  const api = fakeApi(problems, { holdChange: new Promise<void>((r) => (release = r)) });
+  const ui = await openBook(api);
+  await ui.click('번역 보기', item(ui, '문제 3'));
+  await ui.click('번역하기', translationPanel(ui));
+  assert.match(ui.text(translationPanel(ui)), /번역하는 중/);
+  const [button] = ui.find((n) => n.type === 'button', translationPanel(ui));
+  assert.ok(button.props.disabled);
+  release();
+  await ui.settle();
+  assert.match(ui.text(translationPanel(ui)), /번역했습니다/);
+  assert.equal(api.requests.filter((r) => r.method === 'POST').length, 1);
+});

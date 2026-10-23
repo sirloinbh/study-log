@@ -1,6 +1,7 @@
-import { Router } from 'express';
+import { Router, type Response } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod';
+import { TranslationError, type Translator } from './translation.js';
 
 // Same rule as the other ids: plain positive integers that stay exact in JS and fit bigint.
 const pathId = (label: string) =>
@@ -168,9 +169,17 @@ export function textbookExerciseRoutes(pool: Pool) {
   return router;
 }
 
-// Reading, editing and deleting one exercise and its answer: /api/exercises/:id(/answer)
-export function exerciseRoutes(pool: Pool) {
+const translationColumns = `t.body, t.answer, t.model,
+  to_char(t.updated_at AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD HH24:MI') AS "updatedAt",
+  (t.source_body <> e.body OR t.source_answer IS DISTINCT FROM a.body) AS stale`;
+
+// Reading, editing and deleting one exercise, its answer and its translation:
+// /api/exercises/:id(/answer|/translation)
+export function exerciseRoutes(pool: Pool, translator: Translator) {
   const router = Router();
+  // Exercises being translated right now: a second request for one waits for the first instead of
+  // paying for the same translation twice.
+  const translating = new Set<number>();
 
   router.get('/:id', async (req, res) => {
     const id = exerciseIdParam.parse(req.params.id);
@@ -242,6 +251,79 @@ export function exerciseRoutes(pool: Pool) {
       res.status(404).json(notFound);
     }
   });
+
+  // The Korean translation (#31): `{ translation: null }` until one is made. `stale` says the
+  // exercise or its answer changed after it was made.
+  router.get('/:id/translation', async (req, res) => {
+    const id = exerciseIdParam.parse(req.params.id);
+    const { rows } = await pool.query(
+      `SELECT e.id, t.exercise_id AS "translated", ${translationColumns}
+       FROM exercises e LEFT JOIN exercise_answers a ON a.exercise_id = e.id
+       LEFT JOIN exercise_translations t ON t.exercise_id = e.id WHERE e.id = $1`,
+      [id],
+    );
+    if (rows.length === 0) return void res.status(404).json(notFound);
+    const { translated, id: _id, ...translation } = rows[0];
+    res.json({ translation: translated === null ? null : translation });
+  });
+
+  // Translates the exercise and its answer as they are now with Claude, replacing the previous
+  // translation. Nothing is saved when the translation fails.
+  router.post('/:id/translation', async (req, res) => {
+    // Only a JSON request, which another site's page cannot send without a CORS preflight this
+    // server never allows: translating costs money, so a form or a no-cors fetch must not start it.
+    if (!req.is('application/json'))
+      return void res.status(415).json({ error: '번역 요청은 JSON으로 보내세요' });
+    const id = exerciseIdParam.parse(req.params.id);
+    if (translating.has(id))
+      return void res.status(409).json({ error: '이 문제는 이미 번역하는 중입니다' });
+    translating.add(id);
+    try {
+      await translate(id, res);
+    } finally {
+      translating.delete(id);
+    }
+  });
+
+  const translate = async (id: number, res: Response) => {
+    const { rows } = await pool.query<{ body: string; answer: string | null }>(
+      `SELECT e.body, a.body AS answer FROM exercises e
+       LEFT JOIN exercise_answers a ON a.exercise_id = e.id WHERE e.id = $1`,
+      [id],
+    );
+    if (rows.length === 0) return void res.status(404).json(notFound);
+    const source = rows[0];
+    let translated;
+    try {
+      translated = await translator(source);
+    } catch (error) {
+      if (!(error instanceof TranslationError)) throw error;
+      return void res.status(error.status).json({ error: error.message });
+    }
+    try {
+      await pool.query(
+        `INSERT INTO exercise_translations
+           (exercise_id, body, answer, source_body, source_answer, model)
+         VALUES ($1, $2, $3, $4, $5, $6)
+         ON CONFLICT (exercise_id) DO UPDATE SET body = EXCLUDED.body, answer = EXCLUDED.answer,
+           source_body = EXCLUDED.source_body, source_answer = EXCLUDED.source_answer,
+           model = EXCLUDED.model, updated_at = now()`,
+        [id, translated.body, translated.answer, source.body, source.answer, translated.model],
+      );
+    } catch (error) {
+      // The exercise was deleted while it was being translated.
+      if ((error as { code?: string }).code !== '23503') throw error;
+      return void res.status(404).json(notFound);
+    }
+    const saved = await pool.query(
+      `SELECT ${translationColumns} FROM exercises e
+       LEFT JOIN exercise_answers a ON a.exercise_id = e.id
+       JOIN exercise_translations t ON t.exercise_id = e.id WHERE e.id = $1`,
+      [id],
+    );
+    if (saved.rows.length === 0) return void res.status(404).json(notFound);
+    res.json({ translation: saved.rows[0] });
+  };
 
   router.delete('/:id/answer', async (req, res) => {
     const id = exerciseIdParam.parse(req.params.id);
