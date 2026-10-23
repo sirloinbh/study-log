@@ -9,7 +9,7 @@ import {
 } from './month-calendar';
 import { formatMinutes, statusLabels, type StudyLog } from './study-logs';
 
-const weekdays = ['월', '화', '수', '목', '금', '토', '일'];
+const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
 
 // Study log calendar (#17): a month of days with the time studied, and the logs of the picked
 // day. `reloadKey` changes when logs were saved or deleted on the page.

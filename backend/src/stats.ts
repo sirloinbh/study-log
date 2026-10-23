@@ -22,8 +22,8 @@ export const addDays = (day: string, days: number) => {
   return toDay(date);
 };
 
-// Weeks start on Monday.
-export const weekStart = (day: string) => addDays(day, -((toDate(day).getUTCDay() + 6) % 7));
+// Weeks start on Sunday (#96, the user's choice; it was Monday before).
+export const weekStart = (day: string) => addDays(day, -toDate(day).getUTCDay());
 
 // The longest series "all" returns, in days (about ten years). Study dates as early as year 1 are
 // accepted, so without a bound one such log would make every request build hundreds of
@@ -51,7 +51,7 @@ export function periodStart(period: StatPeriod, today: string, firstLog?: string
 
 type Day = { date: string; minutes: number };
 
-// Sums of the daily series by week (keyed by its Monday) and by month (YYYY-MM), in order. The
+// Sums of the daily series by week (keyed by its Sunday) and by month (YYYY-MM), in order. The
 // first and last buckets may cover only part of their week or month.
 export function bucket(daily: Day[], keyOf: (date: string) => string) {
   const sums = new Map<string, number>();
@@ -77,7 +77,7 @@ const dailyMinutes = async (pool: Pool, from: string, to: string) =>
     )
   ).rows;
 
-// The heatmap's weeks (#50): this week and the 52 before it, each from Monday.
+// The heatmap's weeks (#50): this week and the 52 before it, each from Sunday.
 export const heatmapWeeks = 53;
 export const heatmapStart = (today: string) => addDays(weekStart(today), -7 * (heatmapWeeks - 1));
 
