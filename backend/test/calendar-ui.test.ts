@@ -105,18 +105,18 @@ async function open(api: ReturnType<typeof fakeApi>) {
   return ui;
 }
 
-uiTest('the calendar shows this month from Monday with each day’s study time', async () => {
+uiTest('the calendar shows this month from Sunday with each day’s study time', async () => {
   const api = fakeApi(logs);
   const ui = await open(api);
   assert.match(ui.text(card(ui)), /2026년 10월/);
-  // 2026-10-01 is a Thursday: three empty slots (Mon to Wed) before it.
+  // 2026-10-01 is a Thursday: four empty slots (Sun to Wed) before it (#96).
   const grid = ui.find((n) => n.props.className === 'calendar-grid', card(ui))[0];
   const slots = (grid.props.children as unknown[])
     .flat()
     .filter((n): n is { type: string } => typeof n === 'object' && n !== null)
     .map((n) => n.type);
-  // Seven weekday names, then three empty slots, then the 1st.
-  assert.deepEqual(slots.slice(7, 11), ['span', 'span', 'span', 'button']);
+  // Seven weekday names (Sunday first), then four empty slots, then the 1st.
+  assert.deepEqual(slots.slice(7, 12), ['span', 'span', 'span', 'span', 'button']);
   assert.equal(dayButton(ui, '2026-10-01').props['aria-label'], '2026-10-01, 학습 45분, 기록 1개');
   // The planned log counts as a log but not as time.
   const todayButton = dayButton(ui, today);
@@ -177,7 +177,7 @@ uiTest('a failed calendar load is reported', async () => {
   assert.match(ui.text(card(ui)), /캘린더를 불러오지 못했습니다: 서버 오류가 발생했습니다/);
 });
 
-uiTest('calendar helpers: months, Monday-first slots and short amounts', () => {
+uiTest('calendar helpers: months, Sunday-first slots and short amounts', () => {
   const calendar = loadFrontendModule<{
     shiftMonth(month: string, delta: number): string;
     monthTitle(month: string): string;
@@ -187,11 +187,16 @@ uiTest('calendar helpers: months, Monday-first slots and short amounts', () => {
   assert.equal(calendar.shiftMonth('2026-01', -1), '2025-12');
   assert.equal(calendar.shiftMonth('2026-12', 1), '2027-01');
   assert.equal(calendar.monthTitle('2026-03'), '2026년 3월');
-  // 2026-06-01 is a Monday (no empty slot); 2026-03-01 a Sunday (six).
-  assert.equal(calendar.calendarCells([{ date: '2026-06-01' }])[0] !== null, true);
+  // Sunday first (#96): 2026-03-01 is a Sunday (no empty slot); 2026-06-01 a Monday (one).
+  assert.equal(calendar.calendarCells([{ date: '2026-03-01' }])[0] !== null, true);
   assert.equal(
-    calendar.calendarCells([{ date: '2026-03-01' }]).filter((cell) => cell === null).length,
-    6,
+    calendar.calendarCells([{ date: '2026-06-01' }]).filter((cell) => cell === null).length,
+    1,
+  );
+  // 2026-10-01, a Thursday: four.
+  assert.equal(
+    calendar.calendarCells([{ date: '2026-10-01' }]).filter((cell) => cell === null).length,
+    4,
   );
   assert.deepEqual([0, 45, 60, 90, 125].map(calendar.shortMinutes), [
     '',

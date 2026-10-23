@@ -3,9 +3,10 @@ import { requestJson, type RequestError } from './api';
 import { formatMinutes } from './study-logs';
 import { heatBands, heatLevel, heatWeeks, monthLabel, type DayMinutes } from './study-stats';
 
-const weekdays = ['월', '', '수', '', '금', '', ''];
+// Rows run Sunday to Saturday (#96); Monday, Wednesday and Friday are labelled.
+const weekdays = ['', '월', '', '수', '', '금', ''];
 
-// The last year of study as a GitHub-style heatmap (#50): one column per week, Monday on top.
+// The last year of study as a GitHub-style heatmap (#50): one column per week, Sunday on top.
 export function Heatmap() {
   const [data, setData] = useState<{ from: string; to: string; daily: DayMinutes[] }>();
   const [error, setError] = useState<string>();

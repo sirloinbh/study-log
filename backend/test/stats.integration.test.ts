@@ -56,7 +56,7 @@ test(
         await add(today, '09:00', '10:30', 'done'); // 90
         await add(today, '13:00', '13:30', 'planned'); // not studied yet
         await add('2096-05-15', '20:00', '21:00', 'in_progress'); // 60
-        await add('2096-05-13', '10:00', '10:20', 'done'); // 20, Sunday: last week
+        await add('2096-05-13', '10:00', '10:20', 'done'); // 20, Sunday: opens this week (#96)
         await add('2096-05-01', '07:00', '07:45', 'stopped'); // 45
         await add('2096-03-10', '23:00', '01:00', 'done'); // 120, past midnight
         await add('2096-01-05', '09:00', '09:30', 'done'); // 30, before the 3 months
@@ -66,11 +66,11 @@ test(
         const week = await stats('week');
         assert.deepEqual(
           [week.from, week.to, week.totalMinutes, week.todayMinutes, week.days],
-          ['2096-05-14', today, 150, 90, 3],
+          ['2096-05-13', today, 170, 90, 4],
         );
         assert.deepEqual(
           week.daily.map((day) => day.minutes),
-          [0, 60, 90],
+          [20, 0, 60, 90],
         );
 
         const month = await stats('month');
@@ -82,9 +82,9 @@ test(
         assert.equal(month.averageMinutesPerDay, 13);
         assert.equal(month.averageMinutesPerStudyDay, 54);
         assert.deepEqual(month.weekly, [
-          { weekStart: '2096-04-30', minutes: 45 },
-          { weekStart: '2096-05-07', minutes: 20 },
-          { weekStart: '2096-05-14', minutes: 150 },
+          { weekStart: '2096-04-29', minutes: 45 },
+          { weekStart: '2096-05-06', minutes: 0 },
+          { weekStart: '2096-05-13', minutes: 170 },
         ]);
 
         const months3 = await stats('3months');
@@ -110,15 +110,15 @@ test(
         assert.equal(all.daily.length, 3653);
         assert.equal(all.totalMinutes, 365);
 
-        // The heatmap (#50): 53 weeks up to today, from a Monday, the same counting rules.
+        // The heatmap (#50): 53 weeks up to today, from a Sunday (#96), the same counting rules.
         const heat = (await call('/api/stats/heatmap')).data as {
           from: string;
           to: string;
           daily: { date: string; minutes: number }[];
         };
-        assert.deepEqual([heat.from, heat.to], ['2095-05-16', today]);
-        // 52 full weeks plus Monday to Wednesday of this one.
-        assert.equal(heat.daily.length, 52 * 7 + 3);
+        assert.deepEqual([heat.from, heat.to], ['2095-05-15', today]);
+        // 52 full weeks plus Sunday to Wednesday of this one.
+        assert.equal(heat.daily.length, 52 * 7 + 4);
         const minutesOn = (date: string) => heat.daily.find((day) => day.date === date)?.minutes;
         assert.equal(minutesOn(today), 90);
         assert.equal(minutesOn('2096-03-10'), 120);
