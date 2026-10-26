@@ -1,0 +1,15 @@
+# 중앙 관리 파일. 수정은 sirloinbh/project-standards의 templates/app/deploy/에서
+[Unit]
+Description=공부 기록 pull-based deployment of origin/main
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+Group=docker
+WorkingDirectory=/opt/study-log
+# Copied first: the deploy checks out a new commit while this script runs.
+ExecStart=/bin/bash -c 'cp /opt/study-log/deploy/autodeploy.sh /tmp/study-autodeploy.sh && exec /bin/bash /tmp/study-autodeploy.sh'
+TimeoutStartSec=45min
+Nice=10
