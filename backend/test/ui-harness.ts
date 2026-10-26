@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { createContext, runInContext } from 'node:vm';
 import ts from 'typescript';
+import { legacyShell } from './ui-shell.js';
 
 export type Node = { type: unknown; props: Record<string, unknown> & { children: unknown[] } };
 export type FetchInit = { method?: string; headers?: Record<string, string>; body?: string };
@@ -15,6 +16,8 @@ export type FetchImpl = (
 export const frontendMissing = !existsSync(new URL('../../frontend/', import.meta.url));
 
 const sourceUrl = (file: string) => new URL('../../frontend/src/' + file, import.meta.url);
+// The page tests mount the old minimal shell (ui-shell.ts), not the app's real entry (#110).
+const SHELL = 'test-shell.tsx';
 
 // Loads frontend modules into one VM context so errors and objects share a realm.
 function moduleLoader(context: object, external: (name: string) => unknown) {
@@ -23,7 +26,8 @@ function moduleLoader(context: object, external: (name: string) => unknown) {
     if (cache.has(file)) return cache.get(file);
     const exports = {};
     cache.set(file, exports);
-    const code = ts.transpileModule(readFileSync(sourceUrl(file), 'utf8'), {
+    const source = file === SHELL ? legacyShell : readFileSync(sourceUrl(file), 'utf8');
+    const code = ts.transpileModule(source, {
       compilerOptions: {
         module: ts.ModuleKind.CommonJS,
         jsx: ts.JsxEmit.React,
@@ -152,7 +156,7 @@ export function mount(
         }),
       };
     throw new Error('Unexpected import: ' + name);
-  })('main.tsx');
+  })(SHELL);
   const resolve = (node: unknown): unknown => {
     if (Array.isArray(node)) return node.map(resolve);
     if (!node || typeof node !== 'object') return node;

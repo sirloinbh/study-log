@@ -30,6 +30,7 @@
 - **PWA:** 아이콘 4개(중앙 `scripts/pwa-icons.mjs`), `index.html`의 manifest·아이콘·라이트/다크 `theme-color`·`viewport-fit=cover`·깜빡임 방지 스크립트.
 - **테스트·빌드:** `frontend`에 `test`(vitest) 스크립트와 `src/test/setup.ts`를 넣고, 루트 `npm test`가 프론트엔드 테스트도 돌린다. 운영 빌드는 `tsconfig.build.json`으로 테스트 파일을 뺀다. `vite.config.ts`에 Tailwind 플러그인.
 - **백엔드의 화면 테스트 삭제:** `backend/test/app-ui.test.ts`는 Vitest가 없을 때 가짜 React로 `main.tsx`를 실행해 보던 임시 테스트다. 같은 내용(제목·서버 상태·오류 알림·메뉴 이동)을 프론트엔드 Vitest 테스트가 실제 React로 검사하므로 지웠다.
+- **백엔드의 페이지 테스트:** `backend/test/*-ui.test.ts`(165개)는 자체 하네스가 가짜 React로 `main.tsx` 전체를 실행하고 예전 메뉴 버튼으로 페이지를 열었다. 하네스가 이제 `main.tsx` 대신 예전 최소 셸(`backend/test/ui-shell.ts`, 테스트용 발판)을 실행한다. 페이지 컴포넌트는 실제 프론트엔드 파일 그대로라 페이지 동작 검사는 바뀌지 않는다. 셸·라우팅은 프론트엔드 Vitest 테스트가 실제 React로 검사한다.
 - **화면 테스트(`app.test.tsx`):** 서버 날짜 표시, 서버 오류 알림, 메뉴로 페이지 이동과 현재 페이지 표시, 알 수 없는 주소 처리.
 
 ## 검증
