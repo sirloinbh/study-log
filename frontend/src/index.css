@@ -1,0 +1,10 @@
+/*
+ * Common design system (project-standards #126): Tailwind CSS 4, tw-animate-css and the
+ * shared tokens (black-and-white light/dark, Pretendard). Colours come only from tokens.
+ * style.css holds the app's own page styles from before the switch. It sits in the
+ * components layer, so the utilities of the common components win over it.
+ */
+@import 'tailwindcss';
+@import 'tw-animate-css';
+@import '@sirloinbh/design-tokens/tailwind.css';
+@import './style.css' layer(components);

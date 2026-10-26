@@ -87,11 +87,11 @@ export function StudyTimeChart({
             <div className="chart-box" aria-hidden="true">
               <R.ResponsiveContainer width="100%" height={240}>
                 <R.BarChart data={bars} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
-                  <R.CartesianGrid vertical={false} stroke="var(--line)" />
+                  <R.CartesianGrid vertical={false} stroke="var(--border)" />
                   <R.XAxis dataKey="label" tickLine={false} minTickGap={12} fontSize={11} />
                   <R.YAxis allowDecimals={false} unit="h" tickLine={false} fontSize={11} />
                   <R.Tooltip
-                    cursor={{ fill: 'var(--soft)' }}
+                    cursor={{ fill: 'var(--muted)' }}
                     formatter={(_value, _name, item) => [
                       formatMinutes((item.payload as { minutes: number }).minutes),
                       '학습 시간',
