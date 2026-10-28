@@ -47,6 +47,9 @@ const createInput = z.object(
   asObject,
 );
 const updateInput = z.object(entryFields, asObject);
+// A length limit keeps one oversized request from raising an issue per element
+// (zod 3 advisory GHSA-mrhx-c7xc-m3w5, sirloinbh/project-standards#326).
+export const orderLimit = 1000;
 const orderInput = z.object(
   {
     parentId: bodyId('상위 목차').nullable().default(null),
@@ -56,6 +59,7 @@ const orderInput = z.object(
         invalid_type_error: '순서를 바꿀 목차 ID 목록을 보내세요',
       })
       .min(1, '순서를 바꿀 목차 ID 목록을 보내세요')
+      .max(orderLimit, `목차 순서는 한 번에 ${orderLimit}개까지 바꿀 수 있습니다`)
       .refine((ids) => new Set(ids).size === ids.length, '목차 ID가 중복되었습니다'),
   },
   asObject,
