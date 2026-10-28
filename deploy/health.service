@@ -1,0 +1,13 @@
+# 중앙 관리 파일. 수정은 sirloinbh/project-standards의 templates/app/deploy/에서
+[Unit]
+Description=공부 기록 health check signal for healthchecks.io
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=ubuntu
+WorkingDirectory=/opt/study-log
+# Copied first: a deploy may check out a new commit while this script runs.
+ExecStart=/bin/bash -c 'cp /opt/study-log/deploy/notify.sh /tmp/study-notify.sh && exec /bin/bash /tmp/study-notify.sh health'
+TimeoutStartSec=2min
