@@ -73,6 +73,12 @@ test('invalid contents are rejected with Korean messages before touching the DB'
       { entries: Array.from({ length: 501 }, () => ({ level: 0, title: '장' })) },
       /한 번에 500개까지/,
     ],
+    [
+      'PUT',
+      `${base}/order`,
+      { ids: Array.from({ length: 1001 }, (_, i) => i + 1) },
+      /한 번에 1000개까지 바꿀 수 있습니다/,
+    ],
   ];
   await withApi(untouchedPool, async (call) => {
     for (const [method, path, body, message] of cases) {
