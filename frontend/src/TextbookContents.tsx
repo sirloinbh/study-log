@@ -294,7 +294,7 @@ export function TextbookContents({
         const label = contentLabel(node);
         return (
           <li key={node.id}>
-            <div className={`content-row${open?.id === node.id ? 'editing' : ''}`}>
+            <div className={open?.id === node.id ? 'content-row editing' : 'content-row'}>
               <span className="content-label">{label}</span>
               <div className="log-actions">
                 {deletingId === node.id ? (

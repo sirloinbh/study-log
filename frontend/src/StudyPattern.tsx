@@ -78,7 +78,7 @@ export function StudyPattern({
             {pattern.byHour.map((minutes, hour) => (
               <span
                 key={hour}
-                className={`pattern-hour${hour === pattern.topHour ? 'top' : ''}`}
+                className={hour === pattern.topHour ? 'pattern-hour top' : 'pattern-hour'}
                 title={`${hourLabel(hour)}: ${formatMinutes(minutes)}`}
                 style={{ height: barWidth(minutes, pattern.byHour) }}
               />
