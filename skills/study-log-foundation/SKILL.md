@@ -18,7 +18,7 @@ description: Establish or improve the repeatable development foundation of the s
 1. 현재 상태와 이슈의 완료 기준을 정하고, 선택 이유·구조·계약을 문서에 기록한다.
 2. 도구 설정, 실행 명령, CI와 문서를 같은 변경에서 맞춘다. 사용하지 않는 설정·스크립트·빈 모듈은 만들지 않는다.
 3. API·DB 변경은 기존 데이터와 날짜·단위 의미를 보존하고, 마이그레이션 적용과 실패 복구 방법을 검증한다. DB 마이그레이션 원본은 하나로 정한다.
-4. 화면 변경은 디자인 토큰(`frontend/src/style.css`의 CSS 변수)과 기존 컴포넌트를 유지하면서 로딩·빈 결과·오류·키보드 접근을 해당 범위에서 정리한다.
+4. 화면 변경은 디자인 토큰(`@sirloinbh/design-tokens`)과 공통 UI 컴포넌트(`frontend/src/components/ui/`)를 쓰면서 로딩·빈 결과·오류·키보드 접근을 해당 범위에서 정리한다.
 5. `skills/study-log-testing/SKILL.md`를 함께 적용한다. 구현과 테스트를 함께 작성하고, 버그에는 회귀 테스트를 추가하며, 실제 결과를 docs·PR에 기록한다.
 6. 배포는 사용자 요청 범위에서만 한다. 이미지 버전, health check, 비밀값 관리, 백업·복원, 이전 버전 복구를 준비한다.
 7. 각 작업 커밋에 docs 기록을 포함하고 검증한 PR을 만든다. implementation 스킬의 절차로 자동 코드 리뷰를 최대 2회 거치고(큰 수정은 새 이슈카드로 분리), 필수 CI가 모두 통과하면 PR을 병합한다.
