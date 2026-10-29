@@ -1,10 +1,11 @@
-import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { test } from 'node:test';
+
 import {
+  type FetchInit,
   frontendMissing,
   loadFrontendModule,
   mount,
-  type FetchInit,
   type Node,
 } from './ui-harness.js';
 

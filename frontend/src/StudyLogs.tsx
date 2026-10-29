@@ -1,23 +1,24 @@
 import React, { useEffect, useState } from 'react';
+
+import { type RequestError, requestJson } from './api';
 import { useBusy } from './busy';
 import { Calendar } from './Calendar';
 import { Memo } from './Memo';
-import { StudyLogSearch } from './StudyLogSearch';
-import { requestJson, type RequestError } from './api';
 import {
   crossesMidnight,
   emptyForm,
   formatMinutes,
   previewMinutes,
+  reflectionLabel,
   statusLabels,
   studiedLabel,
-  reflectionLabel,
-  understandingLabels,
   type StudyLog,
   type StudyLogForm,
   type StudyStatus,
+  understandingLabels,
 } from './study-logs';
-import { contentOptions, type ContentNode, type Textbook } from './textbook';
+import { StudyLogSearch } from './StudyLogSearch';
+import { type ContentNode, contentOptions, type Textbook } from './textbook';
 
 type Notice = { kind: 'status' | 'alert'; text: string } | undefined;
 
@@ -213,7 +214,7 @@ export function StudyLogs({ today }: { today: string }) {
     <div className="study-logs">
       <section className="card">
         <h2>{editingId === undefined ? '학습 기록 입력' : '학습 기록 수정'}</h2>
-        <form className="log-form" onSubmit={save}>
+        <form className="log-form" onSubmit={(event) => void save(event)}>
           <label>
             학습일
             <input
@@ -403,7 +404,7 @@ export function StudyLogs({ today }: { today: string }) {
                         className="danger"
                         disabled={busy}
                         aria-label={`${describe(log)} 기록 삭제 확인`}
-                        onClick={() => remove(log.id)}
+                        onClick={() => void remove(log.id)}
                       >
                         삭제 확인
                       </button>

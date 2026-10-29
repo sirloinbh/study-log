@@ -1,10 +1,11 @@
 import { BookOpen, ChartColumn, NotebookPen, NotebookText, Settings2, Tags } from 'lucide-react';
-import { useEffect, useState, type ReactNode } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
+
 import { AppShell, type NavItem } from './components/layout/app-shell';
 import { EmptyState } from './components/ui/empty-state';
 import { Toaster } from './components/ui/sonner';
-import { healthText, type Health } from './health';
+import { type Health, healthText } from './health';
 import { Keywords } from './Keywords';
 import { Retrospectives } from './Retrospectives';
 import { Stats } from './Stats';
@@ -12,7 +13,7 @@ import { StudyLogs } from './StudyLogs';
 import { Textbooks } from './Textbooks';
 
 // Every page URL lives here (central docs/directory-rules.md). The study log is the first page.
-export const pages = {
+const pages = {
   logs: '/',
   textbooks: '/textbooks',
   keywords: '/keywords',

@@ -1,15 +1,18 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
+
 import { App } from './app';
 
 // /api/health answers with the server date; other endpoints fail, so pages show their own errors.
 function server(health: { body: object; status?: number }) {
   vi.stubGlobal(
     'fetch',
-    vi.fn(async (url: string) =>
-      url === '/api/health'
-        ? new Response(JSON.stringify(health.body), { status: health.status ?? 200 })
-        : new Response(JSON.stringify({ error: '테스트 서버' }), { status: 500 }),
+    vi.fn((url: string) =>
+      Promise.resolve(
+        url === '/api/health'
+          ? new Response(JSON.stringify(health.body), { status: health.status ?? 200 })
+          : new Response(JSON.stringify({ error: '테스트 서버' }), { status: 500 }),
+      ),
     ),
   );
 }

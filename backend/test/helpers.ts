@@ -1,5 +1,7 @@
 import type { Server } from 'node:http';
+
 import type { Pool } from 'pg';
+
 import { createApp } from '../src/app.js';
 import type { Translator } from '../src/translation.js';
 

@@ -1,5 +1,6 @@
-import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { test } from 'node:test';
+
 import { frontendMissing, loadFrontendModule } from './ui-harness.js';
 
 type Entry = { line: number; level: number; number: string; title: string };

@@ -1,10 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
+
+import { type RequestError, requestJson } from './api';
 import { useBusy } from './busy';
-import { requestJson, type RequestError } from './api';
-import { contentLabel, type ContentNode } from './textbook';
 import { readPdfToc } from './pdf-import';
 import { pdfSizeLimit } from './pdf-toc';
-import { parseToc, tocLimits, tocProblems, tocTree, type TocTree } from './toc';
+import { contentLabel, type ContentNode } from './textbook';
+import { parseToc, tocLimits, tocProblems, type TocTree, tocTree } from './toc';
 
 type Notice = { kind: 'status' | 'alert'; text: string; textbookId: number } | undefined;
 
@@ -293,7 +294,7 @@ export function TextbookContents({
         const label = contentLabel(node);
         return (
           <li key={node.id}>
-            <div className={`content-row${open?.id === node.id ? ' editing' : ''}`}>
+            <div className={`content-row${open?.id === node.id ? 'editing' : ''}`}>
               <span className="content-label">{label}</span>
               <div className="log-actions">
                 {deletingId === node.id ? (
@@ -304,7 +305,7 @@ export function TextbookContents({
                       className="danger"
                       disabled={busy}
                       aria-label={`${label} 목차 삭제 확인`}
-                      onClick={() => remove(node)}
+                      onClick={() => void remove(node)}
                     >
                       삭제 확인
                     </button>
@@ -328,7 +329,7 @@ export function TextbookContents({
                       className="secondary"
                       disabled={busy || index === 0}
                       aria-label={`${label} 위로 이동`}
-                      onClick={() => move(nodes, index, -1, parentId)}
+                      onClick={() => void move(nodes, index, -1, parentId)}
                     >
                       위로
                     </button>
@@ -337,7 +338,7 @@ export function TextbookContents({
                       className="secondary"
                       disabled={busy || index === nodes.length - 1}
                       aria-label={`${label} 아래로 이동`}
-                      onClick={() => move(nodes, index, 1, parentId)}
+                      onClick={() => void move(nodes, index, 1, parentId)}
                     >
                       아래로
                     </button>
@@ -413,6 +414,7 @@ export function TextbookContents({
           <label className="wide">
             목차 텍스트
             <textarea
+              // eslint-disable-next-line jsx-a11y-x/no-autofocus -- this field opens on a click, so focus follows that action.
               autoFocus
               rows={8}
               maxLength={tocLimits.text}
@@ -500,6 +502,7 @@ export function TextbookContents({
           <label className="title">
             목차 제목
             <input
+              // eslint-disable-next-line jsx-a11y-x/no-autofocus -- this field opens on a click, so focus follows that action.
               autoFocus
               required
               maxLength={200}

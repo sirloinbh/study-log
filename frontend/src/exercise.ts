@@ -1,4 +1,4 @@
-import { contentLabel, textbookMeta, type ContentNode, type TextbookForm } from './textbook';
+import { contentLabel, type ContentNode, type TextbookForm, textbookMeta } from './textbook';
 
 export type Exercise = {
   id: number;

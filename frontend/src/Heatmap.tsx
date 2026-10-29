@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { requestJson, type RequestError } from './api';
+
+import { type RequestError, requestJson } from './api';
 import { formatMinutes } from './study-logs';
-import { heatBands, heatLevel, heatWeeks, monthLabel, type DayMinutes } from './study-stats';
+import { type DayMinutes, heatBands, heatLevel, heatWeeks, monthLabel } from './study-stats';
 
 // Rows run Sunday to Saturday (#96); Monday, Wednesday and Friday are labelled.
 const weekdays = ['', '월', '', '수', '', '금', ''];

@@ -1,6 +1,7 @@
-import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { frontendMissing, loadFrontendModule, mount, type FetchInit } from './ui-harness.js';
+import { test } from 'node:test';
+
+import { type FetchInit, frontendMissing, loadFrontendModule, mount } from './ui-harness.js';
 
 const uiTest = frontendMissing ? test.skip : test;
 

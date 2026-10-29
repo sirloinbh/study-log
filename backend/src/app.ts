@@ -2,12 +2,13 @@ import express from 'express';
 import type { Pool } from 'pg';
 import { types } from 'pg';
 import { ZodError } from 'zod';
+
 import { calendarRoutes } from './calendar.js';
+import { contentExerciseRoutes, exerciseRoutes, textbookExerciseRoutes } from './exercises.js';
 import { keywordRoutes } from './keywords.js';
 import { retrospectiveRoutes } from './retrospectives.js';
 import { statsRoutes } from './stats.js';
 import { studyLogRoutes } from './study-logs.js';
-import { contentExerciseRoutes, exerciseRoutes, textbookExerciseRoutes } from './exercises.js';
 import { textbookContentRoutes } from './textbook-contents.js';
 import { textbookRoutes } from './textbooks.js';
 import { claudeTranslator, type Translator } from './translation.js';

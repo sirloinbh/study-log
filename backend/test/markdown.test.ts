@@ -1,5 +1,6 @@
-import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { test } from 'node:test';
+
 import { frontendMissing } from './ui-harness.js';
 
 // Renders the real memo component with react-markdown and react-dom/server (#16), unlike the

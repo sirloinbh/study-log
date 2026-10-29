@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
+
+import { type RequestError, requestJson } from './api';
 import { useBusy } from './busy';
-import { requestJson, type RequestError } from './api';
 import { contentPath, type Exercise } from './exercise';
-import { contentLabel, contentOptions, type ContentNode, type Textbook } from './textbook';
+import { contentLabel, type ContentNode, contentOptions, type Textbook } from './textbook';
 
 type Notice = { kind: 'status' | 'alert'; text: string } | undefined;
 
 // "1 벡터 > 1.2 내적 · 문제 3": where an exercise is, for a list that spans chapters.
-export function importantLabel(tree: ContentNode[], exercise: Exercise) {
+function importantLabel(tree: ContentNode[], exercise: Exercise) {
   const path = (contentPath(tree, exercise.contentId) ?? []).map(contentLabel).join(' > ');
   const number = exercise.number.trim() ? `문제 ${exercise.number.trim()}` : '번호 없는 문제';
   return path ? `${path} · ${number}` : number;
@@ -153,7 +154,7 @@ export function ImportantExercises({
                       className="secondary"
                       disabled={busy}
                       aria-label={`${label} 중요 해제`}
-                      onClick={() => unmark(exercise, label)}
+                      onClick={() => void unmark(exercise, label)}
                     >
                       중요 해제
                     </button>
