@@ -25,7 +25,7 @@ types.setTypeParser(20, (value) => {
   return number;
 });
 
-export const serviceTimeZone = 'Asia/Seoul';
+const serviceTimeZone = 'Asia/Seoul';
 
 // "Today" follows the service time zone, not the server clock's zone.
 export function serviceDate(now = new Date()) {
