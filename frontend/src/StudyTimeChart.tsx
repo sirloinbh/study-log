@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
+
 import { formatMinutes } from './study-logs';
 import {
   busiestBar,
   chartBars,
+  type ChartUnit,
   chartUnitLabels,
   chartUnits,
   defaultChartUnit,
-  type ChartUnit,
   type StatPeriod,
   type StudyTimeStats,
 } from './study-stats';

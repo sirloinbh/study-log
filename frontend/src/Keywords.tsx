@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
+
+import { type RequestError, requestJson } from './api';
 import { useBusy } from './busy';
-import { requestJson, type RequestError } from './api';
 import {
   emptyKeywordForm,
-  keywordLimits,
-  searchPath,
   type Keyword,
   type KeywordForm,
+  keywordLimits,
   type KeywordSearch,
+  searchPath,
 } from './keyword';
 
 type Notice = { kind: 'status' | 'alert'; text: string } | undefined;
@@ -324,7 +325,7 @@ export function Keywords({ today }: { today: string }) {
                           id={`keyword-delete-confirm-${keyword.id}`}
                           disabled={busy}
                           aria-label={`${keyword.keyword} 삭제 확인`}
-                          onClick={() => remove(keyword)}
+                          onClick={() => void remove(keyword)}
                         >
                           삭제 확인
                         </button>

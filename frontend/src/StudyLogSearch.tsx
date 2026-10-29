@@ -1,15 +1,16 @@
 import React, { useEffect, useState } from 'react';
+
+import { type RequestError, requestJson } from './api';
 import { useBusy } from './busy';
-import { requestJson, type RequestError } from './api';
 import { Memo } from './Memo';
 import {
   emptySearch,
   formatMinutes,
   statusLabels,
   studiedLabel,
-  studyLogSearchPath,
   type StudyLog,
   type StudyLogSearch as Search,
+  studyLogSearchPath,
 } from './study-logs';
 import type { Textbook } from './textbook';
 

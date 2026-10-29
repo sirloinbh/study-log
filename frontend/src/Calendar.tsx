@@ -1,12 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { requestJson, type RequestError } from './api';
+
+import { type RequestError, requestJson } from './api';
 import { Memo } from './Memo';
 import {
   calendarCells,
+  type CalendarDay,
   monthTitle,
   shiftMonth,
   shortMinutes,
-  type CalendarDay,
 } from './month-calendar';
 import { formatMinutes, statusLabels, type StudyLog } from './study-logs';
 

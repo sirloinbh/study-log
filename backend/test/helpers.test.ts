@@ -1,5 +1,6 @@
-import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { test } from 'node:test';
+
 import { fetchBlockedPorts, openFetchablePort } from './helpers.js';
 
 // A fake listener that hands out the given ports in order and records which were closed.

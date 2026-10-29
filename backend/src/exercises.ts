@@ -1,6 +1,7 @@
-import { Router, type Response } from 'express';
+import { type Response, Router } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod';
+
 import { TranslationError, type Translator } from './translation.js';
 
 // Same rule as the other ids: plain positive integers that stay exact in JS and fit bigint.

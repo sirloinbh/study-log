@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { requestJson, type RequestError } from './api';
-import { barWidth, hourLabel, weekdayNames, type StudyPattern as Pattern } from './study-stats';
+
+import { type RequestError, requestJson } from './api';
 import { formatMinutes } from './study-logs';
+import { barWidth, hourLabel, type StudyPattern as Pattern, weekdayNames } from './study-stats';
 
 // When study went best in a period (#20): the busiest hour and weekday, and minutes per hour
 // and weekday as bars. Shown on the retrospective of that period; `reloadKey` changes with it.
@@ -77,7 +78,7 @@ export function StudyPattern({
             {pattern.byHour.map((minutes, hour) => (
               <span
                 key={hour}
-                className={`pattern-hour${hour === pattern.topHour ? ' top' : ''}`}
+                className={hour === pattern.topHour ? 'pattern-hour top' : 'pattern-hour'}
                 title={`${hourLabel(hour)}: ${formatMinutes(minutes)}`}
                 style={{ height: barWidth(minutes, pattern.byHour) }}
               />

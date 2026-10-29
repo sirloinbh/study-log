@@ -1,15 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { requestJson, type RequestError } from './api';
+
+import { type RequestError, requestJson } from './api';
 import { Heatmap } from './Heatmap';
-import { StudyTimeChart } from './StudyTimeChart';
+import { formatMinutes } from './study-logs';
 import {
-  periodLabels,
-  statPeriods,
   type ChartUnit,
+  periodLabels,
   type StatPeriod,
+  statPeriods,
   type StudyTimeStats,
 } from './study-stats';
-import { formatMinutes } from './study-logs';
+import { StudyTimeChart } from './StudyTimeChart';
 
 // Study time dashboard (#48): metric cards for the all-time total, today, the picked period and
 // its daily average, from GET /api/stats/study-time (#47), the period's study time chart (#49)

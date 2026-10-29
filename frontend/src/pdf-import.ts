@@ -1,4 +1,4 @@
-import { outlineText, pageText, pdfPageLimit, type OutlineItem, type TextPiece } from './pdf-toc';
+import { type OutlineItem, outlineText, pageText, pdfPageLimit, type TextPiece } from './pdf-toc';
 
 export type PdfToc = { lines: string[]; source: 'outline' | 'pages'; pages: number };
 

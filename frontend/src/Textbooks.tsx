@@ -1,17 +1,18 @@
 import React, { useEffect, useState } from 'react';
+
+import { type RequestError, requestJson } from './api';
 import { useBusy } from './busy';
-import { requestJson, type RequestError } from './api';
 import { Exercises } from './Exercises';
 import { ImportantExercises } from './ImportantExercises';
-import { TextbookContents } from './TextbookContents';
 import {
+  type ContentNode,
   emptyTextbookForm,
   limits,
-  textbookMeta,
-  type ContentNode,
   type Textbook,
   type TextbookForm,
+  textbookMeta,
 } from './textbook';
+import { TextbookContents } from './TextbookContents';
 
 type Notice = { kind: 'status' | 'alert'; text: string } | undefined;
 
@@ -159,7 +160,7 @@ export function Textbooks() {
     <div className="textbooks">
       <section className="card">
         <h2>{editingId === undefined ? '교재 등록' : '교재 수정'}</h2>
-        <form className="log-form textbook-form" onSubmit={save}>
+        <form className="log-form textbook-form" onSubmit={(event) => void save(event)}>
           <label className="title">
             제목
             <input
@@ -271,7 +272,7 @@ export function Textbooks() {
                       className="danger"
                       disabled={busy}
                       aria-label={`${selected.title} 교재 삭제 확인`}
-                      onClick={() => remove(selected.id)}
+                      onClick={() => void remove(selected.id)}
                     >
                       삭제 확인
                     </button>

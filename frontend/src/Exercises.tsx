@@ -1,18 +1,19 @@
 import React, { useEffect, useState } from 'react';
+
+import { type RequestError, requestJson } from './api';
 import { useBusy } from './busy';
-import { ExerciseTranslation } from './ExerciseTranslation';
-import { requestJson, type RequestError } from './api';
 import {
   contentPath,
   emptyExerciseForm,
-  exerciseLabel,
-  exerciseLimits,
-  questionText,
   type Exercise,
   type ExerciseAnswer,
   type ExerciseForm,
+  exerciseLabel,
+  exerciseLimits,
+  questionText,
 } from './exercise';
-import { contentOptions, type ContentNode, type Textbook } from './textbook';
+import { ExerciseTranslation } from './ExerciseTranslation';
+import { type ContentNode, contentOptions, type Textbook } from './textbook';
 
 // The API's answer for a chapter that does not exist (or belongs to another textbook).
 const contentMissing = '목차를 찾을 수 없습니다';
@@ -472,6 +473,7 @@ export function Exercises({
                             정답
                             <textarea
                               id="answer-body"
+                              // eslint-disable-next-line jsx-a11y-x/no-autofocus -- this field opens on a click, so focus follows that action.
                               autoFocus
                               rows={4}
                               maxLength={exerciseLimits.answer}
@@ -535,7 +537,7 @@ export function Exercises({
                           className="danger"
                           disabled={busy}
                           aria-label={`${label} 삭제 확인`}
-                          onClick={() => remove(exercise)}
+                          onClick={() => void remove(exercise)}
                         >
                           삭제 확인
                         </button>
@@ -558,7 +560,7 @@ export function Exercises({
                           type="button"
                           className="secondary"
                           aria-label={`${label} 질문 복사`}
-                          onClick={() => copy(exercise, label)}
+                          onClick={() => void copy(exercise, label)}
                         >
                           질문 복사
                         </button>
@@ -593,7 +595,7 @@ export function Exercises({
                           className="secondary"
                           disabled={busy}
                           aria-label={`${label} ${exercise.important ? '중요 해제' : '중요 표시'}`}
-                          onClick={() => markImportant(exercise)}
+                          onClick={() => void markImportant(exercise)}
                         >
                           {exercise.important ? '중요 해제' : '중요 표시'}
                         </button>
