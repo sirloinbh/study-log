@@ -1,4 +1,5 @@
 import express from 'express';
+import { rateLimit } from 'express-rate-limit';
 import type { Pool } from 'pg';
 import { types } from 'pg';
 import { ZodError } from 'zod';
@@ -38,13 +39,33 @@ export function serviceDate(now = new Date()) {
   }).format(now);
 }
 
+// A safety net above nginx's limit (10 a second per client, frontend/nginx.conf). nginx does not
+// add the client's address, so here every request through it counts as one client. It does pass on
+// a forwarded header the client sent, which could only be forged: trust proxy stays off, so the
+// header is ignored, and the check that would log it is off too.
+const defaultRequestsPerMinute = 1200;
+
 export function createApp(
   pool: Pool,
-  options: { today?: () => string; translator?: Translator } = {},
+  options: { today?: () => string; translator?: Translator; requestsPerMinute?: number } = {},
 ) {
   const today = options.today ?? (() => serviceDate());
   const app = express();
   app.disable('x-powered-by');
+  // Before the body parser, so refused requests cost as little as possible.
+  app.use(
+    '/api',
+    rateLimit({
+      windowMs: 60_000,
+      limit: options.requestsPerMinute ?? defaultRequestsPerMinute,
+      standardHeaders: 'draft-8',
+      legacyHeaders: false,
+      message: { error: '요청이 너무 많습니다. 잠시 뒤 다시 시도하세요' },
+      validate: { xForwardedForHeader: false, forwardedHeader: false },
+      // Deploys and monitoring read health; busy pages must not make a healthy API look down.
+      skip: (req) => (req.method === 'GET' || req.method === 'HEAD') && req.path === '/health',
+    }),
+  );
   app.use(express.json({ limit: '256kb' }));
   app.get('/api/health', async (_req, res) => {
     await pool.query('SELECT 1');
