@@ -29,16 +29,24 @@ export async function openFetchablePort<T extends { port: number; close: () => P
 }
 
 // Test files run in parallel on one DB. The few that compare totals over all rows take turns on
-// this lock, held until the test ends. Call it after registering the test's cleanup, which then
-// runs first. It has its own connection, so closing the test's pool does not wait for it.
+// this lock, held until the test ends. `finish` is the test's cleanup: it runs while the lock is
+// held, and the lock is released even if it fails, or the other test would wait forever. The lock
+// has its own connection, so closing the test's pool does not wait for it.
 export async function holdExactTotalsLock(
   connectionString: string | undefined,
   t: { after: (run: () => Promise<void>) => void },
+  finish: () => Promise<void>,
 ) {
   const client = new Client({ connectionString });
   await client.connect();
+  t.after(async () => {
+    try {
+      await finish();
+    } finally {
+      await client.end();
+    }
+  });
   await client.query('SELECT pg_advisory_lock(424242)');
-  t.after(() => client.end());
 }
 
 const closeServer = (server: Server) =>

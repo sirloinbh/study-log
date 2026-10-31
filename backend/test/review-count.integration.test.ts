@@ -13,17 +13,17 @@ test('the count follows what is due', { skip: !url }, async (t) => {
   // An early year keeps other test files' later reviews out of the count at this "today". The
   // stats test also has early rows, and counts these in its total, so the two take turns.
   const year = '0002';
+  // From the very first date: a stats test killed midway may have left a row there. Its rows are
+  // safe to delete here, since the lock means it is not running.
   const cleanup = () =>
-    pool.query(`DELETE FROM study_logs WHERE study_date BETWEEN $1 AND $2`, [
-      `${year}-01-01`,
+    pool.query(`DELETE FROM study_logs WHERE study_date BETWEEN '0001-01-01' AND $1`, [
       `${year}-12-31`,
     ]);
-  await cleanup();
-  t.after(async () => {
+  await holdExactTotalsLock(url, t, async () => {
     await cleanup();
     await pool.end();
   });
-  await holdExactTotalsLock(url, t);
+  await cleanup();
 
   const today = `${year}-03-02`;
   await withApi(

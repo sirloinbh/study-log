@@ -35,13 +35,12 @@ test(
       pool.query(
         "DELETE FROM study_logs WHERE study_date BETWEEN '2096-01-01' AND '2096-12-31' OR study_date = '0001-01-01'",
       );
-    await cleanup();
-    t.after(async () => {
+    // The all-time total below also counts rows of the other early-date test.
+    await holdExactTotalsLock(url, t, async () => {
       await cleanup();
       await pool.end();
     });
-    // The all-time total below also counts rows of the other early-date test.
-    await holdExactTotalsLock(url, t);
+    await cleanup();
     const today = '2096-05-16';
 
     await withApi(
