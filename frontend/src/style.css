@@ -84,7 +84,8 @@
 .textbooks,
 .keywords,
 .stats,
-.retrospectives {
+.retrospectives,
+.reviews {
   display: grid;
   gap: 20px;
   max-width: 960px;
@@ -93,7 +94,8 @@
 .textbooks h2,
 .keywords h2,
 .stats h2,
-.retrospectives h2 {
+.retrospectives h2,
+.reviews h2 {
   margin: 0 0 16px;
   font-size: 16px;
 }
@@ -150,13 +152,16 @@
 .keywords [role='status'],
 .keywords [role='alert'],
 .retrospectives [role='status'],
-.retrospectives [role='alert'] {
+.retrospectives [role='alert'],
+.reviews [role='status'],
+.reviews [role='alert'] {
   margin: 16px 0 0;
 }
 .study-logs [role='status']:empty,
 .textbooks [role='status']:empty,
 .keywords [role='status']:empty,
-.retrospectives [role='status']:empty {
+.retrospectives [role='status']:empty,
+.reviews [role='status']:empty {
   margin: 0;
 }
 .textbook-form .title {
