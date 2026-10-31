@@ -47,6 +47,8 @@
 - [#133](https://github.com/sirloinbh/study-log/issues/133): DB 연결이 끊기면 API 프로세스가 죽을 수 있다.
 - [#134](https://github.com/sirloinbh/study-log/issues/134): 배포 스크립트가 없는 `dist/migrate.js`를 실행한다. 그래서 012는 `database/README.md`의 수동 절차로 적용해야 한다.
 
+2차 리뷰는 보완점이 없었다.
+
 ## 검증
 
 - 마이그레이션 012를 테스트 DB에 두 번 적용했고 두 번 모두 성공했다.
