@@ -41,7 +41,7 @@ export async function withApi(
       init?: { method?: string; body?: unknown; rawBody?: string; contentType?: string },
     ) => Promise<{ status: number; data: Record<string, unknown> }>,
   ) => Promise<void>,
-  options: { today?: () => string; translator?: Translator } = {},
+  options: { today?: () => string; translator?: Translator; requestsPerMinute?: number } = {},
 ) {
   const { server, port } = await openFetchablePort(async () => {
     // Tests never reach Claude: translating fails unless a test hands in its own translator (#31).
