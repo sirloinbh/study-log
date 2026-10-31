@@ -12,7 +12,11 @@ const untouchedPool = {
     throw new Error('DB must not be queried for invalid input');
   },
 } as unknown as Pool;
-const emptyPool = { query: async () => ({ rows: [], rowCount: 0 }) } as unknown as Pool;
+const emptyResult = async () => ({ rows: [], rowCount: 0 });
+const emptyPool = {
+  query: emptyResult,
+  connect: async () => ({ query: emptyResult, release: () => {} }),
+} as unknown as Pool;
 
 const valid = { studyDate: '2026-10-21', startTime: '09:00', endTime: '10:30' };
 

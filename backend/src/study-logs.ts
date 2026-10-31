@@ -2,7 +2,8 @@ import { Router } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod';
 
-import { likePattern } from './sql.js';
+import { syncFirstReview } from './reviews.js';
+import { inTransaction, likePattern } from './sql.js';
 
 export const studyStatuses = ['planned', 'in_progress', 'done', 'stopped'] as const;
 
@@ -201,62 +202,77 @@ export function studyLogRoutes(pool: Pool) {
   router.post('/', async (req, res) => {
     const log = studyLogInput.parse(req.body);
     const result = await write(() =>
-      pool.query(
-        `WITH saved AS (
-           INSERT INTO study_logs (study_date, start_time, end_time, duration_minutes, memo, status,
-             textbook_id, content_id, understanding, difficulties, goal_achieved)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *)
-         ${select('saved')}`,
-        [
-          log.studyDate,
-          log.startTime,
-          log.endTime,
-          studyMinutes(log.startTime, log.endTime),
-          log.memo,
-          log.status,
-          log.textbookId,
-          log.contentId,
-          log.understanding,
-          log.difficulties,
-          log.goalAchieved,
-        ],
-      ),
+      inTransaction(pool, async (client) => {
+        const { rows } = await client.query<{ id: number }>(
+          `WITH saved AS (
+             INSERT INTO study_logs (study_date, start_time, end_time, duration_minutes, memo,
+               status, textbook_id, content_id, understanding, difficulties, goal_achieved)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *)
+           ${select('saved')}`,
+          [
+            log.studyDate,
+            log.startTime,
+            log.endTime,
+            studyMinutes(log.startTime, log.endTime),
+            log.memo,
+            log.status,
+            log.textbookId,
+            log.contentId,
+            log.understanding,
+            log.difficulties,
+            log.goalAchieved,
+          ],
+        );
+        await syncFirstReview(client, rows[0].id, undefined, log);
+        return rows[0];
+      }),
     );
     if (!result.ok) return void res.status(400).json({ error: result.error });
-    res.status(201).json({ studyLog: result.value.rows[0] });
+    res.status(201).json({ studyLog: result.value });
   });
 
   router.put('/:id', async (req, res) => {
     const id = idParam.parse(req.params.id);
     const log = studyLogInput.parse(req.body);
     const result = await write(() =>
-      pool.query(
-        `WITH saved AS (
-           UPDATE study_logs SET study_date = $2, start_time = $3, end_time = $4,
-             duration_minutes = $5, memo = $6, status = $7, textbook_id = $8, content_id = $9,
-             understanding = $10, difficulties = $11, goal_achieved = $12,
-             updated_at = now()
-           WHERE id = $1 RETURNING *)
-         ${select('saved')}`,
-        [
-          id,
-          log.studyDate,
-          log.startTime,
-          log.endTime,
-          studyMinutes(log.startTime, log.endTime),
-          log.memo,
-          log.status,
-          log.textbookId,
-          log.contentId,
-          log.understanding,
-          log.difficulties,
-          log.goalAchieved,
-        ],
-      ),
+      inTransaction(pool, async (client) => {
+        // The lock keeps two saves of one log from both acting on the same earlier status.
+        const before = await client.query<{ status: string; studyDate: string }>(
+          'SELECT status, study_date AS "studyDate" FROM study_logs WHERE id = $1 FOR UPDATE',
+          [id],
+        );
+        const previous = before.rows[0];
+        if (!previous) return undefined;
+        const { rows } = await client.query(
+          `WITH saved AS (
+             UPDATE study_logs SET study_date = $2, start_time = $3, end_time = $4,
+               duration_minutes = $5, memo = $6, status = $7, textbook_id = $8, content_id = $9,
+               understanding = $10, difficulties = $11, goal_achieved = $12,
+               updated_at = now()
+             WHERE id = $1 RETURNING *)
+           ${select('saved')}`,
+          [
+            id,
+            log.studyDate,
+            log.startTime,
+            log.endTime,
+            studyMinutes(log.startTime, log.endTime),
+            log.memo,
+            log.status,
+            log.textbookId,
+            log.contentId,
+            log.understanding,
+            log.difficulties,
+            log.goalAchieved,
+          ],
+        );
+        await syncFirstReview(client, id, previous, log);
+        return rows[0];
+      }),
     );
     if (!result.ok) return void res.status(400).json({ error: result.error });
-    if (result.value.rows.length === 0) return void res.status(404).json(notFound);
-    res.json({ studyLog: result.value.rows[0] });
+    if (!result.value) return void res.status(404).json(notFound);
+    res.json({ studyLog: result.value });
   });
 
   router.delete('/:id', async (req, res) => {

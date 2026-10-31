@@ -2,6 +2,8 @@ import { type Response, Router } from 'express';
 import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod';
 
+import { inTransaction } from './sql.js';
+
 // Same rule as the textbook id: plain positive integers that stay exact in JS and fit bigint.
 const pathId = (label: string) =>
   z
@@ -137,33 +139,21 @@ type Reply = { status: number; body?: unknown };
 // Every change to a textbook's contents runs in one transaction holding the textbook row lock, so
 // concurrent additions, deletions and reorders of the same textbook cannot interleave positions.
 // A 4xx reply rolls back.
-async function writeContents(
+function writeContents(
   pool: Pool,
   textbookId: number,
   run: (client: PoolClient) => Promise<Reply>,
 ): Promise<Reply> {
-  const client = await pool.connect();
-  // Set when even ROLLBACK fails (a dropped connection): the client is then destroyed instead of
-  // going back to the pool, where the next request would get the broken connection (#68).
-  let broken: Error | undefined;
-  try {
-    await client.query('BEGIN');
-    const { rowCount } = await client.query('SELECT 1 FROM textbooks WHERE id = $1 FOR UPDATE', [
-      textbookId,
-    ]);
-    const reply = rowCount ? await run(client) : { status: 404, body: textbookNotFound };
-    await client.query(reply.status < 400 ? 'COMMIT' : 'ROLLBACK');
-    return reply;
-  } catch (error) {
-    try {
-      await client.query('ROLLBACK');
-    } catch (rollbackError) {
-      broken = rollbackError instanceof Error ? rollbackError : new Error(String(rollbackError));
-    }
-    throw error;
-  } finally {
-    client.release(broken);
-  }
+  return inTransaction<Reply>(
+    pool,
+    async (client) => {
+      const { rowCount } = await client.query('SELECT 1 FROM textbooks WHERE id = $1 FOR UPDATE', [
+        textbookId,
+      ]);
+      return rowCount ? run(client) : { status: 404, body: textbookNotFound };
+    },
+    (reply) => reply.status < 400,
+  );
 }
 
 const send = (res: Response, reply: Reply) =>

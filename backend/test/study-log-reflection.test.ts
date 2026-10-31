@@ -40,10 +40,14 @@ test('understanding, difficulties and goal answers are checked in Korean before 
 test('the answers are optional and the edges of the scale are accepted', async () => {
   const sent: unknown[][] = [];
   const pool = {
-    query: async (_sql: string, params: unknown[]) => {
-      sent.push(params);
-      return { rows: [{}], rowCount: 1 };
-    },
+    connect: async () => ({
+      // BEGIN and COMMIT carry no parameters.
+      query: async (_sql: string, params?: unknown[]) => {
+        if (params) sent.push(params);
+        return { rows: [{}], rowCount: 1 };
+      },
+      release: () => {},
+    }),
   } as unknown as Pool;
   await withApi(pool, async (call) => {
     for (const extra of [
