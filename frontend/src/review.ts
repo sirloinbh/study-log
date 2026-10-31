@@ -11,6 +11,15 @@ export type Review = {
   contentTitle: string | null;
 };
 
+// What the page can list; each key is also the API path.
+export const reviewRanges = {
+  today: { label: '오늘', heading: '오늘의 복습', empty: '오늘 복습할 내용이 없습니다' },
+  week: { label: '이번 주', heading: '이번 주 복습', empty: '이번 주에 복습할 내용이 없습니다' },
+  all: { label: '전체', heading: '전체 복습', empty: '남은 복습이 없습니다' },
+} as const;
+
+export type ReviewRange = keyof typeof reviewRanges;
+
 const dayMs = 86_400_000;
 
 // Whole days from `dueDate` to `today`, both YYYY-MM-DD, so no local time zone shifts a day.

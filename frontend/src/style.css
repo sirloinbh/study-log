@@ -164,6 +164,9 @@
 .reviews [role='status']:empty {
   margin: 0;
 }
+.reviews .reviews-heading {
+  margin-top: 16px;
+}
 .textbook-form .title {
   grid-column: span 2;
 }
