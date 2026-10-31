@@ -36,6 +36,7 @@ test('each page has its own address and is marked in the main menu', async () =>
   render(<App />);
   const menu = screen.getByRole('navigation', { name: '주 메뉴' });
   for (const [label, path] of [
+    ['복습', '/reviews'],
     ['교재', '/textbooks'],
     ['키워드', '/keywords'],
     ['통계', '/stats'],

@@ -1,4 +1,12 @@
-import { BookOpen, ChartColumn, NotebookPen, NotebookText, Settings2, Tags } from 'lucide-react';
+import {
+  BookOpen,
+  CalendarCheck,
+  ChartColumn,
+  NotebookPen,
+  NotebookText,
+  Settings2,
+  Tags,
+} from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
 
@@ -8,6 +16,7 @@ import { Toaster } from './components/ui/sonner';
 import { type Health, healthText } from './health';
 import { Keywords } from './Keywords';
 import { Retrospectives } from './Retrospectives';
+import { Reviews } from './reviews';
 import { Stats } from './Stats';
 import { StudyLogs } from './StudyLogs';
 import { Textbooks } from './Textbooks';
@@ -15,6 +24,7 @@ import { Textbooks } from './Textbooks';
 // Every page URL lives here (central docs/directory-rules.md). The study log is the first page.
 const pages = {
   logs: '/',
+  reviews: '/reviews',
   textbooks: '/textbooks',
   keywords: '/keywords',
   stats: '/stats',
@@ -25,6 +35,7 @@ const pages = {
 // Main menu (LNB) items, in display order.
 const nav: NavItem[] = [
   { to: pages.logs, label: '학습 기록', icon: NotebookPen },
+  { to: pages.reviews, label: '복습', icon: CalendarCheck },
   { to: pages.textbooks, label: '교재', icon: BookOpen },
   { to: pages.keywords, label: '키워드', icon: Tags },
   { to: pages.stats, label: '통계', icon: ChartColumn },
@@ -97,6 +108,18 @@ export function App() {
                 health={health}
               >
                 {(today) => <StudyLogs today={today} />}
+              </Page>
+            }
+          />
+          <Route
+            path={pages.reviews}
+            element={
+              <Page
+                title="복습"
+                description="오늘 복습할 내용을 확인하고 끝낸 복습을 완료로 표시합니다"
+                health={health}
+              >
+                {() => <Reviews />}
               </Page>
             }
           />

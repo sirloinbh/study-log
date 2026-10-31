@@ -8,6 +8,7 @@ import { calendarRoutes } from './calendar.js';
 import { contentExerciseRoutes, exerciseRoutes, textbookExerciseRoutes } from './exercises.js';
 import { keywordRoutes } from './keywords.js';
 import { retrospectiveRoutes } from './retrospectives.js';
+import { reviewRoutes } from './reviews.js';
 import { statsRoutes } from './stats.js';
 import { studyLogRoutes } from './study-logs.js';
 import { textbookContentRoutes } from './textbook-contents.js';
@@ -73,6 +74,7 @@ export function createApp(
   // Before the study log routes, where 'calendar' would be read as a log id.
   app.use('/api/study-logs/calendar', calendarRoutes(pool, today));
   app.use('/api/study-logs', studyLogRoutes(pool));
+  app.use('/api/reviews', reviewRoutes(pool, today));
   app.use('/api/keywords', keywordRoutes(pool, today));
   app.use('/api/stats', statsRoutes(pool, today));
   app.use('/api/retrospectives', retrospectiveRoutes(pool, today));
