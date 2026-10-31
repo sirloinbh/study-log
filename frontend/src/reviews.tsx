@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 
 import { type RequestError, requestJson } from './api';
 import { useBusy } from './busy';
+import { Memo } from './Memo';
 import { overdueDays, type Review, reviewTitle } from './review';
 
 type Notice = { kind: 'status' | 'alert'; text: string } | undefined;
@@ -42,7 +43,8 @@ export function Reviews() {
   useEffect(() => {
     if (!wantFocus || busy) return;
     setWantFocus(undefined);
-    document.getElementById(wantFocus)?.focus?.();
+    // A review completed elsewhere leaves with its button, even after a failure here.
+    (document.getElementById(wantFocus) ?? document.getElementById(headingId))?.focus?.();
   }, [wantFocus, busy]);
 
   // A failure keeps the list on screen and reports that it could not be refreshed.
@@ -57,6 +59,8 @@ export function Reviews() {
 
   const complete = async (review: Review) => {
     if (!begin()) return;
+    // Cleared first, so the same message twice in a row is still announced.
+    setNotice(undefined);
     try {
       const { next } = await requestJson<Completed>(`/api/reviews/${review.id}/complete`, {
         method: 'POST',
@@ -121,7 +125,7 @@ export function Reviews() {
                   <p className="status">
                     학습일 {review.studyDate} · 예정일 {review.dueDate}
                   </p>
-                  {review.textbookTitle && review.memo && <p className="log-memo">{review.memo}</p>}
+                  {review.memo.trim() && <Memo text={review.memo} clamp />}
                   <div className="log-actions">
                     <button
                       type="button"

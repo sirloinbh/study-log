@@ -126,6 +126,93 @@ test('today lists due reviews until they are completed', { skip: !url }, async (
         assert.deepEqual(rows[0], { n: 1 });
       });
 
+      await t.test('saving the log leaves an open round 2 alone', async () => {
+        const body = (status: string, studyDate: string) => ({
+          studyDate,
+          startTime: '09:00',
+          endTime: '10:00',
+          memo: '2회차 유지',
+          status,
+        });
+        const logId = await create(`${year}-10-01`, '2회차 유지');
+        today = `${year}-10-02`;
+        const review = (await listed()).find((r) => r.memo === '2회차 유지')!;
+        assert.equal((await complete(review.id)).status, 200);
+        const roundsNow = async () => {
+          const { rows } = await pool.query(
+            `SELECT round, due_date AS due, completed_on AS completed FROM reviews
+             WHERE study_log_id = $1 ORDER BY round`,
+            [logId],
+          );
+          return rows;
+        };
+        const expected = [
+          { round: 1, due: `${year}-10-02`, completed: `${year}-10-02` },
+          { round: 2, due: `${year}-10-04`, completed: null },
+        ];
+        assert.deepEqual(await roundsNow(), expected);
+        for (const next of [
+          body('planned', `${year}-10-01`),
+          body('done', `${year}-10-01`),
+          body('done', `${year}-11-20`),
+        ]) {
+          const saved = await call(`/api/study-logs/${logId}`, { method: 'PUT', body: next });
+          assert.equal(saved.status, 200);
+          assert.deepEqual(await roundsNow(), expected);
+        }
+      });
+
+      // Holds the study log's row lock until the completion is waiting on it, then runs `change`.
+      const whileWaiting = async (reviewId: number, logId: number, change: string[]) => {
+        const other = await pool.connect();
+        try {
+          await other.query('BEGIN');
+          await other.query('SELECT 1 FROM study_logs WHERE id = $1 FOR UPDATE', [logId]);
+          const completing = complete(reviewId);
+          let waiting = false;
+          for (let attempt = 0; attempt < 100 && !waiting; attempt++) {
+            const { rows } = await pool.query<{ waiting: boolean }>(
+              `SELECT count(*) > 0 AS waiting FROM pg_stat_activity
+               WHERE wait_event_type = 'Lock'
+                 AND query = 'SELECT 1 FROM study_logs WHERE id = $1 FOR UPDATE'`,
+            );
+            waiting = rows[0].waiting;
+            if (!waiting) await new Promise((resolve) => setTimeout(resolve, 50));
+          }
+          assert.ok(waiting, 'the completion should wait for the study log lock');
+          for (const sql of change) await other.query(sql, [logId]);
+          await other.query('COMMIT');
+          return await completing;
+        } finally {
+          await other.query('ROLLBACK');
+          other.release();
+        }
+      };
+
+      await t.test('undoing done while a completion waits answers 404, no round 2', async () => {
+        const logId = await create(`${year}-11-01`, '대기 중 해제');
+        today = `${year}-11-02`;
+        const review = (await listed()).find((r) => r.memo === '대기 중 해제')!;
+        const { status, data } = await whileWaiting(review.id, logId, [
+          `UPDATE study_logs SET status = 'planned' WHERE id = $1`,
+          'DELETE FROM reviews WHERE study_log_id = $1 AND round = 1 AND completed_on IS NULL',
+        ]);
+        assert.equal(status, 404);
+        assert.equal(data.error, '복습을 찾을 수 없습니다');
+        const { rows } = await pool.query('SELECT 1 FROM reviews WHERE study_log_id = $1', [logId]);
+        assert.deepEqual(rows, []);
+      });
+
+      await t.test('deleting the log while a completion waits answers 404', async () => {
+        const logId = await create(`${year}-12-01`, '대기 중 삭제');
+        today = `${year}-12-02`;
+        const review = (await listed()).find((r) => r.memo === '대기 중 삭제')!;
+        const { status } = await whileWaiting(review.id, logId, [
+          'DELETE FROM study_logs WHERE id = $1',
+        ]);
+        assert.equal(status, 404);
+      });
+
       await t.test('a review that does not exist answers a Korean 404', async () => {
         const { status, data } = await complete(999_999_999_999_998);
         assert.equal(status, 404);

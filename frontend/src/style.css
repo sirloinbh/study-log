@@ -328,6 +328,7 @@
 }
 .log-date {
   font-weight: 600;
+  overflow-wrap: anywhere;
 }
 .badge {
   border-radius: 999px;

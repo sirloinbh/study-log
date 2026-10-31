@@ -1,4 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { useState } from 'react';
 import { expect, test, vi } from 'vitest';
 
 import { overdueDays, type Review, reviewTitle } from './review';
@@ -41,6 +42,27 @@ function server(
 
 const done = (next: object | null) => () => ({ status: 200, body: { next } });
 
+// A page whose only review has gone elsewhere: completing it fails and the reload no longer has it.
+function ReviewsWithGone({ status, error }: { status: number; error: string }) {
+  const [ready] = useState(() => {
+    let gone = false;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_url: string, init?: { method?: string }) => {
+        if (init?.method === 'POST') {
+          gone = true;
+          return Promise.resolve(new Response(JSON.stringify({ error }), { status }));
+        }
+        return Promise.resolve(
+          new Response(JSON.stringify({ today, reviews: gone ? [] : [review()] })),
+        );
+      }),
+    );
+    return true;
+  });
+  return ready ? <Reviews /> : null;
+}
+
 test('days overdue count whole days and never go below zero', () => {
   expect(overdueDays('2026-10-31', today)).toBe(0);
   expect(overdueDays('2026-10-28', today)).toBe(3);
@@ -48,15 +70,27 @@ test('days overdue count whole days and never go below zero', () => {
   expect(overdueDays('2024-02-28', '2024-03-01')).toBe(2);
 });
 
-test('the title names the textbook and chapter, or else the memo, or else the date', () => {
+test('the title names the textbook and chapter, or else the date', () => {
   const book = { textbookTitle: '선형대수' };
   expect(reviewTitle(review(book))).toBe('선형대수');
   expect(reviewTitle(review({ ...book, contentNumber: '2', contentTitle: '행렬' }))).toBe(
     '선형대수 · 2 행렬',
   );
-  expect(reviewTitle(review({ memo: '\n  첫 줄\n둘째 줄' }))).toBe('첫 줄');
-  expect(reviewTitle(review({ memo: 'ㄱ'.repeat(41) }))).toBe(`${'ㄱ'.repeat(40)}…`);
-  expect(reviewTitle(review({ memo: ' ' }))).toBe('2026-10-30 학습');
+  expect(reviewTitle(review({ ...book, contentNumber: '', contentTitle: '행렬' }))).toBe(
+    '선형대수 · 행렬',
+  );
+  expect(reviewTitle(review())).toBe('2026-10-30 학습');
+});
+
+test('the memo is shown as Markdown, and a blank memo not at all', async () => {
+  server(
+    [review({ id: 1, memo: '**정의**를 다시 푼다' }), review({ id: 2, memo: '  ' })],
+    done(null),
+  );
+  render(<Reviews />);
+  const bold = await screen.findByText('정의');
+  expect(bold.tagName).toBe('STRONG');
+  expect(document.querySelectorAll('.memo')).toHaveLength(1);
 });
 
 test('an empty list says there is nothing to review', async () => {
@@ -83,7 +117,7 @@ test('overdue reviews stay listed and say how late they are', async () => {
 test('completing removes the review, shows the next date and moves focus', async () => {
   const fetch = server([review()], done({ round: 2, dueDate: '2026-11-02' }));
   render(<Reviews />);
-  fireEvent.click(await screen.findByRole('button', { name: '고유값 정리 1회차 복습 완료' }));
+  fireEvent.click(await screen.findByRole('button', { name: '2026-10-30 학습 1회차 복습 완료' }));
   expect(
     await screen.findByText('복습을 완료했습니다. 다음 복습은 2026-11-02입니다'),
   ).toBeInTheDocument();
@@ -113,6 +147,87 @@ test('a failed completion keeps the review, reports it and returns focus to its 
   await waitFor(() =>
     expect(document.activeElement).toBe(screen.getByRole('button', { name: /복습 완료/ })),
   );
+});
+
+test('a review already completed elsewhere leaves the list and focus goes to the heading', async () => {
+  for (const [status, error] of [
+    [409, '이미 완료한 복습입니다'],
+    [404, '복습을 찾을 수 없습니다'],
+  ] as const) {
+    const { unmount } = render(<ReviewsWithGone status={status} error={error} />);
+    fireEvent.click(await screen.findByRole('button', { name: /복습 완료/ }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(error);
+    expect(await screen.findByText('오늘 복습할 내용이 없습니다')).toBeInTheDocument();
+    await waitFor(() => expect(document.activeElement?.id).toBe('reviews-today'));
+    unmount();
+  }
+});
+
+test('focus goes to the heading when a failed review is gone after the reload', async () => {
+  // A 500 whose completion did commit: the review is not listed when the page reloads.
+  let completed = false;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((_url: string, init?: { method?: string }) => {
+      if (init?.method === 'POST') {
+        completed = true;
+        return Promise.resolve(new Response(JSON.stringify({ error: '오류' }), { status: 500 }));
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify({ today, reviews: completed ? [] : [review()] })),
+      );
+    }),
+  );
+  render(<Reviews />);
+  fireEvent.click(await screen.findByRole('button', { name: /복습 완료/ }));
+  await screen.findByRole('alert');
+  await waitFor(() => expect(document.activeElement?.id).toBe('reviews-today'));
+});
+
+test('a failed reload keeps the list on screen and reports it', async () => {
+  let posted = false;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((_url: string, init?: { method?: string }) => {
+      if (init?.method === 'POST') {
+        posted = true;
+        return Promise.resolve(new Response(JSON.stringify({ next: null })));
+      }
+      return Promise.resolve(
+        posted
+          ? new Response(JSON.stringify({ error: '목록 오류' }), { status: 500 })
+          : new Response(JSON.stringify({ today, reviews: [review()] })),
+      );
+    }),
+  );
+  render(<Reviews />);
+  fireEvent.click(await screen.findByRole('button', { name: /복습 완료/ }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('복습 목록을 불러오지 못했습니다');
+  expect(screen.getByRole('button', { name: /복습 완료/ })).toBeInTheDocument();
+});
+
+test('the same message twice is cleared in between, so it is announced again', async () => {
+  let release = () => {};
+  const held = new Promise<void>((resolve) => (release = resolve));
+  let posts = 0;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (_url: string, init?: { method?: string }) => {
+      if (init?.method !== 'POST')
+        return new Response(JSON.stringify({ today, reviews: [review()] }));
+      if (++posts === 2) await held;
+      return new Response(JSON.stringify({ next: { round: 2, dueDate: '2026-11-02' } }));
+    }),
+  );
+  render(<Reviews />);
+  const message = '복습을 완료했습니다. 다음 복습은 2026-11-02입니다';
+  fireEvent.click(await screen.findByRole('button', { name: /복습 완료/ }));
+  await screen.findByText(message);
+  await waitFor(() => expect(screen.getByRole('button', { name: /복습 완료/ })).toBeEnabled());
+  fireEvent.click(screen.getByRole('button', { name: /복습 완료/ }));
+  await waitFor(() => expect(screen.queryByText(message)).toBeNull());
+  release();
+  await screen.findByText(message);
 });
 
 test('two quick clicks send one completion', async () => {
