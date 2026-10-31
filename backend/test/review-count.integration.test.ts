@@ -3,14 +3,15 @@ import { test } from 'node:test';
 
 import { Pool } from 'pg';
 
-import { withApi } from './helpers.js';
+import { holdExactTotalsLock, withApi } from './helpers.js';
 
 const url = process.env.TEST_DATABASE_URL;
 
 // Requires a dedicated test DB with database/migrations applied. Skipped (not passed) without it.
 test('the count follows what is due', { skip: !url }, async (t) => {
   const pool = new Pool({ connectionString: url });
-  // An early year keeps other test files' later reviews out of the count at this "today".
+  // An early year keeps other test files' later reviews out of the count at this "today". The
+  // stats test also has early rows, and counts these in its total, so the two take turns.
   const year = '0002';
   const cleanup = () =>
     pool.query(`DELETE FROM study_logs WHERE study_date BETWEEN $1 AND $2`, [
@@ -22,6 +23,7 @@ test('the count follows what is due', { skip: !url }, async (t) => {
     await cleanup();
     await pool.end();
   });
+  await holdExactTotalsLock(url, t);
 
   const today = `${year}-03-02`;
   await withApi(

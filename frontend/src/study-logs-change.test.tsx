@@ -22,11 +22,16 @@ const log = {
   goalAchieved: null,
 };
 
-function server(saveStatus = 200) {
+function server(saveStatus = 200, deleteStatus = 204) {
   vi.stubGlobal(
     'fetch',
     vi.fn((url: string, init?: { method?: string }) => {
-      if (init?.method === 'DELETE') return Promise.resolve(new Response(null, { status: 204 }));
+      if (init?.method === 'DELETE')
+        return Promise.resolve(
+          deleteStatus === 204
+            ? new Response(null, { status: 204 })
+            : new Response(JSON.stringify({ error: '오류' }), { status: deleteStatus }),
+        );
       if (init?.method && init.method !== 'GET')
         return Promise.resolve(
           new Response(JSON.stringify(saveStatus < 400 ? { studyLog: log } : { error: '오류' }), {
@@ -64,8 +69,11 @@ test('a failed save reports too: the server may have changed anyway', async () =
   await waitFor(() => expect(onChange).toHaveBeenCalledTimes(1));
 });
 
-test('deleting a log reports a change, since its reviews go with it', async () => {
-  server();
+test.each([
+  ['deleting a log', 204],
+  ['a log already deleted elsewhere', 404],
+])('%s reports a change, since its reviews go with it', async (_name, status) => {
+  server(200, status);
   const onChange = vi.fn();
   render(<StudyLogs today={today} onChange={onChange} />);
   fireEvent.click(await screen.findByRole('button', { name: /삭제$/ }));

@@ -3,7 +3,7 @@ import { test } from 'node:test';
 
 import { Pool } from 'pg';
 
-import { withApi } from './helpers.js';
+import { holdExactTotalsLock, withApi } from './helpers.js';
 
 const url = process.env.TEST_DATABASE_URL;
 
@@ -40,6 +40,8 @@ test(
       await cleanup();
       await pool.end();
     });
+    // The all-time total below also counts rows of the other early-date test.
+    await holdExactTotalsLock(url, t);
     const today = '2096-05-16';
 
     await withApi(

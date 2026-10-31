@@ -1,6 +1,6 @@
 import type { Server } from 'node:http';
 
-import type { Pool } from 'pg';
+import { Client, type Pool } from 'pg';
 
 import { createApp } from '../src/app.js';
 import type { Translator } from '../src/translation.js';
@@ -26,6 +26,19 @@ export async function openFetchablePort<T extends { port: number; close: () => P
     await opened.close();
   }
   throw new Error(`No port fetch may call after ${tries} tries`);
+}
+
+// Test files run in parallel on one DB. The few that compare totals over all rows take turns on
+// this lock, held until the test ends. Call it after registering the test's cleanup, which then
+// runs first. It has its own connection, so closing the test's pool does not wait for it.
+export async function holdExactTotalsLock(
+  connectionString: string | undefined,
+  t: { after: (run: () => Promise<void>) => void },
+) {
+  const client = new Client({ connectionString });
+  await client.connect();
+  await client.query('SELECT pg_advisory_lock(424242)');
+  t.after(() => client.end());
 }
 
 const closeServer = (server: Server) =>
