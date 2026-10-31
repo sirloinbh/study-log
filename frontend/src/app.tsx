@@ -16,6 +16,7 @@ import { Toaster } from './components/ui/sonner';
 import { type Health, healthText } from './health';
 import { Keywords } from './Keywords';
 import { Retrospectives } from './Retrospectives';
+import { ReviewBadge } from './review-badge';
 import { Reviews } from './reviews';
 import { Stats } from './Stats';
 import { StudyLogs } from './StudyLogs';
@@ -95,9 +96,16 @@ function Page({
 
 export function App() {
   const health = useHealth();
+  // Pages that can change what is due bump this, so the badge counts again without a page change.
+  const [reviewVersion, setReviewVersion] = useState(0);
+  const reviewsChanged = () => setReviewVersion((version) => version + 1);
   return (
     <BrowserRouter>
-      <AppShell appName="공부 기록" nav={nav}>
+      <AppShell
+        appName="공부 기록"
+        nav={nav}
+        actions={<ReviewBadge to={pages.reviews} version={reviewVersion} />}
+      >
         <Routes>
           <Route
             path={pages.logs}
@@ -107,7 +115,7 @@ export function App() {
                 description="오늘 공부한 시간과 내용을 기록하고 최근 기록을 확인합니다"
                 health={health}
               >
-                {(today) => <StudyLogs today={today} />}
+                {(today) => <StudyLogs today={today} onChange={reviewsChanged} />}
               </Page>
             }
           />
@@ -119,7 +127,7 @@ export function App() {
                 description="오늘 복습할 내용을 확인하고 끝낸 복습을 완료로 표시합니다"
                 health={health}
               >
-                {() => <Reviews />}
+                {() => <Reviews onChange={reviewsChanged} />}
               </Page>
             }
           />

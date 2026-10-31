@@ -84,6 +84,17 @@ export function reviewRoutes(pool: Pool, today: () => string) {
     res.json({ today: date, reviews: rows });
   });
 
+  // How many rounds the list above has, for the menu badge. Later rounds already created are not
+  // due yet, so finishing today's reviews brings this to zero.
+  router.get('/today/count', async (_req, res) => {
+    const { rows } = await pool.query<{ count: number }>(
+      `SELECT count(*)::int AS count FROM reviews
+       WHERE completed_on IS NULL AND due_date <= $1`,
+      [today()],
+    );
+    res.json({ count: rows[0].count });
+  });
+
   // Completes a round for good and creates the next one, due from today. The study log is locked
   // first, as saving a log does, so a save and a completion cannot wait on each other.
   router.post('/:id/complete', async (req, res) => {

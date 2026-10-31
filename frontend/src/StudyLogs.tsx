@@ -26,7 +26,8 @@ const recentLimit = 20;
 
 const describe = (log: StudyLog) => `${log.studyDate} ${log.startTime}–${log.endTime}`;
 
-export function StudyLogs({ today }: { today: string }) {
+// `onChange` hears each save or delete attempt, since either can change which reviews are due.
+export function StudyLogs({ today, onChange }: { today: string; onChange?: () => void }) {
   const [form, setForm] = useState<StudyLogForm>(() => emptyForm(today));
   const [editingId, setEditingId] = useState<number | undefined>(undefined);
   // The unsaved new entry, restored after an edit is saved or cancelled.
@@ -166,6 +167,7 @@ export function StudyLogs({ today }: { today: string }) {
       fail(error as RequestError, editingId);
     } finally {
       end();
+      onChange?.();
     }
   };
 
@@ -207,6 +209,7 @@ export function StudyLogs({ today }: { today: string }) {
     } finally {
       setDeletingId(undefined);
       end();
+      onChange?.();
     }
   };
 

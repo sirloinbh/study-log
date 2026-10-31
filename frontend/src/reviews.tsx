@@ -15,7 +15,7 @@ const completeId = (review: Review) => `review-complete-${review.id}`;
 // Today's reviews (#43): rounds due today and earlier uncompleted ones, which stay until they are
 // completed. Completing cannot be undone (docs/decisions/review-rules.md), so the next round's
 // date is shown right after.
-export function Reviews() {
+export function Reviews({ onChange }: { onChange?: () => void }) {
   const [loaded, setLoaded] = useState<Today>();
   const [loadError, setLoadError] = useState<string>();
   const [notice, setNotice] = useState<Notice>(undefined);
@@ -81,6 +81,7 @@ export function Reviews() {
     } finally {
       await reload();
       end();
+      onChange?.();
     }
   };
 
