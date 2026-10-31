@@ -43,9 +43,11 @@
 
 2차 리뷰는 보완점이 없었다. 리뷰에서 긴 제목 확인이 한글이라 줄바꿈 수정의 효과를 보여 주지 못한다는 언급이 있어, 영문 제목으로 다시 확인했다.
 
+CodeQL이 `GET /api/reviews/today`에 속도 제한이 없다고 경고했다(`js/missing-rate-limiting`). 사용자가 오탐 처리 대신 Express 제한을 추가하기로 정해 [#137](https://github.com/sirloinbh/study-log/issues/137)로 처리하고 이 브랜치에 합쳤다.
+
 ## 검증
 
-`TEST_DATABASE_URL`을 설정한 `npm run check`가 통과했다. 백엔드 291건, 프런트 66건, 스킬 4건이 모두 통과했다(건너뜀 0). `npm run standards:check`도 통과했다.
+`TEST_DATABASE_URL`을 설정한 `npm run check`가 통과했다. `origin/main`을 합친 뒤 백엔드 296건, 프런트 66건, 스킬 4건이 통과했다. 건너뜀은 프런트 2건으로, 중앙 표준에서 온 다크 전용 앱 테스트이다. `npm run standards:check`도 통과했다.
 
 ## 브라우저 확인
 
