@@ -54,6 +54,9 @@ test('health is neither counted nor refused, so busy pages cannot make the API l
       assert.equal((await call('/api/keywords')).status, 200);
       assert.equal((await call('/api/keywords')).status, 429);
       assert.equal((await call('/api/health')).status, 200);
+      // Only reading health is exempt: other methods would be parsed without any limit.
+      const posted = await call('/api/health', { method: 'POST', body: {} });
+      assert.equal(posted.status, 429);
     },
     { requestsPerMinute: 1 },
   );

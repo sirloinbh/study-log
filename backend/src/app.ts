@@ -62,7 +62,7 @@ export function createApp(
       message: { error: '요청이 너무 많습니다. 잠시 뒤 다시 시도하세요' },
       validate: { xForwardedForHeader: false, forwardedHeader: false },
       // Deploys and monitoring read health; busy pages must not make a healthy API look down.
-      skip: (req) => req.path === '/health',
+      skip: (req) => (req.method === 'GET' || req.method === 'HEAD') && req.path === '/health',
     }),
   );
   app.use(express.json({ limit: '256kb' }));
