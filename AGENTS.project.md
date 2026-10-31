@@ -12,4 +12,5 @@
 
 ## 서비스 규칙
 
-- 아직 없다. 이 프로젝트에만 해당하는 도메인 규칙이 생기면 여기에 적는다.
+- 학습 일정: [docs/decisions/schedule-rules.md](docs/decisions/schedule-rules.md)
+- 복습 주기: [docs/decisions/review-rules.md](docs/decisions/review-rules.md)
