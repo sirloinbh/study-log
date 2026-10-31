@@ -39,8 +39,9 @@ export function serviceDate(now = new Date()) {
 }
 
 // A safety net above nginx's limit (10 a second per client, frontend/nginx.conf). nginx does not
-// forward the client's address, so here every request through it counts as one client, and trust
-// proxy stays off: a forwarded address could only be forged.
+// add the client's address, so here every request through it counts as one client. It does pass on
+// a forwarded header the client sent, which could only be forged: trust proxy stays off, so the
+// header is ignored, and the check that would log it is off too.
 const defaultRequestsPerMinute = 1200;
 
 export function createApp(
@@ -59,6 +60,9 @@ export function createApp(
       standardHeaders: 'draft-8',
       legacyHeaders: false,
       message: { error: '요청이 너무 많습니다. 잠시 뒤 다시 시도하세요' },
+      validate: { xForwardedForHeader: false, forwardedHeader: false },
+      // Deploys and monitoring read health; busy pages must not make a healthy API look down.
+      skip: (req) => req.path === '/health',
     }),
   );
   app.use(express.json({ limit: '256kb' }));
