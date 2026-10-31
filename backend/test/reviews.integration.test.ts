@@ -72,6 +72,62 @@ test('saving a study log keeps its first review in step', { skip: !url }, async 
       assert.deepEqual(await rounds(id), first(`${year}-03-11`));
     });
 
+    await t.test('a save waits for the row lock and acts on the status it then finds', async () => {
+      const id = await create('planned');
+      const other = await pool.connect();
+      try {
+        await other.query('BEGIN');
+        await other.query('SELECT 1 FROM study_logs WHERE id = $1 FOR UPDATE', [id]);
+        const saving = save(id, body('done'));
+        // The save is stuck on its own locking read, not on the UPDATE after it.
+        let waiting = false;
+        for (let attempt = 0; attempt < 100 && !waiting; attempt++) {
+          const { rows } = await pool.query<{ waiting: boolean }>(
+            `SELECT count(*) > 0 AS waiting FROM pg_stat_activity
+             WHERE wait_event_type = 'Lock' AND query LIKE 'SELECT status, study_date%FOR UPDATE'`,
+          );
+          waiting = rows[0].waiting;
+          if (!waiting) await new Promise((resolve) => setTimeout(resolve, 50));
+        }
+        assert.ok(waiting, 'the save should wait on the locking read');
+        // Another save got there first: already done, so this one must not create a round.
+        await other.query(`UPDATE study_logs SET status = 'done' WHERE id = $1`, [id]);
+        await other.query('COMMIT');
+        await saving;
+        assert.deepEqual(await rounds(id), []);
+      } finally {
+        await other.query('ROLLBACK');
+        other.release();
+      }
+    });
+
+    await t.test('an edit that keeps the study date leaves a snoozed date alone', async () => {
+      const id = await create('done');
+      await pool.query('UPDATE reviews SET due_date = $2 WHERE study_log_id = $1', [
+        id,
+        `${year}-04-01`,
+      ]);
+      await save(id, body('done', undefined, '메모만 수정'));
+      assert.deepEqual(await rounds(id), first(`${year}-04-01`, `${year}-03-11`));
+    });
+
+    await t.test('changing the study date leaves a completed round 1 alone', async () => {
+      const id = await create('done');
+      await pool.query('UPDATE reviews SET completed_on = $2 WHERE study_log_id = $1', [
+        id,
+        `${year}-03-12`,
+      ]);
+      await save(id, body('done', `${year}-09-01`));
+      assert.deepEqual(await rounds(id), [
+        {
+          round: 1,
+          due: `${year}-03-11`,
+          original: `${year}-03-11`,
+          completed: `${year}-03-12`,
+        },
+      ]);
+    });
+
     await t.test('undoing done removes an uncompleted round 1; done again recreates', async () => {
       const id = await create('done');
       await save(id, body('stopped', `${year}-03-20`));
@@ -123,7 +179,7 @@ test('saving a study log keeps its first review in step', { skip: !url }, async 
       assert.deepEqual(await rounds(id), []);
     });
 
-    await t.test('a failed save leaves neither the log nor a review', async () => {
+    await t.test('a reference that does not exist saves neither the log nor a review', async () => {
       const id = await create('planned');
       const failed = await call(`/api/study-logs/${id}`, {
         method: 'PUT',
@@ -132,6 +188,8 @@ test('saving a study log keeps its first review in step', { skip: !url }, async 
       assert.equal(failed.status, 400);
       assert.equal(failed.data.error, '교재를 찾을 수 없습니다');
       assert.deepEqual(await rounds(id), []);
+      const kept = await call(`/api/study-logs/${id}`);
+      assert.equal((kept.data.studyLog as { status: string }).status, 'planned');
 
       const marker = '저장되면 안 되는 기록';
       const rejected = await call('/api/study-logs', {

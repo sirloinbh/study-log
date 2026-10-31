@@ -30,13 +30,26 @@
 
 ## 테스트
 
-- `backend/test/reviews.test.ts`: 회차 날짜, 늦은 완료, 월·연·윤일 경계, 마지막 날짜.
-- `backend/test/reviews.integration.test.ts`: 생성, 중복 방지(동시 저장 포함), 완료 해제, 학습일 변경, 소급 없음, 삭제, 실패 시 롤백, 404.
+- `backend/test/reviews.test.ts`: 회차 날짜, 늦은 완료, 월·연·윤일 경계, 마지막 날짜. 복습 저장이 실패하면 ROLLBACK하고 연결을 반납하는지 가짜 DB로 확인한다.
+- `backend/test/reviews.integration.test.ts`: 생성, 중복 방지(동시 저장), 행 잠금 대기, 완료 해제, 학습일 변경, 미룬 날짜와 완료한 회차 보존, 소급 없음, 삭제, 없는 참조, 404.
 - `backend/test/study-logs.test.ts`, `backend/test/study-log-reflection.test.ts`: 가짜 DB가 트랜잭션 연결을 쓰도록 고쳤다.
+
+## 리뷰
+
+1차 리뷰에서 운영 코드의 규칙 위반은 없었고, 테스트 공백 4건과 문서 2건을 이 PR에서 고쳤다.
+
+- 롤백 테스트가 복습 저장 전에 실패해 트랜잭션을 검증하지 못했다. 복습 저장을 실패시키는 테스트를 더했다.
+- 메모 수정 시 미룬 날짜 보존, 학습일 변경 시 완료한 1회차 보존, 행 잠금 대기를 검증하지 않았다. 각각 테스트를 더했다.
+- 변경 기록의 테스트 설명을 실제 범위에 맞췄고, 9999-12-31 처리를 규칙 문서에 적었다.
+
+범위를 넘는 기존 문제는 새 이슈로 분리했다.
+
+- [#133](https://github.com/sirloinbh/study-log/issues/133): DB 연결이 끊기면 API 프로세스가 죽을 수 있다.
+- [#134](https://github.com/sirloinbh/study-log/issues/134): 배포 스크립트가 없는 `dist/migrate.js`를 실행한다. 그래서 012는 `database/README.md`의 수동 절차로 적용해야 한다.
 
 ## 검증
 
 - 마이그레이션 012를 테스트 DB에 두 번 적용했고 두 번 모두 성공했다.
-- `TEST_DATABASE_URL`을 설정하고 `npm run check`의 포맷, 린트, 타입 검사, 테스트를 실행했다. 백엔드 276건, 프런트 52건, 스킬 4건이 모두 통과했다(건너뜀 0).
+- `TEST_DATABASE_URL`을 설정하고 `npm run check`의 포맷, 린트, 타입 검사, 테스트를 실행했다. 백엔드 280건, 프런트 52건, 스킬 4건이 모두 통과했다(건너뜀 0).
 - `npm run build`와 `npm run standards:check`가 통과했다.
 - 화면 변경이 없어 브라우저 확인은 하지 않았다.

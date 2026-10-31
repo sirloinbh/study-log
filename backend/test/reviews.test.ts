@@ -1,7 +1,45 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
+import type { Pool } from 'pg';
+
 import { reviewDueDate, reviewGaps } from '../src/reviews.js';
+import { withApi } from './helpers.js';
+
+test('a review that cannot be saved rolls the study log back', async () => {
+  const valid = { studyDate: '2026-10-31', startTime: '09:00', endTime: '10:00', status: 'done' };
+  const original = console.error;
+  console.error = () => {};
+  try {
+    for (const [method, path] of [
+      ['POST', '/api/study-logs'],
+      ['PUT', '/api/study-logs/1'],
+    ]) {
+      const statements: string[] = [];
+      let released = 0;
+      const pool = {
+        connect: async () => ({
+          query: async (sql: string) => {
+            statements.push(sql);
+            if (sql.startsWith('INSERT INTO reviews')) throw new Error('reviews is unavailable');
+            if (sql.startsWith('SELECT status'))
+              return { rows: [{ status: 'planned', studyDate: valid.studyDate }] };
+            return { rows: [{ id: 1, status: 'done' }] };
+          },
+          release: () => void released++,
+        }),
+      } as unknown as Pool;
+      await withApi(pool, async (call) => {
+        assert.equal((await call(path, { method, body: valid })).status, 500);
+      });
+      assert.ok(statements.includes('ROLLBACK'), method);
+      assert.ok(!statements.includes('COMMIT'), method);
+      assert.equal(released, 1, method);
+    }
+  } finally {
+    console.error = original;
+  }
+});
 
 test('reviewing on time lands 1, 3, 7, 14 and 30 days after studying', () => {
   let done = '2026-10-31';
