@@ -230,6 +230,23 @@ test('the same message twice is cleared in between, so it is announced again', a
   await screen.findByText(message);
 });
 
+test('a completion reports the change once the list is up to date', async () => {
+  server([review()], done({ round: 2, dueDate: '2026-11-02' }));
+  const onChange = vi.fn();
+  render(<Reviews onChange={onChange} />);
+  fireEvent.click(await screen.findByRole('button', { name: /복습 완료/ }));
+  await waitFor(() => expect(onChange).toHaveBeenCalledTimes(1));
+  expect(screen.getByText('오늘 복습할 내용이 없습니다')).toBeInTheDocument();
+});
+
+test('a failed completion reports a change too: it may be gone elsewhere', async () => {
+  server([review()], () => ({ status: 409, body: { error: '이미 완료한 복습입니다' } }));
+  const onChange = vi.fn();
+  render(<Reviews onChange={onChange} />);
+  fireEvent.click(await screen.findByRole('button', { name: /복습 완료/ }));
+  await waitFor(() => expect(onChange).toHaveBeenCalledTimes(1));
+});
+
 test('two quick clicks send one completion', async () => {
   const fetch = server([review()], done({ round: 2, dueDate: '2026-11-02' }));
   render(<Reviews />);
