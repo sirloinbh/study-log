@@ -50,6 +50,12 @@ test(
           (await call(`/api/stats/study-time?period=${period}`)).data as Stats;
         // Whatever the shared DB already holds before 2096 counts toward the all-time total.
         const baseline = (await stats('all')).cumulativeMinutes;
+        const baselineOf = async (type: string) =>
+          ((await call(`/api/stats/study-time?period=all&type=${type}`)).data as Stats)
+            .cumulativeMinutes;
+        const baselineReview = await baselineOf('review');
+        const baselineNew = await baselineOf('new');
+        assert.equal(baselineReview + baselineNew, baseline);
 
         const add = (studyDate: string, startTime: string, endTime: string, status: string) =>
           call('/api/study-logs', {
@@ -127,6 +133,58 @@ test(
         assert.equal(minutesOn('2096-03-10'), 120);
         assert.equal(minutesOn('2096-01-05'), 30);
         assert.equal(minutesOn('2096-05-20'), undefined);
+
+        // The study type filter (#52): logs without a type are new.
+        await call('/api/study-logs', {
+          method: 'POST',
+          body: {
+            studyDate: today,
+            startTime: '15:00',
+            endTime: '15:40',
+            status: 'done',
+            studyType: 'review',
+          },
+        });
+        const typed = async (type: string) =>
+          (await call(`/api/stats/study-time?period=week&type=${type}`)).data as Stats & {
+            type: string;
+          };
+        const reviewOnly = await typed('review');
+        assert.deepEqual(
+          [reviewOnly.type, reviewOnly.totalMinutes, reviewOnly.todayMinutes, reviewOnly.studyDays],
+          ['review', 40, 40, 1],
+        );
+        assert.equal(reviewOnly.cumulativeMinutes, baselineReview + 40);
+        assert.deepEqual(
+          reviewOnly.daily.map((day) => day.minutes),
+          [0, 0, 0, 40],
+        );
+        const newOnly = await typed('new');
+        assert.equal(newOnly.totalMinutes, 170);
+        assert.equal(newOnly.cumulativeMinutes, baselineNew + 375);
+        const everything = await typed('all');
+        assert.deepEqual(
+          [everything.type, everything.totalMinutes, everything.cumulativeMinutes],
+          ['all', 210, baseline + 415],
+        );
+        // The other periods narrow the same way.
+        for (const [period, minutes] of [
+          ['month', 40],
+          ['3months', 40],
+          ['all', 40],
+        ] as const) {
+          const narrowed = (await call(`/api/stats/study-time?period=${period}&type=review`))
+            .data as Stats;
+          assert.equal(narrowed.totalMinutes >= minutes, true, period);
+          assert.equal(narrowed.daily.at(-1)?.minutes, 40, period);
+        }
+        // The heatmap has no filter: it keeps counting every kind of study.
+        const heatAfter = (await call('/api/stats/heatmap')).data as typeof heat;
+        assert.equal(heatAfter.daily.find((day) => day.date === today)?.minutes, 130);
+        assert.equal(((await call('/api/stats/study-time')).data as { type: string }).type, 'all');
+        const refused = await call('/api/stats/study-time?type=exam');
+        assert.equal(refused.status, 400);
+        assert.match(String(refused.data.error), /학습 유형은 전체, 신규, 복습 중에서 고르세요/);
 
         // Without a period it is this week; an empty one is refused like any unknown one.
         assert.equal(((await call('/api/stats/study-time')).data as Stats).period, 'week');

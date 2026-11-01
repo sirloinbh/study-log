@@ -7,6 +7,7 @@ import { syncFirstReview } from './reviews.js';
 import { inTransaction, likePattern } from './sql.js';
 
 export const studyStatuses = ['planned', 'in_progress', 'done', 'stopped'] as const;
+export const studyTypes = ['new', 'review'] as const;
 
 const minutesOf = (time: string) => Number(time.slice(0, 2)) * 60 + Number(time.slice(3, 5));
 
@@ -76,6 +77,11 @@ const studyLogInput = z
         .boolean({ invalid_type_error: '목표 달성 여부 형식이 올바르지 않습니다' })
         .nullable()
         .default(null),
+      studyType: z
+        .enum(studyTypes, {
+          errorMap: () => ({ message: '학습 유형은 신규, 복습 중에서 선택하세요' }),
+        })
+        .default('new'),
     },
     {
       required_error: '학습 기록 내용을 JSON 객체로 보내세요',
@@ -133,7 +139,8 @@ const select = (source: string) => `SELECT l.id, l.study_date AS "studyDate",
   l.duration_minutes AS "durationMinutes", l.memo, l.status,
   l.textbook_id AS "textbookId", t.title AS "textbookTitle",
   l.content_id AS "contentId", c.number AS "contentNumber", c.title AS "contentTitle",
-  l.understanding, l.difficulties, l.goal_achieved AS "goalAchieved"
+  l.understanding, l.difficulties, l.goal_achieved AS "goalAchieved",
+  l.study_type AS "studyType"
   FROM ${source} l
   LEFT JOIN textbooks t ON t.id = l.textbook_id
   LEFT JOIN textbook_contents c ON c.id = l.content_id`;
@@ -197,8 +204,8 @@ export function studyLogRoutes(pool: Pool) {
         const { rows } = await client.query<{ id: number }>(
           `WITH saved AS (
              INSERT INTO study_logs (study_date, start_time, end_time, duration_minutes, memo,
-               status, textbook_id, content_id, understanding, difficulties, goal_achieved)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *)
+               status, textbook_id, content_id, understanding, difficulties, goal_achieved, study_type)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *)
            ${select('saved')}`,
           [
             log.studyDate,
@@ -212,6 +219,7 @@ export function studyLogRoutes(pool: Pool) {
             log.understanding,
             log.difficulties,
             log.goalAchieved,
+            log.studyType,
           ],
         );
         await syncFirstReview(client, rows[0].id, undefined, log);
@@ -238,7 +246,7 @@ export function studyLogRoutes(pool: Pool) {
           `WITH saved AS (
              UPDATE study_logs SET study_date = $2, start_time = $3, end_time = $4,
                duration_minutes = $5, memo = $6, status = $7, textbook_id = $8, content_id = $9,
-               understanding = $10, difficulties = $11, goal_achieved = $12,
+               understanding = $10, difficulties = $11, goal_achieved = $12, study_type = $13,
                updated_at = now()
              WHERE id = $1 RETURNING *)
            ${select('saved')}`,
@@ -255,6 +263,7 @@ export function studyLogRoutes(pool: Pool) {
             log.understanding,
             log.difficulties,
             log.goalAchieved,
+            log.studyType,
           ],
         );
         await syncFirstReview(client, id, previous, log);

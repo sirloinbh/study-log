@@ -1,6 +1,7 @@
 import { contentLabel } from './textbook';
 
 export type StudyStatus = 'planned' | 'in_progress' | 'done' | 'stopped';
+export type StudyType = 'new' | 'review';
 
 export type StudyLog = {
   id: number;
@@ -18,6 +19,7 @@ export type StudyLog = {
   understanding: number | null;
   difficulties: string;
   goalAchieved: boolean | null;
+  studyType: StudyType;
 };
 
 export type StudyLogForm = Pick<
@@ -32,6 +34,7 @@ export type StudyLogForm = Pick<
   | 'understanding'
   | 'difficulties'
   | 'goalAchieved'
+  | 'studyType'
 >;
 
 // Self-assessed understanding, 1 (low) to 5 (high).
@@ -67,6 +70,8 @@ export const statusLabels: Record<StudyStatus, string> = {
   stopped: '중단',
 };
 
+export const studyTypeLabels: Record<StudyType, string> = { new: '신규', review: '복습' };
+
 export const emptyForm = (studyDate: string): StudyLogForm => ({
   studyDate,
   startTime: '',
@@ -78,6 +83,7 @@ export const emptyForm = (studyDate: string): StudyLogForm => ({
   understanding: null,
   difficulties: '',
   goalAchieved: null,
+  studyType: 'new',
 });
 
 const clock = /^([01]\d|2[0-3]):[0-5]\d$/;

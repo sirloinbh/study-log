@@ -2,45 +2,53 @@ import React, { useEffect, useState } from 'react';
 
 import { type RequestError, requestJson } from './api';
 import { Heatmap } from './Heatmap';
+import { ReviewRateChart } from './ReviewRateChart';
 import { formatMinutes } from './study-logs';
 import {
   type ChartUnit,
   periodLabels,
   type StatPeriod,
   statPeriods,
+  type StatStudyType,
+  statStudyTypeLabels,
+  statStudyTypes,
+  studyTimePath,
   type StudyTimeStats,
 } from './study-stats';
 import { StudyTimeChart } from './StudyTimeChart';
 
 // Study time dashboard (#48): metric cards for the all-time total, today, the picked period and
-// its daily average, from GET /api/stats/study-time (#47), the period's study time chart (#49)
-// and the last year's heatmap (#50).
+// its daily average, from GET /api/stats/study-time (#47), the period's study time chart (#49),
+// its review completion (#52) and the last year's heatmap (#50). The study type filter (#52)
+// narrows the cards and the study time chart; reviews and the heatmap do not depend on it.
 export function Stats() {
   const [period, setPeriod] = useState<StatPeriod>('week');
-  // Kept per period, so a slow answer for another period never replaces or hides this one's.
-  const [loaded, setLoaded] = useState<Partial<Record<StatPeriod, StudyTimeStats>>>({});
-  const [loadError, setLoadError] = useState<{ period: StatPeriod; message: string }>();
+  const [studyType, setStudyType] = useState<StatStudyType>('all');
+  // Kept per period and type, so a slow answer for another pick never replaces or hides this one's.
+  const [loaded, setLoaded] = useState<Partial<Record<string, StudyTimeStats>>>({});
+  const [loadError, setLoadError] = useState<{ path: string; message: string }>();
   // The chart unit picked for each period (#49).
   const [chartUnits, setChartUnits] = useState<Partial<Record<StatPeriod, ChartUnit>>>({});
 
+  const path = studyTimePath(period, studyType);
   useEffect(() => {
     let current = true;
-    requestJson<StudyTimeStats>(`/api/stats/study-time?period=${period}`)
+    requestJson<StudyTimeStats>(path)
       .then((data) => {
         if (!current) return;
-        setLoaded((all) => ({ ...all, [period]: data }));
-        setLoadError((failed) => (failed?.period === period ? undefined : failed));
+        setLoaded((all) => ({ ...all, [path]: data }));
+        setLoadError((failed) => (failed?.path === path ? undefined : failed));
       })
       .catch((error: RequestError) => {
-        if (current) setLoadError({ period, message: error.message });
+        if (current) setLoadError({ path, message: error.message });
       });
     return () => {
       current = false;
     };
-  }, [period]);
+  }, [path]);
 
-  const stats = loaded[period];
-  const error = loadError?.period === period ? loadError.message : undefined;
+  const stats = loaded[path];
+  const error = loadError?.path === path ? loadError.message : undefined;
   const label = periodLabels[period];
 
   return (
@@ -58,6 +66,19 @@ export function Stats() {
           </button>
         ))}
       </div>
+      <div className="period-filter" role="group" aria-label="학습 유형">
+        {statStudyTypes.map((key) => (
+          <button
+            key={key}
+            type="button"
+            className={key === studyType ? 'primary' : 'secondary'}
+            aria-pressed={key === studyType}
+            onClick={() => setStudyType(key)}
+          >
+            {statStudyTypeLabels[key]}
+          </button>
+        ))}
+      </div>
       {error ? (
         <p role="alert" className="error">
           통계를 불러오지 못했습니다: {error}
@@ -71,7 +92,7 @@ export function Stats() {
           <article className="card metric">
             <h2>총 학습 시간</h2>
             <p className="metric-value">{formatMinutes(stats.cumulativeMinutes)}</p>
-            <p className="status">지금까지 기록한 전체</p>
+            <p className="status">지금까지 기록한 {statStudyTypeLabels[studyType]}</p>
           </article>
           <article className="card metric">
             <h2>오늘</h2>
@@ -105,6 +126,7 @@ export function Stats() {
           onPick={(key, unit) => setChartUnits((all) => ({ ...all, [key]: unit }))}
         />
       )}
+      <ReviewRateChart period={period} />
       <Heatmap />
     </div>
   );

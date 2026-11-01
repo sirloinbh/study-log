@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 
 import { formatMinutes } from './study-logs';
 import {
@@ -11,10 +11,7 @@ import {
   type StatPeriod,
   type StudyTimeStats,
 } from './study-stats';
-
-type Recharts = typeof import('recharts');
-// Recharts is loaded on first use, so the rest of the app does not carry it; kept once loaded.
-let loadedRecharts: Recharts | undefined;
+import { useRecharts } from './use-recharts';
 
 // Study time over the picked period as bars by day, week or month (#49). The unit starts at what
 // suits the period; the units picked per period are kept by the dashboard, which stays mounted
@@ -28,29 +25,12 @@ export function StudyTimeChart({
   picked: Partial<Record<StatPeriod, ChartUnit>>;
   onPick: (period: StatPeriod, unit: ChartUnit) => void;
 }) {
-  const [charts, setCharts] = useState<Recharts | undefined>(() => loadedRecharts);
-  const [chartError, setChartError] = useState<string>();
-  useEffect(() => {
-    if (charts) return;
-    let current = true;
-    import('recharts')
-      .then((module) => {
-        loadedRecharts = module;
-        if (current) setCharts(module);
-      })
-      .catch((error: Error) => {
-        if (current) setChartError(error.message);
-      });
-    return () => {
-      current = false;
-    };
-  }, [charts]);
+  const { charts: R, chartError } = useRecharts();
 
   const unit = picked[stats.period] ?? defaultChartUnit[stats.period];
   const bars = chartBars(stats, unit);
   const busiest = busiestBar(bars);
   const [noun, topic] = { day: ['날', '날은'], week: ['주', '주는'], month: ['달', '달은'] }[unit];
-  const R = charts;
 
   return (
     <section className="card study-chart" aria-labelledby="study-chart-heading">

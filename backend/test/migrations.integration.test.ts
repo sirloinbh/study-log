@@ -50,6 +50,7 @@ test('migrations apply to an empty database and can run again', { skip: !url }, 
       'study_logs_content_needs_textbook',
       'study_logs_understanding_range',
       'study_logs_difficulties_length',
+      'study_logs_study_type_check',
     ])
       assert.ok(constraintNames.includes(constraint), constraint);
     const { rows } = await client.query<{ name: string }>(

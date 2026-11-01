@@ -138,6 +138,7 @@ export function StudyLogSearch({
                     </span>
                     <strong>{formatMinutes(log.durationMinutes)}</strong>
                     <span className={`badge ${log.status}`}>{statusLabels[log.status]}</span>
+                    {log.studyType === 'review' && <span className="badge">복습</span>}
                   </div>
                   {log.textbookTitle !== null && <p className="log-studied">{studiedLabel(log)}</p>}
                   {log.difficulties && (

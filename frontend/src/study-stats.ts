@@ -8,6 +8,18 @@ export const periodLabels: Record<StatPeriod, string> = {
   all: '전체',
 };
 
+// What the study time figures cover (#52).
+export const statStudyTypes = ['all', 'new', 'review'] as const;
+export type StatStudyType = (typeof statStudyTypes)[number];
+export const statStudyTypeLabels: Record<StatStudyType, string> = {
+  all: '전체',
+  new: '신규',
+  review: '복습',
+};
+
+export const studyTimePath = (period: StatPeriod, type: StatStudyType) =>
+  `/api/stats/study-time?period=${period}${type === 'all' ? '' : `&type=${type}`}`;
+
 // The response of GET /api/stats/study-time (#47).
 export type StudyTimeStats = {
   period: StatPeriod;
@@ -24,6 +36,29 @@ export type StudyTimeStats = {
   weekly: { weekStart: string; minutes: number }[];
   monthly: { month: string; minutes: number }[];
 };
+
+// GET /api/stats/reviews (#46). `completionRate` is a whole percent, null with nothing scheduled.
+export type ReviewStats = {
+  period: StatPeriod;
+  from: string;
+  to: string;
+  scheduled: number;
+  completed: number;
+  delayed: number;
+  completionRate: number | null;
+};
+
+// The bars of the review chart (#52). Late rounds also count as scheduled, and as completed when
+// they were done late, so these are three separate counts rather than parts of a whole. The label
+// carries the count, since a bar of 0 draws nothing to read.
+export const reviewBars = (stats: ReviewStats) =>
+  (
+    [
+      ['예정', stats.scheduled],
+      ['완료', stats.completed],
+      ['지연', stats.delayed],
+    ] as const
+  ).map(([name, count]) => ({ label: `${name} ${count}회`, count }));
 
 export type DayMinutes = { date: string; minutes: number };
 

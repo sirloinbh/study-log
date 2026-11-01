@@ -21,6 +21,7 @@ type Log = {
   understanding: number | null;
   difficulties: string;
   goalAchieved: boolean | null;
+  studyType: string;
 };
 
 // Textbooks and chapters the form can link a log to (served, not recorded).
@@ -150,6 +151,7 @@ const morning: Log = {
   understanding: null,
   difficulties: '',
   goalAchieved: null,
+  studyType: 'new',
 };
 
 uiTest('recent logs show date, time range, computed duration, status and memo', async () => {
@@ -231,6 +233,7 @@ uiTest('entering a session previews its duration and saving adds it to the list'
       understanding: null,
       difficulties: '',
       goalAchieved: null,
+      studyType: 'new',
     },
   });
   // The list is reloaded from the server after saving.
@@ -289,6 +292,7 @@ uiTest('editing a log fills the form and saves it with PUT', async () => {
       understanding: null,
       difficulties: '',
       goalAchieved: null,
+      studyType: 'new',
     },
   });
   assert.match(ui.text(ui.find((n) => n.type === 'li')[0]), /09:00–11:00.*2시간/);
@@ -450,7 +454,7 @@ uiTest('fields are locked while a save is in flight', async () => {
   const disabled = ui
     .find((n) => ['input', 'select', 'textarea'].includes(String(n.type)), form)
     .map((n) => n.props.disabled);
-  assert.deepEqual(disabled, [true, true, true, true, true, true, true, true, true, true]);
+  assert.deepEqual(disabled, Array(11).fill(true));
   release();
   await ui.settle();
   assert.match(ui.text(ui.find((n) => n.props.role === 'status')), /저장했습니다/);
