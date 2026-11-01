@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useState } from 'react';
 import { expect, test, vi } from 'vitest';
 
@@ -545,6 +545,219 @@ test('a slow older answer does not bring back a review just completed', async ()
   answerOld(new Response(JSON.stringify({ today, reviews: [review()] })));
   await new Promise((resolve) => setTimeout(resolve));
   expect(screen.getByText('오늘 복습할 내용이 없습니다')).toBeInTheDocument();
+});
+
+test('returning to the tab loads the range on screen again', async () => {
+  const lists: Record<string, Review[]> = { today: [], week: [] };
+  const fetch = rangeServer(lists);
+  render(<Reviews />);
+  await screen.findByText('오늘 복습할 내용이 없습니다');
+  lists.today = [review()];
+  fireEvent.focus(window);
+  await screen.findByRole('heading', { name: '오늘의 복습 1개' });
+
+  fireEvent.click(screen.getByRole('button', { name: '이번 주' }));
+  await screen.findByText('이번 주에 복습할 내용이 없습니다');
+  lists.week = [review(), review({ id: 2 })];
+  fireEvent.focus(window);
+  await screen.findByRole('heading', { name: '이번 주 복습 2개' });
+  expect(fetch.mock.calls.at(-1)?.[0]).toBe('/api/reviews/week');
+});
+
+test('returning to the tab keeps a date being typed', async () => {
+  const lists = { today: [review()] };
+  const fetch = rangeServer(lists);
+  render(<Reviews />);
+  fireEvent.click(await screen.findByRole('button', { name: /날짜 변경/ }));
+  fireEvent.change(screen.getByLabelText('새 예정일'), { target: { value: '2026-11-05' } });
+  const before = fetch.mock.calls.length;
+  fireEvent.focus(window);
+  await waitFor(() => expect(fetch.mock.calls.length).toBe(before + 1));
+  await act(async () => {});
+  expect(screen.getByLabelText('새 예정일')).toHaveValue('2026-11-05');
+});
+
+test('a review leaving the list closes its date form for good and says so', async () => {
+  const lists: Record<string, Review[]> = { today: [review()] };
+  rangeServer(lists);
+  render(<Reviews />);
+  fireEvent.click(await screen.findByRole('button', { name: /날짜 변경/ }));
+  fireEvent.change(screen.getByLabelText('새 예정일'), { target: { value: '2026-11-05' } });
+  await waitFor(() => expect(document.activeElement?.id).toBe('review-due-date'));
+
+  lists.today = [];
+  fireEvent.focus(window);
+  expect(
+    await screen.findByText('날짜를 바꾸던 복습이 목록에서 빠져 입력을 닫았습니다'),
+  ).toBeInTheDocument();
+  await waitFor(() => expect(document.activeElement?.id).toBe('reviews-today'));
+
+  // It comes back later, with its buttons and not the old form.
+  lists.today = [review()];
+  fireEvent.focus(window);
+  await screen.findByRole('button', { name: /날짜 변경/ });
+  expect(screen.queryByLabelText('새 예정일')).toBeNull();
+});
+
+test('a review leaving the list replaces an error about its date', async () => {
+  const lists: Record<string, Review[]> = { today: [review()] };
+  rangeServer(lists, () => ({ status: 400, body: { error: '존재하지 않는 날짜입니다' } }));
+  render(<Reviews />);
+  fireEvent.click(await screen.findByRole('button', { name: /날짜 변경/ }));
+  fireEvent.click(screen.getByRole('button', { name: /예정일 저장/ }));
+  await screen.findByRole('alert');
+  await waitFor(() => expect(screen.getByRole('button', { name: '전체' })).toBeEnabled());
+  lists.today = [];
+  fireEvent.focus(window);
+  await screen.findByText(/입력을 닫았습니다/);
+  expect(screen.queryByRole('alert')).toBeNull();
+});
+
+test('focus moves to the heading only when the focused review left the list', async () => {
+  const lists: Record<string, Review[]> = {
+    today: [review({ id: 1, studyDate: '2026-10-29' }), review({ id: 2, studyDate: '2026-10-30' })],
+  };
+  rangeServer(lists);
+  render(<Reviews />);
+  const kept = await screen.findByRole('button', { name: '2026-10-29 학습 1회차 복습 완료' });
+  kept.focus();
+
+  lists.today = [review({ id: 1, studyDate: '2026-10-29' })];
+  fireEvent.focus(window);
+  await screen.findByRole('heading', { name: '오늘의 복습 1개' });
+  expect(document.activeElement).toBe(kept);
+
+  lists.today = [];
+  fireEvent.focus(window);
+  await screen.findByText('오늘 복습할 내용이 없습니다');
+  await waitFor(() => expect(document.activeElement?.id).toBe('reviews-today'));
+});
+
+test('focus is left alone when it is not on a review', async () => {
+  const lists: Record<string, Review[]> = { today: [review()] };
+  rangeServer(lists);
+  render(<Reviews />);
+  const range = await screen.findByRole('button', { name: '오늘' });
+  range.focus();
+  lists.today = [];
+  fireEvent.focus(window);
+  await screen.findByText('오늘 복습할 내용이 없습니다');
+  await act(async () => {});
+  expect(document.activeElement).toBe(range);
+});
+
+test('a form closing does not take focus from another control', async () => {
+  const first = review({ id: 1, studyDate: '2026-10-29' });
+  const second = review({ id: 2, studyDate: '2026-10-30' });
+  const lists: Record<string, Review[]> = { today: [first, second] };
+  rangeServer(lists);
+  render(<Reviews />);
+  fireEvent.click(await screen.findByRole('button', { name: '2026-10-29 학습 1회차 날짜 변경' }));
+  await waitFor(() => expect(document.activeElement?.id).toBe('review-due-date'));
+  const other = screen.getByRole('button', { name: '2026-10-30 학습 1회차 복습 완료' });
+  other.focus();
+
+  lists.today = [second];
+  fireEvent.focus(window);
+  await screen.findByText(/입력을 닫았습니다/);
+  await act(async () => {});
+  expect(document.activeElement).toBe(other);
+});
+
+test('focus moved while the list was on its way stays where it went', async () => {
+  const first = review({ id: 1, studyDate: '2026-10-29' });
+  const second = review({ id: 2, studyDate: '2026-10-30' });
+  let answer = (_value: Response) => {};
+  let lists = 0;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() =>
+      ++lists === 1
+        ? Promise.resolve(new Response(JSON.stringify({ today, reviews: [first, second] })))
+        : new Promise<Response>((resolve) => (answer = resolve)),
+    ),
+  );
+  render(<Reviews />);
+  (await screen.findByRole('button', { name: '2026-10-29 학습 1회차 복습 완료' })).focus();
+  fireEvent.focus(window);
+  const moved = screen.getByRole('button', { name: '2026-10-30 학습 1회차 복습 완료' });
+  moved.focus();
+  answer(new Response(JSON.stringify({ today, reviews: [second] })));
+  await screen.findByRole('heading', { name: '오늘의 복습 1개' });
+  await act(async () => {});
+  expect(document.activeElement).toBe(moved);
+});
+
+test('a form closing keeps the failure of another review on screen', async () => {
+  const first = review({ id: 1, studyDate: '2026-10-29' });
+  const second = review({ id: 2, studyDate: '2026-10-30' });
+  const lists: Record<string, Review[]> = { today: [first, second] };
+  rangeServer(lists, () => {
+    lists.today = [second];
+    return { status: 500, body: { error: '서버 오류가 발생했습니다' } };
+  });
+  render(<Reviews />);
+  fireEvent.click(await screen.findByRole('button', { name: '2026-10-29 학습 1회차 날짜 변경' }));
+  fireEvent.click(screen.getByRole('button', { name: '2026-10-30 학습 1회차 하루 미루기' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('서버 오류가 발생했습니다');
+  await waitFor(() => expect(screen.queryByLabelText('새 예정일')).toBeNull());
+  expect(screen.getByRole('alert')).toHaveTextContent('서버 오류가 발생했습니다');
+  await waitFor(() => expect(document.activeElement?.id).toBe('review-snooze-2'));
+});
+
+test('a later return clears the error of a failed one', async () => {
+  let failing = false;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() =>
+      Promise.resolve(
+        failing
+          ? new Response(JSON.stringify({ error: '목록 오류' }), { status: 500 })
+          : new Response(JSON.stringify({ today, reviews: [review()] })),
+      ),
+    ),
+  );
+  render(<Reviews />);
+  await screen.findByRole('button', { name: /복습 완료/ });
+  failing = true;
+  fireEvent.focus(window);
+  expect(await screen.findByRole('alert')).toHaveTextContent('목록 오류');
+  expect(screen.getByRole('button', { name: /복습 완료/ })).toBeInTheDocument();
+  failing = false;
+  fireEvent.focus(window);
+  await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+});
+
+test('returning to the tab while a change runs adds no request', async () => {
+  let release = () => {};
+  const held = new Promise<void>((resolve) => (release = resolve));
+  const fetch = vi.fn(async (_url: string, init?: { method?: string }) => {
+    if (init?.method && init.method !== 'GET') {
+      await held;
+      return new Response(JSON.stringify({ dueDate: '2026-11-01' }));
+    }
+    return new Response(JSON.stringify({ today, reviews: [review()] }));
+  });
+  vi.stubGlobal('fetch', fetch);
+  render(<Reviews />);
+  fireEvent.click(await screen.findByRole('button', { name: /하루 미루기/ }));
+  const before = fetch.mock.calls.length;
+  fireEvent.focus(window);
+  await act(async () => {});
+  expect(fetch.mock.calls.length).toBe(before);
+  release();
+  await waitFor(() => expect(screen.getByRole('button', { name: '전체' })).toBeEnabled());
+});
+
+test('the listener goes away with the page', async () => {
+  const lists = { today: [review()] };
+  const fetch = rangeServer(lists);
+  const { unmount } = render(<Reviews />);
+  await screen.findByRole('button', { name: /복습 완료/ });
+  unmount();
+  const before = fetch.mock.calls.length;
+  fireEvent.focus(window);
+  expect(fetch.mock.calls.length).toBe(before);
 });
 
 test('changing another review closes the date form being typed', async () => {
