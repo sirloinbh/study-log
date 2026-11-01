@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "tsx watch --env-file-if-exists=../.env --env-file-if-exists=../../project-standards/.env src/server.ts",
     "start": "node dist/server.js",
+    "db:migrate": "tsx --env-file-if-exists=../.env src/migrate.ts",
     "build": "tsc",
     "test": "tsx --test test/*.test.ts",
     "typecheck": "tsc -p tsconfig.check.json"

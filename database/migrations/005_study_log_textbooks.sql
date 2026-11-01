@@ -6,16 +6,16 @@ ALTER TABLE study_logs ADD COLUMN IF NOT EXISTS content_id bigint;
 
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'study_logs_textbook_fkey') THEN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'study_logs_textbook_fkey' AND conrelid = 'study_logs'::regclass) THEN
     ALTER TABLE study_logs ADD CONSTRAINT study_logs_textbook_fkey
       FOREIGN KEY (textbook_id) REFERENCES textbooks (id) ON DELETE RESTRICT;
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'study_logs_content_fkey') THEN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'study_logs_content_fkey' AND conrelid = 'study_logs'::regclass) THEN
     ALTER TABLE study_logs ADD CONSTRAINT study_logs_content_fkey
       FOREIGN KEY (textbook_id, content_id) REFERENCES textbook_contents (textbook_id, id)
       ON DELETE RESTRICT;
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'study_logs_content_needs_textbook') THEN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'study_logs_content_needs_textbook' AND conrelid = 'study_logs'::regclass) THEN
     ALTER TABLE study_logs ADD CONSTRAINT study_logs_content_needs_textbook
       CHECK (content_id IS NULL OR textbook_id IS NOT NULL);
   END IF;
