@@ -12,7 +12,7 @@ type Summary = { id: number; endDate: string; currentEndDate: string; delayDays:
 type Detail = { schedule: Summary; items: Item[] };
 
 // #37. Requires a dedicated test DB with database/migrations applied. Years 8041 and 8042 belong to
-// this test alone. Every day here has 60 minutes, so an item exists for each date.
+// this test alone. Days have 60 minutes unless a test says otherwise, so an item exists for each date.
 test('a schedule follows what was done and what fell behind', { skip: !url }, async (t) => {
   const pool = new Pool({ connectionString: url });
   const books: number[] = [];
@@ -309,11 +309,11 @@ test('a schedule follows what was done and what fell behind', { skip: !url }, as
         assert.equal((await progress()).progressPercent, 10);
         await reopen(schedule.id, items[0].id);
         assert.equal((await progress()).progressPercent, 0);
-        // Everything but a little is not yet 100: 1080 of 1200 is 90, and only all of it is 100.
+        // Monday to Saturday is 900 of 1200, and only all of it is 100.
         for (const item of items.slice(0, 6)) await complete(schedule.id, item.id);
         summary = await progress();
-        assert.equal(summary.completedMinutes, 1200 - target[6]);
-        assert.ok(summary.progressPercent < 100);
+        assert.equal(summary.completedMinutes, 900);
+        assert.equal(summary.progressPercent, 75);
         await complete(schedule.id, items[6].id);
         summary = await progress();
         assert.equal(summary.progressPercent, 100);

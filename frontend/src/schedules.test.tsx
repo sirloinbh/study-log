@@ -551,6 +551,12 @@ describe('adjusting the days', () => {
         '10',
       ),
     );
+    // The list follows.
+    await waitFor(() =>
+      expect(list().getByRole('button', { name: '지난 일정' }).closest('li')).toHaveTextContent(
+        '진행 10%',
+      ),
+    );
   });
 
   test('a delay is shown with the end first chosen', async () => {

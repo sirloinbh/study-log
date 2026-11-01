@@ -16,7 +16,7 @@
   - `GET /api/schedules`, `GET /api/schedules/:id`, `POST /api/schedules`, `PUT /api/schedules/:id`(이름), `DELETE /api/schedules/:id`.
 - `backend/src/app.ts`: 경로를 연결하고 `holidayFetcher` 옵션을 더했다.
 - `backend/test/helpers.ts`: 테스트가 실제 공휴일 API를 부르지 않게 기본 조회를 실패로 둔다.
-- `docs/decisions/schedule-rules.md`: 5장을 더했다.
+- `docs/decisions/schedule-rules.md`: 5장(지금의 6장)을 더했다.
 
 ## 구현 판단
 
