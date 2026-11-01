@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
 
 import { Exercises } from './exercises';
@@ -7,8 +7,10 @@ import { fakeApi } from './test/fake-api';
 import { TextbookContents } from './textbook-contents';
 import { Textbooks } from './textbooks';
 
-// The whole page renders in each test and role queries are slow on the first run after a change.
+// The whole page renders in each test and role queries are slow on the first run after a change,
+// which counts against both limits.
 vi.setConfig({ testTimeout: 20_000 });
+configure({ asyncUtilTimeout: 10_000 });
 
 const fill = (label: string, value: string) =>
   fireEvent.change(screen.getByLabelText(label), { target: { value } });
@@ -34,14 +36,22 @@ describe('study logs', () => {
     goalAchieved: null,
     studyType: 'new',
   };
-  const logList = () => document.querySelector<HTMLElement>('.log-list')!;
+  // The recent list's own card: the calendar below has a list of the same class.
+  const recent = () => within(document.getElementById('study-log-list')!.closest('section')!);
 
   // A small server holding the logs, so saving and deleting show up in the reloaded list.
   function server(start: (typeof log)[], failWrites = false) {
     let logs = start;
     return fakeApi(({ method, path, body }) => {
       if (path.startsWith('/api/textbooks')) return { body: { textbooks: [] } };
-      if (method === 'GET') return { body: { studyLogs: logs } };
+      if (path.startsWith('/api/study-logs/calendar')) {
+        const month = new URL(path, 'http://test').searchParams.get('month');
+        return { body: { month, days: [{ date: `${month}-01`, minutes: 0, logs: 0 }] } };
+      }
+      if (method === 'GET') {
+        const date = new URL(path, 'http://test').searchParams.get('date');
+        return { body: { studyLogs: logs.filter((item) => !date || item.studyDate === date) } };
+      }
       if (failWrites) return serverError;
       if (method === 'DELETE') {
         logs = logs.filter((item) => !path.endsWith(`/${item.id}`));
@@ -56,11 +66,10 @@ describe('study logs', () => {
   test('the list shows each log with its time, length and status', async () => {
     server([log]);
     render(<StudyLogs today={today} />);
-    await screen.findAllByRole('button', { name: /기록 삭제$/ });
-    const item = within(logList());
-    expect(item.getByText('09:00–10:30')).toBeInTheDocument();
-    expect(item.getByText('1시간 30분')).toBeInTheDocument();
-    expect(item.getByText('완료')).toBeInTheDocument();
+    await screen.findByRole('button', { name: /기록 삭제$/ });
+    expect(recent().getByText('09:00–10:30')).toBeInTheDocument();
+    expect(recent().getByText('1시간 30분')).toBeInTheDocument();
+    expect(recent().getByText('완료')).toBeInTheDocument();
   });
 
   test('adding sends the form, reloads the list and keeps the date for the next one', async () => {
@@ -77,7 +86,7 @@ describe('study logs', () => {
       path: '/api/study-logs',
       body: { studyDate: '2026-10-20', startTime: '13:00', endTime: '14:00' },
     });
-    await waitFor(() => expect(within(logList()).getByText('13:00–14:00')).toBeInTheDocument());
+    expect(await recent().findByText('13:00–14:00')).toBeInTheDocument();
     expect(screen.getByLabelText<HTMLInputElement>('시작').value).toBe('');
     expect(screen.getByLabelText<HTMLInputElement>('학습일').value).toBe('2026-10-20');
   });
@@ -120,7 +129,9 @@ describe('textbooks', () => {
 
   function server(start: (typeof book)[]) {
     let books = start;
-    return fakeApi(({ method, body }) => {
+    return fakeApi(({ method, path, body }) => {
+      if (path.endsWith('/contents')) return { body: { contents: [] } };
+      if (path.includes('/exercises')) return { body: { exercises: [] } };
       if (method === 'GET') return { body: { textbooks: books } };
       const saved = { ...(body as typeof book), id: 2 };
       books = [...books, saved];
@@ -135,6 +146,10 @@ describe('textbooks', () => {
     const detail = within(screen.getByRole('region', { name: '교재 상세' }));
     expect(detail.getByText('길버트')).toBeInTheDocument();
     expect(detail.getByText('5판')).toBeInTheDocument();
+    // The cards of the picked textbook open too.
+    expect(
+      await screen.findByText('목차를 먼저 추가하면 장·절별로 문제를 입력할 수 있습니다'),
+    ).toBeInTheDocument();
   });
 
   test('adding sends the form, lists the textbook and clears the form', async () => {
@@ -179,10 +194,15 @@ describe('textbook contents', () => {
       path: '/api/textbooks/7/contents/order',
       body: { parentId: null, ids: [2, 1] },
     });
-    // The answered order is shown, and the first entry cannot go further up.
+    // The answered order is shown. Checked after the buttons are back: they are all disabled while
+    // the save runs.
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: /행렬 위로 이동$/ })).toBeDisabled(),
+      expect(screen.getByRole('button', { name: /벡터 위로 이동$/ })).toBeEnabled(),
     );
+    expect(
+      [...document.querySelectorAll('.content-label')].map((label) => label.textContent),
+    ).toEqual(['2 행렬', '1 벡터']);
+    expect(screen.getByRole('button', { name: /행렬 위로 이동$/ })).toBeDisabled();
   });
 
   test('a refused move shows the server message', async () => {
@@ -231,13 +251,14 @@ describe('exercises', () => {
     fireEvent.click(screen.getByRole('button', { name: '문제 추가' }));
     fill('문제 본문', '외적을 구하라');
     fireEvent.submit(document.querySelector('form')!);
-    expect(await screen.findByText('외적을 구하라')).toBeInTheDocument();
+    // In the list: the form's own field holds the same text.
+    expect(await screen.findByText('외적을 구하라', { selector: 'p' })).toBeInTheDocument();
     expect(sent[0]).toMatchObject({
       method: 'POST',
       path: url,
       body: { body: '외적을 구하라', number: '', important: false },
     });
-    expect(screen.getByText('추가했습니다')).toBeInTheDocument();
+    expect(await screen.findByText('추가했습니다')).toBeInTheDocument();
   });
 
   test('deleting asks first, then the problem leaves the list', async () => {
