@@ -19,7 +19,7 @@ type Notice = { kind: 'status' | 'alert'; text: string } | undefined;
 
 // Study schedules (#35): a form that makes one from a period and daily hours, the schedules there
 // are, and the days of the one picked. A schedule's period and hours do not change once it is made
-// (docs/decisions/schedule-rules.md 5장), so this offers deleting rather than editing them.
+// (docs/decisions/schedule-rules.md 6장), so this offers deleting rather than editing them.
 export function Schedules({ today }: { today: string }) {
   const [title, setTitle] = useState('');
   const [startDate, setStartDate] = useState(today);
@@ -130,7 +130,7 @@ export function Schedules({ today }: { today: string }) {
       return;
     }
     // Without its chapters read there was no chance to pick a range, and a whole book cannot be
-    // narrowed afterwards (docs/decisions/schedule-rules.md 5장).
+    // narrowed afterwards (docs/decisions/schedule-rules.md 6장).
     if (textbookId && !bookChapters) {
       setNotice({
         kind: 'alert',
@@ -519,8 +519,9 @@ export function Schedules({ today }: { today: string }) {
                 <p className="status">
                   {item.textbookTitle && `${item.textbookTitle} · `}
                   {item.startDate} ~ {item.endDate}
-                  {item.delayDays > 0 && ` (${item.delayDays}일 늦어짐)`} · 목표{' '}
-                  {formatMinutes(item.totalMinutes)} · {item.itemCount}일
+                  {item.delayDays > 0 && ` (${item.delayDays}일 늦어짐)`} · 진행{' '}
+                  {item.progressPercent}% · 목표 {formatMinutes(item.totalMinutes)} ·{' '}
+                  {item.itemCount}일
                 </p>
               </li>
             ))}
@@ -539,6 +540,25 @@ export function Schedules({ today }: { today: string }) {
               {shownDetail.schedule.textbookTitle && (
                 <p className="status schedule-book">{shownDetail.schedule.textbookTitle}</p>
               )}
+              <div className="schedule-progress">
+                <p>
+                  진행률 <strong>{shownDetail.schedule.progressPercent}%</strong>
+                  <span className="status">
+                    {formatMinutes(shownDetail.schedule.completedMinutes)} /{' '}
+                    {formatMinutes(shownDetail.schedule.totalMinutes)} ·{' '}
+                    {shownDetail.schedule.completedCount} / {shownDetail.schedule.itemCount}일
+                  </span>
+                </p>
+                <div
+                  role="progressbar"
+                  aria-label="일정 진행률"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={shownDetail.schedule.progressPercent}
+                >
+                  <div style={{ width: `${shownDetail.schedule.progressPercent}%` }} />
+                </div>
+              </div>
               <dl className="retro-summary" aria-label="일정 요약">
                 <div>
                   <dt>평일</dt>

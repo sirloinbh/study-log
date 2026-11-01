@@ -16,6 +16,10 @@ export type Schedule = {
   // The later of the end first chosen and the last day, and how far past it that is (rule 4장).
   currentEndDate: string;
   delayDays: number;
+  completedCount: number;
+  completedMinutes: number;
+  // The target time of the days done over all of it, rounded down (rule 5장).
+  progressPercent: number;
 };
 
 export type ScheduleChapter = { id: number; number: string; title: string };
