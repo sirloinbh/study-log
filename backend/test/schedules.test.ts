@@ -78,6 +78,8 @@ test('invalid input is a Korean 400 before the DB or the holiday API', async () 
     [{ ...fine, weekdayMinutes: -1 }, /0시간 이상/],
     [{ ...fine, restDayMinutes: 1441 }, /24시간 이하/],
     [{ ...fine, weekdayMinutes: 0, restDayMinutes: 0 }, /모두 0시간/],
+    // Later than next year, though short.
+    [{ ...fine, startDate: '2027-12-31', endDate: '2028-01-01' }, /내년 말까지/],
     // A start in the past: yesterday by the service date, with a valid end.
     [{ ...fine, startDate: '2026-10-31' }, /시작일은 오늘 이후/],
   ];
@@ -88,6 +90,17 @@ test('invalid input is a Korean 400 before the DB or the holiday API', async () 
         const { status, data } = await call('/api/schedules', { method: 'POST', body });
         assert.equal(status, 400, JSON.stringify(body));
         assert.match(String(data.error), message);
+      }
+      // A wrong date does not bring a false complaint about the other date or the period.
+      for (const [dates, message] of [
+        [{ startDate: '2026-13-01', endDate: '2026-11-30' }, '존재하지 않는 날짜입니다'],
+        [{ startDate: '2026-11-02', endDate: '2028-02-31' }, '존재하지 않는 날짜입니다'],
+      ] as const) {
+        const { data } = await call('/api/schedules', {
+          method: 'POST',
+          body: { ...fine, ...dates },
+        });
+        assert.equal(data.error, message);
       }
       for (const [method, path, body] of [
         ['GET', '/api/schedules/abc', undefined],

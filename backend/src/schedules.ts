@@ -74,6 +74,8 @@ const createInput = z
     { error: '일정 내용을 JSON 객체로 보내세요' },
   )
   .superRefine((input, ctx) => {
+    // Field errors do not stop this check, and a date that is wrong says so itself.
+    if (!isCalendarDate(input.startDate) || !isCalendarDate(input.endDate)) return;
     if (input.endDate < input.startDate)
       ctx.addIssue({ code: 'custom', message: '종료일은 시작일 이후여야 합니다' });
     else if (daysInPeriod(input.startDate, input.endDate) > maxScheduleDays)
@@ -130,8 +132,13 @@ export function scheduleRoutes(pool: Pool, today: () => string, fetcher: Holiday
   router.post('/', async (req, res) => {
     const input = createInput.parse(req.body);
     // An item already overdue would be moved as soon as the schedule is read (rule 4장).
-    if (input.startDate < today())
+    const date = today();
+    if (input.startDate < date)
       return void res.status(400).json({ error: '시작일은 오늘 이후여야 합니다' });
+    // Years further on are not published: asking for them would only spend the API's daily calls,
+    // again on every request, since an empty year is not kept (rule 3장, 5장).
+    if (Number(input.endDate.slice(0, 4)) > Number(date.slice(0, 4)) + 1)
+      return void res.status(400).json({ error: '종료일은 내년 말까지 정할 수 있습니다' });
     let holidays: Set<string>;
     try {
       // Before the transaction: this may call the API (rule 3장).
@@ -142,7 +149,7 @@ export function scheduleRoutes(pool: Pool, today: () => string, fetcher: Holiday
         Number(input.endDate.slice(0, 4)),
       );
     } catch (error) {
-      // The global handler answers only client errors with their message.
+      // The global handler would answer this with a general 500.
       if (!(error instanceof HolidayError)) throw error;
       return void res.status(error.status).json({ error: error.message });
     }
@@ -173,7 +180,10 @@ export function scheduleRoutes(pool: Pool, today: () => string, fetcher: Holiday
       [id, input.title],
     );
     if (!rowCount) return void res.status(404).json(notFound);
-    res.json(await loadSchedule(pool, id));
+    // Deleted right after the update, by another tab.
+    const found = await loadSchedule(pool, id);
+    if (!found) return void res.status(404).json(notFound);
+    res.json(found);
   });
 
   // Its items go with it.

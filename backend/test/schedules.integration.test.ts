@@ -43,6 +43,7 @@ test(
     });
     await cleanup();
 
+    let today = '8034-03-01';
     const asked: number[] = [];
     let answer: HolidayFetcher = async (year) => [
       { date: `${year}-01-01`, name: '1월1일' },
@@ -157,7 +158,22 @@ test(
           assert.equal(longer.status, 400);
         });
 
+        await t.test('a day may hold 24 hours', async () => {
+          const { items } = await created(body('8034-04-03', '8034-04-03', 1440, 1440));
+          assert.equal(items[0].targetMinutes, 1440);
+        });
+
+        await t.test('the end may be next year, and later years are not asked for', async () => {
+          await created(body('8035-12-30', '8035-12-31'));
+          asked.length = 0;
+          const later = await create(body('8035-12-31', '8036-01-01'));
+          assert.equal(later.status, 400);
+          assert.match(String(later.data.error), /내년 말까지/);
+          assert.deepEqual(asked, []);
+        });
+
         await t.test('holidays that cannot be read refuse with their own message', async () => {
+          today = '8036-01-01';
           answer = async () => {
             throw new HolidayError('공휴일 정보를 읽지 못했습니다. 잠시 뒤 다시 시도하세요');
           };
@@ -176,15 +192,20 @@ test(
           const secondYear = await create(body('8036-12-31', '8037-01-02'));
           assert.equal(secondYear.status, 503);
           assert.equal(await rowsOf('schedules', 'start_date = $1', '8036-12-31'), 0);
+          today = '8034-03-01';
         });
 
         await t.test('a schedule is listed and read, oldest start last', async () => {
           const list = (await call('/api/schedules')).data.schedules as Summary[];
           const mine = list.filter((row) => row.startDate.startsWith('803'));
+          const key = (row: Summary) => [row.startDate, row.id];
           assert.deepEqual(
-            mine.map((row) => row.startDate),
-            [...mine.map((row) => row.startDate)].sort().reverse(),
+            mine.map(key),
+            [...mine]
+              .sort((a, b) => b.startDate.localeCompare(a.startDate) || b.id - a.id)
+              .map(key),
           );
+          assert.ok(new Set(mine.map((row) => row.startDate)).size < mine.length);
           const first = mine.find((row) => row.id === firstId);
           assert.equal(first?.totalMinutes, 1260);
           assert.equal(first?.itemCount, 6);
@@ -226,7 +247,7 @@ test(
           }
         });
       },
-      { today: () => '8034-03-01', holidayFetcher },
+      { today: () => today, holidayFetcher },
     );
 
     // A pool of its own, whose connection fails on the items, shows the schedule does not stay alone.
