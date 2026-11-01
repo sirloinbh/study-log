@@ -45,6 +45,7 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
       if (request !== newestLoad.current) return;
       setLoaded({ ...data, range: target });
       setLoadError(undefined);
+      return data.reviews;
     } catch (failure) {
       if (request !== newestLoad.current) return;
       // A failure keeps the list on screen and reports that it could not be refreshed.
@@ -60,7 +61,14 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
   // the badge again. While a change runs nothing is added: its own reload comes after it.
   useEffect(() => {
     if (busy) return;
-    const onFocus = () => void load(range);
+    const onFocus = () => {
+      // A review that leaves the list takes the focused control with it.
+      const focused = document.activeElement?.closest<HTMLElement>('[data-review-id]');
+      void load(range).then((reviews) => {
+        if (focused && reviews?.every((review) => String(review.id) !== focused.dataset.reviewId))
+          setWantFocus(headingId);
+      });
+    };
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
   }, [busy, load, range]);
@@ -75,6 +83,18 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
   const shown = loaded?.range === range ? loaded : undefined;
   const error = loadError?.range === range ? loadError.message : undefined;
   const { heading, empty } = reviewRanges[range];
+
+  // The review being given a new date left the list, changed elsewhere. Its form closes for good, or
+  // it would come back with an old date when the review returns, and this replaces any error about it.
+  const editedGone = Boolean(
+    shown && editor && shown.reviews.every((review) => review.id !== editor.id),
+  );
+  useEffect(() => {
+    if (!editedGone) return;
+    setEditor(undefined);
+    setNotice({ kind: 'status', text: '날짜를 바꾸던 복습이 목록에서 빠져 입력을 닫았습니다' });
+    setWantFocus(headingId);
+  }, [editedGone]);
 
   // Runs one change, then reloads the list and has the badge count again. `done` is where focus
   // goes after it worked and `failed` after a failure that leaves the review in place. A 404 or
@@ -222,7 +242,11 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
               const name = `${title} ${review.round}회차`;
               const late = overdueDays(review.dueDate, shown.today);
               return (
-                <li key={review.id} className={editor?.id === review.id ? 'editing' : ''}>
+                <li
+                  key={review.id}
+                  data-review-id={review.id}
+                  className={editor?.id === review.id ? 'editing' : ''}
+                >
                   <div className="log-head">
                     <span className="log-date">{title}</span>
                     <span className="badge">{review.round}회차</span>
