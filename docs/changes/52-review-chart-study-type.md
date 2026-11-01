@@ -46,10 +46,14 @@
 - 다른 기간의 유형 필터, 필터 뒤의 히트맵, 기록 없는 유형, 검색과 캘린더의 복습 표시, 새 제약 조건의 테스트를 더했다.
 - 공유 테스트 DB에 복습 기록이 남아 있어도 통과하도록 기준값을 유형별로 잡았다.
 
+2차 리뷰에서 결함은 없었다. 변경 기록의 테스트 목록에 빠진 두 파일만 더했다.
+
 ## 테스트
 
 - `backend/test/study-log-type.test.ts`: 잘못된 유형의 400, 기본값 신규, 저장·조회·수정.
-- `backend/test/stats.integration.test.ts`: 유형별 지표와 일별 합계, 기본값, 400.
+- `backend/test/stats.integration.test.ts`: 유형별 지표와 일별 합계, 다른 기간, 필터 뒤의 히트맵, 기본값, 400.
+- `backend/test/stats.test.ts`: 기록 없는 유형의 전체 기간, 쿼리에 전달되는 유형.
+- `backend/test/migrations.integration.test.ts`: 새 제약 조건.
 - `frontend/src/stats-review.test.tsx`: 완료율과 횟수, 기간 변경, 예정 0, 실패 표시, 필터가 복습 통계를 다시 부르지 않음, 막대 값.
 - `frontend/src/study-logs-type.test.tsx`: 폼의 기본값과 저장, 수정 때 유형 유지, 목록 표시.
 - `backend/test/stats-ui.test.ts`, `backend/test/study-logs-ui.test.ts`, `backend/test/study-logs.integration.test.ts`, `frontend/src/study-logs-change.test.tsx`: 새 필드와 요청을 반영했다.
