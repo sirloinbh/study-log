@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 import { type RequestError, requestJson } from './api';
 import { useBusy } from './busy';
@@ -18,6 +18,7 @@ const dateInputId = 'review-due-date';
 const completeId = (review: Review) => `review-complete-${review.id}`;
 const snoozeId = (review: Review) => `review-snooze-${review.id}`;
 const editId = (review: Review) => `review-edit-${review.id}`;
+const rangeId = (range: ReviewRange) => `review-range-${range}`;
 const listPath = (range: ReviewRange) => `/api/reviews/${range}`;
 
 // Reviews (#43, #45): rounds not yet completed, up to today, this week or all of them. Overdue ones
@@ -35,21 +36,25 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
   // The element to focus once the change is done and the controls are enabled again.
   const [wantFocus, setWantFocus] = useState<string>();
 
+  // Only the newest load counts, so a slower, older answer never brings back a review just changed.
+  const newestLoad = useRef(0);
+  const load = useRef(async (target: ReviewRange) => {
+    const request = ++newestLoad.current;
+    try {
+      const data = await requestJson<Listed>(listPath(target));
+      if (request !== newestLoad.current) return;
+      setLoaded({ ...data, range: target });
+      setLoadError(undefined);
+    } catch (failure) {
+      if (request !== newestLoad.current) return;
+      // A failure keeps the list on screen and reports that it could not be refreshed.
+      setLoadError({ range: target, message: (failure as RequestError).message });
+    }
+  }).current;
+
   useEffect(() => {
-    let current = true;
-    requestJson<Listed>(listPath(range))
-      .then((data) => {
-        if (!current) return;
-        setLoaded({ ...data, range });
-        setLoadError(undefined);
-      })
-      .catch((error: RequestError) => {
-        if (current) setLoadError({ range, message: error.message });
-      });
-    return () => {
-      current = false;
-    };
-  }, [range]);
+    void load(range);
+  }, [load, range]);
 
   useEffect(() => {
     if (!wantFocus || busy) return;
@@ -61,16 +66,6 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
   const shown = loaded?.range === range ? loaded : undefined;
   const error = loadError?.range === range ? loadError.message : undefined;
   const { heading, empty } = reviewRanges[range];
-
-  // A failure keeps the list on screen and reports that it could not be refreshed.
-  const reload = async () => {
-    try {
-      setLoaded({ ...(await requestJson<Listed>(listPath(range))), range });
-      setLoadError(undefined);
-    } catch (failure) {
-      setLoadError({ range, message: (failure as RequestError).message });
-    }
-  };
 
   // Runs one change, then reloads the list and has the badge count again. `done` is where focus
   // goes after it worked and `failed` after a failure that leaves the review in place. A 404 or
@@ -89,10 +84,21 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
       if (gone) setEditor(undefined);
       setWantFocus(gone ? headingId : failed);
     } finally {
-      await reload();
+      await load(range);
       end();
       onChange?.();
     }
+  };
+
+  // Loads a failed list again. The old error goes first, so the same one coming back is announced
+  // again, and an earlier change's error goes unless a date form it belongs to is still open.
+  const retry = async () => {
+    if (!begin()) return;
+    setLoadError(undefined);
+    if (!editor) setNotice(undefined);
+    setWantFocus(rangeId(range));
+    await load(range);
+    end();
   };
 
   const complete = (review: Review) =>
@@ -146,7 +152,7 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
   const pickRange = (next: ReviewRange) => {
     if (next === range) {
       // The range already shown: only a failed list has anything to gain, by trying again.
-      if (error && begin()) void reload().finally(end);
+      if (error) void retry();
       return;
     }
     setRange(next);
@@ -168,6 +174,7 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
             <button
               key={key}
               type="button"
+              id={rangeId(key)}
               className={key === range ? 'primary' : 'secondary'}
               aria-pressed={key === range}
               disabled={busy}

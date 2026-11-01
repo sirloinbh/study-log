@@ -461,6 +461,92 @@ test('the range already shown tries again after a failed list', async () => {
   expect(screen.queryByRole('alert')).toBeNull();
 });
 
+test('a retry unlocks the buttons, returns focus and shows that it is loading', async () => {
+  let answer = (_value: Response) => {};
+  let calls = 0;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => {
+      calls += 1;
+      if (calls === 1)
+        return Promise.resolve(
+          new Response(JSON.stringify({ error: '목록 오류' }), { status: 500 }),
+        );
+      return new Promise<Response>((resolve) => (answer = resolve));
+    }),
+  );
+  render(<Reviews />);
+  await screen.findByRole('alert');
+  const button = screen.getByRole('button', { name: '오늘' });
+  fireEvent.click(button);
+  // The old error is gone while trying, so the same error coming back is announced again.
+  expect(await screen.findByText('불러오는 중…')).toBeInTheDocument();
+  expect(screen.queryByRole('alert')).toBeNull();
+  expect(button).toBeDisabled();
+  answer(new Response(JSON.stringify({ error: '목록 오류' }), { status: 500 }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('목록 오류');
+  await waitFor(() => expect(button).toBeEnabled());
+  await waitFor(() => expect(document.activeElement).toBe(button));
+});
+
+test('a retry that works clears the error of the change before it', async () => {
+  let failing = true;
+  let fetchedOnce = false;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((_url: string, init?: { method?: string }) => {
+      if (init?.method === 'POST')
+        return Promise.resolve(
+          new Response(JSON.stringify({ error: '변경 오류' }), { status: 500 }),
+        );
+      if (failing && fetchedOnce)
+        return Promise.resolve(
+          new Response(JSON.stringify({ error: '목록 오류' }), { status: 500 }),
+        );
+      fetchedOnce = true;
+      return Promise.resolve(new Response(JSON.stringify({ today, reviews: [review()] })));
+    }),
+  );
+  render(<Reviews />);
+  fireEvent.click(await screen.findByRole('button', { name: /하루 미루기/ }));
+  await screen.findByText('변경 오류');
+  await screen.findByText(/목록 오류/);
+  await waitFor(() => expect(screen.getByRole('button', { name: '오늘' })).toBeEnabled());
+  failing = false;
+  fireEvent.click(screen.getByRole('button', { name: '오늘' }));
+  await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+  expect(screen.getByRole('button', { name: /하루 미루기/ })).toBeInTheDocument();
+});
+
+test('a slow older answer does not bring back a review just completed', async () => {
+  let answerOld = (_value: Response) => {};
+  let todayLists = 0;
+  const list = (reviews: Review[]) =>
+    Promise.resolve(new Response(JSON.stringify({ today, reviews })));
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string, init?: { method?: string }) => {
+      if (init?.method === 'POST')
+        return Promise.resolve(new Response(JSON.stringify({ next: null })));
+      // The week's list never answers, so the page still shows today's when today is picked again.
+      if (url.endsWith('/week')) return new Promise<Response>(() => {});
+      todayLists += 1;
+      if (todayLists === 1) return list([review()]);
+      if (todayLists === 2) return new Promise<Response>((resolve) => (answerOld = resolve));
+      return list([]);
+    }),
+  );
+  render(<Reviews />);
+  await screen.findByRole('button', { name: /복습 완료/ });
+  fireEvent.click(screen.getByRole('button', { name: '이번 주' }));
+  fireEvent.click(screen.getByRole('button', { name: '오늘' }));
+  fireEvent.click(screen.getByRole('button', { name: /복습 완료/ }));
+  await screen.findByText('오늘 복습할 내용이 없습니다');
+  answerOld(new Response(JSON.stringify({ today, reviews: [review()] })));
+  await new Promise((resolve) => setTimeout(resolve));
+  expect(screen.getByText('오늘 복습할 내용이 없습니다')).toBeInTheDocument();
+});
+
 test('changing another review closes the date form being typed', async () => {
   const lists = {
     today: [review({ id: 1, studyDate: '2026-10-29' }), review({ id: 2, studyDate: '2026-10-30' })],
