@@ -41,11 +41,15 @@ test('losing database connections never ends the process', { skip: !url }, async
   await t.test('an idle connection lost: logged once, and the next query works', async () => {
     logged.length = 0;
     await kill(await pidOf((sql) => pool.query(sql)));
-    await sleep(200);
+    // The pool drops the connection when it hears of the loss; until then a query could still get it.
+    for (let attempt = 0; attempt < 200 && pool.totalCount > 0; attempt++) await sleep(25);
+    assert.equal(pool.totalCount, 0, 'the pool should drop the lost connection');
     await works();
     const entries = logged.filter((line) => line.includes('db_connection_error'));
     assert.equal(entries.length, 1, logged.join('\n'));
-    assert.ok(!entries[0].includes('study_test'), 'the log has no connection details');
+    // Only these two fields, so nothing about the connection can reach the log with it.
+    assert.deepEqual(Object.keys(JSON.parse(entries[0]) as object), ['event', 'message']);
+    assert.ok(!entries[0].includes(url!), 'the log does not repeat the connection string');
   });
 
   await t.test('a connection lost between queries of a transaction: it rejects', async () => {
@@ -65,6 +69,8 @@ test('losing database connections never ends the process', { skip: !url }, async
         method: 'POST',
         body: { studyDate: `${year}-01-01`, startTime: '09:00', endTime: '10:00' },
       });
+      // console.error is captured above, so a failure here shows what the server logged.
+      assert.equal(created.status, 201, logged.join('\n'));
       const { id } = created.data.studyLog as { id: number };
 
       // The save waits on this row lock, so its connection can be found and ended mid-request.
