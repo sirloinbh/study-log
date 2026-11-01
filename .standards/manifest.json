@@ -1,5 +1,5 @@
 {
-  "centralSha": "3f3bf8d44a5f0321c46a93ddd7d375daa96d104f",
+  "centralSha": "10baedfb001c54137e02a1c87484219519dffdac",
   "profile": "app",
   "project": "study-log",
   "files": {
@@ -328,7 +328,7 @@
     },
     "frontend/nginx.conf": {
       "mode": "full",
-      "sha256": "0951d167c2e43586756916e63bb4964ccada2471bf152208a51eea6e64e8f567",
+      "sha256": "292203eb05679b34bf13eab124f3ade45802a64dd79d871758ea54ccad2b18c7",
       "source": "templates/app/frontend/nginx.conf.tmpl"
     },
     "frontend/package.json": {
@@ -359,7 +359,7 @@
         "devDependencies.jsdom": "30.1.2",
         "devDependencies.tailwindcss": "4.3.3",
         "devDependencies.typescript": "5.9.3",
-        "devDependencies.vite": "6.4.4",
+        "devDependencies.vite": "6.4.5",
         "devDependencies.vitest": "5.0.3"
       },
       "source": "templates/index.json"
@@ -372,7 +372,7 @@
     "frontend/public/offline.html": {
       "mode": "full",
       "sha256": "ede6a9c89ca8f239673a03f7df21409a5f871540665e1b29d9d65ca03e4d8395",
-      "source": "templates/app/frontend/public/offline.html"
+      "source": "templates/app/frontend/public/offline.html.tmpl"
     },
     "frontend/public/sw.js": {
       "mode": "full",
