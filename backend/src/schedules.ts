@@ -140,7 +140,8 @@ const moveInput = z.object(
   { error: '날짜를 JSON 객체로 보내세요' },
 );
 
-// Far enough for any delay, near enough that no date runs off the calendar.
+// For every day a move touches: far enough for any plan, near enough that repeated moves cannot run
+// a date off the calendar.
 const maxMoveDays = 730;
 
 const notFound = { error: '일정을 찾을 수 없습니다' };
@@ -275,8 +276,6 @@ export function scheduleRoutes(pool: Pool, today: () => string, fetcher: Holiday
         if (!found.rows[0]) return { status: 404, body: itemNotFound };
         const refused = await change(client, itemId, found.rows[0], date);
         if (refused) return refused;
-        // A day reopened in the past moves what is open along with it.
-        await moveOverdue(client, scheduleId, date);
         return { status: 200, body: await loadSchedule(client, scheduleId) };
       },
       (result) => result.status < 400,
@@ -295,11 +294,15 @@ export function scheduleRoutes(pool: Pool, today: () => string, fetcher: Holiday
   );
 
   router.post('/:id/items/:itemId/reopen', (req, res) =>
-    changeItem(req.params, res, async (client, id, item) => {
+    changeItem(req.params, res, async (client, id, item, date) => {
       if (!item.completedOn) return { status: 409, body: { error: '완료하지 않은 항목입니다' } };
+      // A day already past comes to today by itself: one mistaken click must not push the whole
+      // schedule by however long ago it was done, with no way back (rule 4장).
       await client.query(
-        'UPDATE schedule_items SET completed_on = NULL, updated_at = now() WHERE id = $1',
-        [id],
+        `UPDATE schedule_items SET completed_on = NULL, updated_at = now(),
+           item_date = GREATEST(item_date, $2::date)
+         WHERE id = $1`,
+        [id, date],
       );
     }),
   );
@@ -313,7 +316,18 @@ export function scheduleRoutes(pool: Pool, today: () => string, fetcher: Holiday
         return { status: 400, body: { error: '날짜는 오늘 이후여야 합니다' } };
       if (daysInPeriod(today, input.date) > maxMoveDays)
         return { status: 400, body: { error: `날짜는 오늘부터 ${maxMoveDays}일 안이어야 합니다` } };
-      if (input.withLater)
+      if (input.withLater) {
+        const last = await client.query<{ last: string }>(
+          `SELECT max(item_date) + ($3::date - $4::date) AS last FROM schedule_items
+           WHERE schedule_id = (SELECT schedule_id FROM schedule_items WHERE id = $1)
+             AND completed_on IS NULL AND item_date >= $4::date AND $2::bigint IS NOT NULL`,
+          [id, id, input.date, item.date],
+        );
+        if (daysInPeriod(today, last.rows[0].last) > maxMoveDays)
+          return {
+            status: 400,
+            body: { error: `함께 옮기는 일정도 오늘부터 ${maxMoveDays}일 안이어야 합니다` },
+          };
         await client.query(
           `UPDATE schedule_items i SET item_date = i.item_date + ($2::date - $3::date),
              updated_at = now()
@@ -321,7 +335,7 @@ export function scheduleRoutes(pool: Pool, today: () => string, fetcher: Holiday
              AND i.completed_on IS NULL AND i.item_date >= $3::date`,
           [id, input.date, item.date],
         );
-      else
+      } else
         await client.query(
           'UPDATE schedule_items SET item_date = $2, updated_at = now() WHERE id = $1',
           [id, input.date],
@@ -443,6 +457,7 @@ export function scheduleRoutes(pool: Pool, today: () => string, fetcher: Holiday
       [id, input.title],
     );
     if (!rowCount) return void res.status(404).json(notFound);
+    await catchUp(pool, today(), id);
     // Deleted right after the update, by another tab.
     const found = await loadSchedule(pool, id);
     if (!found) return void res.status(404).json(notFound);

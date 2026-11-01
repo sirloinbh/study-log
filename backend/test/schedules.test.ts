@@ -122,7 +122,8 @@ test('invalid input is a Korean 400 before the DB or the holiday API', async () 
 });
 
 test('a schedule deleted right after its rename is 404, not an empty 200', async () => {
-  const answers = [{ rowCount: 1 }, { rows: [] }];
+  // The rename, looking for days behind, and reading it back.
+  const answers = [{ rowCount: 1 }, { rows: [] }, { rows: [] }];
   const pool = { query: async () => answers.shift() } as unknown as Pool;
   await withApi(pool, async (call) => {
     const { status, data } = await call('/api/schedules/1', {

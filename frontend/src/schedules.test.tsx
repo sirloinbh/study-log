@@ -11,6 +11,7 @@ import { describe, expect, test, vi } from 'vitest';
 
 import {
   dayLabel,
+  dayNames,
   defaultEnd,
   hoursToMinutes,
   type Schedule,
@@ -369,6 +370,7 @@ describe('adjusting the days', () => {
     await opened();
     fireEvent.click(days().getByRole('button', { name: '3월 7일 (토) 옮기기' }));
     expect(days().getByLabelText('옮길 날짜')).toHaveValue('2026-03-07');
+    await waitFor(() => expect(days().getByLabelText('옮길 날짜')).toHaveFocus());
     fireEvent.click(days().getByRole('button', { name: '취소' }));
     expect(days().queryByLabelText('옮길 날짜')).toBeNull();
     await waitFor(() =>
@@ -380,6 +382,9 @@ describe('adjusting the days', () => {
     fireEvent.change(days().getByLabelText('옮길 날짜'), { target: { value: '2026-03-10' } });
     fireEvent.submit(days().getByLabelText('옮길 날짜').closest('form')!);
     await dayCard().findByText('날짜를 옮겼습니다');
+    await waitFor(() =>
+      expect(days().getByRole('button', { name: '3월 10일 (화) 옮기기' })).toHaveFocus(),
+    );
     expect(sent).toEqual([
       {
         method: 'PUT',
@@ -414,6 +419,62 @@ describe('adjusting the days', () => {
     fireEvent.submit(days().getByLabelText('옮길 날짜').closest('form')!);
     expect(await dayCard().findByRole('alert')).toHaveTextContent('날짜는 오늘 이후여야 합니다');
     expect(days().getByLabelText('옮길 날짜')).toBeInTheDocument();
+    // Back where it can be corrected, and correcting it takes the complaint back.
+    await waitFor(() => expect(days().getByLabelText('옮길 날짜')).toHaveFocus());
+    fireEvent.change(days().getByLabelText('옮길 날짜'), { target: { value: '2026-03-20' } });
+    expect(dayCard().queryByRole('alert')).toBeNull();
+  });
+
+  test('what was said about a day does not stay for another schedule', async () => {
+    const first = detailOf(schedule(2, '새 일정'));
+    let rows = [schedule(2, '새 일정'), schedule(1, '지난 일정')];
+    fakeApi(({ method, path }) => {
+      if (path === '/api/textbooks') return { body: { textbooks: [] } };
+      if (path === '/api/schedules') return { body: { schedules: rows } };
+      if (method === 'DELETE') {
+        rows = rows.filter((row) => row.id !== 2);
+        return { status: 204 };
+      }
+      if (method === 'GET')
+        return { body: detailOf(path.endsWith('/2') ? rows[0] : schedule(1, '지난 일정')) };
+      return { body: first };
+    });
+    render(<Schedules today={today} />);
+    await screen.findByRole('heading', { level: 2, name: '새 일정' });
+    fireEvent.click(days().getByRole('checkbox', { name: '3월 2일 (월) 완료' }));
+    await dayCard().findByText('완료로 표시했습니다');
+    fireEvent.click(list().getByRole('button', { name: '새 일정 삭제' }));
+    fireEvent.click(list().getByRole('button', { name: '새 일정 삭제 확인' }));
+    await screen.findByRole('heading', { level: 2, name: '지난 일정' });
+    expect(dayCard().queryByText('완료로 표시했습니다')).toBeNull();
+  });
+
+  test('a day of a schedule gone elsewhere sends focus to the heading', async () => {
+    fakeApi(({ method, path }) => {
+      if (path === '/api/textbooks') return { body: { textbooks: [] } };
+      if (path === '/api/schedules') return { body: { schedules: [schedule(1, '지난 일정')] } };
+      if (method === 'GET') return { body: detailOf(schedule(1, '지난 일정')) };
+      return { status: 404, body: { error: '일정을 찾을 수 없습니다' } };
+    });
+    await opened();
+    fireEvent.click(days().getByRole('checkbox', { name: '3월 2일 (월) 완료' }));
+    await dayCard().findByRole('alert');
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { level: 2, name: '지난 일정' })).toHaveFocus(),
+    );
+  });
+
+  test('days on the same date are told apart', () => {
+    expect([
+      ...dayNames(
+        [
+          { id: 1, date: '2026-03-02' },
+          { id: 2, date: '2026-03-02' },
+          { id: 3, date: '2026-03-03' },
+        ],
+        '2026-03-02',
+      ).values(),
+    ]).toEqual(['3월 2일 (월) 1번째', '3월 2일 (월) 2번째', '3월 3일 (화)']);
   });
 
   test('a delay is shown with the end first chosen', async () => {

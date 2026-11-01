@@ -3,7 +3,7 @@ import { test } from 'node:test';
 
 import { Pool } from 'pg';
 
-import { withApi } from './helpers.js';
+import { holdExactTotalsLock, withApi } from './helpers.js';
 
 const url = process.env.TEST_DATABASE_URL;
 
@@ -15,16 +15,19 @@ type Detail = { schedule: Summary; items: Item[] };
 // this test alone. Every day here has 60 minutes, so an item exists for each date.
 test('a schedule follows what was done and what fell behind', { skip: !url }, async (t) => {
   const pool = new Pool({ connectionString: url });
+  const books: number[] = [];
   const cleanup = async () => {
     await pool.query(
       "DELETE FROM schedules WHERE start_date BETWEEN '8041-01-01' AND '8042-12-31'",
     );
+    if (books.length) await pool.query('DELETE FROM textbooks WHERE id = ANY($1)', [books]);
     await pool.query('DELETE FROM holiday_years WHERE year BETWEEN 8041 AND 8042');
     await pool.query(
       "DELETE FROM holidays WHERE holiday_date BETWEEN '8041-01-01' AND '8042-12-31'",
     );
   };
-  t.after(async () => {
+  // Reading the list moves every schedule behind by its "today", and each test has its own.
+  await holdExactTotalsLock(url, t, async () => {
     await cleanup();
     await pool.end();
   });
@@ -173,21 +176,124 @@ test('a schedule follows what was done and what fell behind', { skip: !url }, as
         assert.equal((await read(schedule.id)).items[0].completedOn, null);
       });
 
-      await t.test('reopening a day in the past moves what is open with it', async () => {
+      await t.test('reopening a day in the past brings only that day to today', async () => {
         today = '8041-08-01';
-        const { schedule, items } = await make('8041-08-01', '8041-08-03');
+        const { schedule, items } = await make('8041-08-01', '8041-08-30');
         await complete(schedule.id, items[0].id);
-        today = '8041-08-02';
-        await complete(schedule.id, items[1].id);
-        today = '8041-08-03';
+        today = '8041-08-20';
+        // Everything left has fallen behind by nineteen days by now, and is moved first.
+        const before = await read(schedule.id);
+        const byIdBefore = new Map(before.items.map((item) => [item.id, item.date]));
+        assert.equal(byIdBefore.get(items[1].id), '8041-08-20');
         const answer = await reopen(schedule.id, items[0].id);
         assert.equal(answer.status, 200);
         const detail = answer.data as unknown as Detail;
-        // 08-01 is open again and two days behind, and takes 08-03 along.
         const byId = new Map(detail.items.map((item) => [item.id, item]));
-        assert.equal(byId.get(items[0].id)?.date, '8041-08-03');
-        assert.equal(byId.get(items[1].id)?.date, '8041-08-02');
-        assert.equal(byId.get(items[2].id)?.date, '8041-08-05');
+        assert.equal(byId.get(items[0].id)?.date, '8041-08-20');
+        assert.equal(byId.get(items[0].id)?.completedOn, null);
+        for (const item of items.slice(1))
+          assert.equal(byId.get(item.id)?.date, byIdBefore.get(item.id));
+        // A day not yet come stays where it is.
+        today = '8041-08-20';
+        const ahead = await make('8041-08-25', '8041-08-26');
+        await complete(ahead.schedule.id, ahead.items[1].id);
+        const reopened = await reopen(ahead.schedule.id, ahead.items[1].id);
+        assert.deepEqual(dates(reopened.data as unknown as Detail), ['8041-08-25', '8041-08-26']);
+      });
+
+      await t.test('moving keeps the target and chapters, and days can share a date', async () => {
+        today = '8042-04-01';
+        const book = await call('/api/textbooks', { method: 'POST', body: { title: '조정 교재' } });
+        const bookId = (book.data.textbook as { id: number }).id;
+        books.push(bookId);
+        await call(`/api/textbooks/${bookId}/contents`, { method: 'POST', body: { title: '1장' } });
+        await call(`/api/textbooks/${bookId}/contents`, { method: 'POST', body: { title: '2장' } });
+        const made = await call('/api/schedules', {
+          method: 'POST',
+          body: {
+            title: '장 있는 일정',
+            startDate: '8042-04-01',
+            endDate: '8042-04-04',
+            weekdayMinutes: 60,
+            restDayMinutes: 60,
+            chapters: { textbookId: bookId },
+          },
+        });
+        const { schedule, items } = made.data as unknown as Detail & {
+          items: { contents: unknown[] }[];
+        };
+        type Full = { items: (Item & { contents: { title: string }[] })[] };
+        const shape = (detail: Full) =>
+          new Map(
+            detail.items.map((item) => [
+              item.id,
+              [item.targetMinutes, item.contents.map((c) => c.title).join()].join('/'),
+            ]),
+          );
+        const original = shape(made.data as unknown as Full);
+        // By hand, with those after it, then behind by days: none of it changes what a day holds.
+        await move(schedule.id, items[3].id, '8042-04-02');
+        await move(schedule.id, items[1].id, '8042-04-10', true);
+        today = '8042-04-05';
+        const after = await read(schedule.id);
+        assert.deepEqual(shape(after as unknown as Full), original);
+
+        // 04-02 now holds items 2 and 3... those on the same date go along with the one moved.
+        today = '8042-05-01';
+        const fresh = await make('8042-05-01', '8042-05-03');
+        await move(fresh.schedule.id, fresh.items[2].id, '8042-05-02');
+        const together = await move(fresh.schedule.id, fresh.items[1].id, '8042-05-05', true);
+        const byId = new Map((together.data as unknown as Detail).items.map((i) => [i.id, i.date]));
+        assert.equal(byId.get(fresh.items[1].id), '8042-05-05');
+        assert.equal(byId.get(fresh.items[2].id), '8042-05-05');
+        assert.equal(byId.get(fresh.items[0].id), '8042-05-01');
+      });
+
+      await t.test('a day moved before the start, and everything done', async () => {
+        today = '8042-06-01';
+        const { schedule, items } = await make('8042-06-10', '8042-06-12');
+        const early = await move(schedule.id, items[0].id, '8042-06-02');
+        assert.equal(early.status, 200);
+        const summary = (early.data as unknown as Detail).schedule;
+        assert.equal(summary.endDate, '8042-06-12');
+        assert.equal(summary.currentEndDate, '8042-06-12');
+        assert.equal(summary.delayDays, 0);
+        for (const item of items) assert.equal((await complete(schedule.id, item.id)).status, 200);
+        today = '8042-07-01';
+        const done = await read(schedule.id);
+        // Nothing open, so nothing moves however late it is.
+        assert.deepEqual(dates(done), ['8042-06-02', '8042-06-11', '8042-06-12']);
+        assert.equal(done.schedule.delayDays, 0);
+      });
+
+      await t.test('a refused change takes the catching up back too', async () => {
+        today = '8042-08-03';
+        const { schedule, items } = await make('8042-08-03', '8042-08-04');
+        today = '8042-08-06';
+        const refused = await move(schedule.id, items[0].id, '8042-08-05');
+        assert.equal(refused.status, 400);
+        const rows = await pool.query<{ date: string }>(
+          `SELECT to_char(item_date, 'YYYY-MM-DD') AS date FROM schedule_items
+           WHERE schedule_id = $1 ORDER BY item_date`,
+          [schedule.id],
+        );
+        assert.deepEqual(
+          rows.rows.map((row) => row.date),
+          ['8042-08-03', '8042-08-04'],
+        );
+      });
+
+      await t.test('days taken along stay within the limit as well', async () => {
+        today = '8042-09-01';
+        const { schedule, items } = await make('8042-09-01', '8042-09-02');
+        // 729 days on takes the next one to 730 days on, counted with today: the last allowed.
+        const lastAllowed = '8044-08-30';
+        const edge = await move(schedule.id, items[0].id, lastAllowed, true);
+        assert.equal(edge.status, 400);
+        assert.match(String(edge.data.error), /함께 옮기는 일정도/);
+        const fits = await move(schedule.id, items[0].id, '8044-08-29', true);
+        assert.equal(fits.status, 200, JSON.stringify(fits.data));
+        assert.deepEqual(dates(fits.data as unknown as Detail), ['8044-08-29', '8044-08-30']);
       });
 
       await t.test('one day moves alone, either way; later days only when asked', async () => {
@@ -242,11 +348,12 @@ test('a schedule follows what was done and what fell behind', { skip: !url }, as
         const past = await move(schedule.id, items[0].id, '8041-11-01');
         assert.equal(past.status, 400);
         assert.match(String(past.data.error), /오늘 이후/);
-        const far = await move(schedule.id, items[0].id, '8043-11-03');
+        const far = await move(schedule.id, items[0].id, '8043-11-02');
         assert.equal(far.status, 400);
         assert.match(String(far.data.error), /730일/);
+        // The 730th day counting today, one before the one refused above.
         const edge = await move(schedule.id, items[1].id, '8043-11-01');
-        assert.equal(edge.status, 200);
+        assert.equal(edge.status, 200, JSON.stringify(edge.data));
         await move(schedule.id, items[1].id, '8041-11-03');
         assert.deepEqual(dates(await read(schedule.id)), before);
         for (const [path, method, body] of [

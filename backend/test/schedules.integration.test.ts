@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { Pool } from 'pg';
 
 import { HolidayError, type HolidayFetcher } from '../src/holidays.js';
-import { withApi } from './helpers.js';
+import { holdExactTotalsLock, withApi } from './helpers.js';
 
 const url = process.env.TEST_DATABASE_URL;
 
@@ -37,7 +37,8 @@ test(
         "DELETE FROM holidays WHERE holiday_date BETWEEN '8034-01-01' AND '8038-12-31'",
       );
     };
-    t.after(async () => {
+    // Reading the list moves every schedule behind by its "today", and each test has its own.
+    await holdExactTotalsLock(url, t, async () => {
       await cleanup();
       await pool.end();
     });

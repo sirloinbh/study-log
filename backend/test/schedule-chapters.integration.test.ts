@@ -3,7 +3,7 @@ import { test } from 'node:test';
 
 import { Pool } from 'pg';
 
-import { withApi } from './helpers.js';
+import { holdExactTotalsLock, withApi } from './helpers.js';
 
 const url = process.env.TEST_DATABASE_URL;
 
@@ -29,7 +29,8 @@ test('a book is laid out over a schedule, chapter by chapter', { skip: !url }, a
     );
     if (books.length) await pool.query('DELETE FROM textbooks WHERE id = ANY($1)', [books]);
   };
-  t.after(async () => {
+  // Reading the list moves every schedule behind by its "today", and each test has its own.
+  await holdExactTotalsLock(url, t, async () => {
     await cleanup();
     await pool.end();
   });
