@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import type { Pool } from 'pg';
-import { z } from 'zod';
+import { z } from 'zod/v4';
 
 import { isCalendarDate } from './dates.js';
 import { studyTypes } from './study-logs.js';
@@ -10,18 +10,14 @@ export type StatPeriod = (typeof statPeriods)[number];
 
 const query = z.object({
   period: z
-    .enum(statPeriods, {
-      errorMap: () => ({ message: '기간은 이번 주, 이번 달, 최근 3개월, 전체 중에서 고르세요' }),
-    })
+    .enum(statPeriods, { error: '기간은 이번 주, 이번 달, 최근 3개월, 전체 중에서 고르세요' })
     .default('week'),
 });
 
 // Study time can be narrowed to one kind of study (#52).
 const studyTimeQuery = query.extend({
   type: z
-    .enum(['all', ...studyTypes], {
-      errorMap: () => ({ message: '학습 유형은 전체, 신규, 복습 중에서 고르세요' }),
-    })
+    .enum(['all', ...studyTypes], { error: '학습 유형은 전체, 신규, 복습 중에서 고르세요' })
     .default('all'),
 });
 
@@ -143,18 +139,18 @@ export const completionRate = (completed: number, scheduled: number) =>
 const patternQuery = z
   .object({
     from: z
-      .string({ invalid_type_error: '시작일 형식이 올바르지 않습니다' })
+      .string({ error: '시작일 형식이 올바르지 않습니다' })
       .regex(/^\d{4}-\d{2}-\d{2}$/, '시작일은 YYYY-MM-DD 형식으로 입력하세요')
       .refine(isCalendarDate, '존재하지 않는 날짜입니다')
       .optional(),
     to: z
-      .string({ invalid_type_error: '종료일 형식이 올바르지 않습니다' })
+      .string({ error: '종료일 형식이 올바르지 않습니다' })
       .regex(/^\d{4}-\d{2}-\d{2}$/, '종료일은 YYYY-MM-DD 형식으로 입력하세요')
       .refine(isCalendarDate, '존재하지 않는 날짜입니다')
       .optional(),
   })
   .refine((query) => !query.from || !query.to || query.from <= query.to, {
-    message: '시작일은 종료일보다 늦을 수 없습니다',
+    error: '시작일은 종료일보다 늦을 수 없습니다',
   });
 
 // Study time statistics (#47): /api/stats/study-time?period=week|month|3months|all&type=all|new|review

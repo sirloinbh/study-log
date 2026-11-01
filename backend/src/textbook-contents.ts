@@ -1,8 +1,9 @@
 import { type Response, Router } from 'express';
 import type { Pool, PoolClient } from 'pg';
-import { z } from 'zod';
+import { z } from 'zod/v4';
 
 import { inTransaction } from './sql.js';
+import { missingOrInvalid } from './validation.js';
 
 // Same rule as the textbook id: plain positive integers that stay exact in JS and fit bigint.
 const pathId = (label: string) =>
@@ -16,31 +17,25 @@ const contentIdParam = pathId('목차');
 const bodyId = (label: string) => {
   const message = `${label} ID가 올바르지 않습니다`;
   return z
-    .number({ required_error: message, invalid_type_error: message })
+    .number({ error: message })
     .int(message)
     .min(1, message)
     .max(999_999_999_999_999, message);
 };
 
-const asObject = {
-  required_error: '목차 내용을 JSON 객체로 보내세요',
-  invalid_type_error: '목차 내용을 JSON 객체로 보내세요',
-};
+const asObject = { error: '목차 내용을 JSON 객체로 보내세요' };
 
 const entryFields = {
   number: z
-    .string({ invalid_type_error: '번호 형식이 올바르지 않습니다' })
+    .string({ error: '번호 형식이 올바르지 않습니다' })
     .trim()
-    .max(20, '번호 길이는 20자 이하여야 합니다')
+    .refine((value) => value.length <= 20, '번호 길이는 20자 이하여야 합니다')
     .default(''),
   title: z
-    .string({
-      required_error: '목차 제목을 입력하세요',
-      invalid_type_error: '목차 제목 형식이 올바르지 않습니다',
-    })
+    .string(missingOrInvalid('목차 제목을 입력하세요', '목차 제목 형식이 올바르지 않습니다'))
     .trim()
-    .min(1, '목차 제목을 입력하세요')
-    .max(200, '목차 제목 길이는 200자 이하여야 합니다'),
+    .refine((value) => value.length >= 1, '목차 제목을 입력하세요')
+    .refine((value) => value.length <= 200, '목차 제목 길이는 200자 이하여야 합니다'),
 };
 
 // A new entry goes last among its siblings; no parent means a top-level chapter.
@@ -55,13 +50,11 @@ export const orderLimit = 1000;
 const orderInput = z.object(
   {
     parentId: bodyId('상위 목차').nullable().default(null),
+    // .max() first: zod 4.6.7 rejects before reading the elements only when no refine precedes it.
     ids: z
-      .array(bodyId('목차'), {
-        required_error: '순서를 바꿀 목차 ID 목록을 보내세요',
-        invalid_type_error: '순서를 바꿀 목차 ID 목록을 보내세요',
-      })
-      .min(1, '순서를 바꿀 목차 ID 목록을 보내세요')
+      .array(bodyId('목차'), { error: '순서를 바꿀 목차 ID 목록을 보내세요' })
       .max(orderLimit, `목차 순서는 한 번에 ${orderLimit}개까지 바꿀 수 있습니다`)
+      .refine((value) => value.length >= 1, '순서를 바꿀 목차 ID 목록을 보내세요')
       .refine((ids) => new Set(ids).size === ids.length, '목차 ID가 중복되었습니다'),
   },
   asObject,
@@ -72,15 +65,13 @@ const orderInput = z.object(
 export const bulkLimits = { entries: 500, levels: 10 } as const;
 const bulkInput = z.object(
   {
+    // .max() first, as in orderInput.
     entries: z
       .array(
         z.object(
           {
             level: z
-              .number({
-                required_error: '목차 단계를 보내세요',
-                invalid_type_error: '목차 단계가 올바르지 않습니다',
-              })
+              .number(missingOrInvalid('목차 단계를 보내세요', '목차 단계가 올바르지 않습니다'))
               .int('목차 단계가 올바르지 않습니다')
               .min(0, '목차 단계가 올바르지 않습니다')
               .max(bulkLimits.levels - 1, `목차는 ${bulkLimits.levels}단계까지입니다`),
@@ -88,13 +79,10 @@ const bulkInput = z.object(
           },
           asObject,
         ),
-        {
-          required_error: '등록할 목차 목록을 보내세요',
-          invalid_type_error: '등록할 목차 목록을 보내세요',
-        },
+        { error: '등록할 목차 목록을 보내세요' },
       )
-      .min(1, '등록할 목차가 없습니다')
       .max(bulkLimits.entries, `목차는 한 번에 ${bulkLimits.entries}개까지 등록할 수 있습니다`)
+      .refine((value) => value.length >= 1, '등록할 목차가 없습니다')
       .superRefine((entries, ctx) => {
         if (entries.length && entries[0].level !== 0)
           ctx.addIssue({ code: 'custom', message: '첫 목차는 맨 위 단계여야 합니다' });
