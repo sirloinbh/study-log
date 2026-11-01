@@ -81,6 +81,7 @@ test('the completion rate and its counts are shown for the period', async () => 
   server();
   render(<Stats />);
   expect(await reviewCard().findByText('75%')).toBeTruthy();
+  expect(reviewCard().getByRole('heading', { name: '복습 완료율' })).toBeTruthy();
   expect(reviewCard().getByText(/이번 주 예정 4회 중 3회 완료, 지연 2회입니다/)).toBeTruthy();
 });
 
