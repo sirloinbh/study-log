@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { type Response, Router } from 'express';
 import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod/v4';
 
@@ -13,6 +13,8 @@ import { missingOrInvalid } from './validation.js';
 // A year at most, so a schedule reads the holidays of two years at most: the request waits for them.
 export const maxScheduleDays = 366;
 const dayMs = 86_400_000;
+
+type Reply = { status: number; body: unknown };
 
 // Both ends counted.
 export const daysInPeriod = (start: string, end: string) =>
@@ -124,13 +126,33 @@ const createInput = z
 // only when creating (rule 3장, 5장).
 const updateInput = z.object({ title }, { error: '일정 내용을 JSON 객체로 보내세요' });
 
+const itemIdParam = z
+  .string()
+  .regex(/^[1-9]\d{0,14}$/, '일정 항목 ID가 올바르지 않습니다')
+  .transform(Number);
+
+// Moving a day (rule 4장). `withLater` takes the open days from it onward along, keeping their gaps.
+const moveInput = z.object(
+  {
+    date: dateField('날짜'),
+    withLater: z.boolean({ error: '이후 일정 이동 여부가 올바르지 않습니다' }).default(false),
+  },
+  { error: '날짜를 JSON 객체로 보내세요' },
+);
+
+// Far enough for any delay, near enough that no date runs off the calendar.
+const maxMoveDays = 730;
+
 const notFound = { error: '일정을 찾을 수 없습니다' };
+const itemNotFound = { error: '일정 항목을 찾을 수 없습니다' };
 
 const summaryColumns = `s.id, s.title, s.start_date AS "startDate", s.end_date AS "endDate",
   s.weekday_minutes AS "weekdayMinutes", s.rest_day_minutes AS "restDayMinutes",
   s.textbook_id AS "textbookId",
   (SELECT t.title FROM textbooks t WHERE t.id = s.textbook_id) AS "textbookTitle",
-  COALESCE(sum(i.target_minutes), 0)::int AS "totalMinutes", count(i.id)::int AS "itemCount"`;
+  COALESCE(sum(i.target_minutes), 0)::int AS "totalMinutes", count(i.id)::int AS "itemCount",
+  GREATEST(s.end_date, max(i.item_date)) AS "currentEndDate",
+  GREATEST(max(i.item_date) - s.end_date, 0)::int AS "delayDays"`;
 
 async function loadSchedule(db: Pool | PoolClient, id: number) {
   const { rows } = await db.query(
@@ -142,6 +164,7 @@ async function loadSchedule(db: Pool | PoolClient, id: number) {
   if (!rows[0]) return undefined;
   const items = await db.query(
     `SELECT i.id, i.item_date AS date, i.target_minutes AS "targetMinutes",
+       i.completed_on AS "completedOn",
        COALESCE(
          json_agg(json_build_object('id', c.id, 'number', c.number, 'title', c.title)
            ORDER BY sc.position) FILTER (WHERE c.id IS NOT NULL),
@@ -154,6 +177,39 @@ async function loadSchedule(db: Pool | PoolClient, id: number) {
     [id],
   );
   return { schedule: rows[0], items: items.rows };
+}
+
+// Moves a schedule's open days so the earliest is today, when it fell behind (rule 4장). All of them
+// by the same days: their gaps stay and none comes forward. The caller holds the schedule's lock,
+// so two reads cannot both move it.
+async function moveOverdue(client: PoolClient, scheduleId: number, today: string) {
+  await client.query(
+    `UPDATE schedule_items i
+     SET item_date = i.item_date + ($2::date - e.earliest), updated_at = now()
+     FROM (
+       SELECT min(item_date) AS earliest FROM schedule_items
+       WHERE schedule_id = $1 AND completed_on IS NULL
+     ) e
+     WHERE i.schedule_id = $1 AND i.completed_on IS NULL AND e.earliest < $2::date`,
+    [scheduleId, today],
+  );
+}
+
+// Run on every read (rule 4장), with no scheduler. Nothing is locked unless something is behind, each
+// schedule in a transaction of its own.
+async function catchUp(pool: Pool, today: string, scheduleId?: number) {
+  const { rows } = await pool.query<{ id: number }>(
+    `SELECT DISTINCT schedule_id AS id FROM schedule_items
+     WHERE completed_on IS NULL AND item_date < $1::date
+       AND ($2::bigint IS NULL OR schedule_id = $2::bigint)
+     ORDER BY id`,
+    [today, scheduleId ?? null],
+  );
+  for (const { id } of rows)
+    await inTransaction(pool, async (client) => {
+      await client.query('SELECT 1 FROM schedules WHERE id = $1 FOR UPDATE', [id]);
+      await moveOverdue(client, id, today);
+    });
 }
 
 type ChapterRange = {
@@ -187,7 +243,94 @@ async function chaptersInRange(
 export function scheduleRoutes(pool: Pool, today: () => string, fetcher: HolidayFetcher) {
   const router = Router();
 
+  // A change to one day: under the schedule's lock, after moving what is behind, so it acts on the
+  // dates being shown. A reply of 4xx changes nothing.
+  type ItemState = { date: string; completedOn: string | null };
+  const changeItem = async (
+    params: Record<string, string>,
+    res: Response,
+    change: (
+      client: PoolClient,
+      id: number,
+      item: ItemState,
+      date: string,
+    ) => Promise<Reply | void>,
+  ) => {
+    const scheduleId = idParam.parse(params.id);
+    const itemId = itemIdParam.parse(params.itemId);
+    const date = today();
+    const reply = await inTransaction<Reply>(
+      pool,
+      async (client) => {
+        const held = await client.query('SELECT 1 FROM schedules WHERE id = $1 FOR UPDATE', [
+          scheduleId,
+        ]);
+        if (!held.rowCount) return { status: 404, body: notFound };
+        await moveOverdue(client, scheduleId, date);
+        const found = await client.query<ItemState>(
+          `SELECT item_date AS date, completed_on AS "completedOn" FROM schedule_items
+           WHERE id = $1 AND schedule_id = $2`,
+          [itemId, scheduleId],
+        );
+        if (!found.rows[0]) return { status: 404, body: itemNotFound };
+        const refused = await change(client, itemId, found.rows[0], date);
+        if (refused) return refused;
+        // A day reopened in the past moves what is open along with it.
+        await moveOverdue(client, scheduleId, date);
+        return { status: 200, body: await loadSchedule(client, scheduleId) };
+      },
+      (result) => result.status < 400,
+    );
+    res.status(reply.status).json(reply.body);
+  };
+
+  router.post('/:id/items/:itemId/complete', (req, res) =>
+    changeItem(req.params, res, async (client, id, item, date) => {
+      if (item.completedOn) return { status: 409, body: { error: '이미 완료한 항목입니다' } };
+      await client.query(
+        'UPDATE schedule_items SET completed_on = $2, updated_at = now() WHERE id = $1',
+        [id, date],
+      );
+    }),
+  );
+
+  router.post('/:id/items/:itemId/reopen', (req, res) =>
+    changeItem(req.params, res, async (client, id, item) => {
+      if (!item.completedOn) return { status: 409, body: { error: '완료하지 않은 항목입니다' } };
+      await client.query(
+        'UPDATE schedule_items SET completed_on = NULL, updated_at = now() WHERE id = $1',
+        [id],
+      );
+    }),
+  );
+
+  router.put('/:id/items/:itemId/date', async (req, res) => {
+    const input = moveInput.parse(req.body);
+    await changeItem(req.params, res, async (client, id, item, today) => {
+      if (item.completedOn)
+        return { status: 409, body: { error: '완료한 항목은 옮길 수 없습니다' } };
+      if (input.date < today)
+        return { status: 400, body: { error: '날짜는 오늘 이후여야 합니다' } };
+      if (daysInPeriod(today, input.date) > maxMoveDays)
+        return { status: 400, body: { error: `날짜는 오늘부터 ${maxMoveDays}일 안이어야 합니다` } };
+      if (input.withLater)
+        await client.query(
+          `UPDATE schedule_items i SET item_date = i.item_date + ($2::date - $3::date),
+             updated_at = now()
+           WHERE i.schedule_id = (SELECT schedule_id FROM schedule_items WHERE id = $1)
+             AND i.completed_on IS NULL AND i.item_date >= $3::date`,
+          [id, input.date, item.date],
+        );
+      else
+        await client.query(
+          'UPDATE schedule_items SET item_date = $2, updated_at = now() WHERE id = $1',
+          [id, input.date],
+        );
+    });
+  });
+
   router.get('/', async (_req, res) => {
+    await catchUp(pool, today());
     const { rows } = await pool.query(
       `SELECT ${summaryColumns} FROM schedules s
        LEFT JOIN schedule_items i ON i.schedule_id = s.id
@@ -197,7 +340,9 @@ export function scheduleRoutes(pool: Pool, today: () => string, fetcher: Holiday
   });
 
   router.get('/:id', async (req, res) => {
-    const found = await loadSchedule(pool, idParam.parse(req.params.id));
+    const id = idParam.parse(req.params.id);
+    await catchUp(pool, today(), id);
+    const found = await loadSchedule(pool, id);
     if (!found) return void res.status(404).json(notFound);
     res.json(found);
   });

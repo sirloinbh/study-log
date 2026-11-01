@@ -106,6 +106,8 @@ test(
               textbookTitle: null,
               totalMinutes: 1260,
               itemCount: 6,
+              currentEndDate: '8034-03-06',
+              delayDays: 0,
             },
           );
           assert.deepEqual(asked, [8034]);
