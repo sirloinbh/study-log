@@ -7,7 +7,7 @@
 에이전트는 다음 순서로 진행한다.
 
 1. 아래 "사용자가 직접 할 일"의 완료 여부를 묻는다.
-2. #134, #142 순서로 진행한다. #28(P2)은 저장 위치와 패키지 설치를 사용자가 정해야 해서, 정해지기 전에는 #142를 먼저 한다.
+2. #142를 진행한다. #28(P2)은 저장 위치와 패키지 설치를 사용자가 정해야 해서, 정해지기 전에는 #142를 먼저 한다.
 3. API 키(#129)가 준비되면 P1인 #33, #34, #35를 위 순서보다 먼저 한다.
 
 ## 사용자가 직접 할 일
@@ -26,6 +26,7 @@
   - `docker version`, `docker compose version` 확인
   - `.env` 준비 여부를 사용자에게 확인. `.env.example`을 복사해 비밀번호를 정한다
   - `docker compose up -d db`로 앱 DB(호스트 15402)를 띄우고 마이그레이션 적용 확인
+  - 배포와 같은 `docker compose run --rm --no-deps -v "$PWD/database/migrations:/database/migrations:ro" api node dist/migrate.js`가 동작하는지 확인(#134에서 Docker가 없어 확인하지 못했다)
   - 필요하면 `docker compose up -d`로 웹(8102)·API 동작 확인. 이미지 빌드에도 `NODE_AUTH_TOKEN`이 필요하다
 - 2번 완료 후:
   - Claude in Chrome 도구로 탭 조회(`tabs_context_mcp`)가 되는지 확인
