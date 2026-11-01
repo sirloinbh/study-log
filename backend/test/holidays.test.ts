@@ -22,7 +22,7 @@ const item = (locdate: number | string, dateName: string, isHoliday = 'Y') => ({
   locdate,
   seq: 1,
 });
-const page = (items: unknown, totalCount = 0, resultCode = '00') => ({
+const page = (items: unknown, totalCount: number | string = 0, resultCode = '00') => ({
   response: {
     header: { resultCode, resultMsg: 'NORMAL SERVICE.' },
     body: { items, numOfRows: 50, pageNo: 1, totalCount },
@@ -158,27 +158,46 @@ test('anything unreadable fails the whole year without showing the key', async (
 // holiday and trusted for seven days, and schedules made from it are never recalculated.
 test('a broken answer never passes for a month without holidays', async () => {
   const header = { resultCode: '00', resultMsg: 'NORMAL SERVICE.' };
+  const empty = (body: unknown) => ({ response: { header, body } });
   const broken: unknown[] = [
     { response: { header } },
-    { response: { header, body: null } },
-    { response: { header, body: {} } },
-    { response: { header, body: { totalCount: 0 } } },
-    { response: { header, body: { items: null, totalCount: 0 } } },
-    { response: { header, body: { items: {}, totalCount: 0 } } },
-    // Without a count to compare.
-    { response: { header, body: { items: '' } } },
+    empty(null),
+    empty({}),
+    empty({ totalCount: 0 }),
+    empty({ items: null, totalCount: 0 }),
+    empty({ items: {}, totalCount: 0 }),
+    // Without a count that can be compared.
+    empty({ items: '' }),
+    empty({ items: '', totalCount: null }),
+    empty({ items: '', totalCount: '' }),
+    empty({ items: '', totalCount: ' ' }),
+    empty({ items: '', totalCount: false }),
+    empty({ items: '', totalCount: [] }),
+    // An empty list is not how an empty month is answered.
+    empty({ items: { item: [] }, totalCount: 0 }),
     // The count says there are holidays the answer does not hold.
     page('', 3),
     page({ item: [] }, 1),
-    page({ item: item(20260505, '어린이날') }, 2),
+    page({ item: item(20260216, '설날') }, 2),
     // Neither Y nor N.
-    one(20260505, '어린이날', 'y'),
-    one(20260505, '어린이날', ''),
+    one(20260216, '설날', 'y'),
+    one(20260216, '설날', ''),
     // Another year, or another month: the request's month was not honoured.
-    one(20250505, '어린이날'),
+    one(20250216, '설날'),
     one(20260101, '1월1일'),
   ];
-  for (const answer of broken) await refused(year2026({ '05': answer }));
+  // The year itself is complete, so nothing but the reading of this month can refuse it.
+  assert.equal((await dataPortalHolidays(portal(year2026()).fetchImpl)(2026)).length, 8);
+  for (const answer of broken) await refused(year2026({ '02': answer }));
+});
+
+test('a count may come as digits, and a holiday in a month without fixed ones is kept', async () => {
+  const { fetchImpl } = portal(year2026({ '02': page({ item: item(20260216, '설날') }, '1') }));
+  const holidays = await dataPortalHolidays(fetchImpl)(2026);
+  assert.deepEqual(
+    holidays.find((holiday) => holiday.name === '설날'),
+    { date: '2026-02-16', name: '설날' },
+  );
 });
 
 test('a reading without a fixed holiday is not complete', async () => {

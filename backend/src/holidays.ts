@@ -45,8 +45,9 @@ const answer = z.object({
   response: z.object({
     header: z.object({ resultCode: z.literal('00') }),
     body: z.object({
-      items: z.union([z.literal(''), z.object({ item: z.union([item, z.array(item)]) })]),
-      totalCount: z.coerce.number(),
+      items: z.union([z.literal(''), z.object({ item: z.union([item, z.array(item).min(1)]) })]),
+      // Not coerced: null, '' and false would all become 0, the count of an empty month.
+      totalCount: z.union([z.number(), z.string().regex(/^\d+$/).transform(Number)]),
     }),
   }),
 });
