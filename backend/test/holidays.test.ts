@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import { afterEach, beforeEach, test } from 'node:test';
 
-import { dataPortalHolidays, dayKind, HolidayError } from '../src/holidays.js';
+import { Pool } from 'pg';
+
+import { dataPortalHolidays, dayKind, HolidayError, loadHolidays } from '../src/holidays.js';
 
 const keyName = 'HOLIDAY_API_KEY';
 const saved = process.env[keyName];
@@ -20,11 +22,25 @@ const item = (locdate: number | string, dateName: string, isHoliday = 'Y') => ({
   locdate,
   seq: 1,
 });
-const page = (items: unknown, resultCode = '00') => ({
+const page = (items: unknown, totalCount = 0, resultCode = '00') => ({
   response: {
     header: { resultCode, resultMsg: 'NORMAL SERVICE.' },
-    body: { items, numOfRows: 50, pageNo: 1, totalCount: 1 },
+    body: { items, numOfRows: 50, pageNo: 1, totalCount },
   },
+});
+const one = (locdate: number | string, name: string, isHoliday = 'Y') =>
+  page({ item: item(locdate, name, isHoliday) }, 1);
+
+// A whole year with its fixed holidays. Months given in `changes` replace those answers.
+const year2026 = (changes: Record<string, unknown> = {}) => ({
+  '01': one(20260101, '1월1일'),
+  '03': one(20260301, '삼일절'),
+  '05': one(20260505, '어린이날'),
+  '06': one(20260606, '현충일'),
+  '08': one(20260815, '광복절'),
+  '10': page({ item: [item(20261003, '개천절'), item(20261009, '한글날')] }, 2),
+  '12': one(20261225, '기독탄신일'),
+  ...changes,
 });
 
 // Answers per month ("03"); a month not listed has no holidays.
@@ -46,6 +62,7 @@ const failsWithoutKey = async (fetchImpl: typeof fetch) => {
     return true;
   });
 };
+const refused = (months: Record<string, unknown>) => failsWithoutKey(portal(months).fetchImpl);
 
 test('a day is a weekday, a weekend or a holiday, a substitute holiday included', () => {
   // 2026-03-01 is a Sunday and a holiday; Monday 03-02 is its substitute.
@@ -60,6 +77,7 @@ test('a day is a weekday, a weekend or a holiday, a substitute holiday included'
 
 test('every month of the year is read, in the documented form, with the key encoded', async () => {
   const { urls, fetchImpl } = portal({});
+  // Nothing at all: a year not published yet.
   assert.deepEqual(await dataPortalHolidays(fetchImpl)(2026), []);
   assert.equal(urls.length, 12);
   const first = new URL(urls[0]);
@@ -79,18 +97,31 @@ test('a key given already encoded is sent as it is', async () => {
 });
 
 test('one holiday, several, a string date, and days that are not days off', async () => {
-  const { fetchImpl } = portal({
-    // One item comes as an object rather than a list.
-    '01': page({ item: item(20260101, '1월1일') }),
-    '03': page({
-      item: [item(20260301, '삼일절'), item(20260302, '대체공휴일'), item('20260315', '평일', 'N')],
+  const { fetchImpl } = portal(
+    year2026({
+      '03': page(
+        {
+          item: [
+            item(20260301, '삼일절'),
+            item(20260302, '대체공휴일'),
+            item('20260315', '평일', 'N'),
+          ],
+        },
+        3,
+      ),
     }),
-  });
-  assert.deepEqual(await dataPortalHolidays(fetchImpl)(2026), [
+  );
+  const holidays = await dataPortalHolidays(fetchImpl)(2026);
+  assert.deepEqual(holidays.slice(0, 3), [
     { date: '2026-01-01', name: '1월1일' },
     { date: '2026-03-01', name: '삼일절' },
     { date: '2026-03-02', name: '대체공휴일' },
   ]);
+  assert.equal(holidays.length, 9);
+  assert.equal(
+    holidays.some((holiday) => holiday.name === '평일'),
+    false,
+  );
 });
 
 test('without a key it says which setting is missing, before any request', async () => {
@@ -102,12 +133,11 @@ test('without a key it says which setting is missing, before any request', async
 
 test('anything unreadable fails the whole year without showing the key', async () => {
   // An error code, which the portal answers under status 200.
-  await failsWithoutKey(portal({ '05': page('', '30') }).fetchImpl);
+  await refused(year2026({ '05': page('', 0, '30') }));
   // A shape that is not the documented one.
-  await failsWithoutKey(portal({ '05': { wrong: true } }).fetchImpl);
-  // A date of another year or none at all.
-  await failsWithoutKey(portal({ '05': page({ item: item(20250505, '어린이날') }) }).fetchImpl);
-  await failsWithoutKey(portal({ '05': page({ item: item(20260231, '없는 날') }) }).fetchImpl);
+  await refused(year2026({ '05': { wrong: true } }));
+  // A date that does not exist.
+  await refused(year2026({ '05': one(20260231, '없는 날') }));
   // A refused key is answered with XML.
   await failsWithoutKey(
     (async () =>
@@ -122,4 +152,49 @@ test('anything unreadable fails the whole year without showing the key', async (
   await failsWithoutKey((async (url: string) => {
     throw new Error(`could not reach ${url}`);
   }) as unknown as typeof fetch);
+});
+
+// A broken answer must never read as "no holiday this month": the year would be kept without the
+// holiday and trusted for seven days, and schedules made from it are never recalculated.
+test('a broken answer never passes for a month without holidays', async () => {
+  const header = { resultCode: '00', resultMsg: 'NORMAL SERVICE.' };
+  const broken: unknown[] = [
+    { response: { header } },
+    { response: { header, body: null } },
+    { response: { header, body: {} } },
+    { response: { header, body: { totalCount: 0 } } },
+    { response: { header, body: { items: null, totalCount: 0 } } },
+    { response: { header, body: { items: {}, totalCount: 0 } } },
+    // Without a count to compare.
+    { response: { header, body: { items: '' } } },
+    // The count says there are holidays the answer does not hold.
+    page('', 3),
+    page({ item: [] }, 1),
+    page({ item: item(20260505, '어린이날') }, 2),
+    // Neither Y nor N.
+    one(20260505, '어린이날', 'y'),
+    one(20260505, '어린이날', ''),
+    // Another year, or another month: the request's month was not honoured.
+    one(20250505, '어린이날'),
+    one(20260101, '1월1일'),
+  ];
+  for (const answer of broken) await refused(year2026({ '05': answer }));
+});
+
+test('a reading without a fixed holiday is not complete', async () => {
+  await refused(year2026({ '05': page('') }));
+  await refused(year2026({ '12': page('') }));
+  // Marked as not a day off.
+  await refused(year2026({ '08': one(20260815, '광복절', 'N') }));
+});
+
+test('years out of order are refused rather than meaning no holidays', async () => {
+  const untouchedPool = {
+    query: async () => {
+      throw new Error('DB must not be queried');
+    },
+  } as unknown as Pool;
+  const fetcher = async () => [];
+  await assert.rejects(loadHolidays(untouchedPool, fetcher, 2027, 2026), RangeError);
+  await assert.rejects(loadHolidays(untouchedPool, fetcher, 2026.5, 2027), RangeError);
 });

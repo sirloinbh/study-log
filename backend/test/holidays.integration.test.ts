@@ -77,6 +77,14 @@ test('holidays are kept per year and read again as the rules say', { skip: !url 
     assert.equal(kept.rows.length, 1);
     assert.equal(errors.mock.callCount(), 2);
     assert.match(String(errors.mock.calls[0].arguments[0]), /holiday_refresh_failed/);
+    // An unexpected failure is not reported as an empty answer.
+    answer = () => {
+      throw new Error('secret in a message');
+    };
+    await load(2190, 2190, later(30));
+    const logged = String(errors.mock.calls[2].arguments[0]);
+    assert.match(logged, /unexpected failure/);
+    assert.doesNotMatch(logged, /secret/);
     // Still stale, so the next schedule tries again.
     asked.length = 0;
     await load(2190, 2190, later(31));

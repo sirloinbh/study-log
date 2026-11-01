@@ -25,40 +25,44 @@ export function dayKind(date: string, holidays: ReadonlySet<string>): DayKind {
 }
 
 const endpoint = 'https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getRestDeInfo';
-const requestTimeout = 10_000;
+// For all twelve requests of a year together: a schedule is waiting.
+const yearTimeout = 30_000;
 const unreadable = '공휴일 정보를 읽지 못했습니다. 잠시 뒤 다시 시도하세요';
 
+// Holidays on fixed dates, in every year. A reading without one of them is not complete.
+const fixedHolidays = ['01-01', '03-01', '05-05', '06-06', '08-15', '10-03', '10-09', '12-25'];
+
+// Strict on purpose: a missing holiday makes a wrong schedule that is never recalculated, so
+// whatever is not clearly what the API documents fails the reading instead of meaning "no holiday".
 const item = z.object({
   locdate: z.union([z.number(), z.string()]),
   dateName: z.string(),
-  isHoliday: z.string(),
+  isHoliday: z.enum(['Y', 'N']),
 });
 // `items` is an empty string for a month without holidays, and `item` a lone object when there is
 // only one.
 const answer = z.object({
   response: z.object({
-    header: z.object({ resultCode: z.string() }),
-    body: z
-      .object({
-        items: z.union([z.literal(''), z.object({ item: z.union([item, z.array(item)]) })]),
-      })
-      .optional(),
+    header: z.object({ resultCode: z.literal('00') }),
+    body: z.object({
+      items: z.union([z.literal(''), z.object({ item: z.union([item, z.array(item)]) })]),
+      totalCount: z.coerce.number(),
+    }),
   }),
 });
 
-function monthHolidays(body: unknown, year: number): Holiday[] {
+function monthHolidays(body: unknown, year: number, month: string): Holiday[] {
   const parsed = answer.safeParse(body);
-  if (!parsed.success || parsed.data.response.header.resultCode !== '00')
-    throw new HolidayError(unreadable);
-  const items = parsed.data.response.body?.items;
-  if (!items) return [];
-  return [items.item]
-    .flat()
+  if (!parsed.success) throw new HolidayError(unreadable);
+  const { items, totalCount } = parsed.data.response.body;
+  const entries = items === '' ? [] : [items.item].flat();
+  if (entries.length !== totalCount) throw new HolidayError(unreadable);
+  return entries
     .filter((entry) => entry.isHoliday === 'Y')
     .map((entry) => {
       const digits = String(entry.locdate);
       const date = `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6, 8)}`;
-      if (digits.length !== 8 || !isCalendarDate(date) || !date.startsWith(`${year}-`))
+      if (digits.length !== 8 || !isCalendarDate(date) || !date.startsWith(`${year}-${month}-`))
         throw new HolidayError(unreadable);
       return { date, name: entry.dateName };
     });
@@ -66,20 +70,23 @@ function monthHolidays(body: unknown, year: number): Holiday[] {
 
 // The astronomy institute's holiday API on the data portal. Its documented request needs a month,
 // so a year is twelve requests, one at a time; one failed month fails the year rather than leaving
-// holidays out. The key is read on use, so the server starts without one.
+// holidays out. No holidays at all is a year not published yet. The key is read on use, so the
+// server starts without one.
 export function dataPortalHolidays(fetchImpl: typeof fetch = fetch): HolidayFetcher {
   return async (year) => {
     const key = process.env.HOLIDAY_API_KEY;
     if (!key) throw new HolidayError('공휴일 API 키(HOLIDAY_API_KEY)가 서버에 설정되지 않았습니다');
     // The portal issues the key in plain and in already encoded form; either may be configured.
     const serviceKey = key.includes('%') ? key : encodeURIComponent(key);
+    const signal = AbortSignal.timeout(yearTimeout);
     const holidays: Holiday[] = [];
-    for (let month = 1; month <= 12; month++) {
-      const query = `solYear=${year}&solMonth=${String(month).padStart(2, '0')}&numOfRows=50&_type=json`;
+    for (let number = 1; number <= 12; number++) {
+      const month = String(number).padStart(2, '0');
+      const query = `solYear=${year}&solMonth=${month}&numOfRows=50&_type=json`;
       let body: unknown;
       try {
         const response = await fetchImpl(`${endpoint}?ServiceKey=${serviceKey}&${query}`, {
-          signal: AbortSignal.timeout(requestTimeout),
+          signal,
         });
         if (!response.ok) throw new Error('status');
         // A refused key is answered with XML under status 200, which fails here too.
@@ -88,8 +95,11 @@ export function dataPortalHolidays(fetchImpl: typeof fetch = fetch): HolidayFetc
         // Not passed on: the failure of a request can quote its URL, and so the key.
         throw new HolidayError(unreadable);
       }
-      holidays.push(...monthHolidays(body, year));
+      holidays.push(...monthHolidays(body, year, month));
     }
+    const dates = new Set(holidays.map((holiday) => holiday.date));
+    if (holidays.length && fixedHolidays.some((day) => !dates.has(`${year}-${day}`)))
+      throw new HolidayError(unreadable);
     return holidays;
   };
 }
@@ -108,6 +118,9 @@ export async function loadHolidays(
   to: number,
   now = new Date(),
 ): Promise<Set<string>> {
+  // Otherwise no years are read, and every date would pass for a day without a holiday.
+  if (!Number.isInteger(from) || !Number.isInteger(to) || from > to)
+    throw new RangeError('holiday years out of order');
   const years = Array.from({ length: to - from + 1 }, (_, index) => from + index);
   const { rows } = await pool.query<{ year: number; fetchedAt: Date }>(
     'SELECT year, fetched_at AS "fetchedAt" FROM holiday_years WHERE year = ANY($1::int[])',
@@ -128,13 +141,20 @@ export async function loadHolidays(
       await saveYear(pool, year, fresh, now);
     } else if (fetchedAt === undefined) {
       if (failure instanceof HolidayError) throw failure;
+      // Whatever else failed, its message stays out: it could quote the key.
+      if (failure) throw new HolidayError(unreadable);
       throw new HolidayError(`${year}년 공휴일 정보가 없어 일정을 만들 수 없습니다`);
     } else {
       console.error(
         JSON.stringify({
           event: 'holiday_refresh_failed',
           year,
-          message: failure instanceof HolidayError ? failure.message : 'no holidays returned',
+          message:
+            failure instanceof HolidayError
+              ? failure.message
+              : failure
+                ? 'unexpected failure'
+                : 'no holidays returned',
         }),
       );
     }
