@@ -20,6 +20,7 @@ const log = {
   understanding: null,
   difficulties: '',
   goalAchieved: null,
+  studyType: 'new',
 };
 
 function server(saveStatus = 200, deleteStatus = 204) {

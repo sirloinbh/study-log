@@ -15,6 +15,8 @@ import {
   type StudyLog,
   type StudyLogForm,
   type StudyStatus,
+  type StudyType,
+  studyTypeLabels,
   understandingLabels,
 } from './study-logs';
 import { StudyLogSearch } from './StudyLogSearch';
@@ -187,6 +189,7 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
       understanding: log.understanding,
       difficulties: log.difficulties,
       goalAchieved: log.goalAchieved,
+      studyType: log.studyType,
     });
     // On a phone the form sits above the list; bring it into view.
     document.getElementById('study-log-date')?.focus?.();
@@ -287,7 +290,17 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
               ))}
             </select>
           </label>
-          <label className="half">
+          <label>
+            유형
+            <select disabled={busy} value={form.studyType} onChange={change('studyType')}>
+              {(Object.keys(studyTypeLabels) as StudyType[]).map((type) => (
+                <option key={type} value={type}>
+                  {studyTypeLabels[type]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
             이해도
             <select
               disabled={busy}
@@ -393,6 +406,7 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
                   </span>
                   <strong>{formatMinutes(log.durationMinutes)}</strong>
                   <span className={`badge ${log.status}`}>{statusLabels[log.status]}</span>
+                  {log.studyType === 'review' && <span className="badge">복습</span>}
                 </div>
                 {log.textbookTitle !== null && <p className="log-studied">{studiedLabel(log)}</p>}
                 {reflectionLabel(log) && <p className="log-studied">{reflectionLabel(log)}</p>}

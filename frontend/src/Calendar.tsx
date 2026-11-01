@@ -165,6 +165,7 @@ export function Calendar({ today, reloadKey }: { today: string; reloadKey?: numb
                   </span>
                   <strong>{formatMinutes(log.durationMinutes)}</strong>
                   <span className={`badge ${log.status}`}>{statusLabels[log.status]}</span>
+                  {log.studyType === 'review' && <span className="badge">복습</span>}
                 </div>
                 {log.memo && <Memo text={log.memo} />}
               </li>

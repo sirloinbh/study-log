@@ -3,6 +3,7 @@ import type { Pool } from 'pg';
 import { z } from 'zod';
 
 import { isCalendarDate } from './dates.js';
+import { studyTypes } from './study-logs.js';
 
 export const statPeriods = ['week', 'month', '3months', 'all'] as const;
 export type StatPeriod = (typeof statPeriods)[number];
@@ -13,6 +14,15 @@ const query = z.object({
       errorMap: () => ({ message: '기간은 이번 주, 이번 달, 최근 3개월, 전체 중에서 고르세요' }),
     })
     .default('week'),
+});
+
+// Study time can be narrowed to one kind of study (#52).
+const studyTimeQuery = query.extend({
+  type: z
+    .enum(['all', ...studyTypes], {
+      errorMap: () => ({ message: '학습 유형은 전체, 신규, 복습 중에서 고르세요' }),
+    })
+    .default('all'),
 });
 
 // Calendar arithmetic on YYYY-MM-DD strings in UTC, so no local time zone shifts a day.
@@ -67,15 +77,22 @@ export function bucket(daily: Day[], keyOf: (date: string) => string) {
 // Planned sessions have not been studied yet, so they do not count; later dates neither.
 const counted = `status <> 'planned' AND study_date <= $1`;
 
-// Minutes studied on every day from `from` to `to`, a day without study as 0.
-const dailyMinutes = async (pool: Pool, from: string, to: string) =>
+// Minutes studied on every day from `from` to `to`, a day without study as 0; only one kind of
+// study when `studyType` is given.
+const dailyMinutes = async (
+  pool: Pool,
+  from: string,
+  to: string,
+  studyType: string | null = null,
+) =>
   (
     await pool.query<Day>(
       `SELECT day::date AS date, COALESCE(sum(l.duration_minutes), 0)::int AS minutes
        FROM generate_series($2::date, $1::date, interval '1 day') AS day
        LEFT JOIN study_logs l ON l.study_date = day::date AND l.status <> 'planned'
+         AND ($3::text IS NULL OR l.study_type = $3)
        GROUP BY day ORDER BY day`,
-      [to, from],
+      [to, from, studyType],
     )
   ).rows;
 
@@ -140,25 +157,27 @@ const patternQuery = z
     message: '시작일은 종료일보다 늦을 수 없습니다',
   });
 
-// Study time statistics (#47): /api/stats/study-time?period=week|month|3months|all
+// Study time statistics (#47): /api/stats/study-time?period=week|month|3months|all&type=all|new|review
 export function statsRoutes(pool: Pool, today: () => string) {
   const router = Router();
 
   router.get('/study-time', async (req, res) => {
-    const { period } = query.parse(req.query);
+    const { period, type } = studyTimeQuery.parse(req.query);
+    const studyType = type === 'all' ? null : type;
     const to = today();
     const totals = await pool.query<{ first: string | null; cumulative: number }>(
       `SELECT min(study_date) AS first, COALESCE(sum(duration_minutes), 0)::int AS cumulative
-       FROM study_logs WHERE ${counted}`,
-      [to],
+       FROM study_logs WHERE ${counted} AND ($2::text IS NULL OR study_type = $2)`,
+      [to, studyType],
     );
     const { first, cumulative } = totals.rows[0];
     const from = periodStart(period, to, first ?? undefined);
-    const daily = await dailyMinutes(pool, from, to);
+    const daily = await dailyMinutes(pool, from, to, studyType);
     const totalMinutes = daily.reduce((sum, day) => sum + day.minutes, 0);
     const studyDays = daily.filter((day) => day.minutes > 0).length;
     res.json({
       period,
+      type,
       from,
       to,
       totalMinutes,

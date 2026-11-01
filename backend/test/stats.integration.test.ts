@@ -128,6 +128,44 @@ test(
         assert.equal(minutesOn('2096-01-05'), 30);
         assert.equal(minutesOn('2096-05-20'), undefined);
 
+        // The study type filter (#52): logs without a type are new; heatmap and all stay together.
+        await call('/api/study-logs', {
+          method: 'POST',
+          body: {
+            studyDate: today,
+            startTime: '15:00',
+            endTime: '15:40',
+            status: 'done',
+            studyType: 'review',
+          },
+        });
+        const typed = async (type: string) =>
+          (await call(`/api/stats/study-time?period=week&type=${type}`)).data as Stats & {
+            type: string;
+          };
+        const reviewOnly = await typed('review');
+        assert.deepEqual(
+          [reviewOnly.type, reviewOnly.totalMinutes, reviewOnly.todayMinutes, reviewOnly.studyDays],
+          ['review', 40, 40, 1],
+        );
+        assert.equal(reviewOnly.cumulativeMinutes, 40);
+        assert.deepEqual(
+          reviewOnly.daily.map((day) => day.minutes),
+          [0, 0, 0, 40],
+        );
+        const newOnly = await typed('new');
+        assert.equal(newOnly.totalMinutes, 170);
+        assert.equal(newOnly.cumulativeMinutes, baseline + 375);
+        const everything = await typed('all');
+        assert.deepEqual(
+          [everything.type, everything.totalMinutes, everything.cumulativeMinutes],
+          ['all', 210, baseline + 415],
+        );
+        assert.equal(((await call('/api/stats/study-time')).data as { type: string }).type, 'all');
+        const refused = await call('/api/stats/study-time?type=exam');
+        assert.equal(refused.status, 400);
+        assert.match(String(refused.data.error), /학습 유형은 전체, 신규, 복습 중에서 고르세요/);
+
         // Without a period it is this week; an empty one is refused like any unknown one.
         assert.equal(((await call('/api/stats/study-time')).data as Stats).period, 'week');
         assert.equal((await call('/api/stats/study-time?period=')).status, 400);

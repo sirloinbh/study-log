@@ -53,6 +53,7 @@ test(
           understanding: null,
           difficulties: '',
           goalAchieved: null,
+          studyType: 'new',
         },
       );
 

@@ -49,6 +49,16 @@ function fakeApi(options: Options = {}) {
       return options.heatmap === null
         ? reply(500, { error: '서버 오류가 발생했습니다' })
         : reply(200, options.heatmap ?? { from: '2026-10-19', to: '2026-10-19', daily: [] });
+    if (path.startsWith('/api/stats/reviews'))
+      return reply(200, {
+        period: 'week',
+        from: '2026-10-19',
+        to: '2026-10-23',
+        scheduled: 0,
+        completed: 0,
+        delayed: 0,
+        completionRate: null,
+      });
     const match = path.match(/^\/api\/stats\/study-time\?period=(.+)$/);
     assert.ok(match, 'unexpected request ' + path);
     const period = match[1];
