@@ -74,6 +74,17 @@ test('a review log is marked in the list and keeps its type when edited', async 
   expect(sent[0]).toMatchObject({ method: 'PUT', body: { studyType: 'review' } });
 });
 
+test('search results and the calendar mark a review log too', async () => {
+  server([log]);
+  render(<StudyLogs today={today} />);
+  const marks = () =>
+    [...document.querySelectorAll('.badge')].filter((badge) => badge.textContent === '복습').length;
+  // The recent list and the calendar's day.
+  await waitFor(() => expect(marks()).toBe(2));
+  fireEvent.click(screen.getByRole('button', { name: '검색' }));
+  await waitFor(() => expect(marks()).toBe(3));
+});
+
 test('a new log has no mark', async () => {
   server([{ ...log, studyType: 'new' }]);
   render(<StudyLogs today={today} />);

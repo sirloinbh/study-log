@@ -114,6 +114,34 @@ test('without any logs the totals are zero and averages do not divide by zero', 
   );
 });
 
+test('all time of a study type without logs is just today, and the type reaches the queries (#52)', async () => {
+  const sent: unknown[][] = [];
+  const pool = {
+    query: async (sql: string, params: unknown[]) => {
+      sent.push(params);
+      return sql.includes('generate_series')
+        ? { rows: [{ date: params[0], minutes: 0 }] }
+        : { rows: [{ first: null, cumulative: 0 }] };
+    },
+  } as unknown as Pool;
+  await withApi(
+    pool,
+    async (call) => {
+      const { status, data } = await call('/api/stats/study-time?period=all&type=review');
+      assert.equal(status, 200);
+      assert.deepEqual(
+        [data.type, data.from, data.days, data.averageMinutesPerDay],
+        ['review', '2026-10-23', 1, 0],
+      );
+      assert.deepEqual(sent, [
+        ['2026-10-23', 'review'],
+        ['2026-10-23', '2026-10-23', 'review'],
+      ]);
+    },
+    { today: () => '2026-10-23' },
+  );
+});
+
 test('the heatmap starts on the Sunday 52 weeks before this week (#50, #96)', () => {
   // Friday 2026-10-23: this week starts Sunday 10-18; 52 weeks earlier is 2025-10-19.
   assert.equal(heatmapWeeks, 53);
