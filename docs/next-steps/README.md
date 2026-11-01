@@ -38,7 +38,7 @@
 ## 로컬 환경 현황
 
 - 네이티브 PostgreSQL 17.11: Windows 서비스 `postgresql-17`, 포트 5432, 자동 시작.
-- 테스트 전용 DB `study_test`(소유자 `study_test`)에 마이그레이션 001~017을 적용했다(2026-11-01 확인). 새 마이그레이션을 적용하기 전에는 그 테이블을 쓰는 통합 테스트가 실패한다.
+- 테스트 전용 DB `study_test`(소유자 `study_test`)에 마이그레이션 001~018을 적용했다(2026-11-01 확인). 새 마이그레이션을 적용하기 전에는 그 테이블을 쓰는 통합 테스트가 실패한다.
 - 사용자 환경변수 `TEST_DATABASE_URL=postgres://study_test@localhost:5432/study_test`로 `npm test`의 DB 통합 테스트가 건너뜀 없이 실행된다. 비밀번호는 `%APPDATA%\postgresql\pgpass.conf`에만 있다.
 - 사용자 PATH에 `C:\Program Files\PostgreSQL\17\bin`(`psql`)을 추가했다.
 - 새 마이그레이션을 테스트 DB에 적용할 때(저장소 루트, PowerShell): `$env:PGCLIENTENCODING='UTF8'; psql -h localhost -U study_test -d study_test -v ON_ERROR_STOP=1 -f database/migrations/NNN_<설명>.sql`. 클라이언트 인코딩을 UTF8로 지정하지 않으면 콘솔 코드 페이지로 읽어 한글이 깨진다.
