@@ -6,6 +6,7 @@ import type { Pool } from 'pg';
 import {
   addDays,
   bucket,
+  completionRate,
   heatmapStart,
   heatmapWeeks,
   maxSeriesDays,
@@ -14,6 +15,14 @@ import {
   weekStart,
 } from '../src/stats.js';
 import { withApi } from './helpers.js';
+
+test('the completion rate is a whole percent, and none without anything scheduled', () => {
+  assert.equal(completionRate(0, 0), null);
+  assert.equal(completionRate(0, 4), 0);
+  assert.equal(completionRate(4, 4), 100);
+  assert.equal(completionRate(1, 3), 33);
+  assert.equal(completionRate(2, 3), 67);
+});
 
 test('weeks start on Sunday (#96)', () => {
   // 2026-10-23 is a Friday; 2026-10-18 and 2026-10-25 are Sundays; 2026-10-24 a Saturday.
