@@ -144,6 +144,11 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
   };
 
   const pickRange = (next: ReviewRange) => {
+    if (next === range) {
+      // The range already shown: only a failed list has anything to gain, by trying again.
+      if (error && begin()) void reload().finally(end);
+      return;
+    }
     setRange(next);
     setEditor(undefined);
     setNotice(undefined);

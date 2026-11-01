@@ -84,13 +84,11 @@ test('reviews are listed by range and moved one round at a time', { skip: !url }
         assert.equal((await rows(logId)).length, 1);
       });
 
-      await t.test('a snoozed round leaves today and the badge count', async () => {
-        const before = (await call('/api/reviews/today/count')).data.count as number;
+      await t.test('a snoozed round leaves today', async () => {
         await create(`${year}-03-08`, '오늘 미루기');
-        assert.equal((await call('/api/reviews/today/count')).data.count, before + 1);
+        assert.ok((await memos('today')).includes('오늘 미루기'));
         await snooze((await find('오늘 미루기')).id);
         assert.ok(!(await memos('today')).includes('오늘 미루기'));
-        assert.equal((await call('/api/reviews/today/count')).data.count, before);
       });
 
       await t.test('the next round counts from the completion, not the snoozed date', async () => {

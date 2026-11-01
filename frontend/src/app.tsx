@@ -124,7 +124,7 @@ export function App() {
             element={
               <Page
                 title="복습"
-                description="오늘 복습할 내용을 확인하고 끝낸 복습을 완료로 표시합니다"
+                description="복습할 내용을 기간별로 확인하고, 완료로 표시하거나 날짜를 조정합니다"
                 health={health}
               >
                 {() => <Reviews onChange={reviewsChanged} />}

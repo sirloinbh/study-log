@@ -61,6 +61,22 @@ test('the count follows what is due', { skip: !url }, async (t) => {
 
       assert.equal((await call(`/api/study-logs/${overdue}`, { method: 'DELETE' })).status, 204);
       assert.equal(await count(), 0);
+
+      const moved = await create(`${year}-03-01`);
+      assert.equal(await count(), 1);
+      const round = await pool.query<{ id: number }>(
+        'SELECT id FROM reviews WHERE study_log_id = $1',
+        [moved],
+      );
+      const { id } = round.rows[0];
+      assert.equal((await call(`/api/reviews/${id}/snooze`, { method: 'POST' })).status, 200);
+      assert.equal(await count(), 0, 'a snoozed round is not due today');
+      const back = await call(`/api/reviews/${id}/due-date`, {
+        method: 'PUT',
+        body: { dueDate: today },
+      });
+      assert.equal(back.status, 200);
+      assert.equal(await count(), 1, 'a round moved to today is due again');
     },
     { today: () => today },
   );
