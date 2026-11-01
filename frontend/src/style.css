@@ -85,6 +85,7 @@
 .keywords,
 .stats,
 .retrospectives,
+.schedules,
 .reviews {
   display: grid;
   gap: 20px;
@@ -95,6 +96,7 @@
 .keywords h2,
 .stats h2,
 .retrospectives h2,
+.schedules h2,
 .reviews h2 {
   margin: 0 0 16px;
   font-size: 16px;
@@ -153,6 +155,8 @@
 .keywords [role='alert'],
 .retrospectives [role='status'],
 .retrospectives [role='alert'],
+.schedules [role='status'],
+.schedules [role='alert'],
 .reviews [role='status'],
 .reviews [role='alert'] {
   margin: 16px 0 0;
@@ -161,6 +165,7 @@
 .textbooks [role='status']:empty,
 .keywords [role='status']:empty,
 .retrospectives [role='status']:empty,
+.schedules [role='status']:empty,
 .reviews [role='status']:empty {
   margin: 0;
 }
@@ -563,6 +568,34 @@
 .calendar-logs h3 {
   margin: 16px 0 8px;
   font-size: 14px;
+}
+.schedules .log-head {
+  justify-content: space-between;
+}
+/* The name is free text, up to 200 characters without a space. */
+.schedules h2 {
+  overflow-wrap: anywhere;
+}
+/* The days of a schedule (#35). */
+.schedule-days {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.schedule-days li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+}
+.schedule-days li + li {
+  border-top: 1px solid var(--border);
+}
+.schedule-days li[aria-current='date'] {
+  background: var(--muted);
+  font-weight: 600;
 }
 .retro-summary {
   display: grid;
