@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { useState } from 'react';
 import { expect, test, vi } from 'vitest';
 
@@ -545,6 +545,68 @@ test('a slow older answer does not bring back a review just completed', async ()
   answerOld(new Response(JSON.stringify({ today, reviews: [review()] })));
   await new Promise((resolve) => setTimeout(resolve));
   expect(screen.getByText('오늘 복습할 내용이 없습니다')).toBeInTheDocument();
+});
+
+test('returning to the tab loads the range on screen again', async () => {
+  const lists: Record<string, Review[]> = { today: [], week: [] };
+  const fetch = rangeServer(lists);
+  render(<Reviews />);
+  await screen.findByText('오늘 복습할 내용이 없습니다');
+  lists.today = [review()];
+  fireEvent.focus(window);
+  await screen.findByRole('heading', { name: '오늘의 복습 1개' });
+
+  fireEvent.click(screen.getByRole('button', { name: '이번 주' }));
+  await screen.findByText('이번 주에 복습할 내용이 없습니다');
+  lists.week = [review(), review({ id: 2 })];
+  fireEvent.focus(window);
+  await screen.findByRole('heading', { name: '이번 주 복습 2개' });
+  expect(fetch.mock.calls.at(-1)?.[0]).toBe('/api/reviews/week');
+});
+
+test('returning to the tab keeps a date being typed', async () => {
+  const lists = { today: [review()] };
+  const fetch = rangeServer(lists);
+  render(<Reviews />);
+  fireEvent.click(await screen.findByRole('button', { name: /날짜 변경/ }));
+  fireEvent.change(screen.getByLabelText('새 예정일'), { target: { value: '2026-11-05' } });
+  const before = fetch.mock.calls.length;
+  fireEvent.focus(window);
+  await waitFor(() => expect(fetch.mock.calls.length).toBe(before + 1));
+  await act(async () => {});
+  expect(screen.getByLabelText('새 예정일')).toHaveValue('2026-11-05');
+});
+
+test('returning to the tab while a change runs adds no request', async () => {
+  let release = () => {};
+  const held = new Promise<void>((resolve) => (release = resolve));
+  const fetch = vi.fn(async (_url: string, init?: { method?: string }) => {
+    if (init?.method && init.method !== 'GET') {
+      await held;
+      return new Response(JSON.stringify({ dueDate: '2026-11-01' }));
+    }
+    return new Response(JSON.stringify({ today, reviews: [review()] }));
+  });
+  vi.stubGlobal('fetch', fetch);
+  render(<Reviews />);
+  fireEvent.click(await screen.findByRole('button', { name: /하루 미루기/ }));
+  const before = fetch.mock.calls.length;
+  fireEvent.focus(window);
+  await act(async () => {});
+  expect(fetch.mock.calls.length).toBe(before);
+  release();
+  await waitFor(() => expect(screen.getByRole('button', { name: '전체' })).toBeEnabled());
+});
+
+test('the listener goes away with the page', async () => {
+  const lists = { today: [review()] };
+  const fetch = rangeServer(lists);
+  const { unmount } = render(<Reviews />);
+  await screen.findByRole('button', { name: /복습 완료/ });
+  unmount();
+  const before = fetch.mock.calls.length;
+  fireEvent.focus(window);
+  expect(fetch.mock.calls.length).toBe(before);
 });
 
 test('changing another review closes the date form being typed', async () => {

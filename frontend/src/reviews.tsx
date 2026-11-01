@@ -56,6 +56,15 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
     void load(range);
   }, [load, range]);
 
+  // Back on the tab, which may have been left overnight or changed elsewhere (#142), the list matches
+  // the badge again. While a change runs nothing is added: its own reload comes after it.
+  useEffect(() => {
+    if (busy) return;
+    const onFocus = () => void load(range);
+    window.addEventListener('focus', onFocus);
+    return () => window.removeEventListener('focus', onFocus);
+  }, [busy, load, range]);
+
   useEffect(() => {
     if (!wantFocus || busy) return;
     setWantFocus(undefined);
