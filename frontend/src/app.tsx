@@ -14,13 +14,13 @@ import { AppShell, type NavItem } from './components/layout/app-shell';
 import { EmptyState } from './components/ui/empty-state';
 import { Toaster } from './components/ui/sonner';
 import { type Health, healthText } from './health';
-import { Keywords } from './Keywords';
-import { Retrospectives } from './Retrospectives';
+import { Keywords } from './keywords';
+import { Retrospectives } from './retrospectives';
 import { ReviewBadge } from './review-badge';
 import { Reviews } from './reviews';
-import { Stats } from './Stats';
-import { StudyLogs } from './StudyLogs';
-import { Textbooks } from './Textbooks';
+import { Stats } from './stats';
+import { StudyLogs } from './study-logs';
+import { Textbooks } from './textbooks';
 
 // Every page URL lives here (central docs/directory-rules.md). The study log is the first page.
 const pages = {

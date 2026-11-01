@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 
-import { Stats } from './Stats';
+import { Stats } from './stats';
 import { reviewBars, studyTimePath } from './study-stats';
 
 // The chart library is slow to load and draws nothing without a real layout; the page is checked
@@ -18,6 +18,10 @@ vi.mock('recharts', () => {
     Bar: Part,
   };
 });
+
+// The whole dashboard renders here and role queries are slow, most of all on the first run after a
+// change, when these tests can take longer than the usual limit.
+vi.setConfig({ testTimeout: 20_000 });
 
 const studyTime = (totalMinutes: number) => ({
   period: 'week',
@@ -71,13 +75,13 @@ function server(answers: { reviews?: unknown; reviewsStatus?: number } = {}) {
   return asked;
 }
 
-const reviewCard = () =>
-  within(screen.getByRole('heading', { name: '복습 완료율' }).closest('section')!);
+const reviewCard = () => within(document.querySelector<HTMLElement>('.review-chart')!);
 
 test('the completion rate and its counts are shown for the period', async () => {
   server();
   render(<Stats />);
   expect(await reviewCard().findByText('75%')).toBeTruthy();
+  expect(reviewCard().getByRole('heading', { name: '복습 완료율' })).toBeTruthy();
   expect(reviewCard().getByText(/이번 주 예정 4회 중 3회 완료, 지연 2회입니다/)).toBeTruthy();
 });
 

@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 
 import { type RequestError, requestJson } from './api';
-import { formatMinutes } from './study-logs';
+import { formatMinutes } from './study-logs-data';
 import { barWidth, hourLabel, type StudyPattern as Pattern, weekdayNames } from './study-stats';
 
 // When study went best in a period (#20): the busiest hour and weekday, and minutes per hour

@@ -2,8 +2,8 @@ import React, { useEffect, useState } from 'react';
 
 import { type RequestError, requestJson } from './api';
 import { useBusy } from './busy';
-import { Exercises } from './Exercises';
-import { ImportantExercises } from './ImportantExercises';
+import { Exercises } from './exercises';
+import { ImportantExercises } from './important-exercises';
 import {
   type ContentNode,
   emptyTextbookForm,
@@ -12,7 +12,7 @@ import {
   type TextbookForm,
   textbookMeta,
 } from './textbook';
-import { TextbookContents } from './TextbookContents';
+import { TextbookContents } from './textbook-contents';
 
 type Notice = { kind: 'status' | 'alert'; text: string } | undefined;
 

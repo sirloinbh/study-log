@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 
-import { StudyLogs } from './StudyLogs';
+import { StudyLogs } from './study-logs';
 
 const today = '2026-10-31';
 const log = {

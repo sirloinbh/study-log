@@ -15,7 +15,7 @@ async function render(text: string): Promise<string> {
   const [{ createElement }, { renderToStaticMarkup }, { Memo }] = await Promise.all([
     load('react'),
     load('react-dom/server'),
-    load(new URL('../../frontend/src/Memo.tsx', import.meta.url).href),
+    load(new URL('../../frontend/src/memo.tsx', import.meta.url).href),
   ]);
   return renderToStaticMarkup(createElement(Memo, { text }));
 }

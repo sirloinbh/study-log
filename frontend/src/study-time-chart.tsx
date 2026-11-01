@@ -1,6 +1,6 @@
 import React from 'react';
 
-import { formatMinutes } from './study-logs';
+import { formatMinutes } from './study-logs-data';
 import {
   busiestBar,
   chartBars,

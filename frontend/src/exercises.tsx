@@ -12,7 +12,7 @@ import {
   exerciseLimits,
   questionText,
 } from './exercise';
-import { ExerciseTranslation } from './ExerciseTranslation';
+import { ExerciseTranslation } from './exercise-translation';
 import { type ContentNode, contentOptions, type Textbook } from './textbook';
 
 // The API's answer for a chapter that does not exist (or belongs to another textbook).
