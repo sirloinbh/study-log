@@ -117,6 +117,10 @@ export function studyPattern(
   };
 }
 
+// Whole percent of the rounds scheduled that were completed; none when nothing was scheduled.
+export const completionRate = (completed: number, scheduled: number) =>
+  scheduled ? Math.round((completed / scheduled) * 100) : null;
+
 // The dates of a pattern request, within the years the other date APIs accept and at most
 // `maxSeriesDays` long, like the stats series.
 const patternQuery = z
@@ -179,6 +183,40 @@ export function statsRoutes(pool: Pool, today: () => string) {
     const to = today();
     const from = heatmapStart(to);
     res.json({ from, to, daily: await dailyMinutes(pool, from, to) });
+  });
+
+  // How well reviews were kept (#46, docs/decisions/review-rules.md 5장): /api/stats/reviews?period=
+  // A round belongs to the period of its original due date, so moving it changes nothing here. A
+  // round due today is not late yet. "All" has no first date to cut at: it counts every round.
+  router.get('/reviews', async (req, res) => {
+    const { period } = query.parse(req.query);
+    const to = today();
+    const from = period === 'all' ? null : periodStart(period, to);
+    const { rows } = await pool.query<{
+      first: string | null;
+      scheduled: number;
+      completed: number;
+      delayed: number;
+    }>(
+      `SELECT min(original_due_date) AS first,
+         count(*)::int AS scheduled,
+         count(completed_on)::int AS completed,
+         count(*) FILTER (WHERE completed_on > original_due_date
+           OR (completed_on IS NULL AND original_due_date < $1))::int AS delayed
+       FROM reviews
+       WHERE original_due_date <= $1 AND ($2::date IS NULL OR original_due_date >= $2::date)`,
+      [to, from],
+    );
+    const { first, scheduled, completed, delayed } = rows[0];
+    res.json({
+      period,
+      from: from ?? first ?? to,
+      to,
+      scheduled,
+      completed,
+      delayed,
+      completionRate: completionRate(completed, scheduled),
+    });
   });
 
   // The study pattern from ?from to ?to (#20); by default the last 3 months up to today.
