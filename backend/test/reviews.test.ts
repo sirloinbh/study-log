@@ -3,8 +3,22 @@ import { test } from 'node:test';
 
 import type { Pool } from 'pg';
 
-import { reviewDueDate, reviewGaps } from '../src/reviews.js';
+import { reviewDueDate, reviewGaps, snoozedDate, weekEnd } from '../src/reviews.js';
 import { withApi } from './helpers.js';
+
+test('a snooze moves to the day after the due date or today, whichever is later', () => {
+  assert.equal(snoozedDate('2026-11-10', '2026-11-01'), '2026-11-11');
+  assert.equal(snoozedDate('2026-11-01', '2026-11-01'), '2026-11-02');
+  assert.equal(snoozedDate('2026-10-20', '2026-11-01'), '2026-11-02');
+  assert.equal(snoozedDate('9999-12-31', '2026-11-01'), '9999-12-31');
+});
+
+test('the week ends on the Saturday of a week that starts on Sunday', () => {
+  assert.equal(weekEnd('2026-11-01'), '2026-11-07'); // Sunday
+  assert.equal(weekEnd('2026-11-04'), '2026-11-07'); // Wednesday
+  assert.equal(weekEnd('2026-11-07'), '2026-11-07'); // Saturday
+  assert.equal(weekEnd('2026-12-30'), '2027-01-02'); // across a year
+});
 
 test('a review that cannot be saved rolls the study log back', async () => {
   const valid = { studyDate: '2026-10-31', startTime: '09:00', endTime: '10:00', status: 'done' };

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod';
 
-import { isCalendarDate } from './study-logs.js';
+import { isCalendarDate } from './dates.js';
 
 export const statPeriods = ['week', 'month', '3months', 'all'] as const;
 export type StatPeriod = (typeof statPeriods)[number];

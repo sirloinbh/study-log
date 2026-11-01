@@ -247,6 +247,348 @@ test('a failed completion reports a change too: it may be gone elsewhere', async
   await waitFor(() => expect(onChange).toHaveBeenCalledTimes(1));
 });
 
+// Each range has its own list; changes answer `moved` and take the review out when told to.
+function rangeServer(
+  lists: Record<string, Review[]>,
+  moved: () => { status: number; body: object; leaves?: boolean } = () => ({
+    status: 200,
+    body: { dueDate: '2026-11-05' },
+  }),
+) {
+  const fetch = vi.fn((url: string, init?: { method?: string }) => {
+    if (init?.method && init.method !== 'GET') {
+      const answer = moved();
+      if (answer.leaves) for (const key of Object.keys(lists)) lists[key] = [];
+      return Promise.resolve(new Response(JSON.stringify(answer.body), { status: answer.status }));
+    }
+    const range = url.split('/').pop()!;
+    return Promise.resolve(new Response(JSON.stringify({ today, reviews: lists[range] })));
+  });
+  vi.stubGlobal('fetch', fetch);
+  return fetch;
+}
+
+const changes = (fetch: ReturnType<typeof rangeServer>) =>
+  fetch.mock.calls.filter(([, init]) => init?.method && init.method !== 'GET');
+
+test('picking a range lists it, marks it and says when it is empty', async () => {
+  const fetch = rangeServer({
+    today: [review()],
+    week: [review({ id: 2 }), review({ id: 3 })],
+    all: [],
+  });
+  render(<Reviews />);
+  await screen.findByRole('heading', { name: '오늘의 복습 1개' });
+  expect(screen.getByRole('button', { name: '오늘' })).toHaveAttribute('aria-pressed', 'true');
+
+  fireEvent.click(screen.getByRole('button', { name: '이번 주' }));
+  await screen.findByRole('heading', { name: '이번 주 복습 2개' });
+  expect(screen.getByRole('button', { name: '이번 주' })).toHaveAttribute('aria-pressed', 'true');
+  expect(screen.getByRole('button', { name: '오늘' })).toHaveAttribute('aria-pressed', 'false');
+
+  fireEvent.click(screen.getByRole('button', { name: '전체' }));
+  expect(await screen.findByText('남은 복습이 없습니다')).toBeInTheDocument();
+  expect(fetch).toHaveBeenCalledWith('/api/reviews/week', expect.anything());
+  expect(fetch).toHaveBeenCalledWith('/api/reviews/all', expect.anything());
+});
+
+test('a slow answer for the range left behind is not shown', async () => {
+  let answerToday = (_value: Response) => {};
+  const slow = new Promise<Response>((resolve) => (answerToday = resolve));
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string) =>
+      url.endsWith('/today')
+        ? slow
+        : Promise.resolve(new Response(JSON.stringify({ today, reviews: [] }))),
+    ),
+  );
+  render(<Reviews />);
+  fireEvent.click(screen.getByRole('button', { name: '전체' }));
+  await screen.findByText('남은 복습이 없습니다');
+  answerToday(new Response(JSON.stringify({ today, reviews: [review()] })));
+  await new Promise((resolve) => setTimeout(resolve));
+  expect(screen.getByText('남은 복습이 없습니다')).toBeInTheDocument();
+  expect(screen.queryByRole('button', { name: /복습 완료/ })).toBeNull();
+});
+
+test('a failed list shows for its own range only', async () => {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string) =>
+      Promise.resolve(
+        url.endsWith('/week')
+          ? new Response(JSON.stringify({ error: '주간 오류' }), { status: 500 })
+          : new Response(JSON.stringify({ today, reviews: [] })),
+      ),
+    ),
+  );
+  render(<Reviews />);
+  fireEvent.click(screen.getByRole('button', { name: '이번 주' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('주간 오류');
+  fireEvent.click(screen.getByRole('button', { name: '전체' }));
+  await screen.findByText('남은 복습이 없습니다');
+  expect(screen.queryByRole('alert')).toBeNull();
+});
+
+test('snoozing reports the new date, reloads the range and tells the badge', async () => {
+  const fetch = rangeServer({ today: [review()] }, () => ({
+    status: 200,
+    body: { dueDate: '2026-11-01' },
+    leaves: true,
+  }));
+  const onChange = vi.fn();
+  render(<Reviews onChange={onChange} />);
+  fireEvent.click(await screen.findByRole('button', { name: /하루 미루기/ }));
+  expect(
+    await screen.findByText('하루 미뤘습니다. 새 예정일은 2026-11-01입니다'),
+  ).toBeInTheDocument();
+  expect(await screen.findByText('오늘 복습할 내용이 없습니다')).toBeInTheDocument();
+  expect(changes(fetch)[0][0]).toBe('/api/reviews/1/snooze');
+  await waitFor(() => expect(onChange).toHaveBeenCalledTimes(1));
+  // Its button left with the review, so focus goes to the heading.
+  await waitFor(() => expect(document.activeElement?.id).toBe('reviews-today'));
+});
+
+test('a snooze that keeps the review in the range keeps focus on its button', async () => {
+  rangeServer({ today: [review()] });
+  render(<Reviews />);
+  fireEvent.click(await screen.findByRole('button', { name: /하루 미루기/ }));
+  await screen.findByText(/하루 미뤘습니다/);
+  await waitFor(() => expect(document.activeElement?.id).toBe('review-snooze-1'));
+});
+
+test('changing a date sends it, closes the form and returns focus', async () => {
+  const fetch = rangeServer({ today: [review({ dueDate: today })] });
+  const onChange = vi.fn();
+  render(<Reviews onChange={onChange} />);
+  fireEvent.click(await screen.findByRole('button', { name: /날짜 변경/ }));
+  const field = screen.getByLabelText('새 예정일');
+  expect(field).toHaveValue(today);
+  await waitFor(() => expect(document.activeElement).toBe(field));
+  fireEvent.change(field, { target: { value: '2026-11-05' } });
+  fireEvent.click(screen.getByRole('button', { name: /예정일 저장/ }));
+  expect(await screen.findByText('예정일을 2026-11-05로 바꿨습니다')).toBeInTheDocument();
+  expect(screen.queryByLabelText('새 예정일')).toBeNull();
+  const [url, init] = changes(fetch)[0] as [string, { method: string; body: string }];
+  expect(url).toBe('/api/reviews/1/due-date');
+  expect(init.method).toBe('PUT');
+  expect(JSON.parse(init.body)).toEqual({ dueDate: '2026-11-05' });
+  await waitFor(() => expect(document.activeElement?.id).toBe('review-edit-1'));
+  expect(onChange).toHaveBeenCalledTimes(1);
+});
+
+test('cancelling a date change sends nothing and returns focus', async () => {
+  const fetch = rangeServer({ today: [review()] });
+  render(<Reviews />);
+  fireEvent.click(await screen.findByRole('button', { name: /날짜 변경/ }));
+  fireEvent.click(screen.getByRole('button', { name: /예정일 변경 취소/ }));
+  expect(screen.queryByLabelText('새 예정일')).toBeNull();
+  expect(changes(fetch)).toEqual([]);
+  await waitFor(() => expect(document.activeElement?.id).toBe('review-edit-1'));
+});
+
+test('a refused date keeps what was typed and returns focus to the field', async () => {
+  rangeServer({ today: [review()] }, () => ({
+    status: 400,
+    body: { error: '존재하지 않는 날짜입니다' },
+  }));
+  render(<Reviews />);
+  fireEvent.click(await screen.findByRole('button', { name: /날짜 변경/ }));
+  fireEvent.change(screen.getByLabelText('새 예정일'), { target: { value: '2026-11-05' } });
+  fireEvent.click(screen.getByRole('button', { name: /예정일 저장/ }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('존재하지 않는 날짜입니다');
+  expect(screen.getByLabelText('새 예정일')).toHaveValue('2026-11-05');
+  await waitFor(() => expect(document.activeElement?.id).toBe('review-due-date'));
+});
+
+test('a date change for a review completed elsewhere closes the form', async () => {
+  rangeServer({ today: [review()] }, () => ({
+    status: 409,
+    body: { error: '이미 완료한 복습입니다' },
+    leaves: true,
+  }));
+  render(<Reviews />);
+  fireEvent.click(await screen.findByRole('button', { name: /날짜 변경/ }));
+  fireEvent.click(screen.getByRole('button', { name: /예정일 저장/ }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('이미 완료한 복습입니다');
+  expect(screen.queryByLabelText('새 예정일')).toBeNull();
+  await waitFor(() => expect(document.activeElement?.id).toBe('reviews-today'));
+});
+
+test('another range closes the open date form and clears the message', async () => {
+  rangeServer({ today: [review()], all: [review()] });
+  render(<Reviews />);
+  fireEvent.click(await screen.findByRole('button', { name: /하루 미루기/ }));
+  await screen.findByText(/하루 미뤘습니다/);
+  await waitFor(() => expect(screen.getByRole('button', { name: /날짜 변경/ })).toBeEnabled());
+  fireEvent.click(screen.getByRole('button', { name: /날짜 변경/ }));
+  screen.getByLabelText('새 예정일');
+  fireEvent.click(screen.getByRole('button', { name: '전체' }));
+  await screen.findByRole('heading', { name: '전체 복습 1개' });
+  expect(screen.queryByLabelText('새 예정일')).toBeNull();
+  expect(screen.queryByText(/하루 미뤘습니다/)).toBeNull();
+});
+
+test('the range already shown keeps a date being typed and sends nothing', async () => {
+  const fetch = rangeServer({ today: [review()] });
+  render(<Reviews />);
+  fireEvent.click(await screen.findByRole('button', { name: /날짜 변경/ }));
+  fireEvent.change(screen.getByLabelText('새 예정일'), { target: { value: '2026-11-05' } });
+  const before = fetch.mock.calls.length;
+  fireEvent.click(screen.getByRole('button', { name: '오늘' }));
+  expect(screen.getByLabelText('새 예정일')).toHaveValue('2026-11-05');
+  expect(fetch.mock.calls.length).toBe(before);
+});
+
+test('the range already shown tries again after a failed list', async () => {
+  let fail = true;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() =>
+      Promise.resolve(
+        fail
+          ? new Response(JSON.stringify({ error: '목록 오류' }), { status: 500 })
+          : new Response(JSON.stringify({ today, reviews: [] })),
+      ),
+    ),
+  );
+  render(<Reviews />);
+  expect(await screen.findByRole('alert')).toHaveTextContent('목록 오류');
+  fail = false;
+  fireEvent.click(screen.getByRole('button', { name: '오늘' }));
+  expect(await screen.findByText('오늘 복습할 내용이 없습니다')).toBeInTheDocument();
+  expect(screen.queryByRole('alert')).toBeNull();
+});
+
+test('a retry unlocks the buttons, returns focus and shows that it is loading', async () => {
+  let answer = (_value: Response) => {};
+  let calls = 0;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() => {
+      calls += 1;
+      if (calls === 1)
+        return Promise.resolve(
+          new Response(JSON.stringify({ error: '목록 오류' }), { status: 500 }),
+        );
+      return new Promise<Response>((resolve) => (answer = resolve));
+    }),
+  );
+  render(<Reviews />);
+  await screen.findByRole('alert');
+  const button = screen.getByRole('button', { name: '오늘' });
+  fireEvent.click(button);
+  // The old error is gone while trying, so the same error coming back is announced again.
+  expect(await screen.findByText('불러오는 중…')).toBeInTheDocument();
+  expect(screen.queryByRole('alert')).toBeNull();
+  expect(button).toBeDisabled();
+  answer(new Response(JSON.stringify({ error: '목록 오류' }), { status: 500 }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('목록 오류');
+  await waitFor(() => expect(button).toBeEnabled());
+  await waitFor(() => expect(document.activeElement).toBe(button));
+});
+
+test('a retry that works clears the error of the change before it', async () => {
+  let failing = true;
+  let fetchedOnce = false;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((_url: string, init?: { method?: string }) => {
+      if (init?.method === 'POST')
+        return Promise.resolve(
+          new Response(JSON.stringify({ error: '변경 오류' }), { status: 500 }),
+        );
+      if (failing && fetchedOnce)
+        return Promise.resolve(
+          new Response(JSON.stringify({ error: '목록 오류' }), { status: 500 }),
+        );
+      fetchedOnce = true;
+      return Promise.resolve(new Response(JSON.stringify({ today, reviews: [review()] })));
+    }),
+  );
+  render(<Reviews />);
+  fireEvent.click(await screen.findByRole('button', { name: /하루 미루기/ }));
+  await screen.findByText('변경 오류');
+  await screen.findByText(/목록 오류/);
+  await waitFor(() => expect(screen.getByRole('button', { name: '오늘' })).toBeEnabled());
+  failing = false;
+  fireEvent.click(screen.getByRole('button', { name: '오늘' }));
+  await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+  expect(screen.getByRole('button', { name: /하루 미루기/ })).toBeInTheDocument();
+});
+
+test('a slow older answer does not bring back a review just completed', async () => {
+  let answerOld = (_value: Response) => {};
+  let todayLists = 0;
+  const list = (reviews: Review[]) =>
+    Promise.resolve(new Response(JSON.stringify({ today, reviews })));
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string, init?: { method?: string }) => {
+      if (init?.method === 'POST')
+        return Promise.resolve(new Response(JSON.stringify({ next: null })));
+      // The week's list never answers, so the page still shows today's when today is picked again.
+      if (url.endsWith('/week')) return new Promise<Response>(() => {});
+      todayLists += 1;
+      if (todayLists === 1) return list([review()]);
+      if (todayLists === 2) return new Promise<Response>((resolve) => (answerOld = resolve));
+      return list([]);
+    }),
+  );
+  render(<Reviews />);
+  await screen.findByRole('button', { name: /복습 완료/ });
+  fireEvent.click(screen.getByRole('button', { name: '이번 주' }));
+  fireEvent.click(screen.getByRole('button', { name: '오늘' }));
+  fireEvent.click(screen.getByRole('button', { name: /복습 완료/ }));
+  await screen.findByText('오늘 복습할 내용이 없습니다');
+  answerOld(new Response(JSON.stringify({ today, reviews: [review()] })));
+  await new Promise((resolve) => setTimeout(resolve));
+  expect(screen.getByText('오늘 복습할 내용이 없습니다')).toBeInTheDocument();
+});
+
+test('changing another review closes the date form being typed', async () => {
+  const lists = {
+    today: [review({ id: 1, studyDate: '2026-10-29' }), review({ id: 2, studyDate: '2026-10-30' })],
+  };
+  rangeServer(lists);
+  render(<Reviews />);
+  fireEvent.click(await screen.findByRole('button', { name: '2026-10-29 학습 1회차 날짜 변경' }));
+  screen.getByLabelText('새 예정일');
+  fireEvent.click(screen.getByRole('button', { name: '2026-10-30 학습 1회차 하루 미루기' }));
+  await screen.findByText(/하루 미뤘습니다/);
+  expect(screen.queryByLabelText('새 예정일')).toBeNull();
+
+  await waitFor(() =>
+    expect(screen.getByRole('button', { name: '2026-10-29 학습 1회차 날짜 변경' })).toBeEnabled(),
+  );
+  fireEvent.click(screen.getByRole('button', { name: '2026-10-29 학습 1회차 날짜 변경' }));
+  screen.getByLabelText('새 예정일');
+  fireEvent.click(screen.getByRole('button', { name: '2026-10-30 학습 1회차 복습 완료' }));
+  await screen.findByText(/복습을 완료했습니다/);
+  expect(screen.queryByLabelText('새 예정일')).toBeNull();
+});
+
+test('the range buttons wait while a change runs', async () => {
+  let release = () => {};
+  const held = new Promise<void>((resolve) => (release = resolve));
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (_url: string, init?: { method?: string }) => {
+      if (init?.method && init.method !== 'GET') {
+        await held;
+        return new Response(JSON.stringify({ dueDate: '2026-11-01' }));
+      }
+      return new Response(JSON.stringify({ today, reviews: [review()] }));
+    }),
+  );
+  render(<Reviews />);
+  fireEvent.click(await screen.findByRole('button', { name: /하루 미루기/ }));
+  expect(screen.getByRole('button', { name: '전체' })).toBeDisabled();
+  release();
+  await waitFor(() => expect(screen.getByRole('button', { name: '전체' })).toBeEnabled());
+});
+
 test('two quick clicks send one completion', async () => {
   const fetch = server([review()], done({ round: 2, dueDate: '2026-11-02' }));
   render(<Reviews />);

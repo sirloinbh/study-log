@@ -3,8 +3,8 @@ import type { Pool } from 'pg';
 import { z } from 'zod';
 
 import { monthRange } from './calendar.js';
+import { isCalendarDate } from './dates.js';
 import { addDays, weekStart } from './stats.js';
-import { isCalendarDate } from './study-logs.js';
 
 export const retrospectiveKinds = ['weekly', 'monthly'] as const;
 export type RetrospectiveKind = (typeof retrospectiveKinds)[number];

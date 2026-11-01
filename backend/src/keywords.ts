@@ -2,8 +2,8 @@ import { Router } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod';
 
+import { isCalendarDate } from './dates.js';
 import { likePattern } from './sql.js';
-import { isCalendarDate } from './study-logs.js';
 
 const keywordDate = z
   .string({ invalid_type_error: '날짜 형식이 올바르지 않습니다' })
