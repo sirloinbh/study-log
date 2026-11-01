@@ -646,6 +646,65 @@ test('focus is left alone when it is not on a review', async () => {
   expect(document.activeElement).toBe(range);
 });
 
+test('a form closing does not take focus from another control', async () => {
+  const first = review({ id: 1, studyDate: '2026-10-29' });
+  const second = review({ id: 2, studyDate: '2026-10-30' });
+  const lists: Record<string, Review[]> = { today: [first, second] };
+  rangeServer(lists);
+  render(<Reviews />);
+  fireEvent.click(await screen.findByRole('button', { name: '2026-10-29 학습 1회차 날짜 변경' }));
+  await waitFor(() => expect(document.activeElement?.id).toBe('review-due-date'));
+  const other = screen.getByRole('button', { name: '2026-10-30 학습 1회차 복습 완료' });
+  other.focus();
+
+  lists.today = [second];
+  fireEvent.focus(window);
+  await screen.findByText(/입력을 닫았습니다/);
+  await act(async () => {});
+  expect(document.activeElement).toBe(other);
+});
+
+test('focus moved while the list was on its way stays where it went', async () => {
+  const first = review({ id: 1, studyDate: '2026-10-29' });
+  const second = review({ id: 2, studyDate: '2026-10-30' });
+  let answer = (_value: Response) => {};
+  let lists = 0;
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(() =>
+      ++lists === 1
+        ? Promise.resolve(new Response(JSON.stringify({ today, reviews: [first, second] })))
+        : new Promise<Response>((resolve) => (answer = resolve)),
+    ),
+  );
+  render(<Reviews />);
+  (await screen.findByRole('button', { name: '2026-10-29 학습 1회차 복습 완료' })).focus();
+  fireEvent.focus(window);
+  const moved = screen.getByRole('button', { name: '2026-10-30 학습 1회차 복습 완료' });
+  moved.focus();
+  answer(new Response(JSON.stringify({ today, reviews: [second] })));
+  await screen.findByRole('heading', { name: '오늘의 복습 1개' });
+  await act(async () => {});
+  expect(document.activeElement).toBe(moved);
+});
+
+test('a form closing keeps the failure of another review on screen', async () => {
+  const first = review({ id: 1, studyDate: '2026-10-29' });
+  const second = review({ id: 2, studyDate: '2026-10-30' });
+  const lists: Record<string, Review[]> = { today: [first, second] };
+  rangeServer(lists, () => {
+    lists.today = [second];
+    return { status: 500, body: { error: '서버 오류가 발생했습니다' } };
+  });
+  render(<Reviews />);
+  fireEvent.click(await screen.findByRole('button', { name: '2026-10-29 학습 1회차 날짜 변경' }));
+  fireEvent.click(screen.getByRole('button', { name: '2026-10-30 학습 1회차 하루 미루기' }));
+  expect(await screen.findByRole('alert')).toHaveTextContent('서버 오류가 발생했습니다');
+  await waitFor(() => expect(screen.queryByLabelText('새 예정일')).toBeNull());
+  expect(screen.getByRole('alert')).toHaveTextContent('서버 오류가 발생했습니다');
+  await waitFor(() => expect(document.activeElement?.id).toBe('review-snooze-2'));
+});
+
 test('a later return clears the error of a failed one', async () => {
   let failing = false;
   vi.stubGlobal(

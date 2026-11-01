@@ -5,7 +5,8 @@ import { useBusy } from './busy';
 import { Memo } from './Memo';
 import { overdueDays, type Review, type ReviewRange, reviewRanges, reviewTitle } from './review';
 
-type Notice = { kind: 'status' | 'alert'; text: string } | undefined;
+// `reviewId` is the review an alert is about.
+type Notice = { kind: 'status' | 'alert'; text: string; reviewId?: number } | undefined;
 type Listed = { today: string; reviews: Review[] };
 type Completed = { next: { round: number; dueDate: string } | null };
 type Moved = { dueDate: string };
@@ -63,10 +64,15 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
     if (busy) return;
     const onFocus = () => {
       // A review that leaves the list takes the focused control with it.
-      const focused = document.activeElement?.closest<HTMLElement>('[data-review-id]');
+      const item = document.activeElement?.closest<HTMLElement>('[data-review-id]');
+      if (!item) return void load(range);
       void load(range).then((reviews) => {
-        if (focused && reviews?.every((review) => String(review.id) !== focused.dataset.reviewId))
-          setWantFocus(headingId);
+        const gone = reviews?.every((review) => String(review.id) !== item.dataset.reviewId);
+        // Unless focus has moved on to another control meanwhile. Nothing focused is not that: the
+        // list may have rendered already and removed the control.
+        const active = document.activeElement;
+        const movedOn = active && active !== document.body && !item.contains(active);
+        if (gone && !movedOn) setWantFocus(headingId);
       });
     };
     window.addEventListener('focus', onFocus);
@@ -85,21 +91,31 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
   const { heading, empty } = reviewRanges[range];
 
   // The review being given a new date left the list, changed elsewhere. Its form closes for good, or
-  // it would come back with an old date when the review returns, and this replaces any error about it.
+  // it would come back with an old date when the review returns. This replaces an error about it, but
+  // not one about another review. Focus is left to whoever moved it: see the tab return above.
   const editedGone = Boolean(
     shown && editor && shown.reviews.every((review) => review.id !== editor.id),
   );
   useEffect(() => {
     if (!editedGone) return;
+    const closedId = editor?.id;
     setEditor(undefined);
-    setNotice({ kind: 'status', text: '날짜를 바꾸던 복습이 목록에서 빠져 입력을 닫았습니다' });
-    setWantFocus(headingId);
-  }, [editedGone]);
+    setNotice((current) =>
+      current?.kind === 'alert' && current.reviewId !== closedId
+        ? current
+        : { kind: 'status', text: '날짜를 바꾸던 복습이 목록에서 빠져 입력을 닫았습니다' },
+    );
+  }, [editedGone, editor?.id]);
 
   // Runs one change, then reloads the list and has the badge count again. `done` is where focus
   // goes after it worked and `failed` after a failure that leaves the review in place. A 404 or
   // 409 means it was completed or removed elsewhere, so it leaves the list on the reload.
-  const run = async (change: () => Promise<void>, done: string, failed: string) => {
+  const run = async (
+    reviewId: number,
+    change: () => Promise<void>,
+    done: string,
+    failed: string,
+  ) => {
     if (!begin()) return;
     // Cleared first, so the same message twice in a row is still announced.
     setNotice(undefined);
@@ -108,7 +124,7 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
       setWantFocus(done);
     } catch (failure) {
       const { message, status } = failure as RequestError;
-      setNotice({ kind: 'alert', text: message });
+      setNotice({ kind: 'alert', text: message, reviewId });
       const gone = status === 404 || status === 409;
       if (gone) setEditor(undefined);
       setWantFocus(gone ? headingId : failed);
@@ -132,6 +148,7 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
 
   const complete = (review: Review) =>
     run(
+      review.id,
       async () => {
         const { next } = await requestJson<Completed>(`/api/reviews/${review.id}/complete`, {
           method: 'POST',
@@ -150,6 +167,7 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
 
   const snooze = (review: Review) =>
     run(
+      review.id,
       async () => {
         const { dueDate } = await requestJson<Moved>(`/api/reviews/${review.id}/snooze`, {
           method: 'POST',
@@ -165,6 +183,7 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
     event.preventDefault();
     if (!editor) return;
     void run(
+      review.id,
       async () => {
         const { dueDate } = await requestJson<Moved>(`/api/reviews/${review.id}/due-date`, {
           method: 'PUT',
