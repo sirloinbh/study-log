@@ -68,6 +68,22 @@ function server(answers: { reviews?: unknown; reviewsStatus?: number } = {}) {
         return Promise.resolve(
           new Response(JSON.stringify({ from: '2026-10-25', to: '2026-10-31', daily: [] })),
         );
+      if (url.startsWith('/api/stats/textbooks'))
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              textbooks: [],
+              schedule: {
+                plannedMinutes: 0,
+                achievedMinutes: 0,
+                achievementRate: null,
+                dueDays: 0,
+                onTimeDays: 0,
+                adherenceRate: null,
+              },
+            }),
+          ),
+        );
       return Promise.resolve(
         new Response(JSON.stringify(studyTime(url.includes('type=review') ? 40 : 100))),
       );
@@ -84,6 +100,12 @@ test('the completion rate and its counts are shown for the period', async () => 
   expect(await reviewCard().findByText('75%')).toBeTruthy();
   expect(reviewCard().getByRole('heading', { name: '복습 완료율' })).toBeTruthy();
   expect(reviewCard().getByText(/이번 주 예정 4회 중 3회 완료, 지연 2회입니다/)).toBeTruthy();
+});
+
+test('the page holds the card of textbooks and schedules', async () => {
+  server();
+  render(<Stats />);
+  expect(await screen.findByRole('region', { name: '교재와 일정' })).toBeInTheDocument();
 });
 
 test('picking a period asks for its reviews too', async () => {

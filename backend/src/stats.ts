@@ -153,6 +153,18 @@ const patternQuery = z
     error: '시작일은 종료일보다 늦을 수 없습니다',
   });
 
+const textbookQuery = z.object({
+  textbookId: z
+    .string({ error: '교재 ID가 올바르지 않습니다' })
+    .regex(/^[1-9]\d{0,14}$/, '교재 ID가 올바르지 않습니다')
+    .transform(Number)
+    .optional(),
+});
+
+// Whole percent rounded down, so nearly all is not shown as all; none when there is nothing to count.
+export const percentDown = (part: number, whole: number) =>
+  whole ? Math.floor((part * 100) / whole) : null;
+
 // Study time statistics (#47): /api/stats/study-time?period=week|month|3months|all&type=all|new|review
 export function statsRoutes(pool: Pool, today: () => string) {
   const router = Router();
@@ -231,6 +243,64 @@ export function statsRoutes(pool: Pool, today: () => string) {
       completed,
       delayed,
       completionRate: completionRate(completed, scheduled),
+    });
+  });
+
+  // Chapters done per textbook, and how schedules were kept (#51, docs/decisions/schedule-rules.md
+  // 7장): /api/stats/textbooks?textbookId=. A chapter is done by a done log on it or anywhere under
+  // it, dated today at the latest, as the other statistics count. A day counts once its first planned date has passed, or once it is done on that date; one
+  // still open today is not late yet. Moves do not change that date, so this writes nothing.
+  router.get('/textbooks', async (req, res) => {
+    const { textbookId } = textbookQuery.parse(req.query);
+    const id = textbookId ?? null;
+    const { rows: textbooks } = await pool.query(
+      `WITH RECURSIVE tree AS (
+         SELECT textbook_id, id, id AS chapter_id FROM textbook_contents WHERE parent_id IS NULL
+         UNION ALL
+         SELECT c.textbook_id, c.id, t.chapter_id
+         FROM textbook_contents c JOIN tree t ON c.parent_id = t.id
+       )
+       SELECT b.id, b.title,
+         (SELECT count(*)::int FROM textbook_contents c
+          WHERE c.textbook_id = b.id AND c.parent_id IS NULL) AS "totalChapters",
+         (SELECT count(DISTINCT t.chapter_id)::int FROM tree t
+          JOIN study_logs l ON l.textbook_id = t.textbook_id AND l.content_id = t.id
+          WHERE t.textbook_id = b.id AND l.status = 'done' AND l.study_date <= $2::date)
+           AS "completedChapters"
+       FROM textbooks b WHERE ($1::bigint IS NULL OR b.id = $1)
+       ORDER BY b.title, b.id`,
+      [id, today()],
+    );
+    if (id !== null && textbooks.length === 0)
+      return void res.status(404).json({ error: '교재를 찾을 수 없습니다' });
+    const { rows } = await pool.query<{
+      plannedMinutes: number;
+      achievedMinutes: number;
+      dueDays: number;
+      onTimeDays: number;
+    }>(
+      `SELECT COALESCE(sum(i.target_minutes), 0)::int AS "plannedMinutes",
+         COALESCE(sum(i.target_minutes) FILTER (WHERE i.completed_on IS NOT NULL), 0)::int
+           AS "achievedMinutes",
+         count(*)::int AS "dueDays",
+         count(*) FILTER (WHERE i.completed_on <= i.original_date)::int AS "onTimeDays"
+       FROM schedule_items i JOIN schedules s ON s.id = i.schedule_id
+       WHERE ($1::bigint IS NULL OR s.textbook_id = $1)
+         AND (i.original_date < $2::date
+           OR (i.original_date = $2::date AND i.completed_on IS NOT NULL))`,
+      [id, today()],
+    );
+    const { plannedMinutes, achievedMinutes, dueDays, onTimeDays } = rows[0];
+    res.json({
+      textbooks,
+      schedule: {
+        plannedMinutes,
+        achievedMinutes,
+        achievementRate: percentDown(achievedMinutes, plannedMinutes),
+        dueDays,
+        onTimeDays,
+        adherenceRate: percentDown(onTimeDays, dueDays),
+      },
     });
   });
 

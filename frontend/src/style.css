@@ -576,6 +576,52 @@
 .schedules h2 {
   overflow-wrap: anywhere;
 }
+.textbook-filter {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  margin: 0 0 16px;
+  max-width: 320px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.textbook-filter select {
+  /* Titles run to 200 characters: the choice must not push the page wider. */
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 2px);
+  background: var(--card);
+  color: var(--foreground);
+  padding: 9px 10px;
+}
+.textbook-stats .status {
+  margin: 0;
+}
+.textbook-progress {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 14px;
+}
+.textbook-progress p {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  margin: 0 0 6px;
+}
+.textbook-progress [role='progressbar'] {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--muted);
+}
+.textbook-progress [role='progressbar'] > div {
+  height: 100%;
+  background: var(--primary);
+}
 .schedule-progress {
   margin: 0 0 16px;
 }

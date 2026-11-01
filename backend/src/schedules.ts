@@ -426,8 +426,8 @@ export function scheduleRoutes(pool: Pool, today: () => string, fetcher: Holiday
         ],
       );
       const saved = await client.query<{ id: number; date: string }>(
-        `INSERT INTO schedule_items (schedule_id, item_date, target_minutes)
-         SELECT $1, * FROM unnest($2::date[], $3::int[])
+        `INSERT INTO schedule_items (schedule_id, item_date, original_date, target_minutes)
+         SELECT $1, day, day, target FROM unnest($2::date[], $3::int[]) AS p(day, target)
          RETURNING id, to_char(item_date, 'YYYY-MM-DD') AS date`,
         [rows[0].id, items.map((item) => item.date), items.map((item) => item.targetMinutes)],
       );
