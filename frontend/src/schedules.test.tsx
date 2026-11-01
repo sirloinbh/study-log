@@ -36,12 +36,20 @@ const schedule = (id: number, title: string): Schedule => ({
   textbookTitle: null,
   totalMinutes: 1200,
   itemCount: 7,
+  currentEndDate: '2026-03-08',
+  delayDays: 0,
 });
 const detailOf = (item: Schedule): ScheduleDetail => ({
   schedule: item,
   items: [
-    { id: item.id * 10, date: '2026-03-02', targetMinutes: 120, contents: [] },
-    { id: item.id * 10 + 1, date: '2026-03-07', targetMinutes: 90, contents: [] },
+    { id: item.id * 10, date: '2026-03-02', targetMinutes: 120, completedOn: null, contents: [] },
+    {
+      id: item.id * 10 + 1,
+      date: '2026-03-07',
+      targetMinutes: 90,
+      completedOn: null,
+      contents: [],
+    },
   ],
 });
 
@@ -110,6 +118,7 @@ describe('a textbook', () => {
               id: 90,
               date: '2026-03-02',
               targetMinutes: 120,
+              completedOn: null,
               contents: [
                 { id: 71, number: '1', title: '벡터' },
                 { id: 72, number: '2', title: '행렬' },
@@ -301,6 +310,129 @@ describe('a textbook', () => {
     await screen.findByRole('heading', { level: 2, name: '지난 일정' });
     expect(list().getByRole('button', { name: '지난 일정' }).closest('li')).toHaveTextContent(
       '선형대수 · 2026-03-02 ~ 2026-03-08',
+    );
+  });
+});
+
+describe('adjusting the days', () => {
+  const adjustable = () => {
+    const made = schedule(1, '지난 일정');
+    let current = detailOf(made);
+    const sent = fakeApi(({ method, path, body }) => {
+      if (path === '/api/textbooks') return { body: { textbooks: [] } };
+      if (path === '/api/schedules') return { body: { schedules: [current.schedule] } };
+      if (method === 'GET') return { body: current };
+      const id = Number(path.split('/')[5]);
+      current = {
+        ...current,
+        items: current.items.map((item) => {
+          if (item.id !== id) return item;
+          if (path.endsWith('/complete')) return { ...item, completedOn: today };
+          if (path.endsWith('/reopen')) return { ...item, completedOn: null };
+          return { ...item, date: (body as { date: string }).date };
+        }),
+      };
+      return { body: current };
+    });
+    return sent;
+  };
+  const opened = async () => {
+    render(<Schedules today={today} />);
+    await screen.findByRole('heading', { level: 2, name: '지난 일정' });
+  };
+  const dayCard = () => within(screen.getByRole('region', { name: '날짜별 일정' }));
+
+  test('a day is completed and reopened, and focus stays on it', async () => {
+    const sent = adjustable();
+    await opened();
+    const check = days().getByRole('checkbox', { name: '3월 2일 (월) 완료' });
+    expect(check).not.toBeChecked();
+    fireEvent.click(check);
+    await dayCard().findByText('완료로 표시했습니다');
+    expect(sent).toEqual([{ method: 'POST', path: '/api/schedules/1/items/10/complete' }]);
+    expect(days().getByRole('checkbox', { name: '3월 2일 (월) 완료' })).toBeChecked();
+    expect(days().getByText('3월 2일 (월)').closest('li')).toHaveClass('done');
+    await waitFor(() =>
+      expect(days().getByRole('checkbox', { name: '3월 2일 (월) 완료' })).toHaveFocus(),
+    );
+    // A completed day cannot be moved.
+    expect(days().queryByRole('button', { name: '3월 2일 (월) 옮기기' })).toBeNull();
+
+    fireEvent.click(days().getByRole('checkbox', { name: '3월 2일 (월) 완료' }));
+    await dayCard().findByText('완료를 취소했습니다');
+    expect(sent[1]).toEqual({ method: 'POST', path: '/api/schedules/1/items/10/reopen' });
+    expect(days().getByRole('button', { name: '3월 2일 (월) 옮기기' })).toBeInTheDocument();
+  });
+
+  test('a day moves alone unless asked, and can be cancelled', async () => {
+    const sent = adjustable();
+    await opened();
+    fireEvent.click(days().getByRole('button', { name: '3월 7일 (토) 옮기기' }));
+    expect(days().getByLabelText('옮길 날짜')).toHaveValue('2026-03-07');
+    fireEvent.click(days().getByRole('button', { name: '취소' }));
+    expect(days().queryByLabelText('옮길 날짜')).toBeNull();
+    await waitFor(() =>
+      expect(days().getByRole('button', { name: '3월 7일 (토) 옮기기' })).toHaveFocus(),
+    );
+    expect(sent).toEqual([]);
+
+    fireEvent.click(days().getByRole('button', { name: '3월 7일 (토) 옮기기' }));
+    fireEvent.change(days().getByLabelText('옮길 날짜'), { target: { value: '2026-03-10' } });
+    fireEvent.submit(days().getByLabelText('옮길 날짜').closest('form')!);
+    await dayCard().findByText('날짜를 옮겼습니다');
+    expect(sent).toEqual([
+      {
+        method: 'PUT',
+        path: '/api/schedules/1/items/11/date',
+        body: { date: '2026-03-10', withLater: false },
+      },
+    ]);
+    expect(days().getByText('3월 10일 (화)')).toBeInTheDocument();
+    expect(days().queryByLabelText('옮길 날짜')).toBeNull();
+  });
+
+  test('later days are taken along when asked', async () => {
+    const sent = adjustable();
+    await opened();
+    fireEvent.click(days().getByRole('button', { name: '3월 2일 (월) 옮기기' }));
+    fireEvent.change(days().getByLabelText('옮길 날짜'), { target: { value: '2026-03-04' } });
+    fireEvent.click(days().getByLabelText('이후 일정도 함께'));
+    fireEvent.submit(days().getByLabelText('옮길 날짜').closest('form')!);
+    await dayCard().findByText('이후 일정과 함께 옮겼습니다');
+    expect(sent[0].body).toEqual({ date: '2026-03-04', withLater: true });
+  });
+
+  test('a refusal is said beside the days and keeps the move open', async () => {
+    fakeApi(({ method, path }) => {
+      if (path === '/api/textbooks') return { body: { textbooks: [] } };
+      if (path === '/api/schedules') return { body: { schedules: [schedule(1, '지난 일정')] } };
+      if (method === 'GET') return { body: detailOf(schedule(1, '지난 일정')) };
+      return { status: 400, body: { error: '날짜는 오늘 이후여야 합니다' } };
+    });
+    await opened();
+    fireEvent.click(days().getByRole('button', { name: '3월 2일 (월) 옮기기' }));
+    fireEvent.submit(days().getByLabelText('옮길 날짜').closest('form')!);
+    expect(await dayCard().findByRole('alert')).toHaveTextContent('날짜는 오늘 이후여야 합니다');
+    expect(days().getByLabelText('옮길 날짜')).toBeInTheDocument();
+  });
+
+  test('a delay is shown with the end first chosen', async () => {
+    const late = {
+      ...schedule(1, '지난 일정'),
+      currentEndDate: '2026-03-10',
+      delayDays: 2,
+    };
+    fakeApi(({ path }) => {
+      if (path === '/api/textbooks') return { body: { textbooks: [] } };
+      if (path === '/api/schedules') return { body: { schedules: [late] } };
+      return { body: detailOf(late) };
+    });
+    await opened();
+    expect(
+      dayCard().getByText(/처음 정한 종료일 2026-03-08에서\s*2일 늦어져 2026-03-10에\s*끝납니다/),
+    ).toBeInTheDocument();
+    expect(list().getByRole('button', { name: '지난 일정' }).closest('li')).toHaveTextContent(
+      '2026-03-08 (2일 늦어짐)',
     );
   });
 });

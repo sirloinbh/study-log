@@ -103,12 +103,55 @@ test('a schedule follows what was done and what fell behind', { skip: !url }, as
         ]);
       });
 
+      await t.test('days still ahead never come forward', async () => {
+        today = '8042-02-01';
+        const { schedule, items } = await make('8042-02-10', '8042-02-11');
+        // Neither reading nor changing a day pulls them to today.
+        assert.deepEqual(dates(await read(schedule.id)), ['8042-02-10', '8042-02-11']);
+        await call('/api/schedules');
+        const done = await complete(schedule.id, items[1].id);
+        assert.deepEqual(dates(done.data as unknown as Detail), ['8042-02-10', '8042-02-11']);
+      });
+
       await t.test('two reads at once move it only once', async () => {
         today = '8041-06-01';
         const { schedule } = await make('8041-06-01', '8041-06-02');
         today = '8041-06-05';
         await Promise.all([read(schedule.id), read(schedule.id), call('/api/schedules')]);
         assert.deepEqual(dates(await read(schedule.id)), ['8041-06-05', '8041-06-06']);
+      });
+
+      await t.test('a read that waits for another one does not move it again', async () => {
+        today = '8042-03-01';
+        const { schedule } = await make('8042-03-01', '8042-03-02');
+        today = '8042-03-05';
+        // Another read in the middle of moving it, not committed yet. The request's own check
+        // still sees the days behind, so only taking the lock first keeps it from moving them too.
+        const client = await pool.connect();
+        try {
+          await client.query('BEGIN');
+          await client.query('SELECT 1 FROM schedules WHERE id = $1 FOR UPDATE', [schedule.id]);
+          await client.query(
+            'UPDATE schedule_items SET item_date = item_date + 4 WHERE schedule_id = $1',
+            [schedule.id],
+          );
+          const waiting = read(schedule.id);
+          for (let tries = 0; tries < 200; tries++) {
+            const { rowCount } = await pool.query(
+              `SELECT 1 FROM pg_stat_activity
+               WHERE datname = current_database() AND wait_event_type = 'Lock'
+                 AND (query LIKE '%schedules WHERE id = $1 FOR UPDATE%'
+                   OR query LIKE '%UPDATE schedule_items i%')`,
+            );
+            if (rowCount) break;
+            await new Promise((resolve) => setTimeout(resolve, 25));
+          }
+          await client.query('COMMIT');
+          assert.deepEqual(dates(await waiting), ['8042-03-05', '8042-03-06']);
+        } finally {
+          await client.query('ROLLBACK').catch(() => undefined);
+          client.release();
+        }
       });
 
       await t.test('a completed day cannot be completed or moved, until reopened', async () => {

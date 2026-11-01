@@ -13,6 +13,9 @@ export type Schedule = {
   textbookTitle: string | null;
   totalMinutes: number;
   itemCount: number;
+  // The later of the end first chosen and the last day, and how far past it that is (rule 4장).
+  currentEndDate: string;
+  delayDays: number;
 };
 
 export type ScheduleChapter = { id: number; number: string; title: string };
@@ -21,6 +24,7 @@ export type ScheduleItem = {
   id: number;
   date: string;
   targetMinutes: number;
+  completedOn: string | null;
   contents: ScheduleChapter[];
 };
 

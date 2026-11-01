@@ -586,9 +586,48 @@
 }
 .schedule-days li {
   display: flex;
-  justify-content: space-between;
-  gap: 12px;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
   padding: 10px 14px;
+}
+.schedule-days li.done .schedule-day {
+  color: var(--muted-foreground);
+  text-decoration: line-through;
+}
+.schedule-days input[type='checkbox'] {
+  flex: none;
+  width: 18px;
+  height: 18px;
+}
+.schedule-days .schedule-day {
+  flex: 1 1 0;
+}
+.schedule-move {
+  flex: 1 1 100%;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 12px;
+}
+.schedule-move label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.schedule-move input[type='date'] {
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 2px);
+  background: var(--card);
+  color: var(--foreground);
+  padding: 9px 10px;
+}
+.schedule-move .schedule-later {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 36px;
 }
 .schedule-days li + li {
   border-top: 1px solid var(--border);
