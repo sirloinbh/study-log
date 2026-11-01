@@ -9,11 +9,20 @@ export type Schedule = {
   endDate: string;
   weekdayMinutes: number;
   restDayMinutes: number;
+  textbookId: number | null;
+  textbookTitle: string | null;
   totalMinutes: number;
   itemCount: number;
 };
 
-export type ScheduleItem = { id: number; date: string; targetMinutes: number };
+export type ScheduleChapter = { id: number; number: string; title: string };
+
+export type ScheduleItem = {
+  id: number;
+  date: string;
+  targetMinutes: number;
+  contents: ScheduleChapter[];
+};
 
 export type ScheduleDetail = { schedule: Schedule; items: ScheduleItem[] };
 

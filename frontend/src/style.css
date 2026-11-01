@@ -593,6 +593,19 @@
 .schedule-days li + li {
   border-top: 1px solid var(--border);
 }
+.schedule-day {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.schedule-days strong {
+  flex: none;
+}
+.schedules .schedule-book {
+  margin: -8px 0 16px;
+  overflow-wrap: anywhere;
+}
 .schedule-days li[aria-current='date'] {
   background: var(--muted);
   font-weight: 600;

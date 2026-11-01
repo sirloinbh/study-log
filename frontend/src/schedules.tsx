@@ -12,6 +12,7 @@ import {
   type ScheduleDetail,
 } from './schedule';
 import { formatMinutes } from './study-logs-data';
+import { contentLabel, type ContentNode, type Textbook } from './textbook';
 
 type Notice = { kind: 'status' | 'alert'; text: string } | undefined;
 
@@ -24,6 +25,15 @@ export function Schedules({ today }: { today: string }) {
   const [endDate, setEndDate] = useState(defaultEnd(today));
   const [weekdayHours, setWeekdayHours] = useState(defaultHours.weekday);
   const [restDayHours, setRestDayHours] = useState(defaultHours.restDay);
+  // A book is optional, and without a chapter picked its range runs to that end of the book.
+  const [textbookId, setTextbookId] = useState('');
+  const [fromContentId, setFromContentId] = useState('');
+  const [toContentId, setToContentId] = useState('');
+  const [textbooks, setTextbooks] = useState<Textbook[]>();
+  const [textbooksFailed, setTextbooksFailed] = useState(false);
+  // Tagged with their book, so a slow answer for another one is never offered for this one.
+  const [chapters, setChapters] = useState<{ textbookId: string; list: ContentNode[] }>();
+  const [chaptersFailed, setChaptersFailed] = useState<string>();
 
   const [schedules, setSchedules] = useState<Schedule[]>();
   const [listError, setListError] = useState<string>();
@@ -57,6 +67,29 @@ export function Schedules({ today }: { today: string }) {
       current = false;
     };
   }, [reload]);
+
+  useEffect(() => {
+    let current = true;
+    requestJson<{ textbooks: Textbook[] }>('/api/textbooks')
+      .then((data) => current && setTextbooks(data.textbooks))
+      .catch(() => current && setTextbooksFailed(true));
+    return () => {
+      current = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!textbookId) return;
+    let current = true;
+    requestJson<{ contents: ContentNode[] }>(`/api/textbooks/${textbookId}/contents`)
+      .then((data) => current && setChapters({ textbookId, list: data.contents }))
+      .catch(() => current && setChaptersFailed(textbookId));
+    return () => {
+      current = false;
+    };
+  }, [textbookId]);
+
+  const bookChapters = chapters?.textbookId === textbookId ? chapters.list : undefined;
 
   // The one picked, or the first in the list (the latest start); a picked one that is gone falls
   // back too.
@@ -100,7 +133,20 @@ export function Schedules({ today }: { today: string }) {
     try {
       const data = await requestJson<ScheduleDetail>('/api/schedules', {
         method: 'POST',
-        body: { title, startDate, endDate, weekdayMinutes, restDayMinutes },
+        body: {
+          title,
+          startDate,
+          endDate,
+          weekdayMinutes,
+          restDayMinutes,
+          ...(textbookId && {
+            chapters: {
+              textbookId: Number(textbookId),
+              fromContentId: fromContentId ? Number(fromContentId) : null,
+              toContentId: toContentId ? Number(toContentId) : null,
+            },
+          }),
+        },
       });
       setDetail(data);
       setPickedId(data.schedule.id);
@@ -209,6 +255,68 @@ export function Schedules({ today }: { today: string }) {
               onChange={typed(setRestDayHours)}
             />
           </label>
+          <label className="half">
+            교재 (선택)
+            <select
+              disabled={busy || !textbooks}
+              value={textbookId}
+              onChange={(event) => {
+                setNotice(undefined);
+                setTextbookId(event.target.value);
+                setFromContentId('');
+                setToContentId('');
+                setChaptersFailed(undefined);
+              }}
+            >
+              <option value="">교재 없이 시간만</option>
+              {textbooks?.map((book) => (
+                <option key={book.id} value={book.id}>
+                  {book.title}
+                </option>
+              ))}
+            </select>
+          </label>
+          {textbookId && (
+            <>
+              <label>
+                첫 장
+                <select
+                  disabled={busy || !bookChapters?.length}
+                  value={fromContentId}
+                  onChange={typed(setFromContentId)}
+                >
+                  <option value="">처음부터</option>
+                  {bookChapters?.map((chapter) => (
+                    <option key={chapter.id} value={chapter.id}>
+                      {contentLabel(chapter)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                마지막 장
+                <select
+                  disabled={busy || !bookChapters?.length}
+                  value={toContentId}
+                  onChange={typed(setToContentId)}
+                >
+                  <option value="">끝까지</option>
+                  {bookChapters?.map((chapter) => (
+                    <option key={chapter.id} value={chapter.id}>
+                      {contentLabel(chapter)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </>
+          )}
+          {textbooksFailed && <p className="status wide">교재 목록을 불러오지 못했습니다</p>}
+          {chaptersFailed === textbookId && textbookId && (
+            <p className="status wide">이 교재의 목차를 불러오지 못했습니다</p>
+          )}
+          {bookChapters?.length === 0 && (
+            <p className="status wide">이 교재에는 장이 없습니다. 목차를 먼저 등록하세요</p>
+          )}
           <div className="actions wide">
             <button type="submit" className="primary" disabled={busy}>
               <ButtonSpinner when={action === 'create'} />
@@ -317,6 +425,7 @@ export function Schedules({ today }: { today: string }) {
                   </div>
                 </div>
                 <p className="status">
+                  {item.textbookTitle && `${item.textbookTitle} · `}
                   {item.startDate} ~ {item.endDate} · 목표 {formatMinutes(item.totalMinutes)} ·{' '}
                   {item.itemCount}일
                 </p>
@@ -334,6 +443,9 @@ export function Schedules({ today }: { today: string }) {
               <h2 id="schedule-heading" tabIndex={-1}>
                 {shownDetail.schedule.title}
               </h2>
+              {shownDetail.schedule.textbookTitle && (
+                <p className="status schedule-book">{shownDetail.schedule.textbookTitle}</p>
+              )}
               <dl className="retro-summary" aria-label="일정 요약">
                 <div>
                   <dt>평일</dt>
@@ -355,7 +467,14 @@ export function Schedules({ today }: { today: string }) {
               <ul className="schedule-days" aria-label="날짜별 목표 시간">
                 {shownDetail.items.map((item) => (
                   <li key={item.id} aria-current={item.date === today ? 'date' : undefined}>
-                    <span>{dayLabel(item.date, shownDetail.schedule.startDate)}</span>
+                    <span className="schedule-day">
+                      <span>{dayLabel(item.date, shownDetail.schedule.startDate)}</span>
+                      {item.contents.length > 0 && (
+                        <span className="status">
+                          {item.contents.map(contentLabel).join(' · ')}
+                        </span>
+                      )}
+                    </span>
                     <strong>{formatMinutes(item.targetMinutes)}</strong>
                   </li>
                 ))}
