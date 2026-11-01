@@ -54,6 +54,7 @@
   "overrides": {
     "@napi-rs/canvas": "1.0.10",
     "immer": "11.1.21",
+    "minimatch": "11.0.3",
     "react-is": "19.3.0"
   }
 }
