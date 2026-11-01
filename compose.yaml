@@ -26,6 +26,8 @@ services:
       TZ: Asia/Seoul
       # Exercise translation (#31); without it only translating fails.
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      # Public holidays for schedules (#33); without it only reading holidays fails.
+      HOLIDAY_API_KEY: ${HOLIDAY_API_KEY:-}
     depends_on:
       db: { condition: service_healthy }
     restart: unless-stopped
