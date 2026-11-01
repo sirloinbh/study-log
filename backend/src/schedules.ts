@@ -134,7 +134,7 @@ const itemIdParam = z
 // Moving a day (rule 4장). `withLater` takes the open days from it onward along, keeping their gaps.
 const moveInput = z.object(
   {
-    date: dateField('날짜'),
+    date: dateField('이동일'),
     withLater: z.boolean({ error: '이후 일정 이동 여부가 올바르지 않습니다' }).default(false),
   },
   { error: '날짜를 JSON 객체로 보내세요' },
@@ -318,10 +318,10 @@ export function scheduleRoutes(pool: Pool, today: () => string, fetcher: Holiday
         return { status: 400, body: { error: `날짜는 오늘부터 ${maxMoveDays}일 안이어야 합니다` } };
       if (input.withLater) {
         const last = await client.query<{ last: string }>(
-          `SELECT max(item_date) + ($3::date - $4::date) AS last FROM schedule_items
+          `SELECT max(item_date) + ($2::date - $3::date) AS last FROM schedule_items
            WHERE schedule_id = (SELECT schedule_id FROM schedule_items WHERE id = $1)
-             AND completed_on IS NULL AND item_date >= $4::date AND $2::bigint IS NOT NULL`,
-          [id, id, input.date, item.date],
+             AND completed_on IS NULL AND item_date >= $3::date`,
+          [id, input.date, item.date],
         );
         if (daysInPeriod(today, last.rows[0].last) > maxMoveDays)
           return {

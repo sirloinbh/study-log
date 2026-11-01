@@ -180,6 +180,7 @@ export function Schedules({ today }: { today: string }) {
   // A change to one day answers with the whole schedule: others can move with it.
   const changeDay = async (
     name: string,
+    dayId: number,
     request: () => Promise<ScheduleDetail>,
     success: string,
     focus: string,
@@ -197,9 +198,20 @@ export function Schedules({ today }: { today: string }) {
       setWantFocus(focus);
     } catch (failure) {
       const { status, message } = failure as RequestError;
-      setDayNotice({ kind: 'alert', text: message });
-      // Gone elsewhere: what it would go back to may go with the reload.
-      setWantFocus(status === 404 ? 'schedule-heading' : focusIfRefused);
+      if (status === 404) {
+        // The schedule is gone, and its card with the reload: this goes where it stays.
+        setMoving(undefined);
+        setListNotice({ kind: 'alert', text: message });
+        setWantFocus('schedules-heading');
+      } else if (status === 409) {
+        // Done or reopened elsewhere: the reload may take the form and its button away.
+        setMoving(undefined);
+        setDayNotice({ kind: 'alert', text: message });
+        setWantFocus(`schedule-day-check-${dayId}`);
+      } else {
+        setDayNotice({ kind: 'alert', text: message });
+        setWantFocus(focusIfRefused);
+      }
     } finally {
       // The list's end date follows, and after a refusal the days are read again.
       setReload((count) => count + 1);
@@ -210,6 +222,7 @@ export function Schedules({ today }: { today: string }) {
   const toggleDay = (scheduleId: number, id: number, done: boolean) =>
     changeDay(
       'toggle',
+      id,
       () =>
         requestJson<ScheduleDetail>(
           `/api/schedules/${scheduleId}/items/${id}/${done ? 'reopen' : 'complete'}`,
@@ -222,6 +235,7 @@ export function Schedules({ today }: { today: string }) {
   const moveDay = (scheduleId: number, target: { id: number; date: string; withLater: boolean }) =>
     changeDay(
       'move',
+      target.id,
       () =>
         requestJson<ScheduleDetail>(`/api/schedules/${scheduleId}/items/${target.id}/date`, {
           method: 'PUT',
@@ -629,9 +643,10 @@ export function Schedules({ today }: { today: string }) {
                             type="checkbox"
                             disabled={busy}
                             checked={moving.withLater}
-                            onChange={(event) =>
-                              setMoving({ ...moving, withLater: event.target.checked })
-                            }
+                            onChange={(event) => {
+                              setDayNotice(undefined);
+                              setMoving({ ...moving, withLater: event.target.checked });
+                            }}
                           />
                           이후 일정도 함께
                         </label>
@@ -645,6 +660,7 @@ export function Schedules({ today }: { today: string }) {
                             className="secondary"
                             disabled={busy}
                             onClick={() => {
+                              setDayNotice(undefined);
                               setMoving(undefined);
                               setWantFocus(`schedule-day-move-${item.id}`);
                             }}

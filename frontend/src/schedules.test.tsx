@@ -449,18 +449,47 @@ describe('adjusting the days', () => {
     expect(dayCard().queryByText('완료로 표시했습니다')).toBeNull();
   });
 
-  test('a day of a schedule gone elsewhere sends focus to the heading', async () => {
+  test('a schedule gone elsewhere says so beside the list, and focus goes there', async () => {
+    let rows = [schedule(2, '새 일정'), schedule(1, '지난 일정')];
     fakeApi(({ method, path }) => {
       if (path === '/api/textbooks') return { body: { textbooks: [] } };
-      if (path === '/api/schedules') return { body: { schedules: [schedule(1, '지난 일정')] } };
-      if (method === 'GET') return { body: detailOf(schedule(1, '지난 일정')) };
+      if (path === '/api/schedules') return { body: { schedules: rows } };
+      if (method === 'GET')
+        return {
+          body: detailOf(path.endsWith('/2') ? schedule(2, '새 일정') : schedule(1, '지난 일정')),
+        };
+      rows = rows.filter((row) => row.id !== 2);
       return { status: 404, body: { error: '일정을 찾을 수 없습니다' } };
     });
-    await opened();
+    render(<Schedules today={today} />);
+    await screen.findByRole('heading', { level: 2, name: '새 일정' });
     fireEvent.click(days().getByRole('checkbox', { name: '3월 2일 (월) 완료' }));
-    await dayCard().findByRole('alert');
+    expect(await list().findByRole('alert')).toHaveTextContent('일정을 찾을 수 없습니다');
+    // The next one opens, with nothing said about the one that is gone.
+    await screen.findByRole('heading', { level: 2, name: '지난 일정' });
+    expect(dayCard().queryByRole('alert')).toBeNull();
+    await waitFor(() => expect(screen.getByRole('heading', { name: '내 일정' })).toHaveFocus());
+  });
+
+  test('a day done elsewhere closes its move, and focus goes to its box', async () => {
+    let current = detailOf(schedule(1, '지난 일정'));
+    fakeApi(({ method, path }) => {
+      if (path === '/api/textbooks') return { body: { textbooks: [] } };
+      if (path === '/api/schedules') return { body: { schedules: [current.schedule] } };
+      if (method === 'GET') return { body: current };
+      current = {
+        ...current,
+        items: current.items.map((item) => ({ ...item, completedOn: today })),
+      };
+      return { status: 409, body: { error: '완료한 항목은 옮길 수 없습니다' } };
+    });
+    await opened();
+    fireEvent.click(days().getByRole('button', { name: '3월 2일 (월) 옮기기' }));
+    fireEvent.submit(days().getByLabelText('옮길 날짜').closest('form')!);
+    expect(await dayCard().findByRole('alert')).toHaveTextContent('완료한 항목은 옮길 수 없습니다');
+    expect(days().queryByLabelText('옮길 날짜')).toBeNull();
     await waitFor(() =>
-      expect(screen.getByRole('heading', { level: 2, name: '지난 일정' })).toHaveFocus(),
+      expect(days().getByRole('checkbox', { name: '3월 2일 (월) 완료' })).toHaveFocus(),
     );
   });
 
