@@ -16,7 +16,7 @@
 
 ## 구현 판단
 
-- 게시 후 14일이 지나지 않은 버전을 피해 온 관행(#23, #49)의 예외이다. 수정 버전 11.0.1~11.0.3은 모두 2026-10-27~28 게시이다. 사용자가 이 점을 안내받고 직접 설치했다.
+- 게시 후 14일이 지나지 않은 버전을 피해 온 관행(#23, #49)의 예외이다. 수정 버전 11.0.1~11.0.3은 모두 2026-10-27~28 게시이고, 함께 들어온 `@isaacs/nonrecursive-glob-match` 1.0.3도 2026-10-28 게시이다. 사용자가 이 점을 안내받고 직접 설치했다.
 - ESLint 계열은 `minimatch` `^10`을 요구하므로 주 버전을 넘겨 강제한다. 이들이 11을 공식 지원하면 override를 지운다.
 - 패키지 설치는 사용자가 `--ignore-scripts`로 실행했다.
 
@@ -29,6 +29,10 @@
   - `backend/src`와 `frontend/src`의 `.ts`: `simple-import-sort/imports`, `@typescript-eslint/require-await`, `no-var`, `@typescript-eslint/no-unused-vars`를 잡았다.
   - `.tsx`: `react-hooks/exhaustive-deps`, `jsx-a11y-x/alt-text`를 잡았다.
   - 빌드 결과인 `frontend/dist`의 파일은 검사하지 않았다.
-  - 전체 195개 파일을 검사했고 기존 파일에 새 문제는 없었다.
+  - 임시 파일을 뺀 192개 파일에 새 문제는 없었다.
 
 앱 코드를 바꾸지 않아 브라우저 확인은 하지 않았다. 바뀐 패키지는 개발 도구에서만 쓰인다.
+
+## 리뷰
+
+1차 리뷰에서 동작 결함은 없었다. ESLint 계열 네 패키지가 쓰는 `Minimatch`, `minimatch`, `match`, `dot`, `flipNegate`는 11.0.3에 그대로 있고, 없어진 API(`makeRe`, `AST` 등)는 쓰지 않는다. 문서의 파일 수와 새 패키지의 게시일 누락을 고쳤다.
