@@ -12,8 +12,8 @@ import {
   shiftDays,
   shiftPeriod,
 } from './retrospective';
-import { formatMinutes } from './study-logs';
-import { StudyPattern } from './StudyPattern';
+import { formatMinutes } from './study-logs-data';
+import { StudyPattern } from './study-pattern';
 
 type Notice = { kind: 'status' | 'alert'; text: string } | undefined;
 

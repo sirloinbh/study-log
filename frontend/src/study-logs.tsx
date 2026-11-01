@@ -2,8 +2,9 @@ import React, { useEffect, useState } from 'react';
 
 import { type RequestError, requestJson } from './api';
 import { useBusy } from './busy';
-import { Calendar } from './Calendar';
-import { Memo } from './Memo';
+import { Calendar } from './calendar';
+import { Memo } from './memo';
+import { StudyLogSearch } from './study-log-search';
 import {
   crossesMidnight,
   emptyForm,
@@ -18,8 +19,7 @@ import {
   type StudyType,
   studyTypeLabels,
   understandingLabels,
-} from './study-logs';
-import { StudyLogSearch } from './StudyLogSearch';
+} from './study-logs-data';
 import { type ContentNode, contentOptions, type Textbook } from './textbook';
 
 type Notice = { kind: 'status' | 'alert'; text: string } | undefined;

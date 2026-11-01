@@ -615,7 +615,7 @@ uiTest('editing a log fills in and can clear its self-assessment', async () => {
 uiTest('reflection label joins whichever answers were given', () => {
   const logic = loadFrontendModule<{
     reflectionLabel(log: { understanding: number | null; goalAchieved: boolean | null }): string;
-  }>('study-logs.ts');
+  }>('study-logs-data.ts');
   assert.equal(logic.reflectionLabel({ understanding: null, goalAchieved: null }), '');
   assert.equal(logic.reflectionLabel({ understanding: 3, goalAchieved: null }), '이해도 3/5');
   assert.equal(logic.reflectionLabel({ understanding: null, goalAchieved: false }), '목표 미달성');
@@ -628,7 +628,7 @@ uiTest('reflection label joins whichever answers were given', () => {
 uiTest('studied label shows the textbook and the chapter when there is one', () => {
   const logic = loadFrontendModule<{
     studiedLabel(log: Record<string, unknown>): string;
-  }>('study-logs.ts');
+  }>('study-logs-data.ts');
   const none = { textbookTitle: null, contentNumber: null, contentTitle: null };
   assert.equal(logic.studiedLabel(none), '');
   assert.equal(logic.studiedLabel({ ...none, textbookTitle: '선형대수' }), '선형대수');
@@ -647,7 +647,7 @@ uiTest('duration preview follows the API rule and formats hours and minutes', ()
     previewMinutes(start: string, end: string): number | undefined;
     crossesMidnight(start: string, end: string): boolean;
     formatMinutes(total: number): string;
-  }>('study-logs.ts');
+  }>('study-logs-data.ts');
   assert.equal(logic.previewMinutes('09:00', '10:30'), 90);
   assert.equal(logic.previewMinutes('23:00', '01:00'), 120);
   assert.equal(logic.previewMinutes('10:00', '10:00'), undefined);

@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 
 import { type RequestError, requestJson } from './api';
-import { Heatmap } from './Heatmap';
-import { ReviewRateChart } from './ReviewRateChart';
-import { formatMinutes } from './study-logs';
+import { Heatmap } from './heatmap';
+import { ReviewRateChart } from './review-rate-chart';
+import { formatMinutes } from './study-logs-data';
 import {
   type ChartUnit,
   periodLabels,
@@ -15,7 +15,7 @@ import {
   studyTimePath,
   type StudyTimeStats,
 } from './study-stats';
-import { StudyTimeChart } from './StudyTimeChart';
+import { StudyTimeChart } from './study-time-chart';
 
 // Study time dashboard (#48): metric cards for the all-time total, today, the picked period and
 // its daily average, from GET /api/stats/study-time (#47), the period's study time chart (#49),

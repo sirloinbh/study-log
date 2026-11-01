@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 
 import { type RequestError, requestJson } from './api';
 import { useBusy } from './busy';
-import { Memo } from './Memo';
+import { Memo } from './memo';
 import { overdueDays, type Review, type ReviewRange, reviewRanges, reviewTitle } from './review';
 
 // `reviewId` is the review an alert is about.

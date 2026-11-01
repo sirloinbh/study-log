@@ -187,7 +187,7 @@ uiTest('saving a log searches the shown results again', async () => {
 uiTest('the search request leaves out blank conditions', () => {
   const { studyLogSearchPath } = loadFrontendModule<{
     studyLogSearchPath(search: { q: string; from: string; to: string; textbookId: string }): string;
-  }>('study-logs.ts');
+  }>('study-logs-data.ts');
   assert.equal(
     studyLogSearchPath({ q: '  ', from: '', to: '', textbookId: '' }),
     '/api/study-logs?limit=100',

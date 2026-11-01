@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 
 import { type RequestError, requestJson } from './api';
-import { Memo } from './Memo';
+import { Memo } from './memo';
 import {
   calendarCells,
   type CalendarDay,
@@ -9,7 +9,7 @@ import {
   shiftMonth,
   shortMinutes,
 } from './month-calendar';
-import { formatMinutes, statusLabels, type StudyLog } from './study-logs';
+import { formatMinutes, statusLabels, type StudyLog } from './study-logs-data';
 
 const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
 

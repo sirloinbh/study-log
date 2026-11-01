@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 
 import { type RequestError, requestJson } from './api';
-import { formatMinutes } from './study-logs';
+import { formatMinutes } from './study-logs-data';
 import { type DayMinutes, heatBands, heatLevel, heatWeeks, monthLabel } from './study-stats';
 
 // Rows run Sunday to Saturday (#96); Monday, Wednesday and Friday are labelled.

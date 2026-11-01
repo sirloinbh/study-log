@@ -6,11 +6,11 @@ export const legacyShell = String.raw`import React, { useEffect, useState } from
 import { createRoot } from 'react-dom/client';
 import { BookOpen, ChartColumn, NotebookPen, NotebookText, Settings2, Tags } from 'lucide-react';
 import { healthText, type Health } from './health';
-import { Keywords } from './Keywords';
-import { Retrospectives } from './Retrospectives';
-import { Stats } from './Stats';
-import { StudyLogs } from './StudyLogs';
-import { Textbooks } from './Textbooks';
+import { Keywords } from './keywords';
+import { Retrospectives } from './retrospectives';
+import { Stats } from './stats';
+import { StudyLogs } from './study-logs';
+import { Textbooks } from './textbooks';
 
 const pages = [
   {

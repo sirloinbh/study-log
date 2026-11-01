@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 
 import { type RequestError, requestJson } from './api';
 import { useBusy } from './busy';
-import { Memo } from './Memo';
+import { Memo } from './memo';
 import {
   emptySearch,
   formatMinutes,
@@ -11,7 +11,7 @@ import {
   type StudyLog,
   type StudyLogSearch as Search,
   studyLogSearchPath,
-} from './study-logs';
+} from './study-logs-data';
 import type { Textbook } from './textbook';
 
 // Searching past study logs (#18) by words in the memo or difficulties, a date range and a
