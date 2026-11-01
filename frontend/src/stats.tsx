@@ -17,6 +17,7 @@ import {
   type StudyTimeStats,
 } from './study-stats';
 import { StudyTimeChart } from './study-time-chart';
+import { TextbookStats } from './textbook-stats';
 
 // Study time dashboard (#48): metric cards for the all-time total, today, the picked period and
 // its daily average, from GET /api/stats/study-time (#47), the period's study time chart (#49),
@@ -126,6 +127,7 @@ export function Stats() {
         />
       )}
       <ReviewRateChart period={period} />
+      <TextbookStats />
       <Heatmap />
     </div>
   );

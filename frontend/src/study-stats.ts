@@ -110,6 +110,26 @@ export type StudyPattern = {
   topWeekday: number | null;
 };
 
+// The response of GET /api/stats/textbooks (#51).
+export type TextbookStats = {
+  textbooks: { id: number; title: string; completedChapters: number; totalChapters: number }[];
+  schedule: {
+    plannedMinutes: number;
+    achievedMinutes: number;
+    achievementRate: number | null;
+    dueDays: number;
+    onTimeDays: number;
+    adherenceRate: number | null;
+  };
+};
+
+export const textbookStatsPath = (textbookId: string) =>
+  `/api/stats/textbooks${textbookId ? `?textbookId=${textbookId}` : ''}`;
+
+// Rounded down, so nearly all is not shown as all.
+export const chapterPercent = (book: { completedChapters: number; totalChapters: number }) =>
+  book.totalChapters ? Math.floor((book.completedChapters * 100) / book.totalChapters) : 0;
+
 export const weekdayNames = ['일', '월', '화', '수', '목', '금', '토'];
 
 // "20시~21시" for the hour starting at 20.

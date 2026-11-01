@@ -68,6 +68,22 @@ function server(answers: { reviews?: unknown; reviewsStatus?: number } = {}) {
         return Promise.resolve(
           new Response(JSON.stringify({ from: '2026-10-25', to: '2026-10-31', daily: [] })),
         );
+      if (url.startsWith('/api/stats/textbooks'))
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              textbooks: [],
+              schedule: {
+                plannedMinutes: 0,
+                achievedMinutes: 0,
+                achievementRate: null,
+                dueDays: 0,
+                onTimeDays: 0,
+                adherenceRate: null,
+              },
+            }),
+          ),
+        );
       return Promise.resolve(
         new Response(JSON.stringify(studyTime(url.includes('type=review') ? 40 : 100))),
       );
