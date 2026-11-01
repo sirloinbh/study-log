@@ -1,0 +1,346 @@
+import { useEffect, useState } from 'react';
+
+import { type RequestError, requestJson } from './api';
+import { useBusy } from './busy';
+import { ButtonSpinner, Loading } from './loading';
+import {
+  dayLabel,
+  defaultEnd,
+  defaultHours,
+  hoursToMinutes,
+  type Schedule,
+  type ScheduleDetail,
+} from './schedule';
+import { formatMinutes } from './study-logs-data';
+
+type Notice = { kind: 'status' | 'alert'; text: string } | undefined;
+
+// Study schedules (#35): a form that makes one from a period and daily hours, the schedules there
+// are, and the days of the one picked. A schedule's period and hours do not change once it is made
+// (docs/decisions/schedule-rules.md 5장), so this offers deleting rather than editing them.
+export function Schedules({ today }: { today: string }) {
+  const [title, setTitle] = useState('');
+  const [startDate, setStartDate] = useState(today);
+  const [endDate, setEndDate] = useState(defaultEnd(today));
+  const [weekdayHours, setWeekdayHours] = useState(defaultHours.weekday);
+  const [restDayHours, setRestDayHours] = useState(defaultHours.restDay);
+
+  const [schedules, setSchedules] = useState<Schedule[]>();
+  const [listError, setListError] = useState<string>();
+  const [reload, setReload] = useState(0);
+  const [pickedId, setPickedId] = useState<number>();
+  // Tagged with their schedule, so a slow answer for another one is never shown as this one's.
+  const [detail, setDetail] = useState<ScheduleDetail>();
+  const [detailError, setDetailError] = useState<{ id: number; message: string }>();
+  const [confirming, setConfirming] = useState<number>();
+  const [notice, setNotice] = useState<Notice>(undefined);
+  const { busy, action, nameNext, begin, end } = useBusy();
+  const [wantFocus, setWantFocus] = useState<string>();
+  useEffect(() => {
+    if (!wantFocus || busy) return;
+    setWantFocus(undefined);
+    document.getElementById(wantFocus)?.focus?.();
+  }, [wantFocus, busy]);
+
+  useEffect(() => {
+    let current = true;
+    requestJson<{ schedules: Schedule[] }>('/api/schedules')
+      .then((data) => {
+        if (!current) return;
+        setSchedules(data.schedules);
+        setListError(undefined);
+      })
+      .catch((failure: RequestError) => current && setListError(failure.message));
+    return () => {
+      current = false;
+    };
+  }, [reload]);
+
+  // The one picked, or the newest; a picked one that is gone falls back too.
+  const shown = schedules?.find((item) => item.id === pickedId) ?? schedules?.[0];
+  const shownId = shown?.id;
+
+  useEffect(() => {
+    if (shownId === undefined) return;
+    let current = true;
+    requestJson<ScheduleDetail>(`/api/schedules/${shownId}`)
+      .then((data) => {
+        if (!current) return;
+        setDetail(data);
+        setDetailError(undefined);
+      })
+      .catch(
+        (failure: RequestError) =>
+          current && setDetailError({ id: shownId, message: failure.message }),
+      );
+    return () => {
+      current = false;
+    };
+  }, [shownId]);
+
+  const shownDetail = detail?.schedule.id === shownId ? detail : undefined;
+  const shownError = detailError && detailError.id === shownId ? detailError.message : undefined;
+
+  const create = async (event: { preventDefault(): void }) => {
+    event.preventDefault();
+    const weekdayMinutes = hoursToMinutes(weekdayHours);
+    const restDayMinutes = hoursToMinutes(restDayHours);
+    if (weekdayMinutes === undefined || restDayMinutes === undefined) {
+      setNotice({ kind: 'alert', text: '하루 분량은 0시간에서 24시간 사이로 입력하세요' });
+      return;
+    }
+    nameNext('create');
+    if (!begin()) return;
+    setNotice(undefined);
+    try {
+      const data = await requestJson<ScheduleDetail>('/api/schedules', {
+        method: 'POST',
+        body: { title, startDate, endDate, weekdayMinutes, restDayMinutes },
+      });
+      setDetail(data);
+      setPickedId(data.schedule.id);
+      setSchedules((all) => [data.schedule, ...(all ?? [])]);
+      setTitle('');
+      setNotice({ kind: 'status', text: '일정을 만들었습니다' });
+      setWantFocus('schedule-heading');
+      setReload((count) => count + 1);
+    } catch (failure) {
+      setNotice({ kind: 'alert', text: (failure as RequestError).message });
+    } finally {
+      end();
+    }
+  };
+
+  const remove = async (id: number) => {
+    nameNext('delete');
+    if (!begin()) return;
+    setNotice(undefined);
+    try {
+      await requestJson(`/api/schedules/${id}`, { method: 'DELETE' });
+      setNotice({ kind: 'status', text: '일정을 삭제했습니다' });
+      setWantFocus('schedules-heading');
+    } catch (failure) {
+      const { status, message } = failure as RequestError;
+      setNotice({ kind: 'alert', text: message });
+      // Already gone elsewhere, so the button it would go back to goes with the reload.
+      setWantFocus(status === 404 ? 'schedules-heading' : `schedule-delete-${id}`);
+    } finally {
+      setConfirming(undefined);
+      setReload((count) => count + 1);
+      end();
+    }
+  };
+
+  return (
+    <div className="schedules">
+      <section className="card" aria-label="일정 만들기">
+        <h2>일정 만들기</h2>
+        <form className="log-form" onSubmit={(event) => void create(event)}>
+          <label className="wide">
+            일정 이름
+            <input
+              required
+              maxLength={200}
+              placeholder="예: 알고리즘 교재 1회독"
+              disabled={busy}
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+            />
+          </label>
+          <label>
+            시작일
+            <input
+              type="date"
+              required
+              min={today}
+              disabled={busy}
+              value={startDate}
+              onChange={(event) => setStartDate(event.target.value)}
+            />
+          </label>
+          <label>
+            종료일
+            <input
+              type="date"
+              required
+              min={startDate}
+              disabled={busy}
+              value={endDate}
+              onChange={(event) => setEndDate(event.target.value)}
+            />
+          </label>
+          <label>
+            평일 (시간)
+            <input
+              type="number"
+              required
+              min={0}
+              max={24}
+              step={0.5}
+              disabled={busy}
+              value={weekdayHours}
+              onChange={(event) => setWeekdayHours(event.target.value)}
+            />
+          </label>
+          <label>
+            주말·공휴일 (시간)
+            <input
+              type="number"
+              required
+              min={0}
+              max={24}
+              step={0.5}
+              disabled={busy}
+              value={restDayHours}
+              onChange={(event) => setRestDayHours(event.target.value)}
+            />
+          </label>
+          <div className="actions wide">
+            <button type="submit" className="primary" disabled={busy}>
+              <ButtonSpinner when={action === 'create'} />
+              일정 만들기
+            </button>
+          </div>
+        </form>
+        {/* Always mounted so screen readers announce each new message. */}
+        <p role="status" className="status">
+          {notice?.kind === 'status' ? notice.text : ''}
+        </p>
+        {notice?.kind === 'alert' && (
+          <p role="alert" className="error">
+            {notice.text}
+          </p>
+        )}
+      </section>
+
+      <section className="card" aria-label="내 일정">
+        <h2 id="schedules-heading" tabIndex={-1}>
+          내 일정
+        </h2>
+        {listError && (
+          <p role="alert" className="error">
+            일정을 불러오지 못했습니다: {listError}
+          </p>
+        )}
+        {schedules === undefined ? (
+          !listError && <Loading label="일정을 불러오는 중" />
+        ) : schedules.length === 0 ? (
+          <p className="status">아직 만든 일정이 없습니다</p>
+        ) : (
+          <ul className="log-list">
+            {schedules.map((item) => (
+              <li key={item.id}>
+                <div className="log-head">
+                  <button
+                    type="button"
+                    className="book-title"
+                    disabled={busy}
+                    aria-current={item.id === shownId ? 'true' : undefined}
+                    onClick={() => {
+                      setPickedId(item.id);
+                      setConfirming(undefined);
+                      setNotice(undefined);
+                    }}
+                  >
+                    {item.title}
+                  </button>
+                  <div className="actions">
+                    {confirming === item.id ? (
+                      <>
+                        <button
+                          type="button"
+                          id={`schedule-delete-confirm-${item.id}`}
+                          className="danger"
+                          aria-label={`${item.title} 삭제 확인`}
+                          disabled={busy}
+                          onClick={() => void remove(item.id)}
+                        >
+                          <ButtonSpinner when={action === 'delete'} />
+                          삭제 확인
+                        </button>
+                        <button
+                          type="button"
+                          className="secondary"
+                          aria-label={`${item.title} 삭제 취소`}
+                          disabled={busy}
+                          onClick={() => {
+                            setConfirming(undefined);
+                            setWantFocus(`schedule-delete-${item.id}`);
+                          }}
+                        >
+                          취소
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        id={`schedule-delete-${item.id}`}
+                        className="secondary"
+                        aria-label={`${item.title} 삭제`}
+                        disabled={busy}
+                        onClick={() => {
+                          setConfirming(item.id);
+                          setWantFocus(`schedule-delete-confirm-${item.id}`);
+                        }}
+                      >
+                        삭제
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <p className="status">
+                  {item.startDate} ~ {item.endDate} · 목표 {formatMinutes(item.totalMinutes)} ·{' '}
+                  {item.itemCount}일
+                </p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      {shown && (
+        <section className="card" aria-label="날짜별 일정">
+          {shownError ? (
+            <p role="alert" className="error">
+              날짜별 일정을 불러오지 못했습니다: {shownError}
+            </p>
+          ) : !shownDetail ? (
+            <Loading label="날짜별 일정을 불러오는 중" />
+          ) : (
+            <>
+              <h2 id="schedule-heading" tabIndex={-1}>
+                {shownDetail.schedule.title}
+              </h2>
+              <dl className="retro-summary" aria-label="일정 요약">
+                <div>
+                  <dt>평일</dt>
+                  <dd>{formatMinutes(shownDetail.schedule.weekdayMinutes)}</dd>
+                </div>
+                <div>
+                  <dt>주말·공휴일</dt>
+                  <dd>{formatMinutes(shownDetail.schedule.restDayMinutes)}</dd>
+                </div>
+                <div>
+                  <dt>전체 목표</dt>
+                  <dd>{formatMinutes(shownDetail.schedule.totalMinutes)}</dd>
+                </div>
+                <div>
+                  <dt>학습일</dt>
+                  <dd>{shownDetail.schedule.itemCount}일</dd>
+                </div>
+              </dl>
+              <ul className="schedule-days" aria-label="날짜별 목표 시간">
+                {shownDetail.items.map((item) => (
+                  <li key={item.id} aria-current={item.date === today ? 'date' : undefined}>
+                    <span>{dayLabel(item.date)}</span>
+                    <strong>{formatMinutes(item.targetMinutes)}</strong>
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+        </section>
+      )}
+    </div>
+  );
+}

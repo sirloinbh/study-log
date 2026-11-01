@@ -1,6 +1,7 @@
 import {
   BookOpen,
   CalendarCheck,
+  CalendarDays,
   ChartColumn,
   NotebookPen,
   NotebookText,
@@ -18,6 +19,7 @@ import { Keywords } from './keywords';
 import { Retrospectives } from './retrospectives';
 import { ReviewBadge } from './review-badge';
 import { Reviews } from './reviews';
+import { Schedules } from './schedules';
 import { Stats } from './stats';
 import { StudyLogs } from './study-logs';
 import { Textbooks } from './textbooks';
@@ -25,6 +27,7 @@ import { Textbooks } from './textbooks';
 // Every page URL lives here (central docs/directory-rules.md). The study log is the first page.
 const pages = {
   logs: '/',
+  schedules: '/schedules',
   reviews: '/reviews',
   textbooks: '/textbooks',
   keywords: '/keywords',
@@ -36,6 +39,7 @@ const pages = {
 // Main menu (LNB) items, in display order.
 const nav: NavItem[] = [
   { to: pages.logs, label: '학습 기록', icon: NotebookPen },
+  { to: pages.schedules, label: '일정', icon: CalendarDays },
   { to: pages.reviews, label: '복습', icon: CalendarCheck },
   { to: pages.textbooks, label: '교재', icon: BookOpen },
   { to: pages.keywords, label: '키워드', icon: Tags },
@@ -116,6 +120,18 @@ export function App() {
                 health={health}
               >
                 {(today) => <StudyLogs today={today} onChange={reviewsChanged} />}
+              </Page>
+            }
+          />
+          <Route
+            path={pages.schedules}
+            element={
+              <Page
+                title="일정"
+                description="기간과 하루 분량을 정해 날짜별 학습 목표를 만듭니다"
+                health={health}
+              >
+                {(today) => <Schedules today={today} />}
               </Page>
             }
           />
