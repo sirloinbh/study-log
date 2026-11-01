@@ -42,7 +42,7 @@
 - 3번 완료 후:
   - 실제 키로 한 해를 조회해, 응답이 `backend/src/holidays.ts`의 해석과 맞는지 확인한다. 대체공휴일과 임시공휴일이 `isHoliday: Y`로 오는지, 빈 달의 `items` 모양과 키 오류 응답도 본다. 고정 공휴일이 주말일 때도 응답에 오는지 본다. `_type=json`은 공식 문서에 없어 이때 처음 확인된다.
   - 실제 공휴일로 일정을 만들어 설날이나 추석이 있는 기간의 분량을 브라우저에서 확인한다. 지금까지는 테스트 DB에 넣은 공휴일로만 확인했다.
-  - Docker가 없으면 앱 DB 대신 테스트 DB를 쓴다. `.env`에는 키만 있으면 되고, PowerShell에서 `$env:DATABASE_URL=[Environment]::GetEnvironmentVariable('TEST_DATABASE_URL','User'); $env:PGPASSFILE="$env:APPDATA\postgresql\pgpass.conf"; npm run dev`로 띄운다. 2026-11-01 브라우저 확인과 같은 방법이다. 이렇게 하면 `npm test`가 지우지 않는 공휴일과 일정이 테스트 DB에 남으므로 끝나면 지운다.
+  - Docker가 없으면 앱 DB 대신 테스트 DB를 쓴다. `.env`에는 키만 있으면 되고, PowerShell에서 `$env:DATABASE_URL=[Environment]::GetEnvironmentVariable('TEST_DATABASE_URL','User'); $env:PGPASSFILE="$env:APPDATA\postgresql\pgpass.conf"; npm run dev`로 띄운다. 2026-11-01 브라우저 확인과 같은 방법이다. 이렇게 하면 `npm test`가 지우지 않는 행이 테스트 DB에 남으므로 끝나면 `schedules`, `holidays`, `holiday_years`에서 지운다. `holiday_years`만 남으면 7일 동안 API를 부르지 않아 공휴일 없는 일정이 만들어진다.
 - 끝난 항목은 이 표에서 지우고 일일 기록에 남긴다.
 
 ## 로컬 환경 현황
