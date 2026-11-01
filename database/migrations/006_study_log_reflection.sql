@@ -6,11 +6,11 @@ ALTER TABLE study_logs ADD COLUMN IF NOT EXISTS goal_achieved boolean;
 
 DO $$
 BEGIN
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'study_logs_understanding_range') THEN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'study_logs_understanding_range' AND conrelid = 'study_logs'::regclass) THEN
     ALTER TABLE study_logs ADD CONSTRAINT study_logs_understanding_range
       CHECK (understanding BETWEEN 1 AND 5);
   END IF;
-  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'study_logs_difficulties_length') THEN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'study_logs_difficulties_length' AND conrelid = 'study_logs'::regclass) THEN
     ALTER TABLE study_logs ADD CONSTRAINT study_logs_difficulties_length
       CHECK (length(difficulties) <= 2000);
   END IF;

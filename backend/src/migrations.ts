@@ -91,6 +91,8 @@ export async function migrate(db: Db, files: Migration[]) {
     }
     return pending.map((file) => file.name);
   } finally {
-    await db.query('SELECT pg_advisory_unlock($1)', [lockKey]);
+    // After a lost connection this fails too; the lock went with the session, and the error that
+    // matters is the one already on its way.
+    await db.query('SELECT pg_advisory_unlock($1)', [lockKey]).catch(() => undefined);
   }
 }

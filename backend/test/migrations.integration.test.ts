@@ -39,6 +39,19 @@ test('migrations apply to an empty database and can run again', { skip: !url }, 
     const found = await tables();
     for (const table of ['study_logs', 'textbooks', 'exercises', 'reviews', 'schema_migrations'])
       assert.ok(found.includes(table), table);
+    // Guarded constraints: the guards must look at this schema's table, not one of the same name.
+    const constraints = await client.query<{ name: string }>(
+      `SELECT conname AS name FROM pg_constraint WHERE conrelid = 'study_logs'::regclass`,
+    );
+    const constraintNames = constraints.rows.map((row) => row.name);
+    for (const constraint of [
+      'study_logs_textbook_fkey',
+      'study_logs_content_fkey',
+      'study_logs_content_needs_textbook',
+      'study_logs_understanding_range',
+      'study_logs_difficulties_length',
+    ])
+      assert.ok(constraintNames.includes(constraint), constraint);
     const { rows } = await client.query<{ name: string }>(
       'SELECT name FROM schema_migrations ORDER BY name',
     );

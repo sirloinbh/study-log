@@ -486,13 +486,9 @@ server {
 - 적용 방식:
   - 빈 볼륨: Compose가 `/docker-entrypoint-initdb.d`의 모든 파일을 이름순으로 자동 실행한다.
   - CI: 모든 파일을 이름순으로 `psql -v ON_ERROR_STOP=1 -f`로 적용한다.
-  - **기존 DB: 컨테이너에 마운트된 파일을 직접 실행한다.**
+  - **기존 DB: `npm run db:migrate -w backend`로 아직 적용하지 않은 파일만 실행한다.** 배포는 `node dist/migrate.js`로 같은 일을 한다. 절차는 [DB 문서](../database/README.md)를 따른다.
 
-    ```powershell
-    docker compose exec -T db psql -U <db> -d <db> -v ON_ERROR_STOP=1 -f /docker-entrypoint-initdb.d/NNN_<설명>.sql
-    ```
-
-    `Get-Content … | docker compose exec … psql`처럼 **PowerShell 파이프로 넘기지 않는다.** Windows PowerShell 5.1은 외부 프로그램으로 파이프할 때 ASCII로 보내 한글이 `?`로 깨진다. workout-memo에서 `'기타'` 브랜드가 `'??'`로 중복 저장되는 것을 재현했다. 어쩔 수 없이 파이프해야 하면 먼저 `$OutputEncoding = [System.Text.UTF8Encoding]::new($false)`를 설정한다.
+    파일을 직접 실행해야 할 때 `Get-Content … | docker compose exec … psql`처럼 **PowerShell 파이프로 넘기지 않는다.** Windows PowerShell 5.1은 외부 프로그램으로 파이프할 때 ASCII로 보내 한글이 `?`로 깨진다. workout-memo에서 `'기타'` 브랜드가 `'??'`로 중복 저장되는 것을 재현했다. 어쩔 수 없이 파이프해야 하면 먼저 `$OutputEncoding = [System.Text.UTF8Encoding]::new($false)`를 설정한다.
 - SQL의 한글 리터럴(CHECK 값 등)은 가능하면 `U&'\AC00\C2B4'` 같은 유니코드 이스케이프로 쓴다. 적용 경로와 무관하게 안전하다.
 - 단위·NULL 규칙을 스키마에 명시한다. 확인하지 못한 값은 NULL로 두고 0과 구분한다. 수치 정밀도는 `NUMERIC(p,s)`로 정한다.
 - 백업: `scripts/backup.ps1`이 `pg_dump --no-owner --no-acl`을 UTF-8(BOM 없음) 파일로 저장한다. `backups/`는 Git에서 제외하며, PC 밖 안전한 저장소에도 보관하고 주기적으로 복원을 확인한다.
