@@ -1,22 +1,21 @@
 import { Router } from 'express';
 import type { Pool } from 'pg';
-import { z } from 'zod';
+import { z } from 'zod/v4';
 
 import { monthRange } from './calendar.js';
 import { isCalendarDate } from './dates.js';
 import { addDays, weekStart } from './stats.js';
+import { missingOrInvalid } from './validation.js';
 
 export const retrospectiveKinds = ['weekly', 'monthly'] as const;
 export type RetrospectiveKind = (typeof retrospectiveKinds)[number];
 
-const kind = z.enum(retrospectiveKinds, {
-  errorMap: () => ({ message: '회고 종류는 주간 또는 월간이어야 합니다' }),
-});
+const kind = z.enum(retrospectiveKinds, { error: '회고 종류는 주간 또는 월간이어야 합니다' });
 
 // Years 1900 to 9998 only: a week around 0001-01-01 or 9999-12-31 would run into a year the
 // database cannot store and fail as a 500.
 const day = z
-  .string({ invalid_type_error: '날짜 형식이 올바르지 않습니다' })
+  .string({ error: '날짜 형식이 올바르지 않습니다' })
   .regex(/^\d{4}-\d{2}-\d{2}$/, '날짜는 YYYY-MM-DD 형식으로 입력하세요')
   .refine(isCalendarDate, '존재하지 않는 날짜입니다')
   .refine(
@@ -27,17 +26,11 @@ const day = z
 const bodyInput = z.object(
   {
     body: z
-      .string({
-        required_error: '회고 내용을 입력하세요',
-        invalid_type_error: '회고 내용 형식이 올바르지 않습니다',
-      })
+      .string(missingOrInvalid('회고 내용을 입력하세요', '회고 내용 형식이 올바르지 않습니다'))
       .refine((body) => body.trim().length > 0, '회고 내용을 입력하세요')
       .refine((body) => body.length <= 20000, '회고 내용은 20000자 이하로 입력하세요'),
   },
-  {
-    required_error: '회고 내용을 JSON 객체로 보내세요',
-    invalid_type_error: '회고 내용을 JSON 객체로 보내세요',
-  },
+  { error: '회고 내용을 JSON 객체로 보내세요' },
 );
 
 // The week (Sunday to Saturday, #96) or month that holds `date`.
@@ -57,6 +50,7 @@ const periodPath = (params: Record<string, string>) => {
     throw new z.ZodError([
       {
         code: 'custom',
+        input: parsed.start,
         path: ['start'],
         message:
           parsed.kind === 'weekly'
@@ -111,7 +105,7 @@ export function retrospectiveRoutes(pool: Pool, today: () => string) {
       .object({
         kind: kind.optional(),
         limit: z.coerce
-          .number({ invalid_type_error: '조회 개수가 올바르지 않습니다' })
+          .number({ error: '조회 개수가 올바르지 않습니다' })
           .int('조회 개수가 올바르지 않습니다')
           .min(1, '조회 개수는 1 이상이어야 합니다')
           .max(100, '조회 개수는 100 이하여야 합니다')

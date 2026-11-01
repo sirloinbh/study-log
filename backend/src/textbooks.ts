@@ -1,30 +1,26 @@
 import { Router } from 'express';
 import type { Pool } from 'pg';
-import { z } from 'zod';
+import { z } from 'zod/v4';
+
+import { missingOrInvalid } from './validation.js';
 
 const text = (label: string, max: number) =>
   z
-    .string({ invalid_type_error: `${label} 형식이 올바르지 않습니다` })
+    .string({ error: `${label} 형식이 올바르지 않습니다` })
     .trim()
-    .max(max, `${label} 길이는 ${max}자 이하여야 합니다`);
+    .refine((value) => value.length <= max, `${label} 길이는 ${max}자 이하여야 합니다`);
 
 const textbookInput = z.object(
   {
     title: z
-      .string({
-        required_error: '제목을 입력하세요',
-        invalid_type_error: '제목 형식이 올바르지 않습니다',
-      })
+      .string(missingOrInvalid('제목을 입력하세요', '제목 형식이 올바르지 않습니다'))
       .trim()
-      .min(1, '제목을 입력하세요')
-      .max(200, '제목 길이는 200자 이하여야 합니다'),
+      .refine((value) => value.length >= 1, '제목을 입력하세요')
+      .refine((value) => value.length <= 200, '제목 길이는 200자 이하여야 합니다'),
     author: text('저자', 200).default(''),
     edition: text('판본', 50).default(''),
   },
-  {
-    required_error: '교재 내용을 JSON 객체로 보내세요',
-    invalid_type_error: '교재 내용을 JSON 객체로 보내세요',
-  },
+  { error: '교재 내용을 JSON 객체로 보내세요' },
 );
 
 // Only plain positive integers that stay exact in JS and fit the bigint column; "1e3", "0x10"

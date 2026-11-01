@@ -1,12 +1,13 @@
 import { Router } from 'express';
 import type { Pool } from 'pg';
-import { z } from 'zod';
+import { z } from 'zod/v4';
 
 import { isCalendarDate } from './dates.js';
 import { likePattern } from './sql.js';
+import { missingOrInvalid } from './validation.js';
 
 const keywordDate = z
-  .string({ invalid_type_error: '날짜 형식이 올바르지 않습니다' })
+  .string({ error: '날짜 형식이 올바르지 않습니다' })
   .regex(/^\d{4}-\d{2}-\d{2}$/, '날짜는 YYYY-MM-DD 형식으로 입력하세요')
   .refine(isCalendarDate, '존재하지 않는 날짜입니다');
 
@@ -15,23 +16,17 @@ const keywordInput = z.object(
   {
     date: keywordDate.optional(),
     keyword: z
-      .string({
-        required_error: '키워드를 입력하세요',
-        invalid_type_error: '키워드 형식이 올바르지 않습니다',
-      })
+      .string(missingOrInvalid('키워드를 입력하세요', '키워드 형식이 올바르지 않습니다'))
       .trim()
-      .min(1, '키워드를 입력하세요')
-      .max(50, '키워드는 50자 이하로 입력하세요')
+      .refine((value) => value.length >= 1, '키워드를 입력하세요')
+      .refine((value) => value.length <= 50, '키워드는 50자 이하로 입력하세요')
       .regex(/^[^\r\n]*$/, '키워드는 한 줄로 입력하세요'),
     memo: z
-      .string({ invalid_type_error: '메모 형식이 올바르지 않습니다' })
-      .max(2000, '메모는 2000자 이하로 입력하세요')
+      .string({ error: '메모 형식이 올바르지 않습니다' })
+      .refine((value) => value.length <= 2000, '메모는 2000자 이하로 입력하세요')
       .default(''),
   },
-  {
-    required_error: '키워드 내용을 JSON 객체로 보내세요',
-    invalid_type_error: '키워드 내용을 JSON 객체로 보내세요',
-  },
+  { error: '키워드 내용을 JSON 객체로 보내세요' },
 );
 
 // ?date for one day; otherwise the most recent keywords, narrowed by ?q (keyword or memo, any
@@ -40,21 +35,21 @@ const listQuery = z
   .object({
     date: keywordDate.optional(),
     q: z
-      .string({ invalid_type_error: '검색어 형식이 올바르지 않습니다' })
+      .string({ error: '검색어 형식이 올바르지 않습니다' })
       .trim()
-      .max(50, '검색어는 50자 이하로 입력하세요')
+      .refine((value) => value.length <= 50, '검색어는 50자 이하로 입력하세요')
       .optional(),
     from: keywordDate.optional(),
     to: keywordDate.optional(),
     limit: z.coerce
-      .number({ invalid_type_error: '조회 개수가 올바르지 않습니다' })
+      .number({ error: '조회 개수가 올바르지 않습니다' })
       .int('조회 개수가 올바르지 않습니다')
       .min(1, '조회 개수는 1 이상이어야 합니다')
       .max(200, '조회 개수는 200 이하여야 합니다')
       .default(50),
   })
   .refine((query) => !query.from || !query.to || query.from <= query.to, {
-    message: '시작일은 종료일보다 늦을 수 없습니다',
+    error: '시작일은 종료일보다 늦을 수 없습니다',
   });
 
 // Same rule as the other ids: plain positive integers that stay exact in JS and fit bigint.

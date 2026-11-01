@@ -1,8 +1,9 @@
 import { type Response, Router } from 'express';
 import type { Pool } from 'pg';
-import { z } from 'zod';
+import { z } from 'zod/v4';
 
 import { TranslationError, type Translator } from './translation.js';
+import { missingOrInvalid } from './validation.js';
 
 // Same rule as the other ids: plain positive integers that stay exact in JS and fit bigint.
 const pathId = (label: string) =>
@@ -19,66 +20,48 @@ const exerciseIdParam = pathId('연습문제');
 const exerciseInput = z.object(
   {
     number: z
-      .string({ invalid_type_error: '문제 번호 형식이 올바르지 않습니다' })
+      .string({ error: '문제 번호 형식이 올바르지 않습니다' })
       .trim()
-      .max(20, '문제 번호 길이는 20자 이하여야 합니다')
+      .refine((value) => value.length <= 20, '문제 번호 길이는 20자 이하여야 합니다')
       .default(''),
     body: z
-      .string({
-        required_error: '문제 본문을 입력하세요',
-        invalid_type_error: '문제 본문 형식이 올바르지 않습니다',
-      })
+      .string(missingOrInvalid('문제 본문을 입력하세요', '문제 본문 형식이 올바르지 않습니다'))
       .refine((body) => body.trim().length > 0, '문제 본문을 입력하세요')
       .refine((body) => body.length <= 20000, '문제 본문은 20000자 이하로 입력하세요'),
-    important: z
-      .boolean({ invalid_type_error: '중요 표시 형식이 올바르지 않습니다' })
-      .default(false),
+    important: z.boolean({ error: '중요 표시 형식이 올바르지 않습니다' }).default(false),
   },
-  {
-    required_error: '연습문제 내용을 JSON 객체로 보내세요',
-    invalid_type_error: '연습문제 내용을 JSON 객체로 보내세요',
-  },
+  { error: '연습문제 내용을 JSON 객체로 보내세요' },
 );
 
 // The answer body follows the exercise body: line breaks kept, not trimmed.
 const answerInput = z.object(
   {
     body: z
-      .string({
-        required_error: '정답을 입력하세요',
-        invalid_type_error: '정답 형식이 올바르지 않습니다',
-      })
+      .string(missingOrInvalid('정답을 입력하세요', '정답 형식이 올바르지 않습니다'))
       .refine((body) => body.trim().length > 0, '정답을 입력하세요')
       .refine((body) => body.length <= 20000, '정답은 20000자 이하로 입력하세요'),
   },
-  {
-    required_error: '정답 내용을 JSON 객체로 보내세요',
-    invalid_type_error: '정답 내용을 JSON 객체로 보내세요',
-  },
+  { error: '정답 내용을 JSON 객체로 보내세요' },
 );
 
 const importantInput = z.object(
   {
-    important: z.boolean({
-      required_error: '중요 표시 여부를 보내세요',
-      invalid_type_error: '중요 표시 형식이 올바르지 않습니다',
-    }),
+    important: z.boolean(
+      missingOrInvalid('중요 표시 여부를 보내세요', '중요 표시 형식이 올바르지 않습니다'),
+    ),
   },
-  {
-    required_error: '중요 표시 여부를 JSON 객체로 보내세요',
-    invalid_type_error: '중요 표시 여부를 JSON 객체로 보내세요',
-  },
+  { error: '중요 표시 여부를 JSON 객체로 보내세요' },
 );
 
 // Filters for a textbook's exercises: one chapter (with its sections) and the important mark.
 const textbookListQuery = z.object({
   contentId: z
-    .string()
+    .string({ error: '목차 ID가 올바르지 않습니다' })
     .regex(/^[1-9]\d{0,14}$/, '목차 ID가 올바르지 않습니다')
     .transform(Number)
     .optional(),
   important: z
-    .enum(['true', 'false'], { message: '중요 표시 조건이 올바르지 않습니다' })
+    .enum(['true', 'false'], { error: '중요 표시 조건이 올바르지 않습니다' })
     .transform((value) => value === 'true')
     .optional(),
 });

@@ -2,7 +2,7 @@ import express from 'express';
 import { rateLimit } from 'express-rate-limit';
 import type { Pool } from 'pg';
 import { types } from 'pg';
-import { ZodError } from 'zod';
+import { ZodError } from 'zod/v4';
 
 import { calendarRoutes } from './calendar.js';
 import { contentExerciseRoutes, exerciseRoutes, textbookExerciseRoutes } from './exercises.js';

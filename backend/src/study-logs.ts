@@ -1,10 +1,11 @@
 import { Router } from 'express';
 import type { Pool } from 'pg';
-import { z } from 'zod';
+import { z } from 'zod/v4';
 
 import { isCalendarDate } from './dates.js';
 import { syncFirstReview } from './reviews.js';
 import { inTransaction, likePattern } from './sql.js';
+import { missingOrInvalid } from './validation.js';
 
 export const studyStatuses = ['planned', 'in_progress', 'done', 'stopped'] as const;
 export const studyTypes = ['new', 'review'] as const;
@@ -18,26 +19,20 @@ export function studyMinutes(startTime: string, endTime: string) {
 }
 
 const studyDate = z
-  .string({
-    required_error: '학습일을 입력하세요',
-    invalid_type_error: '학습일 형식이 올바르지 않습니다',
-  })
+  .string(missingOrInvalid('학습일을 입력하세요', '학습일 형식이 올바르지 않습니다'))
   .regex(/^\d{4}-\d{2}-\d{2}$/, '학습일은 YYYY-MM-DD 형식으로 입력하세요')
   .refine(isCalendarDate, '존재하지 않는 날짜입니다');
 
 const clock = (label: string) =>
   z
-    .string({
-      required_error: `${label}을 입력하세요`,
-      invalid_type_error: `${label} 형식이 올바르지 않습니다`,
-    })
+    .string(missingOrInvalid(`${label}을 입력하세요`, `${label} 형식이 올바르지 않습니다`))
     .regex(/^([01]\d|2[0-3]):[0-5]\d$/, `${label}은 HH:MM 형식으로 입력하세요`);
 
 // Optional reference ids in the body: a positive integer within the id limit, or null.
 const referenceId = (label: string) => {
   const message = `${label} ID가 올바르지 않습니다`;
   return z
-    .number({ invalid_type_error: message })
+    .number({ error: message })
     .int(message)
     .min(1, message)
     .max(999_999_999_999_999, message)
@@ -52,48 +47,41 @@ const studyLogInput = z
       startTime: clock('시작 시각'),
       endTime: clock('종료 시각'),
       memo: z
-        .string({ invalid_type_error: '메모 형식이 올바르지 않습니다' })
-        .max(10000, '메모는 10000자 이하로 입력하세요')
+        .string({ error: '메모 형식이 올바르지 않습니다' })
+        .refine((value) => value.length <= 10000, '메모는 10000자 이하로 입력하세요')
         .default(''),
       status: z
-        .enum(studyStatuses, {
-          errorMap: () => ({ message: '상태는 계획, 진행 중, 완료, 중단 중에서 선택하세요' }),
-        })
+        .enum(studyStatuses, { error: '상태는 계획, 진행 중, 완료, 중단 중에서 선택하세요' })
         .default('planned'),
       textbookId: referenceId('교재'),
       contentId: referenceId('목차'),
       understanding: z
-        .number({ invalid_type_error: '이해도는 1~5 사이 정수로 입력하세요' })
+        .number({ error: '이해도는 1~5 사이 정수로 입력하세요' })
         .int('이해도는 1~5 사이 정수로 입력하세요')
         .min(1, '이해도는 1~5 사이 정수로 입력하세요')
         .max(5, '이해도는 1~5 사이 정수로 입력하세요')
         .nullable()
         .default(null),
       difficulties: z
-        .string({ invalid_type_error: '어려웠던 부분 형식이 올바르지 않습니다' })
-        .max(2000, '어려웠던 부분은 2000자 이하로 입력하세요')
+        .string({ error: '어려웠던 부분 형식이 올바르지 않습니다' })
+        .refine((value) => value.length <= 2000, '어려웠던 부분은 2000자 이하로 입력하세요')
         .default(''),
       goalAchieved: z
-        .boolean({ invalid_type_error: '목표 달성 여부 형식이 올바르지 않습니다' })
+        .boolean({ error: '목표 달성 여부 형식이 올바르지 않습니다' })
         .nullable()
         .default(null),
       studyType: z
-        .enum(studyTypes, {
-          errorMap: () => ({ message: '학습 유형은 신규, 복습 중에서 선택하세요' }),
-        })
+        .enum(studyTypes, { error: '학습 유형은 신규, 복습 중에서 선택하세요' })
         .default('new'),
     },
-    {
-      required_error: '학습 기록 내용을 JSON 객체로 보내세요',
-      invalid_type_error: '학습 기록 내용을 JSON 객체로 보내세요',
-    },
+    { error: '학습 기록 내용을 JSON 객체로 보내세요' },
   )
   .refine((log) => log.startTime !== log.endTime, {
-    message: '종료 시각은 시작 시각과 달라야 합니다',
+    error: '종료 시각은 시작 시각과 달라야 합니다',
     path: ['endTime'],
   })
   .refine((log) => log.contentId === null || log.textbookId !== null, {
-    message: '목차를 고르려면 교재를 먼저 선택하세요',
+    error: '목차를 고르려면 교재를 먼저 선택하세요',
     path: ['contentId'],
   });
 
@@ -110,26 +98,26 @@ const listQuery = z
   .object({
     date: studyDate.optional(),
     q: z
-      .string({ invalid_type_error: '검색어 형식이 올바르지 않습니다' })
+      .string({ error: '검색어 형식이 올바르지 않습니다' })
       .trim()
-      .max(50, '검색어는 50자 이하로 입력하세요')
+      .refine((value) => value.length <= 50, '검색어는 50자 이하로 입력하세요')
       .optional(),
     from: studyDate.optional(),
     to: studyDate.optional(),
     textbookId: z
-      .string()
+      .string({ error: '교재 ID가 올바르지 않습니다' })
       .regex(/^[1-9]\d{0,14}$/, '교재 ID가 올바르지 않습니다')
       .transform(Number)
       .optional(),
     limit: z.coerce
-      .number({ invalid_type_error: '조회 개수가 올바르지 않습니다' })
+      .number({ error: '조회 개수가 올바르지 않습니다' })
       .int('조회 개수가 올바르지 않습니다')
       .min(1, '조회 개수는 1 이상이어야 합니다')
       .max(100, '조회 개수는 100 이하여야 합니다')
       .default(20),
   })
   .refine((query) => !query.from || !query.to || query.from <= query.to, {
-    message: '시작일은 종료일보다 늦을 수 없습니다',
+    error: '시작일은 종료일보다 늦을 수 없습니다',
   });
 
 // `source` is study_logs or a CTE of written rows; the textbook and chapter names come along so

@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
-import { z } from 'zod';
+import { z } from 'zod/v4';
 
 // Translating an exercise and its answer into Korean with Claude (#31). The route takes a
 // `Translator`, so tests hand in a stand-in and never call the API.
