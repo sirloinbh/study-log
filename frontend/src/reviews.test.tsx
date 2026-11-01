@@ -480,7 +480,7 @@ test('a retry unlocks the buttons, returns focus and shows that it is loading', 
   const button = screen.getByRole('button', { name: '오늘' });
   fireEvent.click(button);
   // The old error is gone while trying, so the same error coming back is announced again.
-  expect(await screen.findByText('불러오는 중…')).toBeInTheDocument();
+  expect(await screen.findByText('복습을 불러오는 중…')).toBeInTheDocument();
   expect(screen.queryByRole('alert')).toBeNull();
   expect(button).toBeDisabled();
   answer(new Response(JSON.stringify({ error: '목록 오류' }), { status: 500 }));

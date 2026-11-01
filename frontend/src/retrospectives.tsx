@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 
 import { type RequestError, requestJson } from './api';
 import { useBusy } from './busy';
+import { ButtonSpinner, Loading } from './loading';
 import {
   kindLabels,
   periodTitle,
@@ -33,7 +34,7 @@ export function Retrospectives({ today }: { today: string }) {
   const [recent, setRecent] = useState<Retrospective[]>();
   const [reload, setReload] = useState(0);
   const [notice, setNotice] = useState<Notice>(undefined);
-  const { busy, begin, end } = useBusy();
+  const { busy, action, nameNext, begin, end } = useBusy();
   // Along the delete flow, as on the other screens (#65): the confirm button, the delete button
   // after a cancel, the heading once it is gone. Focused once the controls are enabled again.
   const [wantFocus, setWantFocus] = useState<string>();
@@ -110,6 +111,7 @@ export function Retrospectives({ today }: { today: string }) {
   const save = (event: { preventDefault(): void }) => {
     event.preventDefault();
     if (!period) return;
+    nameNext('save');
     void change(async () => {
       const data = await requestJson<{ retrospective: Retrospective }>(
         `/api/retrospectives/${period.kind}/${period.from}`,
@@ -195,11 +197,7 @@ export function Retrospectives({ today }: { today: string }) {
           </p>
         )}
         {!period ? (
-          !error && (
-            <p role="status" className="status">
-              불러오는 중…
-            </p>
-          )
+          !error && <Loading label="회고를 불러오는 중" kind="text" />
         ) : (
           <>
             <h2 id="retro-heading" tabIndex={-1}>
@@ -245,6 +243,7 @@ export function Retrospectives({ today }: { today: string }) {
               </label>
               <div className="actions wide">
                 <button type="submit" className="primary" disabled={busy}>
+                  <ButtonSpinner when={action === 'save'} />
                   {period.retrospective ? '수정 저장' : '저장'}
                 </button>
                 {period.retrospective &&
@@ -255,8 +254,12 @@ export function Retrospectives({ today }: { today: string }) {
                         id="retro-delete-confirm"
                         className="danger"
                         disabled={busy}
-                        onClick={() => void remove()}
+                        onClick={() => {
+                          nameNext('delete');
+                          void remove();
+                        }}
                       >
+                        <ButtonSpinner when={action === 'delete'} />
                         삭제 확인
                       </button>
                       <button
@@ -307,7 +310,7 @@ export function Retrospectives({ today }: { today: string }) {
       <section className="card" aria-label="지난 회고">
         <h2>지난 회고</h2>
         {recent === undefined ? (
-          <p className="status">불러오는 중…</p>
+          <Loading label="회고 목록을 불러오는 중" />
         ) : recent.length === 0 ? (
           <p className="status">아직 쓴 회고가 없습니다</p>
         ) : (

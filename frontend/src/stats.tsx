@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 
 import { type RequestError, requestJson } from './api';
 import { Heatmap } from './heatmap';
+import { Loading } from './loading';
 import { ReviewRateChart } from './review-rate-chart';
 import { formatMinutes } from './study-logs-data';
 import {
@@ -84,9 +85,7 @@ export function Stats() {
           통계를 불러오지 못했습니다: {error}
         </p>
       ) : !stats ? (
-        <p role="status" className="status">
-          불러오는 중…
-        </p>
+        <Loading label="통계를 불러오는 중" kind="cards" />
       ) : (
         <section className="metric-grid" aria-label="학습 시간 지표">
           <article className="card metric">

@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { type RequestError, requestJson } from './api';
 import { useBusy } from './busy';
 import type { ExerciseTranslation as Translation } from './exercise';
+import { Loading } from './loading';
 
 type Notice = { exerciseId: number; kind: 'status' | 'alert'; text: string } | undefined;
 
@@ -67,7 +68,7 @@ export function ExerciseTranslation({ exerciseId, label }: { exerciseId: number;
           번역을 불러오지 못했습니다: {error}
         </p>
       ) : translation === undefined ? (
-        <p className="status">번역을 불러오는 중…</p>
+        <Loading label="번역을 불러오는 중" kind="text" />
       ) : translation === null ? (
         <p className="status">아직 번역하지 않았습니다</p>
       ) : (

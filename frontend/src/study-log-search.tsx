@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 
 import { type RequestError, requestJson } from './api';
 import { useBusy } from './busy';
+import { ButtonSpinner } from './loading';
 import { Memo } from './memo';
 import {
   emptySearch,
@@ -28,7 +29,7 @@ export function StudyLogSearch({
   // The last search run and its results, kept until the next one.
   const [results, setResults] = useState<{ path: string; logs: StudyLog[] }>();
   const [error, setError] = useState<string>();
-  const { busy, begin, end } = useBusy();
+  const { busy, action, nameNext, begin, end } = useBusy();
 
   const run = async (path: string) => {
     try {
@@ -52,6 +53,7 @@ export function StudyLogSearch({
 
   const find = (event: { preventDefault(): void }) => {
     event.preventDefault();
+    nameNext('search');
     if (!begin()) return;
     void run(studyLogSearchPath(search)).finally(end);
   };
@@ -107,6 +109,7 @@ export function StudyLogSearch({
         </label>
         <div className="actions wide">
           <button type="submit" className="primary" disabled={busy}>
+            <ButtonSpinner when={action === 'search'} />
             검색
           </button>
         </div>

@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 
 import { type RequestError, requestJson } from './api';
 import { useBusy } from './busy';
+import { ButtonSpinner, Loading } from './loading';
 import { readPdfToc } from './pdf-import';
 import { pdfSizeLimit } from './pdf-toc';
 import { contentLabel, type ContentNode } from './textbook';
@@ -51,7 +52,7 @@ export function TextbookContents({
   const [notice, setNotice] = useState<Notice>(undefined);
   // One request at a time: fields and buttons stay disabled while a change and the reload after
   // it are pending, so the next change never starts from an outdated tree.
-  const { busy, begin, end } = useBusy();
+  const { busy, action, nameNext, begin, end } = useBusy();
   // Along the delete flow: the confirm button, the delete button after a cancel, or the card
   // heading once the entry is gone. Focused once the controls are enabled again (#86).
   const [wantFocus, setWantFocus] = useState<string>();
@@ -158,6 +159,7 @@ export function TextbookContents({
   const save = (event: { preventDefault(): void }) => {
     event.preventDefault();
     if (!open) return;
+    nameNext('save');
     void run(async () => {
       const body = { number: open.number, title: open.title };
       if (open.id === undefined)
@@ -218,6 +220,7 @@ export function TextbookContents({
   const savePaste = (event: { preventDefault(): void }) => {
     event.preventDefault();
     if (!pasted.length || pasteProblems.length) return;
+    nameNext('paste');
     void run(async () => {
       const data = await requestJson<{ contents: ContentNode[] }>(
         `/api/textbooks/${textbookId}/contents/bulk`,
@@ -305,8 +308,12 @@ export function TextbookContents({
                       className="danger"
                       disabled={busy}
                       aria-label={`${label} 목차 삭제 확인`}
-                      onClick={() => void remove(node)}
+                      onClick={() => {
+                        nameNext('delete');
+                        void remove(node);
+                      }}
                     >
+                      <ButtonSpinner when={action === 'delete'} />
                       삭제 확인
                     </button>
                     <button
@@ -464,6 +471,7 @@ export function TextbookContents({
               className="primary"
               disabled={busy || reading || !pasted.length || pasteProblems.length > 0}
             >
+              <ButtonSpinner when={action === 'paste'} />
               {pasted.length ? `${pasted.length}개 저장` : '저장'}
             </button>
             <button
@@ -513,6 +521,7 @@ export function TextbookContents({
           </label>
           <div className="actions wide">
             <button type="submit" className="primary" disabled={busy}>
+              <ButtonSpinner when={action === 'save'} />
               {open.id === undefined ? '추가' : '수정 저장'}
             </button>
             <button
@@ -541,7 +550,7 @@ export function TextbookContents({
         </p>
       )}
       {tree === undefined ? (
-        !error && <p className="status">불러오는 중…</p>
+        !error && <Loading label="목차를 불러오는 중" />
       ) : tree.length === 0 ? (
         <p className="status">아직 목차가 없습니다</p>
       ) : (

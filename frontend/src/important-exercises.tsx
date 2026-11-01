@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { type RequestError, requestJson } from './api';
 import { useBusy } from './busy';
 import { contentPath, type Exercise } from './exercise';
+import { Loading } from './loading';
 import { contentLabel, type ContentNode, contentOptions, type Textbook } from './textbook';
 
 type Notice = { kind: 'status' | 'alert'; text: string } | undefined;
@@ -94,7 +95,7 @@ export function ImportantExercises({
       {treeFailed ? (
         <p className="status">목차를 불러오지 못해 중요 문제를 모을 수 없습니다</p>
       ) : !tree ? (
-        <p className="status">목차를 불러오는 중…</p>
+        <Loading label="목차를 불러오는 중" kind="text" />
       ) : (
         <div className="log-form exercise-picker">
           <label className="wide">
@@ -133,7 +134,7 @@ export function ImportantExercises({
       )}
       {tree &&
         (exercises === undefined ? (
-          !error && <p className="status">불러오는 중…</p>
+          !error && <Loading label="중요 문제를 불러오는 중" />
         ) : exercises.length === 0 ? (
           <p className="status">
             {scope ? '이 단원에 중요 표시한 문제가 없습니다' : '중요 표시한 문제가 없습니다'}

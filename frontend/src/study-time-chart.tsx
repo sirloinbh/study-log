@@ -1,5 +1,6 @@
 import React from 'react';
 
+import { Loading } from './loading';
 import { formatMinutes } from './study-logs-data';
 import {
   busiestBar,
@@ -63,7 +64,7 @@ export function StudyTimeChart({
               그래프를 불러오지 못했습니다: {chartError}
             </p>
           ) : !R ? (
-            <p className="status">그래프를 불러오는 중…</p>
+            <Loading label="그래프를 불러오는 중" kind="text" />
           ) : (
             <div className="chart-box" aria-hidden="true">
               <R.ResponsiveContainer width="100%" height={240}>

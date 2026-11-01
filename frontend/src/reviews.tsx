@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 
 import { type RequestError, requestJson } from './api';
 import { useBusy } from './busy';
+import { ButtonSpinner, Loading } from './loading';
 import { Memo } from './memo';
 import { overdueDays, type Review, type ReviewRange, reviewRanges, reviewTitle } from './review';
 
@@ -33,7 +34,7 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
   const [editor, setEditor] = useState<Editor>();
   const [notice, setNotice] = useState<Notice>(undefined);
   // One change at a time, including the reload after it.
-  const { busy, begin, end } = useBusy();
+  const { busy, action, nameNext, begin, end } = useBusy();
   // The element to focus once the change is done and the controls are enabled again.
   const [wantFocus, setWantFocus] = useState<string>();
 
@@ -182,6 +183,7 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
   const saveDate = (event: { preventDefault(): void }, review: Review) => {
     event.preventDefault();
     if (!editor) return;
+    nameNext('date');
     void run(
       review.id,
       async () => {
@@ -251,7 +253,7 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
           </p>
         )}
         {shown === undefined ? (
-          !error && <p className="status">불러오는 중…</p>
+          !error && <Loading label="복습을 불러오는 중" />
         ) : shown.reviews.length === 0 ? (
           <p className="status">{empty}</p>
         ) : (
@@ -297,6 +299,7 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
                           disabled={busy}
                           aria-label={`${name} 예정일 저장`}
                         >
+                          <ButtonSpinner when={action === 'date'} />
                           저장
                         </button>
                         <button

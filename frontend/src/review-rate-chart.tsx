@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 
 import { type RequestError, requestJson } from './api';
+import { Loading } from './loading';
 import { periodLabels, reviewBars, type ReviewStats, type StatPeriod } from './study-stats';
 import { useRecharts } from './use-recharts';
 
@@ -13,7 +14,7 @@ function ReviewBars({ stats }: { stats: ReviewStats }) {
         그래프를 불러오지 못했습니다: {chartError}
       </p>
     );
-  if (!R) return <p className="status">그래프를 불러오는 중…</p>;
+  if (!R) return <Loading label="그래프를 불러오는 중" kind="text" />;
   return (
     <div className="chart-box" aria-hidden="true">
       <R.ResponsiveContainer width="100%" height={200}>
@@ -74,9 +75,7 @@ export function ReviewRateChart({ period }: { period: StatPeriod }) {
           복습 통계를 불러오지 못했습니다: {error}
         </p>
       ) : !stats ? (
-        <p role="status" className="status">
-          불러오는 중…
-        </p>
+        <Loading label="복습 통계를 불러오는 중" kind="text" />
       ) : stats.completionRate === null ? (
         <p className="status">{periodLabels[period]}에는 예정된 복습이 없습니다</p>
       ) : (

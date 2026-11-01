@@ -42,7 +42,7 @@ function moduleLoader(context: object, external: (name: string) => unknown) {
     ) => void;
     run(exports, (name) => {
       if (name.endsWith('.css')) return {};
-      if (!name.startsWith('./')) return external(name);
+      if (!name.startsWith('./') || name.startsWith('./components/')) return external(name);
       const base = name.slice(2);
       const file = [base + '.ts', base + '.tsx'].find((f) => existsSync(sourceUrl(f)));
       if (!file) throw new Error('Unexpected import: ' + name);
@@ -131,9 +131,10 @@ export function mount(
       return { createRoot: () => ({ render: (v: Node) => (element = v) }) };
     if (name === 'lucide-react') return new Proxy({}, { get: () => () => null });
     if (name in modules) return modules[name];
-    // Each chart part becomes an element named after it ('recharts:Bar'), keeping its props. No
-    // `then`, so the module can come from a dynamic import without being taken for a promise.
-    if (name === 'recharts')
+    // Each chart part or common component becomes an element named after it ('recharts:Bar',
+    // 'ui:Spinner'), keeping its props. No `then`, so the module can come from a dynamic import
+    // without being taken for a promise.
+    if (name === 'recharts' || name.startsWith('./components/'))
       return new Proxy(
         {},
         {
@@ -143,7 +144,7 @@ export function mount(
               : part === 'then'
                 ? undefined
                 : (props: Record<string, unknown>) => ({
-                    type: 'recharts:' + String(part),
+                    type: (name === 'recharts' ? 'recharts:' : 'ui:') + String(part),
                     props: { ...props, children: props.children ?? [] },
                   }),
         },
