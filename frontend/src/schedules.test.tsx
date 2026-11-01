@@ -245,10 +245,38 @@ test('days that could not be read are tried again by picking the schedule', asyn
   });
   render(<Schedules today={today} />);
   await screen.findByText(/날짜별 일정을 불러오지 못했습니다/);
+  // A second failure is said anew: the message leaves while trying.
+  const first = screen.getByText(/날짜별 일정을 불러오지 못했습니다/);
+  fireEvent.click(list().getByRole('button', { name: '지난 일정' }));
+  expect(first).not.toBeInTheDocument();
+  await screen.findByText(/날짜별 일정을 불러오지 못했습니다/);
   failing = false;
   fireEvent.click(list().getByRole('button', { name: '지난 일정' }));
   await screen.findByRole('heading', { level: 2, name: '지난 일정' });
   expect(screen.queryByText(/날짜별 일정을 불러오지 못했습니다/)).toBeNull();
+});
+
+test('days already read stay when reading them again fails, and focus stays', async () => {
+  let made = false;
+  fakeApi(({ method, path, body }) => {
+    if (method === 'POST') {
+      made = true;
+      return { status: 201, body: detailOf(schedule(9, (body as { title: string }).title)) };
+    }
+    if (path === '/api/schedules')
+      return { body: { schedules: made ? [schedule(9, '알고리즘')] : [] } };
+    return { status: 500, body: { error: '서버 오류가 발생했습니다' } };
+  });
+  render(<Schedules today={today} />);
+  await screen.findByText('아직 만든 일정이 없습니다');
+  fill('일정 이름', '알고리즘');
+  submit();
+  const heading = await screen.findByRole('heading', { level: 2, name: '알고리즘' });
+  await waitFor(() => expect(heading).toHaveFocus());
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  expect(heading).toHaveFocus();
+  expect(screen.queryByText(/날짜별 일정을 불러오지 못했습니다/)).toBeNull();
+  expect(days().getByText('3월 2일 (월)')).toBeInTheDocument();
 });
 
 test('typing takes back the last complaint, and a new schedule ends a pending delete', async () => {

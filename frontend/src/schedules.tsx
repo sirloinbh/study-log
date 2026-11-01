@@ -231,6 +231,15 @@ export function Schedules({ today }: { today: string }) {
         <h2 id="schedules-heading" tabIndex={-1}>
           내 일정
         </h2>
+        {/* Above the rows: a long list would put it out of sight. */}
+        <p role="status" className="status">
+          {listNotice?.kind === 'status' ? listNotice.text : ''}
+        </p>
+        {listNotice?.kind === 'alert' && (
+          <p role="alert" className="error">
+            {listNotice.text}
+          </p>
+        )}
         {listError && (
           <p role="alert" className="error">
             일정을 불러오지 못했습니다: {listError}
@@ -255,7 +264,9 @@ export function Schedules({ today }: { today: string }) {
                       setConfirming(undefined);
                       setNotice(undefined);
                       setListNotice(undefined);
-                      // Also the way to try again after its days could not be read.
+                      // Also the way to try again after its days could not be read: the
+                      // error leaves first, so a second failure is shown and announced anew.
+                      setDetailError(undefined);
                       setReload((count) => count + 1);
                     }}
                   >
@@ -313,25 +324,12 @@ export function Schedules({ today }: { today: string }) {
             ))}
           </ul>
         )}
-        <p role="status" className="status">
-          {listNotice?.kind === 'status' ? listNotice.text : ''}
-        </p>
-        {listNotice?.kind === 'alert' && (
-          <p role="alert" className="error">
-            {listNotice.text}
-          </p>
-        )}
       </section>
 
       {shown && (
         <section className="card" aria-label="날짜별 일정">
-          {shownError ? (
-            <p role="alert" className="error">
-              날짜별 일정을 불러오지 못했습니다: {shownError}
-            </p>
-          ) : !shownDetail ? (
-            <Loading label="날짜별 일정을 불러오는 중" />
-          ) : (
+          {/* Days already read stay if reading them again fails: they do not change once made. */}
+          {shownDetail ? (
             <>
               <h2 id="schedule-heading" tabIndex={-1}>
                 {shownDetail.schedule.title}
@@ -363,6 +361,12 @@ export function Schedules({ today }: { today: string }) {
                 ))}
               </ul>
             </>
+          ) : shownError ? (
+            <p role="alert" className="error">
+              날짜별 일정을 불러오지 못했습니다: {shownError}
+            </p>
+          ) : (
+            <Loading label="날짜별 일정을 불러오는 중" />
           )}
         </section>
       )}
