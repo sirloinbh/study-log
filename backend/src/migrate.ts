@@ -26,7 +26,9 @@ try {
   }
 } catch (error) {
   // A deploy stops on this exit code, before it starts the new version.
-  console.error((error as Error).message);
+  // A refused connection to localhost, which has two addresses, has a code but an empty message.
+  const { message, code } = error as NodeJS.ErrnoException;
+  console.error(message || `DB에 연결할 수 없습니다 (${code})`);
   process.exitCode = 1;
 } finally {
   await pool.end();

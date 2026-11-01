@@ -34,6 +34,12 @@
 
 `compose.yaml`이 배포 스크립트의 이미지 태그와 포트 전제를 지키지 않아 롤백이 동작하지 않는 기존 문제는 [#146](https://github.com/sirloinbh/study-log/issues/146)으로 분리했다.
 
+2차 리뷰에서 다음을 이 PR에서 고쳤다. 리뷰는 최대 2회이므로 3차 리뷰는 하지 않았다.
+
+- `localhost`에 접속이 거부되면 메시지가 빈 오류라 빈 줄만 남았다. `DB에 연결할 수 없습니다 (ECONNREFUSED)`로 안내하고, 닫힌 포트로 실행해 확인했다.
+- `docs/next-steps/README.md`에서 끝난 #133을 지우고, #146과 #142의 순서를 적었다.
+- `docs/project-setup.md`의 Compose 템플릿에도 고친 헬스체크를 반영했다.
+
 ## 검증
 
 - `TEST_DATABASE_URL`을 설정한 `npm run check`가 통과했다. 백엔드 325건, 프런트 100건, 스킬 4건이 통과했다. 건너뜀은 프런트 2건으로, 중앙 표준에서 온 다크 전용 앱 테스트이다.
