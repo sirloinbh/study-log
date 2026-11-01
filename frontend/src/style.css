@@ -578,6 +578,7 @@
 }
 .textbook-filter {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 6px;
   margin: 0 0 16px;
   max-width: 320px;
@@ -585,6 +586,9 @@
   font-weight: 500;
 }
 .textbook-filter select {
+  /* Titles run to 200 characters: the choice must not push the page wider. */
+  width: 100%;
+  min-width: 0;
   border: 1px solid var(--border);
   border-radius: calc(var(--radius) - 2px);
   background: var(--card);

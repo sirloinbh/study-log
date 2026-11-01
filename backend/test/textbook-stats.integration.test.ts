@@ -61,11 +61,16 @@ test('textbooks and schedules are counted as the rules say', { skip: !url }, asy
         }
         return { id, chapters: ids };
       };
-      const log = async (textbookId: number, contentId: number, status: string) => {
+      const log = async (
+        textbookId: number,
+        contentId: number,
+        status: string,
+        studyDate = '8050-03-01',
+      ) => {
         const made = await call('/api/study-logs', {
           method: 'POST',
           body: {
-            studyDate: '8050-03-01',
+            studyDate,
             startTime: '09:00',
             endTime: '10:00',
             status,
@@ -87,6 +92,7 @@ test('textbooks and schedules are counted as the rules say', { skip: !url }, asy
       const math = await book('통계 수학', 3);
       const physics = await book('통계 물리', 2);
       const empty = await book('통계 빈 책', 0);
+      const empty2 = await book('통계 다시 여는 책', 1);
 
       await t.test('a chapter is done by a done log on it or on a section under it', async () => {
         assert.equal(row(await stats(), math.id)?.completedChapters, 0);
@@ -99,7 +105,14 @@ test('textbooks and schedules are counted as the rules say', { skip: !url }, asy
         // A log not done does not count.
         await log(math.id, math.chapters[1], 'planned');
         await log(math.id, math.chapters[1], 'in_progress');
+        await log(math.id, math.chapters[1], 'stopped');
         assert.equal(row(await stats(), math.id)?.completedChapters, 1);
+        // Done on a date still to come does not count yet, as in the other statistics.
+        await log(math.id, math.chapters[2], 'done', '8050-03-02');
+        assert.equal(row(await stats(), math.id)?.completedChapters, 1);
+        today = '8050-03-02';
+        assert.equal(row(await stats(), math.id)?.completedChapters, 2);
+        today = '8050-03-01';
         // A section two levels down counts for its chapter, and sections are not chapters.
         const section = await call(`/api/textbooks/${math.id}/contents`, {
           method: 'POST',
@@ -114,6 +127,9 @@ test('textbooks and schedules are counted as the rules say', { skip: !url }, asy
         const after = row(await stats(), math.id);
         assert.equal(after?.completedChapters, 2);
         assert.equal(after?.totalChapters, 3);
+        today = '8050-03-02';
+        assert.equal(row(await stats(), math.id)?.completedChapters, 3);
+        today = '8050-03-01';
         // Other books are not touched, and a book with no contents has nothing to count.
         assert.equal(row(await stats(), physics.id)?.completedChapters, 0);
         assert.deepEqual(
@@ -226,6 +242,36 @@ test('textbooks and schedules are counted as the rules say', { skip: !url }, asy
         assert.equal(totals.achievementRate, 0);
       });
 
+      await t.test('reopening a day takes it out of what was done on time', async () => {
+        today = '8050-05-02';
+        const made = await call('/api/schedules', {
+          method: 'POST',
+          body: {
+            title: '다시 여는 일정',
+            startDate: '8050-05-02',
+            endDate: '8050-05-02',
+            weekdayMinutes: 60,
+            restDayMinutes: 60,
+            chapters: { textbookId: empty2.id },
+          },
+        });
+        const { schedule, items } = made.data as unknown as Detail;
+        const path = `/api/schedules/${schedule.id}/items/${items[0].id}`;
+        await call(`${path}/complete`, { method: 'POST' });
+        assert.deepEqual(
+          (({ dueDays, onTimeDays }) => [dueDays, onTimeDays])((await stats(empty2.id)).schedule),
+          [1, 1],
+        );
+        await call(`${path}/reopen`, { method: 'POST' });
+        // Open again and due today: not late yet, and not counted.
+        assert.equal((await stats(empty2.id)).schedule.dueDays, 0);
+        today = '8050-05-03';
+        const late = (await stats(empty2.id)).schedule;
+        assert.deepEqual([late.dueDays, late.onTimeDays, late.adherenceRate], [1, 0, 0]);
+        today = '8050-05-04';
+        await call(`/api/schedules/${schedule.id}`, { method: 'DELETE' });
+      });
+
       await t.test('a book narrows both the books and the rates', async () => {
         today = '8050-04-10';
         const narrowed = await stats(physics.id);
@@ -243,9 +289,11 @@ test('textbooks and schedules are counted as the rules say', { skip: !url }, asy
       });
 
       await t.test('a wrong or missing book is said so', async () => {
-        const wrong = await call('/api/stats/textbooks?textbookId=abc');
-        assert.equal(wrong.status, 400);
-        assert.match(String(wrong.data.error), /교재 ID가 올바르지 않습니다/);
+        for (const query of ['textbookId=abc', 'textbookId=', 'textbookId=1&textbookId=2']) {
+          const wrong = await call(`/api/stats/textbooks?${query}`);
+          assert.equal(wrong.status, 400, query);
+          assert.match(String(wrong.data.error), /교재 ID/);
+        }
         const none = await call('/api/stats/textbooks?textbookId=999999999999');
         assert.equal(none.status, 404);
         assert.match(String(none.data.error), /교재를 찾을 수 없습니다/);

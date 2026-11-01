@@ -248,7 +248,7 @@ export function statsRoutes(pool: Pool, today: () => string) {
 
   // Chapters done per textbook, and how schedules were kept (#51, docs/decisions/schedule-rules.md
   // 7장): /api/stats/textbooks?textbookId=. A chapter is done by a done log on it or anywhere under
-  // it. A day counts once its first planned date has passed, or once it is done on that date; one
+  // it, dated today at the latest, as the other statistics count. A day counts once its first planned date has passed, or once it is done on that date; one
   // still open today is not late yet. Moves do not change that date, so this writes nothing.
   router.get('/textbooks', async (req, res) => {
     const { textbookId } = textbookQuery.parse(req.query);
@@ -265,10 +265,11 @@ export function statsRoutes(pool: Pool, today: () => string) {
           WHERE c.textbook_id = b.id AND c.parent_id IS NULL) AS "totalChapters",
          (SELECT count(DISTINCT t.chapter_id)::int FROM tree t
           JOIN study_logs l ON l.textbook_id = t.textbook_id AND l.content_id = t.id
-          WHERE t.textbook_id = b.id AND l.status = 'done') AS "completedChapters"
+          WHERE t.textbook_id = b.id AND l.status = 'done' AND l.study_date <= $2::date)
+           AS "completedChapters"
        FROM textbooks b WHERE ($1::bigint IS NULL OR b.id = $1)
        ORDER BY b.title, b.id`,
-      [id],
+      [id, today()],
     );
     if (id !== null && textbooks.length === 0)
       return void res.status(404).json({ error: '교재를 찾을 수 없습니다' });

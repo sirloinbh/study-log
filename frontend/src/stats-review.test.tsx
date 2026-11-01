@@ -102,6 +102,12 @@ test('the completion rate and its counts are shown for the period', async () => 
   expect(reviewCard().getByText(/이번 주 예정 4회 중 3회 완료, 지연 2회입니다/)).toBeTruthy();
 });
 
+test('the page holds the card of textbooks and schedules', async () => {
+  server();
+  render(<Stats />);
+  expect(await screen.findByRole('region', { name: '교재와 일정' })).toBeInTheDocument();
+});
+
 test('picking a period asks for its reviews too', async () => {
   const asked = server();
   render(<Stats />);

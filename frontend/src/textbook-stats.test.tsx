@@ -83,12 +83,21 @@ test('with nothing due yet the rates say so rather than zero', async () => {
   expect(card().queryByText('0%')).toBeNull();
 });
 
-test('a failure says so, and a slow answer for another pick is not shown', async () => {
-  fakeApi(() => ({ status: 500, body: { error: '서버 오류가 발생했습니다' } }));
-  const { unmount } = render(<TextbookStats />);
+test('a failure says so and can be tried again', async () => {
+  let failing = true;
+  fakeApi(() =>
+    failing ? { status: 500, body: { error: '서버 오류가 발생했습니다' } } : { body: all },
+  );
+  render(<TextbookStats />);
   expect(await card().findByRole('alert')).toHaveTextContent('교재 통계를 불러오지 못했습니다');
-  unmount();
+  failing = false;
+  fireEvent.click(card().getByRole('button', { name: '다시 불러오기' }));
+  await card().findByText('목차 없음');
+  expect(card().queryByRole('alert')).toBeNull();
+  expect(card().getByRole('option', { name: '해석학' })).toBeInTheDocument();
+});
 
+test('a slow answer for another pick is not shown', async () => {
   const late: (() => void)[] = [];
   vi.stubGlobal(
     'fetch',

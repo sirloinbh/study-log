@@ -15,6 +15,7 @@ export function TextbookStats() {
   // from the unfiltered answer, which is the first one asked for.
   const [loaded, setLoaded] = useState<Partial<Record<string, Stats>>>({});
   const [loadError, setLoadError] = useState<{ path: string; message: string }>();
+  const [retry, setRetry] = useState(0);
 
   const path = textbookStatsPath(textbookId);
   useEffect(() => {
@@ -31,7 +32,7 @@ export function TextbookStats() {
     return () => {
       current = false;
     };
-  }, [path]);
+  }, [path, retry]);
 
   const stats = loaded[path];
   const error = loadError?.path === path ? loadError.message : undefined;
@@ -52,9 +53,22 @@ export function TextbookStats() {
         </select>
       </label>
       {error ? (
-        <p role="alert" className="error">
-          교재 통계를 불러오지 못했습니다: {error}
-        </p>
+        <>
+          <p role="alert" className="error">
+            교재 통계를 불러오지 못했습니다: {error}
+          </p>
+          {/* With the first answer lost there is no other pick to come back from. */}
+          <button
+            type="button"
+            className="secondary"
+            onClick={() => {
+              setLoadError(undefined);
+              setRetry((count) => count + 1);
+            }}
+          >
+            다시 불러오기
+          </button>
+        </>
       ) : !stats ? (
         <Loading label="교재 통계를 불러오는 중" kind="text" />
       ) : (
