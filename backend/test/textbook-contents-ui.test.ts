@@ -279,7 +279,7 @@ uiTest('deleting needs a confirmation and removes the entry with its sections', 
 
 uiTest('a delete refused because study logs use the entry shows the server message', async () => {
   const api = fakeApi(outline, {
-    rejectDelete: { status: 409, error: '학습 기록이 연결된 목차는 삭제할 수 없습니다' },
+    rejectDelete: { status: 409, error: '학습 기록이나 일정이 연결된 목차는 삭제할 수 없습니다' },
   });
   const ui = await openBook(api);
   await ui.click('수정', row(ui, '2 행렬'));
@@ -287,7 +287,7 @@ uiTest('a delete refused because study logs use the entry shows the server messa
   await ui.click('삭제 확인', row(ui, '1.2 내적'));
   assert.match(
     ui.text(ui.find((n) => n.props.role === 'alert', card(ui))),
-    /학습 기록이 연결된 목차는 삭제할 수 없습니다/,
+    /학습 기록이나 일정이 연결된 목차는 삭제할 수 없습니다/,
   );
   assert.equal(shape(ui), '1 벡터[1.1 덧셈|1.2 내적]|2 행렬');
   // The edit of another entry stays open.
@@ -434,7 +434,10 @@ uiTest(
     await press(ui, '2 행렬 목차 삭제 취소');
     assert.equal(focused.at(-1), 'content-delete-4');
     // Study logs still point at it: the entry stays with its delete button.
-    options.rejectDelete = { status: 409, error: '학습 기록이 연결된 목차는 삭제할 수 없습니다' };
+    options.rejectDelete = {
+      status: 409,
+      error: '학습 기록이나 일정이 연결된 목차는 삭제할 수 없습니다',
+    };
     await press(ui, '2 행렬 목차 삭제');
     await press(ui, '2 행렬 목차 삭제 확인');
     assert.equal(focused.at(-1), 'content-delete-4');

@@ -102,6 +102,8 @@ test(
               endDate: '8034-03-06',
               weekdayMinutes: 120,
               restDayMinutes: 300,
+              textbookId: null,
+              textbookTitle: null,
               totalMinutes: 1260,
               itemCount: 6,
             },
