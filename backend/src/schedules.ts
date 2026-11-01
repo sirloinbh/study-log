@@ -5,6 +5,7 @@ import { z } from 'zod/v4';
 import { datePlusDays, isCalendarDate } from './dates.js';
 import { dayKind, HolidayError, type HolidayFetcher, loadHolidays } from './holidays.js';
 import { inTransaction } from './sql.js';
+import { bodyId } from './textbook-contents.js';
 import { missingOrInvalid } from './validation.js';
 
 // Study schedules (#34): /api/schedules. Rules in docs/decisions/schedule-rules.md.
@@ -33,6 +34,28 @@ export function plannedItems(
     const kind = dayKind(date, holidays);
     return { date, targetMinutes: kind === 'weekday' ? weekdayMinutes : restDayMinutes };
   }).filter((item) => item.targetMinutes > 0);
+}
+
+// Which chapters each day holds, as indexes, for days with these targets (rule 2장). Chapter k of n
+// ends on the first day whose running total reaches total × k ÷ n, compared in whole numbers. The
+// next one starts that same day when the total went past the boundary, and on the next day when it
+// landed exactly on it.
+export function chapterDays(targets: number[], chapters: number): number[][] {
+  const total = targets.reduce((sum, target) => sum + target, 0);
+  let running = 0;
+  let chapter = 0;
+  return targets.map((target) => {
+    running += target;
+    const today: number[] = [];
+    while (chapter < chapters) {
+      today.push(chapter);
+      const left = running * chapters - total * (chapter + 1);
+      if (left < 0) break;
+      chapter += 1;
+      if (left === 0) break;
+    }
+    return today;
+  });
 }
 
 // Same rule as the other ids: plain positive integers that stay exact in JS and fit bigint.
@@ -70,6 +93,18 @@ const createInput = z
       endDate: dateField('종료일'),
       weekdayMinutes: minutes('평일'),
       restDayMinutes: minutes('주말·공휴일'),
+      // Without it the schedule holds only time. Without an end of the range, it runs to that end
+      // of the book.
+      chapters: z
+        .object(
+          {
+            textbookId: bodyId('교재'),
+            fromContentId: bodyId('첫 장').nullable().default(null),
+            toContentId: bodyId('마지막 장').nullable().default(null),
+          },
+          { error: '장 범위를 JSON 객체로 보내세요' },
+        )
+        .optional(),
     },
     { error: '일정 내용을 JSON 객체로 보내세요' },
   )
@@ -93,6 +128,8 @@ const notFound = { error: '일정을 찾을 수 없습니다' };
 
 const summaryColumns = `s.id, s.title, s.start_date AS "startDate", s.end_date AS "endDate",
   s.weekday_minutes AS "weekdayMinutes", s.rest_day_minutes AS "restDayMinutes",
+  s.textbook_id AS "textbookId",
+  (SELECT t.title FROM textbooks t WHERE t.id = s.textbook_id) AS "textbookTitle",
   COALESCE(sum(i.target_minutes), 0)::int AS "totalMinutes", count(i.id)::int AS "itemCount"`;
 
 async function loadSchedule(db: Pool | PoolClient, id: number) {
@@ -104,11 +141,47 @@ async function loadSchedule(db: Pool | PoolClient, id: number) {
   );
   if (!rows[0]) return undefined;
   const items = await db.query(
-    `SELECT id, item_date AS date, target_minutes AS "targetMinutes" FROM schedule_items
-     WHERE schedule_id = $1 ORDER BY item_date, id`,
+    `SELECT i.id, i.item_date AS date, i.target_minutes AS "targetMinutes",
+       COALESCE(
+         json_agg(json_build_object('id', c.id, 'number', c.number, 'title', c.title)
+           ORDER BY c.position) FILTER (WHERE c.id IS NOT NULL),
+         '[]'
+       ) AS contents
+     FROM schedule_items i
+     LEFT JOIN schedule_item_contents sc ON sc.schedule_item_id = i.id
+     LEFT JOIN textbook_contents c ON c.id = sc.content_id
+     WHERE i.schedule_id = $1 GROUP BY i.id ORDER BY i.item_date, i.id`,
     [id],
   );
   return { schedule: rows[0], items: items.rows };
+}
+
+type ChapterRange = {
+  textbookId: number;
+  fromContentId: number | null;
+  toContentId: number | null;
+};
+
+// The chapters of the range in book order, or why there are none. A chapter is a top-level entry of
+// the contents (rule 2장), so a section or another book's chapter is not found here.
+async function chaptersInRange(
+  db: Pool | PoolClient,
+  { textbookId, fromContentId, toContentId }: ChapterRange,
+): Promise<{ ids: number[] } | { error: string }> {
+  const book = await db.query('SELECT 1 FROM textbooks WHERE id = $1', [textbookId]);
+  if (!book.rowCount) return { error: '교재를 찾을 수 없습니다' };
+  const { rows } = await db.query<{ id: number }>(
+    `SELECT id FROM textbook_contents WHERE textbook_id = $1 AND parent_id IS NULL
+     ORDER BY position`,
+    [textbookId],
+  );
+  const ids = rows.map((row) => row.id);
+  if (ids.length === 0) return { error: '목차에 장이 없어 장 단위 일정을 만들 수 없습니다' };
+  const from = fromContentId === null ? 0 : ids.indexOf(fromContentId);
+  const to = toContentId === null ? ids.length - 1 : ids.indexOf(toContentId);
+  if (from < 0 || to < 0) return { error: '장을 찾을 수 없습니다' };
+  if (from > to) return { error: '마지막 장은 첫 장 이후여야 합니다' };
+  return { ids: ids.slice(from, to + 1) };
 }
 
 export function scheduleRoutes(pool: Pool, today: () => string, fetcher: HolidayFetcher) {
@@ -139,6 +212,11 @@ export function scheduleRoutes(pool: Pool, today: () => string, fetcher: Holiday
     // again on every request, since an empty year is not kept (rule 3장, 5장).
     if (Number(input.endDate.slice(0, 4)) > Number(date.slice(0, 4)) + 1)
       return void res.status(400).json({ error: '종료일은 내년 말까지 정할 수 있습니다' });
+    // Before the holidays, so a range that cannot work calls no API. Checked again below, under lock.
+    if (input.chapters) {
+      const chosen = await chaptersInRange(pool, input.chapters);
+      if ('error' in chosen) return void res.status(400).json({ error: chosen.error });
+    }
     let holidays: Set<string>;
     try {
       // Before the transaction: this may call the API (rule 3장).
@@ -156,20 +234,54 @@ export function scheduleRoutes(pool: Pool, today: () => string, fetcher: Holiday
     const items = plannedItems(input.startDate, input.endDate, holidays, input);
     if (items.length === 0)
       return void res.status(400).json({ error: '이 기간에는 목표 시간이 있는 날이 없습니다' });
-    const created = await inTransaction(pool, async (client) => {
+    const reply = await inTransaction(pool, async (client) => {
+      let chapterIds: number[] = [];
+      if (input.chapters) {
+        // Changing a book's contents takes this row's lock (textbook-contents.ts).
+        await client.query('SELECT 1 FROM textbooks WHERE id = $1 FOR SHARE', [
+          input.chapters.textbookId,
+        ]);
+        const chosen = await chaptersInRange(client, input.chapters);
+        if ('error' in chosen) return { status: 400, body: { error: chosen.error } };
+        chapterIds = chosen.ids;
+      }
       const { rows } = await client.query<{ id: number }>(
-        `INSERT INTO schedules (title, start_date, end_date, weekday_minutes, rest_day_minutes)
-         VALUES ($1, $2, $3, $4, $5) RETURNING id`,
-        [input.title, input.startDate, input.endDate, input.weekdayMinutes, input.restDayMinutes],
+        `INSERT INTO schedules
+           (title, start_date, end_date, weekday_minutes, rest_day_minutes, textbook_id)
+         VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
+        [
+          input.title,
+          input.startDate,
+          input.endDate,
+          input.weekdayMinutes,
+          input.restDayMinutes,
+          input.chapters?.textbookId ?? null,
+        ],
       );
-      await client.query(
+      const saved = await client.query<{ id: number; date: string }>(
         `INSERT INTO schedule_items (schedule_id, item_date, target_minutes)
-         SELECT $1, * FROM unnest($2::date[], $3::int[])`,
+         SELECT $1, * FROM unnest($2::date[], $3::int[])
+         RETURNING id, to_char(item_date, 'YYYY-MM-DD') AS date`,
         [rows[0].id, items.map((item) => item.date), items.map((item) => item.targetMinutes)],
       );
-      return loadSchedule(client, rows[0].id);
+      if (input.chapters) {
+        const idOfDate = new Map(saved.rows.map((row) => [row.date, row.id]));
+        const days = chapterDays(
+          items.map((item) => item.targetMinutes),
+          chapterIds.length,
+        );
+        const pairs = days.flatMap((chapters, day) =>
+          chapters.map((chapter) => [idOfDate.get(items[day].date), chapterIds[chapter]]),
+        );
+        await client.query(
+          `INSERT INTO schedule_item_contents (schedule_item_id, textbook_id, content_id)
+           SELECT item, $1, content FROM unnest($2::bigint[], $3::bigint[]) AS p(item, content)`,
+          [input.chapters.textbookId, pairs.map((pair) => pair[0]), pairs.map((pair) => pair[1])],
+        );
+      }
+      return { status: 201, body: await loadSchedule(client, rows[0].id) };
     });
-    res.status(201).json(created);
+    res.status(reply.status).json(reply.body);
   });
 
   router.put('/:id', async (req, res) => {

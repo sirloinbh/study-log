@@ -77,11 +77,11 @@ test('a textbook or chapter that study logs point to cannot be deleted', async (
   await withApi(foreignKeyPool('study_logs_textbook_fkey'), async (call) => {
     const book = await call('/api/textbooks/1', { method: 'DELETE' });
     assert.equal(book.status, 409);
-    assert.equal(book.data.error, '학습 기록이 연결된 교재는 삭제할 수 없습니다');
+    assert.equal(book.data.error, '학습 기록이나 일정이 연결된 교재는 삭제할 수 없습니다');
   });
   await withApi(foreignKeyPool('study_logs_content_fkey'), async (call) => {
     const chapter = await call('/api/textbooks/1/contents/2', { method: 'DELETE' });
     assert.equal(chapter.status, 409);
-    assert.equal(chapter.data.error, '학습 기록이 연결된 목차는 삭제할 수 없습니다');
+    assert.equal(chapter.data.error, '학습 기록이나 일정이 연결된 목차는 삭제할 수 없습니다');
   });
 });

@@ -14,7 +14,7 @@ const pathId = (label: string) =>
 const textbookIdParam = pathId('교재');
 const contentIdParam = pathId('목차');
 
-const bodyId = (label: string) => {
+export const bodyId = (label: string) => {
   const message = `${label} ID가 올바르지 않습니다`;
   return z
     .number({ error: message })
@@ -255,7 +255,7 @@ export function textbookContentRoutes(pool: Pool) {
   });
 
   // Removes the entry with everything below it and closes the gap among its siblings. Study logs
-  // that point to the entry or anything below it block the deletion.
+  // and schedules that point to the entry or anything below it block the deletion.
   router.delete('/:id', async (req, res) => {
     const textbookId = textbookOf(req.params);
     const id = contentIdParam.parse(req.params.id);
@@ -269,7 +269,10 @@ export function textbookContentRoutes(pool: Pool) {
         ));
       } catch (error) {
         if ((error as { code?: string }).code !== '23503') throw error;
-        return { status: 409, body: { error: '학습 기록이 연결된 목차는 삭제할 수 없습니다' } };
+        return {
+          status: 409,
+          body: { error: '학습 기록이나 일정이 연결된 목차는 삭제할 수 없습니다' },
+        };
       }
       if (rows.length === 0) return { status: 404, body: contentNotFound };
       await client.query(

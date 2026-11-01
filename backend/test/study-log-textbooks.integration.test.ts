@@ -115,11 +115,11 @@ test(
       // What a log points to cannot be deleted: the textbook, the section or its chapter.
       const blockedBook = await call(`/api/textbooks/${linear}`, { method: 'DELETE' });
       assert.equal(blockedBook.status, 409);
-      assert.equal(blockedBook.data.error, '학습 기록이 연결된 교재는 삭제할 수 없습니다');
+      assert.equal(blockedBook.data.error, '학습 기록이나 일정이 연결된 교재는 삭제할 수 없습니다');
       for (const id of [section, chapter]) {
         const blocked = await call(`/api/textbooks/${linear}/contents/${id}`, { method: 'DELETE' });
         assert.equal(blocked.status, 409, `content ${id}`);
-        assert.equal(blocked.data.error, '학습 기록이 연결된 목차는 삭제할 수 없습니다');
+        assert.equal(blocked.data.error, '학습 기록이나 일정이 연결된 목차는 삭제할 수 없습니다');
       }
       const stillThere = (await call(`/api/textbooks/${linear}/contents`)).data.contents as {
         children: unknown[];
