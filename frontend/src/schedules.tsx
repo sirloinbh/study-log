@@ -5,6 +5,7 @@ import { useBusy } from './busy';
 import { ButtonSpinner, Loading } from './loading';
 import {
   dayLabel,
+  dayNames,
   defaultEnd,
   defaultHours,
   hoursToMinutes,
@@ -43,6 +44,9 @@ export function Schedules({ today }: { today: string }) {
   const [detail, setDetail] = useState<ScheduleDetail>();
   const [detailError, setDetailError] = useState<{ id: number; message: string }>();
   const [confirming, setConfirming] = useState<number>();
+  // The day being moved, and where to.
+  const [moving, setMoving] = useState<{ id: number; date: string; withLater: boolean }>();
+  const [dayNotice, setDayNotice] = useState<Notice>(undefined);
   // Each next to the buttons that lead to it: the list can be scrolled far below the form.
   const [notice, setNotice] = useState<Notice>(undefined);
   const [listNotice, setListNotice] = useState<Notice>(undefined);
@@ -138,6 +142,8 @@ export function Schedules({ today }: { today: string }) {
     if (!begin()) return;
     setNotice(undefined);
     setListNotice(undefined);
+    setDayNotice(undefined);
+    setMoving(undefined);
     setConfirming(undefined);
     try {
       const data = await requestJson<ScheduleDetail>('/api/schedules', {
@@ -171,11 +177,82 @@ export function Schedules({ today }: { today: string }) {
     }
   };
 
+  // A change to one day answers with the whole schedule: others can move with it.
+  const changeDay = async (
+    name: string,
+    dayId: number,
+    request: () => Promise<ScheduleDetail>,
+    success: string,
+    focus: string,
+    focusIfRefused: string = focus,
+  ) => {
+    nameNext(name);
+    if (!begin()) return;
+    setNotice(undefined);
+    setListNotice(undefined);
+    setDayNotice(undefined);
+    try {
+      setDetail(await request());
+      if (name === 'move') setMoving(undefined);
+      setDayNotice({ kind: 'status', text: success });
+      setWantFocus(focus);
+    } catch (failure) {
+      const { status, message } = failure as RequestError;
+      if (status === 404) {
+        // The schedule is gone, and its card with the reload: this goes where it stays.
+        setMoving(undefined);
+        setListNotice({ kind: 'alert', text: message });
+        setWantFocus('schedules-heading');
+      } else if (status === 409) {
+        // Done or reopened elsewhere: the reload may take the form and its button away.
+        setMoving(undefined);
+        setDayNotice({ kind: 'alert', text: message });
+        setWantFocus(`schedule-day-check-${dayId}`);
+      } else {
+        setDayNotice({ kind: 'alert', text: message });
+        setWantFocus(focusIfRefused);
+      }
+    } finally {
+      // The list's end date follows, and after a refusal the days are read again.
+      setReload((count) => count + 1);
+      end();
+    }
+  };
+
+  const toggleDay = (scheduleId: number, id: number, done: boolean) =>
+    changeDay(
+      'toggle',
+      id,
+      () =>
+        requestJson<ScheduleDetail>(
+          `/api/schedules/${scheduleId}/items/${id}/${done ? 'reopen' : 'complete'}`,
+          { method: 'POST' },
+        ),
+      done ? '완료를 취소했습니다' : '완료로 표시했습니다',
+      `schedule-day-check-${id}`,
+    );
+
+  const moveDay = (scheduleId: number, target: { id: number; date: string; withLater: boolean }) =>
+    changeDay(
+      'move',
+      target.id,
+      () =>
+        requestJson<ScheduleDetail>(`/api/schedules/${scheduleId}/items/${target.id}/date`, {
+          method: 'PUT',
+          body: { date: target.date, withLater: target.withLater },
+        }),
+      target.withLater ? '이후 일정과 함께 옮겼습니다' : '날짜를 옮겼습니다',
+      `schedule-day-move-${target.id}`,
+      `schedule-day-date-${target.id}`,
+    );
+
   const remove = async (id: number) => {
     nameNext('delete');
     if (!begin()) return;
     setNotice(undefined);
     setListNotice(undefined);
+    setDayNotice(undefined);
+    setMoving(undefined);
     try {
       await requestJson(`/api/schedules/${id}`, { method: 'DELETE' });
       // At once, and even if reading the list again fails.
@@ -193,6 +270,8 @@ export function Schedules({ today }: { today: string }) {
       end();
     }
   };
+
+  const names = dayNames(shownDetail?.items ?? [], shownDetail?.schedule.startDate ?? '');
 
   // Typing takes back what was said about the last try.
   const typed = (set: (value: string) => void) => (event: { target: { value: string } }) => {
@@ -383,6 +462,8 @@ export function Schedules({ today }: { today: string }) {
                       setConfirming(undefined);
                       setNotice(undefined);
                       setListNotice(undefined);
+                      setDayNotice(undefined);
+                      setMoving(undefined);
                       // Also the way to try again after its days could not be read: the
                       // error leaves first, so a second failure is shown and announced anew.
                       setDetailError(undefined);
@@ -437,8 +518,9 @@ export function Schedules({ today }: { today: string }) {
                 </div>
                 <p className="status">
                   {item.textbookTitle && `${item.textbookTitle} · `}
-                  {item.startDate} ~ {item.endDate} · 목표 {formatMinutes(item.totalMinutes)} ·{' '}
-                  {item.itemCount}일
+                  {item.startDate} ~ {item.endDate}
+                  {item.delayDays > 0 && ` (${item.delayDays}일 늦어짐)`} · 목표{' '}
+                  {formatMinutes(item.totalMinutes)} · {item.itemCount}일
                 </p>
               </li>
             ))}
@@ -448,7 +530,7 @@ export function Schedules({ today }: { today: string }) {
 
       {shown && (
         <section className="card" aria-label="날짜별 일정">
-          {/* Days already read stay if reading them again fails: they do not change once made. */}
+          {/* Days already read stay if reading them again fails. */}
           {shownDetail ? (
             <>
               <h2 id="schedule-heading" tabIndex={-1}>
@@ -475,9 +557,38 @@ export function Schedules({ today }: { today: string }) {
                   <dd>{shownDetail.schedule.itemCount}일</dd>
                 </div>
               </dl>
+              {shownDetail.schedule.delayDays > 0 && (
+                <p className="status">
+                  처음 정한 종료일 {shownDetail.schedule.endDate}에서{' '}
+                  {shownDetail.schedule.delayDays}일 늦어져 {shownDetail.schedule.currentEndDate}에
+                  끝납니다
+                </p>
+              )}
+              <p role="status" className="status">
+                {dayNotice?.kind === 'status' ? dayNotice.text : ''}
+              </p>
+              {dayNotice?.kind === 'alert' && (
+                <p role="alert" className="error">
+                  {dayNotice.text}
+                </p>
+              )}
               <ul className="schedule-days" aria-label="날짜별 목표 시간">
                 {shownDetail.items.map((item) => (
-                  <li key={item.id} aria-current={item.date === today ? 'date' : undefined}>
+                  <li
+                    key={item.id}
+                    aria-current={item.date === today ? 'date' : undefined}
+                    className={item.completedOn ? 'done' : undefined}
+                  >
+                    <input
+                      type="checkbox"
+                      id={`schedule-day-check-${item.id}`}
+                      aria-label={`${names.get(item.id)} 완료`}
+                      checked={item.completedOn !== null}
+                      disabled={busy}
+                      onChange={() =>
+                        void toggleDay(shownDetail.schedule.id, item.id, item.completedOn !== null)
+                      }
+                    />
                     <span className="schedule-day">
                       <span>{dayLabel(item.date, shownDetail.schedule.startDate)}</span>
                       {item.contents.length > 0 && (
@@ -487,6 +598,78 @@ export function Schedules({ today }: { today: string }) {
                       )}
                     </span>
                     <strong>{formatMinutes(item.targetMinutes)}</strong>
+                    {!item.completedOn && moving?.id !== item.id && (
+                      <button
+                        type="button"
+                        id={`schedule-day-move-${item.id}`}
+                        className="secondary"
+                        aria-label={`${names.get(item.id)} 옮기기`}
+                        disabled={busy}
+                        onClick={() => {
+                          setDayNotice(undefined);
+                          setMoving({ id: item.id, date: item.date, withLater: false });
+                          setWantFocus(`schedule-day-date-${item.id}`);
+                        }}
+                      >
+                        옮기기
+                      </button>
+                    )}
+                    {moving?.id === item.id && !item.completedOn && (
+                      <form
+                        className="schedule-move"
+                        aria-label={`${names.get(item.id)} 옮기기`}
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          void moveDay(shownDetail.schedule.id, moving);
+                        }}
+                      >
+                        <label>
+                          옮길 날짜
+                          <input
+                            type="date"
+                            id={`schedule-day-date-${item.id}`}
+                            required
+                            min={today}
+                            disabled={busy}
+                            value={moving.date}
+                            onChange={(event) => {
+                              setDayNotice(undefined);
+                              setMoving({ ...moving, date: event.target.value });
+                            }}
+                          />
+                        </label>
+                        <label className="schedule-later">
+                          <input
+                            type="checkbox"
+                            disabled={busy}
+                            checked={moving.withLater}
+                            onChange={(event) => {
+                              setDayNotice(undefined);
+                              setMoving({ ...moving, withLater: event.target.checked });
+                            }}
+                          />
+                          이후 일정도 함께
+                        </label>
+                        <div className="actions">
+                          <button type="submit" className="primary" disabled={busy}>
+                            <ButtonSpinner when={action === 'move'} />
+                            옮기기
+                          </button>
+                          <button
+                            type="button"
+                            className="secondary"
+                            disabled={busy}
+                            onClick={() => {
+                              setDayNotice(undefined);
+                              setMoving(undefined);
+                              setWantFocus(`schedule-day-move-${item.id}`);
+                            }}
+                          >
+                            취소
+                          </button>
+                        </div>
+                      </form>
+                    )}
                   </li>
                 ))}
               </ul>

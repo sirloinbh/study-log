@@ -13,6 +13,9 @@ export type Schedule = {
   textbookTitle: string | null;
   totalMinutes: number;
   itemCount: number;
+  // The later of the end first chosen and the last day, and how far past it that is (rule 4장).
+  currentEndDate: string;
+  delayDays: number;
 };
 
 export type ScheduleChapter = { id: number; number: string; title: string };
@@ -21,6 +24,7 @@ export type ScheduleItem = {
   id: number;
   date: string;
   targetMinutes: number;
+  completedOn: string | null;
   contents: ScheduleChapter[];
 };
 
@@ -37,6 +41,18 @@ export function hoursToMinutes(text: string) {
   const hours = Number(text);
   if (text.trim() === '' || !Number.isFinite(hours) || hours < 0 || hours > 24) return undefined;
   return Math.round(hours * 60);
+}
+
+// What each day is called to a screen reader: days can share a date (rule 4장), so those are told
+// apart by their order.
+export function dayNames(items: { id: number; date: string }[], startDate: string) {
+  const names = new Map<number, string>();
+  items.forEach((item) => {
+    const same = items.filter((other) => other.date === item.date);
+    const label = dayLabel(item.date, startDate);
+    names.set(item.id, same.length > 1 ? `${label} ${same.indexOf(item) + 1}번째` : label);
+  });
+  return names;
 }
 
 // "3월 2일 (월)". A schedule can run for a year, so a day in another year than its start says which.
