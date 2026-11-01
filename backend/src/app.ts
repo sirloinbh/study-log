@@ -6,9 +6,11 @@ import { ZodError } from 'zod/v4';
 
 import { calendarRoutes } from './calendar.js';
 import { contentExerciseRoutes, exerciseRoutes, textbookExerciseRoutes } from './exercises.js';
+import { dataPortalHolidays, type HolidayFetcher } from './holidays.js';
 import { keywordRoutes } from './keywords.js';
 import { retrospectiveRoutes } from './retrospectives.js';
 import { reviewRoutes } from './reviews.js';
+import { scheduleRoutes } from './schedules.js';
 import { statsRoutes } from './stats.js';
 import { studyLogRoutes } from './study-logs.js';
 import { textbookContentRoutes } from './textbook-contents.js';
@@ -47,7 +49,12 @@ const defaultRequestsPerMinute = 1200;
 
 export function createApp(
   pool: Pool,
-  options: { today?: () => string; translator?: Translator; requestsPerMinute?: number } = {},
+  options: {
+    today?: () => string;
+    translator?: Translator;
+    holidayFetcher?: HolidayFetcher;
+    requestsPerMinute?: number;
+  } = {},
 ) {
   const today = options.today ?? (() => serviceDate());
   const app = express();
@@ -78,6 +85,10 @@ export function createApp(
   app.use('/api/keywords', keywordRoutes(pool, today));
   app.use('/api/stats', statsRoutes(pool, today));
   app.use('/api/retrospectives', retrospectiveRoutes(pool, today));
+  app.use(
+    '/api/schedules',
+    scheduleRoutes(pool, today, options.holidayFetcher ?? dataPortalHolidays()),
+  );
   app.use('/api/textbooks/:textbookId/contents/:contentId/exercises', contentExerciseRoutes(pool));
   app.use('/api/textbooks/:textbookId/contents', textbookContentRoutes(pool));
   app.use('/api/textbooks/:textbookId/exercises', textbookExerciseRoutes(pool));

@@ -3,6 +3,7 @@ import type { Server } from 'node:http';
 import { Client, type Pool } from 'pg';
 
 import { createApp } from '../src/app.js';
+import type { HolidayFetcher } from '../src/holidays.js';
 import type { Translator } from '../src/translation.js';
 
 // Ports the fetch standard refuses to connect to ("bad port"), as listed in the Fetch spec's
@@ -68,7 +69,12 @@ export async function withApi(
       },
     ) => Promise<{ status: number; data: Record<string, unknown> }>,
   ) => Promise<void>,
-  options: { today?: () => string; translator?: Translator; requestsPerMinute?: number } = {},
+  options: {
+    today?: () => string;
+    translator?: Translator;
+    holidayFetcher?: HolidayFetcher;
+    requestsPerMinute?: number;
+  } = {},
 ) {
   const { server, port } = await openFetchablePort(async () => {
     // Tests never reach Claude: translating fails unless a test hands in its own translator (#31).
@@ -77,7 +83,16 @@ export async function withApi(
       (async () => {
         throw new Error('tests must not call the Claude API');
       });
-    const server = createApp(pool, { ...options, translator }).listen(0, '127.0.0.1');
+    // Nor the holiday API, in the same way (#34).
+    const holidayFetcher: HolidayFetcher =
+      options.holidayFetcher ??
+      (async () => {
+        throw new Error('tests must not call the holiday API');
+      });
+    const server = createApp(pool, { ...options, translator, holidayFetcher }).listen(
+      0,
+      '127.0.0.1',
+    );
     await new Promise<void>((resolve, reject) => {
       server.once('listening', resolve);
       server.once('error', reject);
