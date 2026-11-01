@@ -206,6 +206,59 @@ describe('a textbook', () => {
     expect(sent).toEqual([]);
   });
 
+  test('chapters read before do not count once the book is picked again', async () => {
+    let failing = false;
+    const sent = fakeApi(({ path }) => {
+      if (path === '/api/textbooks') return { body: { textbooks: [book] } };
+      if (path === '/api/schedules') return { body: { schedules: [] } };
+      return failing
+        ? { status: 500, body: { error: '서버 오류가 발생했습니다' } }
+        : { body: { contents } };
+    });
+    await start();
+    fill('교재 (선택)', '7');
+    await screen.findAllByRole('option', { name: '1 벡터' });
+    failing = true;
+    fill('교재 (선택)', '');
+    fill('교재 (선택)', '7');
+    await screen.findByText('이 교재의 목차를 불러오지 못했습니다');
+    expect(screen.queryByRole('option', { name: '1 벡터' })).toBeNull();
+    submit();
+    expect(await form().findByRole('alert')).toHaveTextContent('목차를 아직 읽지 못했습니다');
+    expect(sent).toEqual([]);
+  });
+
+  test('while the chapters are being read a schedule waits, and another book is not offered', async () => {
+    const answers: (() => void)[] = [];
+    const reply = (body: unknown) => new Response(JSON.stringify(body));
+    const fetchMock = vi.fn((path: string) => {
+      if (path === '/api/textbooks')
+        return Promise.resolve(reply({ textbooks: [book, { ...book, id: 8, title: '해석학' }] }));
+      if (path === '/api/schedules') return Promise.resolve(reply({ schedules: [] }));
+      if (path === '/api/textbooks/7/contents') return Promise.resolve(reply({ contents }));
+      return new Promise<Response>((resolve) =>
+        answers.push(() => resolve(reply({ contents: [chapterNode(81, '1', '극한')] }))),
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    await start();
+    fill('교재 (선택)', '7');
+    await screen.findAllByRole('option', { name: '1 벡터' });
+    fill('교재 (선택)', '8');
+    await waitFor(() => expect(answers).toHaveLength(1));
+    // Book 7's chapters are not shown for book 8 while its own are on their way.
+    expect(screen.queryByRole('option', { name: '1 벡터' })).toBeNull();
+    submit();
+    expect(await form().findByRole('alert')).toHaveTextContent('목차를 아직 읽지 못했습니다');
+    expect(
+      fetchMock.mock.calls.some(
+        ([, init]: unknown[]) => (init as { method?: string })?.method === 'POST',
+      ),
+    ).toBe(false);
+    answers.forEach((answer) => answer());
+    await screen.findAllByRole('option', { name: '1 극한' });
+  });
+
   test('a late answer for the book left behind is not offered for this one', async () => {
     const late: (() => void)[] = [];
     const reply = (body: unknown) => new Response(JSON.stringify(body));

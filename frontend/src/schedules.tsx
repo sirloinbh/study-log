@@ -274,6 +274,8 @@ export function Schedules({ today }: { today: string }) {
                 setTextbookId(event.target.value);
                 setFromContentId('');
                 setToContentId('');
+                // Even for the same book again: what was read before does not count as read now.
+                setChapters(undefined);
                 setChaptersFailed(undefined);
               }}
             >

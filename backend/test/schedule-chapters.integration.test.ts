@@ -236,17 +236,21 @@ test('a book is laid out over a schedule, chapter by chapter', { skip: !url }, a
           await client.query('SELECT 1 FROM textbooks WHERE id = $1 FOR UPDATE', [held.id]);
           await client.query('DELETE FROM textbook_contents WHERE id = $1', [held.chapters[0]]);
           finished = (async () => {
-            for (let tries = 0; tries < 200; tries++) {
-              const { rowCount } = await pool.query(
-                `SELECT 1 FROM pg_stat_activity
-                 WHERE datname = current_database() AND wait_event_type = 'Lock'
-                   AND (query LIKE '%textbooks WHERE id = $1 FOR SHARE%'
-                     OR query LIKE '%INSERT INTO schedules%')`,
-              );
-              if (rowCount) break;
-              await new Promise((resolve) => setTimeout(resolve, 25));
+            try {
+              for (let tries = 0; tries < 200; tries++) {
+                const { rowCount } = await pool.query(
+                  `SELECT 1 FROM pg_stat_activity
+                   WHERE datname = current_database() AND wait_event_type = 'Lock'
+                     AND (query LIKE '%textbooks WHERE id = $1 FOR SHARE%'
+                       OR query LIKE '%INSERT INTO schedules%')`,
+                );
+                if (rowCount) break;
+                await new Promise((resolve) => setTimeout(resolve, 25));
+              }
+            } finally {
+              // Whatever happened, or the request would wait on this lock for good.
+              await client.query('COMMIT');
             }
-            await client.query('COMMIT');
           })();
         };
         try {
@@ -262,8 +266,13 @@ test('a book is laid out over a schedule, chapter by chapter', { skip: !url }, a
           assert.match(String(answered.data.error), /장을 찾을 수 없습니다/);
         } finally {
           whileReading = async () => undefined;
-          await finished;
-          client.release();
+          try {
+            await finished;
+          } finally {
+            // No open transaction goes back to the pool, whatever failed above.
+            await client.query('ROLLBACK').catch(() => undefined);
+            client.release();
+          }
         }
       });
 
