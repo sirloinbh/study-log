@@ -33,7 +33,9 @@ export function Schedules({ today }: { today: string }) {
   const [detail, setDetail] = useState<ScheduleDetail>();
   const [detailError, setDetailError] = useState<{ id: number; message: string }>();
   const [confirming, setConfirming] = useState<number>();
+  // Each next to the buttons that lead to it: the list can be scrolled far below the form.
   const [notice, setNotice] = useState<Notice>(undefined);
+  const [listNotice, setListNotice] = useState<Notice>(undefined);
   const { busy, action, nameNext, begin, end } = useBusy();
   const [wantFocus, setWantFocus] = useState<string>();
   useEffect(() => {
@@ -56,7 +58,8 @@ export function Schedules({ today }: { today: string }) {
     };
   }, [reload]);
 
-  // The one picked, or the newest; a picked one that is gone falls back too.
+  // The one picked, or the first in the list (the latest start); a picked one that is gone falls
+  // back too.
   const shown = schedules?.find((item) => item.id === pickedId) ?? schedules?.[0];
   const shownId = shown?.id;
 
@@ -76,7 +79,7 @@ export function Schedules({ today }: { today: string }) {
     return () => {
       current = false;
     };
-  }, [shownId]);
+  }, [shownId, reload]);
 
   const shownDetail = detail?.schedule.id === shownId ? detail : undefined;
   const shownError = detailError && detailError.id === shownId ? detailError.message : undefined;
@@ -92,6 +95,8 @@ export function Schedules({ today }: { today: string }) {
     nameNext('create');
     if (!begin()) return;
     setNotice(undefined);
+    setListNotice(undefined);
+    setConfirming(undefined);
     try {
       const data = await requestJson<ScheduleDetail>('/api/schedules', {
         method: 'POST',
@@ -115,13 +120,16 @@ export function Schedules({ today }: { today: string }) {
     nameNext('delete');
     if (!begin()) return;
     setNotice(undefined);
+    setListNotice(undefined);
     try {
       await requestJson(`/api/schedules/${id}`, { method: 'DELETE' });
-      setNotice({ kind: 'status', text: '일정을 삭제했습니다' });
+      // At once, and even if reading the list again fails.
+      setSchedules((all) => all?.filter((item) => item.id !== id));
+      setListNotice({ kind: 'status', text: '일정을 삭제했습니다' });
       setWantFocus('schedules-heading');
     } catch (failure) {
       const { status, message } = failure as RequestError;
-      setNotice({ kind: 'alert', text: message });
+      setListNotice({ kind: 'alert', text: message });
       // Already gone elsewhere, so the button it would go back to goes with the reload.
       setWantFocus(status === 404 ? 'schedules-heading' : `schedule-delete-${id}`);
     } finally {
@@ -129,6 +137,12 @@ export function Schedules({ today }: { today: string }) {
       setReload((count) => count + 1);
       end();
     }
+  };
+
+  // Typing takes back what was said about the last try.
+  const typed = (set: (value: string) => void) => (event: { target: { value: string } }) => {
+    setNotice(undefined);
+    set(event.target.value);
   };
 
   return (
@@ -144,7 +158,7 @@ export function Schedules({ today }: { today: string }) {
               placeholder="예: 알고리즘 교재 1회독"
               disabled={busy}
               value={title}
-              onChange={(event) => setTitle(event.target.value)}
+              onChange={typed(setTitle)}
             />
           </label>
           <label>
@@ -155,7 +169,7 @@ export function Schedules({ today }: { today: string }) {
               min={today}
               disabled={busy}
               value={startDate}
-              onChange={(event) => setStartDate(event.target.value)}
+              onChange={typed(setStartDate)}
             />
           </label>
           <label>
@@ -166,7 +180,7 @@ export function Schedules({ today }: { today: string }) {
               min={startDate}
               disabled={busy}
               value={endDate}
-              onChange={(event) => setEndDate(event.target.value)}
+              onChange={typed(setEndDate)}
             />
           </label>
           <label>
@@ -179,7 +193,7 @@ export function Schedules({ today }: { today: string }) {
               step={0.5}
               disabled={busy}
               value={weekdayHours}
-              onChange={(event) => setWeekdayHours(event.target.value)}
+              onChange={typed(setWeekdayHours)}
             />
           </label>
           <label>
@@ -192,7 +206,7 @@ export function Schedules({ today }: { today: string }) {
               step={0.5}
               disabled={busy}
               value={restDayHours}
-              onChange={(event) => setRestDayHours(event.target.value)}
+              onChange={typed(setRestDayHours)}
             />
           </label>
           <div className="actions wide">
@@ -240,6 +254,9 @@ export function Schedules({ today }: { today: string }) {
                       setPickedId(item.id);
                       setConfirming(undefined);
                       setNotice(undefined);
+                      setListNotice(undefined);
+                      // Also the way to try again after its days could not be read.
+                      setReload((count) => count + 1);
                     }}
                   >
                     {item.title}
@@ -296,6 +313,14 @@ export function Schedules({ today }: { today: string }) {
             ))}
           </ul>
         )}
+        <p role="status" className="status">
+          {listNotice?.kind === 'status' ? listNotice.text : ''}
+        </p>
+        {listNotice?.kind === 'alert' && (
+          <p role="alert" className="error">
+            {listNotice.text}
+          </p>
+        )}
       </section>
 
       {shown && (
@@ -332,7 +357,7 @@ export function Schedules({ today }: { today: string }) {
               <ul className="schedule-days" aria-label="날짜별 목표 시간">
                 {shownDetail.items.map((item) => (
                   <li key={item.id} aria-current={item.date === today ? 'date' : undefined}>
-                    <span>{dayLabel(item.date)}</span>
+                    <span>{dayLabel(item.date, shownDetail.schedule.startDate)}</span>
                     <strong>{formatMinutes(item.targetMinutes)}</strong>
                   </li>
                 ))}

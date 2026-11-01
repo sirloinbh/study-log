@@ -60,6 +60,7 @@ function server(start: Schedule[], writeFailure?: { status: number; body: object
 const fill = (label: string, value: string) =>
   fireEvent.change(screen.getByLabelText(label), { target: { value } });
 const submit = () => fireEvent.click(screen.getByRole('button', { name: '일정 만들기' }));
+const form = () => within(screen.getByRole('region', { name: '일정 만들기' }));
 const list = () => within(screen.getByRole('region', { name: '내 일정' }));
 const days = () => within(screen.getByRole('list', { name: '날짜별 목표 시간' }));
 
@@ -78,8 +79,10 @@ test('hours as typed become minutes, and only 0 to 24 count', () => {
 test('the end proposed is thirty days on, and a day reads with its weekday', () => {
   expect(defaultEnd('2026-03-02')).toBe('2026-03-31');
   expect(defaultEnd('2026-12-15')).toBe('2027-01-13');
-  expect(dayLabel('2026-03-02')).toBe('3월 2일 (월)');
-  expect(dayLabel('2026-03-08')).toBe('3월 8일 (일)');
+  expect(dayLabel('2026-03-02', '2026-03-02')).toBe('3월 2일 (월)');
+  expect(dayLabel('2026-03-08', '2026-03-02')).toBe('3월 8일 (일)');
+  // In the year after the start.
+  expect(dayLabel('2027-01-01', '2026-12-30')).toBe('2027년 1월 1일 (금)');
 });
 
 test('the form starts with the suggested dates and hours', async () => {
@@ -116,7 +119,7 @@ test('making a schedule sends minutes and shows its days', async () => {
       },
     },
   ]);
-  expect(screen.getByRole('status')).toHaveTextContent('일정을 만들었습니다');
+  expect(form().getByRole('status')).toHaveTextContent('일정을 만들었습니다');
   expect(screen.getByLabelText('일정 이름')).toHaveValue('');
   // The period and hours stay, to make another one like it.
   expect(screen.getByLabelText('종료일')).toHaveValue('2026-03-08');
@@ -152,7 +155,7 @@ test('a refusal shows the server message and keeps what was typed', async () => 
   expect(screen.getByRole('button', { name: '일정 만들기' })).toBeEnabled();
 });
 
-test('the newest schedule opens first, another opens when picked, and today is marked', async () => {
+test('the first in the list opens, another opens when picked, and today is marked', async () => {
   server([schedule(2, '새 일정'), schedule(1, '지난 일정')]);
   render(<Schedules today={today} />);
   await screen.findByRole('heading', { level: 2, name: '새 일정' });
@@ -173,7 +176,11 @@ test('deleting asks first, and the next schedule opens', async () => {
   await screen.findByRole('heading', { level: 2, name: '새 일정' });
 
   fireEvent.click(list().getByRole('button', { name: '새 일정 삭제' }));
+  await waitFor(() =>
+    expect(list().getByRole('button', { name: '새 일정 삭제 확인' })).toHaveFocus(),
+  );
   fireEvent.click(list().getByRole('button', { name: '새 일정 삭제 취소' }));
+  await waitFor(() => expect(list().getByRole('button', { name: '새 일정 삭제' })).toHaveFocus());
   expect(sent).toEqual([]);
 
   fireEvent.click(list().getByRole('button', { name: '새 일정 삭제' }));
@@ -181,7 +188,9 @@ test('deleting asks first, and the next schedule opens', async () => {
   await screen.findByRole('heading', { level: 2, name: '지난 일정' });
   expect(sent).toEqual([{ method: 'DELETE', path: '/api/schedules/2' }]);
   expect(list().queryByRole('button', { name: '새 일정' })).toBeNull();
-  expect(screen.getByRole('status')).toHaveTextContent('일정을 삭제했습니다');
+  // Beside the list, which can be scrolled far below the form.
+  expect(list().getByRole('status')).toHaveTextContent('일정을 삭제했습니다');
+  await waitFor(() => expect(screen.getByRole('heading', { name: '내 일정' })).toHaveFocus());
 });
 
 test('a failed delete says why and leaves the schedule', async () => {
@@ -190,9 +199,85 @@ test('a failed delete says why and leaves the schedule', async () => {
   await screen.findByRole('heading', { level: 2, name: '지난 일정' });
   fireEvent.click(list().getByRole('button', { name: '지난 일정 삭제' }));
   fireEvent.click(list().getByRole('button', { name: '지난 일정 삭제 확인' }));
-  expect(await screen.findByRole('alert')).toHaveTextContent('서버 오류가 발생했습니다');
+  expect(await list().findByRole('alert')).toHaveTextContent('서버 오류가 발생했습니다');
   expect(list().getByRole('button', { name: '지난 일정' })).toBeInTheDocument();
   await waitFor(() => expect(list().getByRole('button', { name: '지난 일정 삭제' })).toHaveFocus());
+});
+
+test('a schedule deleted elsewhere says so and focus goes to the list heading', async () => {
+  server([schedule(1, '지난 일정')], { status: 404, body: { error: '일정을 찾을 수 없습니다' } });
+  render(<Schedules today={today} />);
+  await screen.findByRole('heading', { level: 2, name: '지난 일정' });
+  fireEvent.click(list().getByRole('button', { name: '지난 일정 삭제' }));
+  fireEvent.click(list().getByRole('button', { name: '지난 일정 삭제 확인' }));
+  expect(await list().findByRole('alert')).toHaveTextContent('일정을 찾을 수 없습니다');
+  await waitFor(() => expect(screen.getByRole('heading', { name: '내 일정' })).toHaveFocus());
+});
+
+test('a deleted schedule leaves at once, even when the list cannot be read again', async () => {
+  let deleted = false;
+  fakeApi(({ method, path }) => {
+    if (method === 'DELETE') {
+      deleted = true;
+      return { status: 204 };
+    }
+    if (deleted) return { status: 500, body: { error: '서버 오류가 발생했습니다' } };
+    return path === '/api/schedules'
+      ? { body: { schedules: [schedule(2, '새 일정'), schedule(1, '지난 일정')] } }
+      : { body: detailOf(schedule(path.endsWith('/2') ? 2 : 1, '새 일정')) };
+  });
+  render(<Schedules today={today} />);
+  await screen.findByRole('heading', { level: 2, name: '새 일정' });
+  fireEvent.click(list().getByRole('button', { name: '새 일정 삭제' }));
+  fireEvent.click(list().getByRole('button', { name: '새 일정 삭제 확인' }));
+  await list().findByText('일정을 삭제했습니다');
+  expect(list().queryByRole('button', { name: '새 일정' })).toBeNull();
+  expect(list().getByRole('button', { name: '지난 일정' })).toBeInTheDocument();
+});
+
+test('days that could not be read are tried again by picking the schedule', async () => {
+  let failing = true;
+  fakeApi(({ path }) => {
+    if (path === '/api/schedules') return { body: { schedules: [schedule(1, '지난 일정')] } };
+    return failing
+      ? { status: 500, body: { error: '서버 오류가 발생했습니다' } }
+      : { body: detailOf(schedule(1, '지난 일정')) };
+  });
+  render(<Schedules today={today} />);
+  await screen.findByText(/날짜별 일정을 불러오지 못했습니다/);
+  failing = false;
+  fireEvent.click(list().getByRole('button', { name: '지난 일정' }));
+  await screen.findByRole('heading', { level: 2, name: '지난 일정' });
+  expect(screen.queryByText(/날짜별 일정을 불러오지 못했습니다/)).toBeNull();
+});
+
+test('typing takes back the last complaint, and a new schedule ends a pending delete', async () => {
+  server([schedule(1, '지난 일정')]);
+  render(<Schedules today={today} />);
+  await screen.findByRole('heading', { level: 2, name: '지난 일정' });
+  fill('일정 이름', '알고리즘');
+  fill('평일 (시간)', '25');
+  fireEvent.submit(document.querySelector('.schedules form')!);
+  await form().findByRole('alert');
+  fill('평일 (시간)', '2');
+  expect(form().queryByRole('alert')).toBeNull();
+
+  fireEvent.click(list().getByRole('button', { name: '지난 일정 삭제' }));
+  submit();
+  await screen.findByRole('heading', { level: 2, name: '알고리즘' });
+  expect(list().queryByRole('button', { name: '지난 일정 삭제 확인' })).toBeNull();
+});
+
+test('two submits at once make one schedule', async () => {
+  const sent = server([]);
+  render(<Schedules today={today} />);
+  await screen.findByText('아직 만든 일정이 없습니다');
+  fill('일정 이름', '알고리즘');
+  const element = document.querySelector('.schedules form')!;
+  fireEvent.submit(element);
+  fireEvent.submit(element);
+  await screen.findByRole('heading', { level: 2, name: '알고리즘' });
+  expect(sent).toHaveLength(1);
 });
 
 test('a list or days that cannot be read say so', async () => {

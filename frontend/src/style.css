@@ -572,6 +572,10 @@
 .schedules .log-head {
   justify-content: space-between;
 }
+/* The name is free text, up to 200 characters without a space. */
+.schedules h2 {
+  overflow-wrap: anywhere;
+}
 /* The days of a schedule (#35). */
 .schedule-days {
   list-style: none;

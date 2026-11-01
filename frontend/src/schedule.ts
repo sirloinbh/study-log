@@ -30,8 +30,9 @@ export function hoursToMinutes(text: string) {
   return Math.round(hours * 60);
 }
 
-// "3월 2일 (월)".
-export function dayLabel(date: string) {
+// "3월 2일 (월)". A schedule can run for a year, so a day in another year than its start says which.
+export function dayLabel(date: string, startDate: string) {
   const day = new Date(`${date}T00:00:00Z`);
-  return `${day.getUTCMonth() + 1}월 ${day.getUTCDate()}일 (${weekdayNames[day.getUTCDay()]})`;
+  const year = date.slice(0, 4) === startDate.slice(0, 4) ? '' : `${date.slice(0, 4)}년 `;
+  return `${year}${day.getUTCMonth() + 1}월 ${day.getUTCDate()}일 (${weekdayNames[day.getUTCDay()]})`;
 }
