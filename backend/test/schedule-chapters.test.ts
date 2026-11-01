@@ -47,6 +47,15 @@ test('whole numbers keep a boundary that fractions would miss', () => {
   ]);
 });
 
+test('a boundary that a fraction would put a hair off is still exact', () => {
+  // 49 × (1 ÷ 49) is not 1 in floating point: each day must hold its own chapter alone.
+  const days = chapterDays(Array<number>(49).fill(1), 49);
+  assert.deepEqual(
+    days,
+    Array.from({ length: 49 }, (_, index) => [index]),
+  );
+});
+
 test('every chapter appears, in order, and the last ends on the last day', () => {
   for (const [targets, chapters] of [
     [[120, 300, 300, 120, 120, 45, 1440], 5],

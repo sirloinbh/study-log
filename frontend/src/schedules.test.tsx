@@ -196,6 +196,40 @@ describe('a textbook', () => {
     expect(await screen.findByText('교재 목록을 불러오지 못했습니다')).toBeInTheDocument();
   });
 
+  test('without its chapters read, a book cannot make a schedule yet', async () => {
+    const sent = bookServer({ status: 500, body: { error: '서버 오류가 발생했습니다' } });
+    await start();
+    fill('교재 (선택)', '7');
+    await screen.findByText('이 교재의 목차를 불러오지 못했습니다');
+    submit();
+    expect(await form().findByRole('alert')).toHaveTextContent('목차를 아직 읽지 못했습니다');
+    expect(sent).toEqual([]);
+  });
+
+  test('a late answer for the book left behind is not offered for this one', async () => {
+    const late: (() => void)[] = [];
+    const reply = (body: unknown) => new Response(JSON.stringify(body));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((path: string) => {
+        if (path === '/api/textbooks')
+          return Promise.resolve(reply({ textbooks: [book, { ...book, id: 8, title: '해석학' }] }));
+        if (path === '/api/schedules') return Promise.resolve(reply({ schedules: [] }));
+        if (path === '/api/textbooks/7/contents')
+          return new Promise<Response>((resolve) => late.push(() => resolve(reply({ contents }))));
+        return Promise.resolve(reply({ contents: [chapterNode(81, '1', '극한')] }));
+      }),
+    );
+    await start();
+    fill('교재 (선택)', '7');
+    fill('교재 (선택)', '8');
+    await screen.findAllByRole('option', { name: '1 극한' });
+    late.forEach((resolve) => resolve());
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(screen.queryByRole('option', { name: '1 벡터' })).toBeNull();
+    expect(screen.getAllByRole('option', { name: '1 극한' })).toHaveLength(2);
+  });
+
   test('a schedule with a book names it in the list', async () => {
     fakeApi(({ path }) =>
       path === '/api/schedules'

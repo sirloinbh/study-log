@@ -144,7 +144,7 @@ async function loadSchedule(db: Pool | PoolClient, id: number) {
     `SELECT i.id, i.item_date AS date, i.target_minutes AS "targetMinutes",
        COALESCE(
          json_agg(json_build_object('id', c.id, 'number', c.number, 'title', c.title)
-           ORDER BY c.position) FILTER (WHERE c.id IS NOT NULL),
+           ORDER BY sc.position) FILTER (WHERE c.id IS NOT NULL),
          '[]'
        ) AS contents
      FROM schedule_items i
@@ -237,7 +237,7 @@ export function scheduleRoutes(pool: Pool, today: () => string, fetcher: Holiday
     const reply = await inTransaction(pool, async (client) => {
       let chapterIds: number[] = [];
       if (input.chapters) {
-        // Changing a book's contents takes this row's lock (textbook-contents.ts).
+        // Adding, deleting and reordering chapters take this row's lock (textbook-contents.ts).
         await client.query('SELECT 1 FROM textbooks WHERE id = $1 FOR SHARE', [
           input.chapters.textbookId,
         ]);
@@ -271,12 +271,18 @@ export function scheduleRoutes(pool: Pool, today: () => string, fetcher: Holiday
           chapterIds.length,
         );
         const pairs = days.flatMap((chapters, day) =>
-          chapters.map((chapter) => [idOfDate.get(items[day].date), chapterIds[chapter]]),
+          chapters.map((chapter) => [idOfDate.get(items[day].date), chapterIds[chapter], chapter]),
         );
         await client.query(
-          `INSERT INTO schedule_item_contents (schedule_item_id, textbook_id, content_id)
-           SELECT item, $1, content FROM unnest($2::bigint[], $3::bigint[]) AS p(item, content)`,
-          [input.chapters.textbookId, pairs.map((pair) => pair[0]), pairs.map((pair) => pair[1])],
+          `INSERT INTO schedule_item_contents (schedule_item_id, textbook_id, content_id, position)
+           SELECT item, $1, content, position
+           FROM unnest($2::bigint[], $3::bigint[], $4::int[]) AS p(item, content, position)`,
+          [
+            input.chapters.textbookId,
+            pairs.map((pair) => pair[0]),
+            pairs.map((pair) => pair[1]),
+            pairs.map((pair) => pair[2]),
+          ],
         );
       }
       return { status: 201, body: await loadSchedule(client, rows[0].id) };

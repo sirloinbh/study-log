@@ -125,6 +125,15 @@ export function Schedules({ today }: { today: string }) {
       setNotice({ kind: 'alert', text: '하루 분량은 0시간에서 24시간 사이로 입력하세요' });
       return;
     }
+    // Without its chapters read there was no chance to pick a range, and a whole book cannot be
+    // narrowed afterwards (docs/decisions/schedule-rules.md 5장).
+    if (textbookId && !bookChapters) {
+      setNotice({
+        kind: 'alert',
+        text: '교재의 목차를 아직 읽지 못했습니다. 잠시 뒤 다시 시도하거나 교재를 다시 고르세요',
+      });
+      return;
+    }
     nameNext('create');
     if (!begin()) return;
     setNotice(undefined);

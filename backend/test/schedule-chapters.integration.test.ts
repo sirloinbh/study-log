@@ -36,6 +36,7 @@ test('a book is laid out over a schedule, chapter by chapter', { skip: !url }, a
   await cleanup();
 
   let holidayCalls = 0;
+  let whileReading: () => Promise<void> = async () => undefined;
   await withApi(
     pool,
     async (call) => {
@@ -173,6 +174,99 @@ test('a book is laid out over a schedule, chapter by chapter', { skip: !url }, a
         assert.equal(none.rowCount, 0);
       });
 
+      await t.test(
+        'reordering the book keeps what was laid out, and ranges follow it',
+        async () => {
+          const moved = await book('순서를 바꿀 책', 4);
+          const [a, b, c, d] = moved.chapters;
+          const made = await create(body({ textbookId: moved.id }));
+          const id = (made.data as unknown as Detail).schedule.id;
+          const before = titles(made.data as unknown as Detail);
+          assert.deepEqual(before[2], ['1장', '2장']);
+
+          const order = await call(`/api/textbooks/${moved.id}/contents/order`, {
+            method: 'PUT',
+            body: { parentId: null, ids: [b, a, c, d] },
+          });
+          assert.equal(order.status, 200);
+          const read = await call(`/api/schedules/${id}`);
+          assert.deepEqual(titles(read.data as unknown as Detail), before);
+
+          // The book's order now decides what a range is, not the order chapters were added in.
+          const range = await create(
+            body({ textbookId: moved.id, fromContentId: b, toContentId: a }),
+          );
+          assert.equal(range.status, 201);
+          assert.deepEqual(titles(range.data as unknown as Detail)[0], ['2장']);
+          const backwards = await create(
+            body({ textbookId: moved.id, fromContentId: a, toContentId: b }),
+          );
+          assert.equal(backwards.status, 400);
+        },
+      );
+
+      await t.test('a chapter deleted while holidays are read is refused, not a 500', async () => {
+        const going = await book('장이 사라지는 책', 2);
+        await pool.query('DELETE FROM holiday_years WHERE year = 8040');
+        whileReading = async () => {
+          await pool.query('DELETE FROM textbook_contents WHERE id = $1', [going.chapters[0]]);
+        };
+        const refused = await create(
+          body(
+            { textbookId: going.id, fromContentId: going.chapters[0] },
+            '8040-03-05',
+            '8040-03-06',
+          ),
+        );
+        whileReading = async () => undefined;
+        assert.equal(refused.status, 400, JSON.stringify(refused.data));
+        assert.match(String(refused.data.error), /장을 찾을 수 없습니다/);
+      });
+
+      await t.test('creating waits for a change to the book in progress', async () => {
+        const held = await book('잠긴 책', 2);
+        await pool.query('DELETE FROM holiday_years WHERE year = 8040');
+        const client = await pool.connect();
+        let finished: Promise<void> = Promise.resolve();
+        // After the first check, which still saw the chapter: the change starts, and commits only
+        // once the request is seen waiting for it. Under the lock the chapter is read after that;
+        // without it the chapter is read before, and saving it fails.
+        whileReading = async () => {
+          await client.query('BEGIN');
+          await client.query('SELECT 1 FROM textbooks WHERE id = $1 FOR UPDATE', [held.id]);
+          await client.query('DELETE FROM textbook_contents WHERE id = $1', [held.chapters[0]]);
+          finished = (async () => {
+            for (let tries = 0; tries < 200; tries++) {
+              const { rowCount } = await pool.query(
+                `SELECT 1 FROM pg_stat_activity
+                 WHERE datname = current_database() AND wait_event_type = 'Lock'
+                   AND (query LIKE '%textbooks WHERE id = $1 FOR SHARE%'
+                     OR query LIKE '%INSERT INTO schedules%')`,
+              );
+              if (rowCount) break;
+              await new Promise((resolve) => setTimeout(resolve, 25));
+            }
+            await client.query('COMMIT');
+          })();
+        };
+        try {
+          const answered = await create(
+            body(
+              { textbookId: held.id, fromContentId: held.chapters[0] },
+              '8040-03-05',
+              '8040-03-06',
+            ),
+          );
+          await finished;
+          assert.equal(answered.status, 400, JSON.stringify(answered.data));
+          assert.match(String(answered.data.error), /장을 찾을 수 없습니다/);
+        } finally {
+          whileReading = async () => undefined;
+          await finished;
+          client.release();
+        }
+      });
+
       await t.test('a book or chapter in a schedule stays until the schedule goes', async () => {
         const kept = await book('일정에 쓴 책', 2);
         const made = await create(body({ textbookId: kept.id }));
@@ -219,6 +313,7 @@ test('a book is laid out over a schedule, chapter by chapter', { skip: !url }, a
       today: () => '8039-01-01',
       holidayFetcher: async (year) => {
         holidayCalls += 1;
+        await whileReading();
         return [{ date: `${year}-01-01`, name: '1월1일' }];
       },
     },
