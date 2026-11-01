@@ -576,6 +576,26 @@
 .schedules h2 {
   overflow-wrap: anywhere;
 }
+.schedule-progress {
+  margin: 0 0 16px;
+}
+.schedule-progress p {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  margin: 0 0 8px;
+}
+.schedule-progress [role='progressbar'] {
+  height: 8px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--muted);
+}
+.schedule-progress [role='progressbar'] > div {
+  height: 100%;
+  background: var(--primary);
+}
 /* The days of a schedule (#35). */
 .schedule-days {
   list-style: none;

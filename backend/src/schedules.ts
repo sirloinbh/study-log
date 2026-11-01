@@ -123,7 +123,7 @@ const createInput = z
   });
 
 // The period and the amounts stay: changing them would need the holidays again, and they are read
-// only when creating (rule 3장, 5장).
+// only when creating (rule 3장, 6장).
 const updateInput = z.object({ title }, { error: '일정 내용을 JSON 객체로 보내세요' });
 
 const itemIdParam = z
@@ -153,7 +153,15 @@ const summaryColumns = `s.id, s.title, s.start_date AS "startDate", s.end_date A
   (SELECT t.title FROM textbooks t WHERE t.id = s.textbook_id) AS "textbookTitle",
   COALESCE(sum(i.target_minutes), 0)::int AS "totalMinutes", count(i.id)::int AS "itemCount",
   GREATEST(s.end_date, max(i.item_date)) AS "currentEndDate",
-  GREATEST(max(i.item_date) - s.end_date, 0)::int AS "delayDays"`;
+  GREATEST(max(i.item_date) - s.end_date, 0)::int AS "delayDays",
+  count(i.id) FILTER (WHERE i.completed_on IS NOT NULL)::int AS "completedCount",
+  COALESCE(sum(i.target_minutes) FILTER (WHERE i.completed_on IS NOT NULL), 0)::int
+    AS "completedMinutes",
+  COALESCE(
+    (sum(i.target_minutes) FILTER (WHERE i.completed_on IS NOT NULL) * 100
+      / NULLIF(sum(i.target_minutes), 0))::int,
+    0
+  ) AS "progressPercent"`;
 
 async function loadSchedule(db: Pool | PoolClient, id: number) {
   const { rows } = await db.query(
@@ -368,7 +376,7 @@ export function scheduleRoutes(pool: Pool, today: () => string, fetcher: Holiday
     if (input.startDate < date)
       return void res.status(400).json({ error: '시작일은 오늘 이후여야 합니다' });
     // Years further on are not published: asking for them would only spend the API's daily calls,
-    // again on every request, since an empty year is not kept (rule 3장, 5장).
+    // again on every request, since an empty year is not kept (rule 3장, 6장).
     if (Number(input.endDate.slice(0, 4)) > Number(date.slice(0, 4)) + 1)
       return void res.status(400).json({ error: '종료일은 내년 말까지 정할 수 있습니다' });
     // Before the holidays, so a range that cannot work calls no API. Checked again below, under lock.

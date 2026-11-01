@@ -266,6 +266,77 @@ test('a schedule follows what was done and what fell behind', { skip: !url }, as
         assert.equal(done.schedule.delayDays, 0);
       });
 
+      await t.test('progress is the target time of the days done, rounded down', async () => {
+        today = '8042-10-04';
+        // Monday to Sunday at 120 and 300 minutes: 5 × 120 + 2 × 300 = 1200 in all.
+        const made = await call('/api/schedules', {
+          method: 'POST',
+          body: {
+            title: '진행률',
+            startDate: '8042-10-06',
+            endDate: '8042-10-12',
+            weekdayMinutes: 120,
+            restDayMinutes: 300,
+          },
+        });
+        const { schedule, items } = made.data as unknown as Detail;
+        type Progress = Summary & {
+          completedCount: number;
+          completedMinutes: number;
+          progressPercent: number;
+          totalMinutes: number;
+        };
+        const progress = async () => (await read(schedule.id)).schedule as Progress;
+        const target = (await read(schedule.id)).items.map((item) => item.targetMinutes);
+        assert.equal(
+          target.reduce((sum, minutes) => sum + minutes, 0),
+          1200,
+        );
+        let summary = await progress();
+        assert.deepEqual(
+          [summary.completedCount, summary.completedMinutes, summary.progressPercent],
+          [0, 0, 0],
+        );
+        // A weekday: 10 percent of the time, though one day of seven.
+        await complete(schedule.id, items[0].id);
+        summary = await progress();
+        assert.deepEqual(
+          [summary.completedCount, summary.completedMinutes, summary.progressPercent],
+          [1, 120, 10],
+        );
+        // Moving a day changes none of it, and reopening takes it back.
+        await move(schedule.id, items[1].id, '8042-10-20');
+        assert.equal((await progress()).progressPercent, 10);
+        await reopen(schedule.id, items[0].id);
+        assert.equal((await progress()).progressPercent, 0);
+        // Everything but a little is not yet 100: 1080 of 1200 is 90, and only all of it is 100.
+        for (const item of items.slice(0, 6)) await complete(schedule.id, item.id);
+        summary = await progress();
+        assert.equal(summary.completedMinutes, 1200 - target[6]);
+        assert.ok(summary.progressPercent < 100);
+        await complete(schedule.id, items[6].id);
+        summary = await progress();
+        assert.equal(summary.progressPercent, 100);
+        assert.equal(summary.completedCount, 7);
+        // The list says the same.
+        const list = await call('/api/schedules');
+        const row = (list.data.schedules as Progress[]).find((item) => item.id === schedule.id);
+        assert.equal(row?.progressPercent, 100);
+        assert.equal(row?.completedMinutes, 1200);
+      });
+
+      await t.test('a percent rounds down, so nearly all is not shown as all', async () => {
+        today = '8042-11-01';
+        const { schedule, items } = await make('8042-11-01', '8042-11-03');
+        // 60 of 180 minutes is 33.3…
+        const one = await complete(schedule.id, items[0].id);
+        const first = (one.data as unknown as { schedule: { progressPercent: number } }).schedule;
+        assert.equal(first.progressPercent, 33);
+        const two = await complete(schedule.id, items[1].id);
+        const second = (two.data as unknown as { schedule: { progressPercent: number } }).schedule;
+        assert.equal(second.progressPercent, 66);
+      });
+
       await t.test('a refused change takes the catching up back too', async () => {
         today = '8042-08-03';
         const { schedule, items } = await make('8042-08-03', '8042-08-04');

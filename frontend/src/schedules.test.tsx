@@ -39,6 +39,9 @@ const schedule = (id: number, title: string): Schedule => ({
   itemCount: 7,
   currentEndDate: '2026-03-08',
   delayDays: 0,
+  completedCount: 0,
+  completedMinutes: 0,
+  progressPercent: 0,
 });
 const detailOf = (item: Schedule): ScheduleDetail => ({
   schedule: item,
@@ -506,6 +509,50 @@ describe('adjusting the days', () => {
     ]).toEqual(['3월 2일 (월) 1번째', '3월 2일 (월) 2번째', '3월 3일 (화)']);
   });
 
+  test('progress is shown as a bar with the time and days done', async () => {
+    const going = {
+      ...schedule(1, '지난 일정'),
+      completedCount: 2,
+      completedMinutes: 300,
+      progressPercent: 25,
+    };
+    fakeApi(({ path }) => {
+      if (path === '/api/textbooks') return { body: { textbooks: [] } };
+      if (path === '/api/schedules') return { body: { schedules: [going] } };
+      return { body: detailOf(going) };
+    });
+    await opened();
+    const bar = dayCard().getByRole('progressbar', { name: '일정 진행률' });
+    expect(bar).toHaveAttribute('aria-valuenow', '25');
+    expect(bar.firstElementChild).toHaveStyle({ width: '25%' });
+    expect(dayCard().getByText('25%')).toBeInTheDocument();
+    expect(dayCard().getByText(/5시간 \/ 20시간 · 2 \/ 7일/)).toBeInTheDocument();
+    expect(list().getByRole('button', { name: '지난 일정' }).closest('li')).toHaveTextContent(
+      '진행 25%',
+    );
+  });
+
+  test('completing a day raises the progress shown', async () => {
+    const before = schedule(1, '지난 일정');
+    const after = { ...before, completedCount: 1, completedMinutes: 120, progressPercent: 10 };
+    let current = before;
+    fakeApi(({ method, path }) => {
+      if (path === '/api/textbooks') return { body: { textbooks: [] } };
+      if (path === '/api/schedules') return { body: { schedules: [current] } };
+      if (method === 'GET') return { body: detailOf(current) };
+      current = after;
+      return { body: detailOf(after) };
+    });
+    await opened();
+    fireEvent.click(days().getByRole('checkbox', { name: '3월 2일 (월) 완료' }));
+    await waitFor(() =>
+      expect(dayCard().getByRole('progressbar', { name: '일정 진행률' })).toHaveAttribute(
+        'aria-valuenow',
+        '10',
+      ),
+    );
+  });
+
   test('a delay is shown with the end first chosen', async () => {
     const late = {
       ...schedule(1, '지난 일정'),
@@ -623,7 +670,7 @@ test('the first in the list opens, another opens when picked, and today is marke
   render(<Schedules today={today} />);
   await screen.findByRole('heading', { level: 2, name: '새 일정' });
   const firstRow = list().getByRole('button', { name: '새 일정' }).closest('li')!;
-  expect(firstRow).toHaveTextContent('2026-03-02 ~ 2026-03-08 · 목표 20시간 · 7일');
+  expect(firstRow).toHaveTextContent('2026-03-02 ~ 2026-03-08 · 진행 0% · 목표 20시간 · 7일');
   const row = days().getByText('3월 2일 (월)').closest('li');
   expect(row).toHaveAttribute('aria-current', 'date');
   expect(days().getByText('3월 7일 (토)').closest('li')).not.toHaveAttribute('aria-current');
