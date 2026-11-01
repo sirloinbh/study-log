@@ -13,6 +13,7 @@ import {
   questionText,
 } from './exercise';
 import { ExerciseTranslation } from './exercise-translation';
+import { ButtonSpinner, Loading } from './loading';
 import { type ContentNode, contentOptions, type Textbook } from './textbook';
 
 // The API's answer for a chapter that does not exist (or belongs to another textbook).
@@ -64,7 +65,7 @@ export function Exercises({
   const [translating, setTranslating] = useState<{ contentId: number; id: number }>();
   const [notice, setNotice] = useState<Notice>(undefined);
   // One request at a time, including the reload after a change, like the contents card.
-  const { busy, begin, end } = useBusy();
+  const { busy, action, nameNext, begin, end } = useBusy();
   // The element to focus once the controls are enabled again: the body after an add, or along
   // the delete flow the confirm button, the delete button, or the card heading (#86).
   const [wantFocus, setWantFocus] = useState<string>();
@@ -207,6 +208,7 @@ export function Exercises({
   const save = (event: { preventDefault(): void }) => {
     event.preventDefault();
     if (!open) return;
+    nameNext('save');
     void run(async () => {
       if (open.id === undefined) {
         await requestJson(url, { method: 'POST', body: open.form });
@@ -283,6 +285,7 @@ export function Exercises({
     if (panel?.draft === undefined) return;
     const draft = panel.draft;
     const path = `/api/exercises/${panel.id}/answer`;
+    nameNext('answer');
     void run(async () => {
       let body: string | null;
       if (draft.trim()) {
@@ -358,7 +361,7 @@ export function Exercises({
       {treeFailed ? (
         <p className="status">목차를 불러오지 못해 단원을 고를 수 없습니다</p>
       ) : tree === undefined ? (
-        <p className="status">목차를 불러오는 중…</p>
+        <Loading label="목차를 불러오는 중" kind="text" />
       ) : options.length === 0 ? (
         <p className="status">목차를 먼저 추가하면 장·절별로 문제를 입력할 수 있습니다</p>
       ) : (
@@ -413,6 +416,7 @@ export function Exercises({
               </label>
               <div className="actions wide">
                 <button type="submit" className="primary" disabled={busy}>
+                  <ButtonSpinner when={action === 'save'} />
                   {open.id === undefined ? '추가' : '수정 저장'}
                 </button>
                 <button
@@ -448,7 +452,7 @@ export function Exercises({
       )}
       {contentId !== undefined &&
         (exercises === undefined ? (
-          !error && <p className="status">불러오는 중…</p>
+          !error && <Loading label="연습문제를 불러오는 중" />
         ) : exercises.length === 0 ? (
           <p className="status">이 단원에 입력한 문제가 없습니다</p>
         ) : (
@@ -485,6 +489,7 @@ export function Exercises({
                           <p className="wide status">비워 두고 저장하면 정답을 지웁니다</p>
                           <div className="actions wide">
                             <button type="submit" className="primary" disabled={busy}>
+                              <ButtonSpinner when={action === 'answer'} />
                               정답 저장
                             </button>
                             <button
@@ -504,7 +509,7 @@ export function Exercises({
                           정답을 불러오지 못했습니다: {answerShown.error}
                         </p>
                       ) : answerShown.body === undefined ? (
-                        <p className="status">정답을 불러오는 중…</p>
+                        <Loading label="정답을 불러오는 중" kind="text" />
                       ) : (
                         <>
                           <p className="answer-label">정답</p>
@@ -537,8 +542,12 @@ export function Exercises({
                           className="danger"
                           disabled={busy}
                           aria-label={`${label} 삭제 확인`}
-                          onClick={() => void remove(exercise)}
+                          onClick={() => {
+                            nameNext('delete');
+                            void remove(exercise);
+                          }}
                         >
+                          <ButtonSpinner when={action === 'delete'} />
                           삭제 확인
                         </button>
                         <button

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 
 import { type RequestError, requestJson } from './api';
+import { Loading } from './loading';
 import { Memo } from './memo';
 import {
   calendarCells,
@@ -108,11 +109,7 @@ export function Calendar({ today, reloadKey }: { today: string; reloadKey?: numb
         </p>
       )}
       {!days ? (
-        !error && (
-          <p role="status" className="status">
-            불러오는 중…
-          </p>
-        )
+        !error && <Loading label="달력을 불러오는 중" kind="text" />
       ) : (
         <div className="calendar-grid">
           {weekdays.map((name) => (
@@ -152,7 +149,7 @@ export function Calendar({ today, reloadKey }: { today: string; reloadKey?: numb
             일지를 불러오지 못했습니다: {logsError}
           </p>
         ) : logs === undefined ? (
-          <p className="status">불러오는 중…</p>
+          <Loading label="일지를 불러오는 중" />
         ) : logs.length === 0 ? (
           <p className="status">이 날짜의 기록이 없습니다</p>
         ) : (

@@ -4,6 +4,7 @@ import { type RequestError, requestJson } from './api';
 import { useBusy } from './busy';
 import { Exercises } from './exercises';
 import { ImportantExercises } from './important-exercises';
+import { ButtonSpinner, Loading } from './loading';
 import {
   type ContentNode,
   emptyTextbookForm,
@@ -28,7 +29,7 @@ export function Textbooks() {
   const [loadError, setLoadError] = useState<string | undefined>(undefined);
   const [notice, setNotice] = useState<Notice>(undefined);
   // One request at a time: fields and action buttons are disabled while a save or delete is pending.
-  const { busy, begin, end } = useBusy();
+  const { busy, action, nameNext, begin, end } = useBusy();
   const [selectedId, setSelectedId] = useState<number | undefined>(undefined);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [reload, setReload] = useState(0);
@@ -97,6 +98,7 @@ export function Textbooks() {
 
   const save = async (event: { preventDefault(): void }) => {
     event.preventDefault();
+    nameNext('save');
     if (!begin()) return;
     try {
       const data = await requestJson<{ textbook: Textbook }>(
@@ -138,6 +140,7 @@ export function Textbooks() {
   };
 
   const remove = async (id: number) => {
+    nameNext('delete');
     if (!begin()) return;
     try {
       await requestJson(`/api/textbooks/${id}`, { method: 'DELETE' });
@@ -192,6 +195,7 @@ export function Textbooks() {
           </label>
           <div className="actions wide">
             <button type="submit" className="primary" disabled={busy}>
+              <ButtonSpinner when={action === 'save'} />
               {editingId === undefined ? '등록' : '수정 저장'}
             </button>
             {editingId !== undefined && (
@@ -222,7 +226,7 @@ export function Textbooks() {
             </p>
           )}
           {books === undefined ? (
-            !loadError && <p className="status">불러오는 중…</p>
+            !loadError && <Loading label="교재를 불러오는 중" />
           ) : books.length === 0 ? (
             <p className="status">아직 등록한 교재가 없습니다</p>
           ) : (
@@ -274,6 +278,7 @@ export function Textbooks() {
                       aria-label={`${selected.title} 교재 삭제 확인`}
                       onClick={() => void remove(selected.id)}
                     >
+                      <ButtonSpinner when={action === 'delete'} />
                       삭제 확인
                     </button>
                     <button

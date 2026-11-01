@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 
 import { type RequestError, requestJson } from './api';
+import { Loading } from './loading';
 import { formatMinutes } from './study-logs-data';
 import { type DayMinutes, heatBands, heatLevel, heatWeeks, monthLabel } from './study-stats';
 
@@ -43,9 +44,7 @@ export function Heatmap() {
           히트맵을 불러오지 못했습니다: {error}
         </p>
       ) : !data ? (
-        <p role="status" className="status">
-          불러오는 중…
-        </p>
+        <Loading label="히트맵을 불러오는 중" kind="text" />
       ) : (
         <>
           <p className="status">

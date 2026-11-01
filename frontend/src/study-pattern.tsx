@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 
 import { type RequestError, requestJson } from './api';
+import { Loading } from './loading';
 import { formatMinutes } from './study-logs-data';
 import { barWidth, hourLabel, type StudyPattern as Pattern, weekdayNames } from './study-stats';
 
@@ -48,7 +49,7 @@ export function StudyPattern({
           학습 패턴을 불러오지 못했습니다: {failed}
         </p>
       ) : !pattern ? (
-        <p className="status">불러오는 중…</p>
+        <Loading label="학습 패턴을 불러오는 중" kind="text" />
       ) : pattern.topHour === null || pattern.topWeekday === null ? (
         <p className="status">이 기간에는 학습 기록이 없어 패턴을 볼 수 없습니다</p>
       ) : (

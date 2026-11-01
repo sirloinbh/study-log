@@ -10,6 +10,7 @@ import {
   type KeywordSearch,
   searchPath,
 } from './keyword';
+import { ButtonSpinner, Loading } from './loading';
 
 type Notice = { kind: 'status' | 'alert'; text: string } | undefined;
 
@@ -28,7 +29,7 @@ export function Keywords({ today }: { today: string }) {
   const [deletingId, setDeletingId] = useState<number>();
   const [notice, setNotice] = useState<Notice>(undefined);
   // One change at a time, including the reloads after it.
-  const { busy, begin, end } = useBusy();
+  const { busy, action, nameNext, begin, end } = useBusy();
   // The element to focus once the change is done and the controls are enabled again.
   const [wantFocus, setWantFocus] = useState<string>();
   const [search, setSearch] = useState<KeywordSearch>({ q: '', from: '', to: '' });
@@ -117,6 +118,7 @@ export function Keywords({ today }: { today: string }) {
 
   const add = (event: { preventDefault(): void }) => {
     event.preventDefault();
+    nameNext('add');
     void run(async () => {
       await requestJson('/api/keywords', { method: 'POST', body: { date, ...form } });
       setForm(emptyKeywordForm());
@@ -128,6 +130,7 @@ export function Keywords({ today }: { today: string }) {
   const save = (event: { preventDefault(): void }) => {
     event.preventDefault();
     if (!editor) return;
+    nameNext('save');
     void run(async () => {
       await requestJson(`/api/keywords/${editor.id}`, {
         method: 'PUT',
@@ -164,6 +167,7 @@ export function Keywords({ today }: { today: string }) {
 
   const find = (event: { preventDefault(): void }) => {
     event.preventDefault();
+    nameNext('search');
     if (!begin()) return;
     void runSearch(searchPath(search)).finally(end);
   };
@@ -220,6 +224,7 @@ export function Keywords({ today }: { today: string }) {
           </label>
           <div className="actions wide">
             <button type="submit" className="primary" disabled={busy}>
+              <ButtonSpinner when={action === 'add'} />
               추가
             </button>
             {date !== today && (
@@ -254,7 +259,7 @@ export function Keywords({ today }: { today: string }) {
             키워드를 불러오지 못했습니다: {error}
           </p>
         ) : keywords === undefined ? (
-          <p className="status">불러오는 중…</p>
+          <Loading label="키워드를 불러오는 중" />
         ) : keywords.length === 0 ? (
           <p className="status">이 날짜에 남긴 키워드가 없습니다</p>
         ) : (
@@ -294,6 +299,7 @@ export function Keywords({ today }: { today: string }) {
                     </label>
                     <div className="actions wide">
                       <button type="submit" className="primary" disabled={busy}>
+                        <ButtonSpinner when={action === 'save'} />
                         수정 저장
                       </button>
                       <button
@@ -325,8 +331,12 @@ export function Keywords({ today }: { today: string }) {
                           id={`keyword-delete-confirm-${keyword.id}`}
                           disabled={busy}
                           aria-label={`${keyword.keyword} 삭제 확인`}
-                          onClick={() => void remove(keyword)}
+                          onClick={() => {
+                            nameNext('delete');
+                            void remove(keyword);
+                          }}
                         >
+                          <ButtonSpinner when={action === 'delete'} />
                           삭제 확인
                         </button>
                         <button
@@ -421,6 +431,7 @@ export function Keywords({ today }: { today: string }) {
           </label>
           <div className="actions wide">
             <button type="submit" className="primary" disabled={busy}>
+              <ButtonSpinner when={action === 'search'} />
               검색
             </button>
           </div>

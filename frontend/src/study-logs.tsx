@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { type RequestError, requestJson } from './api';
 import { useBusy } from './busy';
 import { Calendar } from './calendar';
+import { ButtonSpinner, Loading } from './loading';
 import { Memo } from './memo';
 import { StudyLogSearch } from './study-log-search';
 import {
@@ -38,7 +39,7 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
   const [loadError, setLoadError] = useState<string | undefined>(undefined);
   const [notice, setNotice] = useState<Notice>(undefined);
   // One request at a time: fields and action buttons are disabled while a save or delete is pending.
-  const { busy, begin, end } = useBusy();
+  const { busy, action, nameNext, begin, end } = useBusy();
   const [deletingId, setDeletingId] = useState<number | undefined>(undefined);
   const [reload, setReload] = useState(0);
 
@@ -148,6 +149,7 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
 
   const save = async (event: { preventDefault(): void }) => {
     event.preventDefault();
+    nameNext('save');
     if (!begin()) return;
     try {
       await requestJson(
@@ -196,6 +198,7 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
   };
 
   const remove = async (id: number) => {
+    nameNext('delete');
     if (!begin()) return;
     try {
       await requestJson(`/api/study-logs/${id}`, { method: 'DELETE' });
@@ -363,6 +366,7 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
           </p>
           <div className="actions wide">
             <button type="submit" className="primary" disabled={busy}>
+              <ButtonSpinner when={action === 'save'} />
               {editingId === undefined ? '저장' : '수정 저장'}
             </button>
             {editingId !== undefined && (
@@ -392,7 +396,7 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
           </p>
         )}
         {logs === undefined ? (
-          !loadError && <p className="status">불러오는 중…</p>
+          !loadError && <Loading label="최근 기록을 불러오는 중" />
         ) : logs.length === 0 ? (
           <p className="status">아직 학습 기록이 없습니다</p>
         ) : (
@@ -423,6 +427,7 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
                         aria-label={`${describe(log)} 기록 삭제 확인`}
                         onClick={() => void remove(log.id)}
                       >
+                        <ButtonSpinner when={action === 'delete'} />
                         삭제 확인
                       </button>
                       <button
