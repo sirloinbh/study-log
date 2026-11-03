@@ -868,3 +868,100 @@ test('a slow answer for the schedule left behind is not shown', async () => {
   expect(screen.getByRole('heading', { level: 2, name: '지난 일정' })).toBeInTheDocument();
   expect(screen.queryByRole('heading', { level: 2, name: '새 일정' })).toBeNull();
 });
+
+describe('renaming a schedule (#179)', () => {
+  // The name the server holds, and the answer to a rename when it is not a success.
+  const renamable = (refusal?: { status: number; body: object }) => {
+    let current = schedule(1, '지난 일정');
+    return fakeApi(({ method, path, body }) => {
+      if (path === '/api/textbooks') return { body: { textbooks: [] } };
+      if (path === '/api/schedules') return { body: { schedules: [current] } };
+      if (method === 'GET') return { body: detailOf(current) };
+      if (refusal) return refusal;
+      current = { ...current, title: (body as { title: string }).title.trim() };
+      return { body: detailOf(current) };
+    });
+  };
+  const opened = async () => {
+    render(<Schedules today={today} />);
+    await screen.findByRole('heading', { level: 2, name: '지난 일정' });
+  };
+  const dayCard = () => within(screen.getByRole('region', { name: '날짜별 일정' }));
+  const startRenaming = async () => {
+    fireEvent.click(dayCard().getByRole('button', { name: '지난 일정 이름 수정' }));
+    const input = dayCard().getByLabelText('일정 이름');
+    await waitFor(() => expect(input).toHaveFocus());
+    return input;
+  };
+  const save = () => fireEvent.click(dayCard().getByRole('button', { name: '이름 저장' }));
+
+  test('a new name is saved and shown in the heading and the list', async () => {
+    const sent = renamable();
+    await opened();
+    const input = await startRenaming();
+    expect(input).toHaveValue('지난 일정');
+    fireEvent.change(input, { target: { value: '  선형대수 복습  ' } });
+    save();
+    await dayCard().findByText('일정 이름을 바꿨습니다');
+    expect(sent).toEqual([
+      { method: 'PUT', path: '/api/schedules/1', body: { title: '  선형대수 복습  ' } },
+    ]);
+    const heading = screen.getByRole('heading', { level: 2, name: '선형대수 복습' });
+    await waitFor(() => expect(heading).toHaveFocus());
+    expect(list().getByRole('button', { name: '선형대수 복습' })).toBeInTheDocument();
+    expect(dayCard().queryByLabelText('일정 이름')).toBeNull();
+  });
+
+  test('cancelling sends nothing and goes back to the button', async () => {
+    const sent = renamable();
+    await opened();
+    const input = await startRenaming();
+    fireEvent.change(input, { target: { value: '다른 이름' } });
+    fireEvent.click(dayCard().getByRole('button', { name: '취소' }));
+    expect(dayCard().queryByLabelText('일정 이름')).toBeNull();
+    expect(screen.getByRole('heading', { level: 2, name: '지난 일정' })).toBeInTheDocument();
+    await waitFor(() =>
+      expect(dayCard().getByRole('button', { name: '지난 일정 이름 수정' })).toHaveFocus(),
+    );
+    expect(sent).toEqual([]);
+  });
+
+  test('a blank name is refused before asking the server', async () => {
+    const sent = renamable();
+    await opened();
+    const input = await startRenaming();
+    fireEvent.change(input, { target: { value: '   ' } });
+    save();
+    expect(await dayCard().findByRole('alert')).toHaveTextContent('일정 이름을 입력하세요');
+    expect(sent).toEqual([]);
+    // Typing again takes the message back.
+    fireEvent.change(input, { target: { value: '새 이름' } });
+    expect(dayCard().queryByRole('alert')).toBeNull();
+  });
+
+  test('a refusal is said beside the name, which stays open to fix', async () => {
+    renamable({ status: 400, body: { error: '일정 이름 길이는 200자 이하여야 합니다' } });
+    await opened();
+    const input = await startRenaming();
+    fireEvent.change(input, { target: { value: '새 이름' } });
+    save();
+    expect(await dayCard().findByRole('alert')).toHaveTextContent(
+      '일정 이름 길이는 200자 이하여야 합니다',
+    );
+    await waitFor(() => expect(dayCard().getByLabelText('일정 이름')).toHaveFocus());
+    expect(dayCard().getByLabelText('일정 이름')).toHaveValue('새 이름');
+  });
+
+  test('a schedule deleted elsewhere is said in the list', async () => {
+    renamable({ status: 404, body: { error: '일정을 찾을 수 없습니다' } });
+    await opened();
+    const input = await startRenaming();
+    fireEvent.change(input, { target: { value: '새 이름' } });
+    save();
+    expect(await list().findByRole('alert')).toHaveTextContent('일정을 찾을 수 없습니다');
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { level: 2, name: '내 일정' })).toHaveFocus(),
+    );
+    expect(screen.queryByLabelText('일정 이름', { selector: '#schedule-rename-input' })).toBeNull();
+  });
+});
