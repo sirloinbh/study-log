@@ -870,16 +870,33 @@ test('a slow answer for the schedule left behind is not shown', async () => {
 });
 
 describe('renaming a schedule (#179)', () => {
-  // The name the server holds, and the answer to a rename when it is not a success.
-  const renamable = (refusal?: { status: number; body: object }) => {
-    let current = schedule(1, '지난 일정');
+  // The names the server holds. `refusal` answers a rename that is not a success; after one is
+  // saved the list cannot be read again when `listFailsAfter` is set.
+  const renamable = ({
+    refusal,
+    listFailsAfter = false,
+    rows = [schedule(1, '지난 일정')],
+  }: {
+    refusal?: { status: number; body: object };
+    listFailsAfter?: boolean;
+    rows?: Schedule[];
+  } = {}) => {
+    let current = rows;
+    let saved = false;
     return fakeApi(({ method, path, body }) => {
       if (path === '/api/textbooks') return { body: { textbooks: [] } };
-      if (path === '/api/schedules') return { body: { schedules: [current] } };
-      if (method === 'GET') return { body: detailOf(current) };
+      if (path === '/api/schedules')
+        return saved && listFailsAfter
+          ? { status: 500, body: { error: '서버 오류' } }
+          : { body: { schedules: current } };
+      const id = Number(path.split('/')[3]);
+      const found = current.find((item) => item.id === id)!;
+      if (method === 'GET') return { body: detailOf(found) };
       if (refusal) return refusal;
-      current = { ...current, title: (body as { title: string }).title.trim() };
-      return { body: detailOf(current) };
+      const renamed = { ...found, title: (body as { title: string }).title.trim() };
+      current = current.map((item) => (item.id === id ? renamed : item));
+      saved = true;
+      return { body: detailOf(renamed) };
     });
   };
   const opened = async () => {
@@ -889,11 +906,12 @@ describe('renaming a schedule (#179)', () => {
   const dayCard = () => within(screen.getByRole('region', { name: '날짜별 일정' }));
   const startRenaming = async () => {
     fireEvent.click(dayCard().getByRole('button', { name: '지난 일정 이름 수정' }));
-    const input = dayCard().getByLabelText('일정 이름');
+    const input = dayCard().getByLabelText('새 일정 이름');
     await waitFor(() => expect(input).toHaveFocus());
     return input;
   };
   const save = () => fireEvent.click(dayCard().getByRole('button', { name: '이름 저장' }));
+  const renameForm = () => within(screen.getByRole('form', { name: '일정 이름 수정' }));
 
   test('a new name is saved and shown in the heading and the list', async () => {
     const sent = renamable();
@@ -909,7 +927,17 @@ describe('renaming a schedule (#179)', () => {
     const heading = screen.getByRole('heading', { level: 2, name: '선형대수 복습' });
     await waitFor(() => expect(heading).toHaveFocus());
     expect(list().getByRole('button', { name: '선형대수 복습' })).toBeInTheDocument();
-    expect(dayCard().queryByLabelText('일정 이름')).toBeNull();
+    expect(dayCard().queryByLabelText('새 일정 이름')).toBeNull();
+  });
+
+  test('the list shows the new name even when it cannot be read again', async () => {
+    renamable({ listFailsAfter: true });
+    await opened();
+    fireEvent.change(await startRenaming(), { target: { value: '새 이름' } });
+    save();
+    await dayCard().findByText('일정 이름을 바꿨습니다');
+    expect(await list().findByRole('alert')).toHaveTextContent('일정을 불러오지 못했습니다');
+    expect(list().getByRole('button', { name: '새 이름' })).toBeInTheDocument();
   });
 
   test('cancelling sends nothing and goes back to the button', async () => {
@@ -917,8 +945,8 @@ describe('renaming a schedule (#179)', () => {
     await opened();
     const input = await startRenaming();
     fireEvent.change(input, { target: { value: '다른 이름' } });
-    fireEvent.click(dayCard().getByRole('button', { name: '취소' }));
-    expect(dayCard().queryByLabelText('일정 이름')).toBeNull();
+    fireEvent.click(dayCard().getByRole('button', { name: '이름 수정 취소' }));
+    expect(dayCard().queryByLabelText('새 일정 이름')).toBeNull();
     expect(screen.getByRole('heading', { level: 2, name: '지난 일정' })).toBeInTheDocument();
     await waitFor(() =>
       expect(dayCard().getByRole('button', { name: '지난 일정 이름 수정' })).toHaveFocus(),
@@ -926,42 +954,87 @@ describe('renaming a schedule (#179)', () => {
     expect(sent).toEqual([]);
   });
 
-  test('a blank name is refused before asking the server', async () => {
+  test('a blank or too long name is said under it, before asking the server', async () => {
     const sent = renamable();
     await opened();
     const input = await startRenaming();
     fireEvent.change(input, { target: { value: '   ' } });
     save();
-    expect(await dayCard().findByRole('alert')).toHaveTextContent('일정 이름을 입력하세요');
-    expect(sent).toEqual([]);
+    expect(await renameForm().findByRole('alert')).toHaveTextContent('일정 이름을 입력하세요');
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    expect(input).toHaveAccessibleDescription('일정 이름을 입력하세요');
     // Typing again takes the message back.
     fireEvent.change(input, { target: { value: '새 이름' } });
-    expect(dayCard().queryByRole('alert')).toBeNull();
+    expect(renameForm().queryByRole('alert')).toBeNull();
+    expect(input).not.toHaveAttribute('aria-invalid');
+
+    // Nothing is cut: 201 characters are said to be too many.
+    const long = '가'.repeat(201);
+    fireEvent.change(input, { target: { value: long } });
+    expect(input).toHaveValue(long);
+    save();
+    expect(await renameForm().findByRole('alert')).toHaveTextContent(
+      '일정 이름 길이는 200자 이하여야 합니다',
+    );
+    expect(sent).toEqual([]);
+    // Counted without the spaces around it, as the server does.
+    fireEvent.change(input, { target: { value: ' ' + '가'.repeat(200) + ' ' } });
+    save();
+    await dayCard().findByText('일정 이름을 바꿨습니다');
+    expect(sent).toHaveLength(1);
   });
 
-  test('a refusal is said beside the name, which stays open to fix', async () => {
-    renamable({ status: 400, body: { error: '일정 이름 길이는 200자 이하여야 합니다' } });
+  test('a refusal is said under the name, which stays open to fix', async () => {
+    renamable({ refusal: { status: 400, body: { error: '일정 이름 형식이 올바르지 않습니다' } } });
     await opened();
     const input = await startRenaming();
     fireEvent.change(input, { target: { value: '새 이름' } });
     save();
-    expect(await dayCard().findByRole('alert')).toHaveTextContent(
-      '일정 이름 길이는 200자 이하여야 합니다',
+    expect(await renameForm().findByRole('alert')).toHaveTextContent(
+      '일정 이름 형식이 올바르지 않습니다',
     );
-    await waitFor(() => expect(dayCard().getByLabelText('일정 이름')).toHaveFocus());
-    expect(dayCard().getByLabelText('일정 이름')).toHaveValue('새 이름');
+    await waitFor(() => expect(dayCard().getByLabelText('새 일정 이름')).toHaveFocus());
+    expect(dayCard().getByLabelText('새 일정 이름')).toHaveValue('새 이름');
   });
 
   test('a schedule deleted elsewhere is said in the list', async () => {
-    renamable({ status: 404, body: { error: '일정을 찾을 수 없습니다' } });
+    renamable({ refusal: { status: 404, body: { error: '일정을 찾을 수 없습니다' } } });
     await opened();
-    const input = await startRenaming();
-    fireEvent.change(input, { target: { value: '새 이름' } });
+    fireEvent.change(await startRenaming(), { target: { value: '새 이름' } });
     save();
     expect(await list().findByRole('alert')).toHaveTextContent('일정을 찾을 수 없습니다');
     await waitFor(() =>
       expect(screen.getByRole('heading', { level: 2, name: '내 일정' })).toHaveFocus(),
     );
-    expect(screen.queryByLabelText('일정 이름', { selector: '#schedule-rename-input' })).toBeNull();
+    expect(screen.queryByLabelText('새 일정 이름')).toBeNull();
+  });
+
+  test('picking another schedule closes the renaming', async () => {
+    renamable({ rows: [schedule(1, '지난 일정'), schedule(2, '다른 일정')] });
+    await opened();
+    await startRenaming();
+    fireEvent.click(list().getByRole('button', { name: '다른 일정' }));
+    await screen.findByRole('heading', { level: 2, name: '다른 일정' });
+    expect(screen.queryByLabelText('새 일정 이름')).toBeNull();
+    // Coming back, it is closed too.
+    fireEvent.click(list().getByRole('button', { name: '지난 일정' }));
+    await screen.findByRole('heading', { level: 2, name: '지난 일정' });
+    expect(screen.queryByLabelText('새 일정 이름')).toBeNull();
+  });
+
+  test('a day can be moved while renaming, and each keeps its own cancel', async () => {
+    renamable();
+    await opened();
+    const input = await startRenaming();
+    fireEvent.change(input, { target: { value: '   ' } });
+    save();
+    await renameForm().findByRole('alert');
+    fireEvent.click(days().getByRole('button', { name: '3월 7일 (토) 옮기기' }));
+    // What was said about the name stays with it.
+    expect(renameForm().getByRole('alert')).toHaveTextContent('일정 이름을 입력하세요');
+    expect(dayCard().getAllByRole('button', { name: '취소' })).toHaveLength(1);
+    fireEvent.click(dayCard().getByRole('button', { name: '취소' }));
+    expect(days().queryByLabelText('옮길 날짜')).toBeNull();
+    expect(dayCard().getByLabelText('새 일정 이름')).toBeInTheDocument();
   });
 });

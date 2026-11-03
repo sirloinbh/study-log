@@ -20,6 +20,8 @@ type Notice = { kind: 'status' | 'alert'; text: string } | undefined;
 // Study schedules (#35): a form that makes one from a period and daily hours, the schedules there
 // are, and the days of the one picked. A schedule's period and hours do not change once it is made
 // (docs/decisions/schedule-rules.md 6장), so this offers deleting rather than editing them.
+type Renaming = { id: number; title: string; error?: string };
+
 export function Schedules({ today }: { today: string }) {
   const [title, setTitle] = useState('');
   const [startDate, setStartDate] = useState(today);
@@ -46,8 +48,8 @@ export function Schedules({ today }: { today: string }) {
   const [confirming, setConfirming] = useState<number>();
   // The day being moved, and where to.
   const [moving, setMoving] = useState<{ id: number; date: string; withLater: boolean }>();
-  // The schedule whose name is being changed, and the name typed (#179).
-  const [renaming, setRenaming] = useState<{ id: number; title: string }>();
+  // The schedule whose name is being changed, the name typed and why it was refused (#179).
+  const [renaming, setRenaming] = useState<Renaming>();
   const [dayNotice, setDayNotice] = useState<Notice>(undefined);
   // Each next to the buttons that lead to it: the list can be scrolled far below the form.
   const [notice, setNotice] = useState<Notice>(undefined);
@@ -275,18 +277,22 @@ export function Schedules({ today }: { today: string }) {
     }
   };
 
-  // Only the name changes after creating (docs/decisions/schedule-rules.md 6장, #179).
-  const rename = async (target: { id: number; title: string }) => {
-    if (!target.title.trim()) {
-      setDayNotice({ kind: 'alert', text: '일정 이름을 입력하세요' });
+  // Only the name changes after creating (docs/decisions/schedule-rules.md 6장, #179). The same
+  // checks as the server's, which also trims, so a long name is said rather than cut.
+  const rename = async (target: Renaming) => {
+    const refuse = (error: string) => {
+      setRenaming({ ...target, error });
       setWantFocus('schedule-rename-input');
-      return;
-    }
+    };
+    const trimmed = target.title.trim();
+    if (!trimmed) return refuse('일정 이름을 입력하세요');
+    if (trimmed.length > 200) return refuse('일정 이름 길이는 200자 이하여야 합니다');
     nameNext('rename');
     if (!begin()) return;
     setNotice(undefined);
     setListNotice(undefined);
     setDayNotice(undefined);
+    setRenaming({ ...target, error: undefined });
     try {
       const data = await requestJson<ScheduleDetail>(`/api/schedules/${target.id}`, {
         method: 'PUT',
@@ -309,10 +315,7 @@ export function Schedules({ today }: { today: string }) {
         setRenaming(undefined);
         setListNotice({ kind: 'alert', text: message });
         setWantFocus('schedules-heading');
-      } else {
-        setDayNotice({ kind: 'alert', text: message });
-        setWantFocus('schedule-rename-input');
-      }
+      } else refuse(message);
     } finally {
       setReload((count) => count + 1);
       end();
@@ -593,16 +596,17 @@ export function Schedules({ today }: { today: string }) {
                   }}
                 >
                   <label>
-                    일정 이름
+                    새 일정 이름
                     <input
                       id="schedule-rename-input"
                       required
-                      maxLength={200}
                       disabled={busy}
                       value={renaming.title}
+                      aria-invalid={renaming.error ? 'true' : undefined}
+                      aria-describedby={renaming.error ? 'schedule-rename-error' : undefined}
                       onChange={(event) => {
                         setDayNotice(undefined);
-                        setRenaming({ ...renaming, title: event.target.value });
+                        setRenaming({ ...renaming, title: event.target.value, error: undefined });
                       }}
                     />
                   </label>
@@ -614,6 +618,7 @@ export function Schedules({ today }: { today: string }) {
                     <button
                       type="button"
                       className="secondary"
+                      aria-label="이름 수정 취소"
                       disabled={busy}
                       onClick={() => {
                         setDayNotice(undefined);
@@ -624,6 +629,12 @@ export function Schedules({ today }: { today: string }) {
                       취소
                     </button>
                   </div>
+                  {/* Right under the name, apart from what the days say. */}
+                  {renaming.error && (
+                    <p id="schedule-rename-error" role="alert" className="error">
+                      {renaming.error}
+                    </p>
+                  )}
                 </form>
               ) : (
                 <div className="log-head">

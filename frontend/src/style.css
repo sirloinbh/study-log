@@ -704,6 +704,10 @@
   font-size: 12px;
   font-weight: 500;
 }
+.schedule-rename .error {
+  flex: 1 1 100%;
+  margin: 0;
+}
 .schedule-rename input {
   min-width: 0;
   border: 1px solid var(--border);
