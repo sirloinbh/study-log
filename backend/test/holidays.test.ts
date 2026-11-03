@@ -200,6 +200,25 @@ test('a count may come as digits, and a holiday in a month without fixed ones is
   );
 });
 
+test('a month answers at most as many rows as asked for', async () => {
+  // 삼일절 and days off that are not holidays, up to the 50 rows a request asks for.
+  const march = (rows: number) =>
+    page(
+      {
+        item: [
+          item(20260301, '삼일절'),
+          ...Array.from({ length: rows - 1 }, () => item(20260315, '평일', 'N')),
+        ],
+      },
+      rows,
+    );
+  const { urls, fetchImpl } = portal(year2026({ '03': march(50) }));
+  assert.equal((await dataPortalHolidays(fetchImpl)(2026)).length, 8);
+  assert.equal(new URL(urls[0] ?? '').searchParams.get('numOfRows'), '50');
+  // More than asked for is not an answer to the request.
+  await refused(year2026({ '03': march(51) }));
+});
+
 test('a reading without a fixed holiday is not complete', async () => {
   await refused(year2026({ '05': page('') }));
   await refused(year2026({ '12': page('') }));

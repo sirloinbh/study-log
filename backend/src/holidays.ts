@@ -27,6 +27,8 @@ export function dayKind(date: string, holidays: ReadonlySet<string>): DayKind {
 const endpoint = 'https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getRestDeInfo';
 // For all twelve requests of a year together: a schedule is waiting.
 const yearTimeout = 30_000;
+// Rows asked for in one month. No month has nearly this many, and an answer with more is refused.
+const rowsPerMonth = 50;
 const unreadable = '공휴일 정보를 읽지 못했습니다. 잠시 뒤 다시 시도하세요';
 
 // Holidays on fixed dates, in every year. A reading without one of them is not complete.
@@ -45,7 +47,10 @@ const answer = z.object({
   response: z.object({
     header: z.object({ resultCode: z.literal('00') }),
     body: z.object({
-      items: z.union([z.literal(''), z.object({ item: z.union([item, z.array(item).min(1)]) })]),
+      items: z.union([
+        z.literal(''),
+        z.object({ item: z.union([item, z.array(item).min(1).max(rowsPerMonth)]) }),
+      ]),
       // Not coerced: null, '' and false would all become 0, the count of an empty month.
       totalCount: z.union([z.number(), z.string().regex(/^\d+$/).transform(Number)]),
     }),
@@ -83,7 +88,7 @@ export function dataPortalHolidays(fetchImpl: typeof fetch = fetch): HolidayFetc
     const holidays: Holiday[] = [];
     for (let number = 1; number <= 12; number++) {
       const month = String(number).padStart(2, '0');
-      const query = `solYear=${year}&solMonth=${month}&numOfRows=50&_type=json`;
+      const query = `solYear=${year}&solMonth=${month}&numOfRows=${rowsPerMonth}&_type=json`;
       let body: unknown;
       try {
         const response = await fetchImpl(`${endpoint}?ServiceKey=${serviceKey}&${query}`, {
