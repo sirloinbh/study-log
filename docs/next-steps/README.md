@@ -45,7 +45,7 @@
 
 ## 로컬 환경 현황
 
-- **2026-11-03 확인: 아래 테스트 DB 설정이 사라졌다.** 사용자 환경변수 `TEST_DATABASE_URL`과 `%APPDATA%postgresqlpgpass.conf`가 없고, `postgresql-17` 서비스도 조회되지 않는다. 그래서 DB 통합 테스트 32개가 건너뛰어진다. 다시 설정할지, Docker의 테스트 DB로 옮길지 사용자에게 묻는다.
+- **2026-11-03 확인: 아래 테스트 DB 설정이 사라졌다.** 사용자 환경변수 `TEST_DATABASE_URL`과 `%APPDATA%\postgresql\pgpass.conf`가 없고, `postgresql-17` 서비스도 조회되지 않는다. 그래서 DB 통합 테스트 32개가 건너뛰어진다. 다시 설정할지, Docker의 테스트 DB로 옮길지 사용자에게 묻는다.
 
 - 네이티브 PostgreSQL 17.11: Windows 서비스 `postgresql-17`, 포트 5432, 자동 시작.
 - 테스트 전용 DB `study_test`(소유자 `study_test`)에 마이그레이션 001~018을 적용했다(2026-11-01 확인). 새 마이그레이션을 적용하기 전에는 그 테이블을 쓰는 통합 테스트가 실패한다.
