@@ -199,6 +199,21 @@ test('a schedule follows what was done and what fell behind', { skip: !url }, as
         await complete(ahead.schedule.id, ahead.items[1].id);
         const reopened = await reopen(ahead.schedule.id, ahead.items[1].id);
         assert.deepEqual(dates(reopened.data as unknown as Detail), ['8041-08-25', '8041-08-26']);
+        // Nothing to go back to for a day not yet past, or for today's (#165): completed later, it
+        // is done the day it is completed. Left open past 08-25, both are moved a day first.
+        today = '8041-08-25';
+        await complete(ahead.schedule.id, ahead.items[0].id);
+        await reopen(ahead.schedule.id, ahead.items[0].id);
+        today = '8041-08-26';
+        for (const item of ahead.items) await complete(ahead.schedule.id, item.id);
+        const done = await read(ahead.schedule.id);
+        assert.deepEqual(
+          done.items.map((item) => [item.date, item.completedOn]),
+          [
+            ['8041-08-26', '8041-08-26'],
+            ['8041-08-27', '8041-08-26'],
+          ],
+        );
       });
 
       await t.test('completing a day reopened from the past puts it back (#165)', async () => {
