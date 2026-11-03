@@ -194,3 +194,94 @@ test(
     );
   },
 );
+
+// #180. One textbook's logs only: dates in 2095, which no other test file uses, and a book of its
+// own, so the all-time total of the book holds only what is added here.
+test('study time can be narrowed to one textbook', { skip: !url }, async (t) => {
+  const pool = new Pool({ connectionString: url });
+  const books: number[] = [];
+  const cleanup = async () => {
+    await pool.query(
+      "DELETE FROM study_logs WHERE study_date BETWEEN '2095-01-01' AND '2095-12-31'",
+    );
+    if (books.length) await pool.query('DELETE FROM textbooks WHERE id = ANY($1)', [books]);
+  };
+  await holdExactTotalsLock(url, t, async () => {
+    await cleanup();
+    await pool.end();
+  });
+  await cleanup();
+  const today = '2095-08-17';
+
+  await withApi(
+    pool,
+    async (call) => {
+      const book = async (title: string) => {
+        const made = await call('/api/textbooks', { method: 'POST', body: { title } });
+        const id = (made.data.textbook as { id: number }).id;
+        books.push(id);
+        return id;
+      };
+      const first = await book('필터 교재');
+      const second = await book('다른 교재');
+      const empty = await book('기록 없는 교재');
+      const add = (studyDate: string, startTime: string, endTime: string, extra: object) =>
+        call('/api/study-logs', {
+          method: 'POST',
+          body: { studyDate, startTime, endTime, status: 'done', ...extra },
+        });
+      await add(today, '09:00', '10:00', { textbookId: first }); // 60
+      await add(today, '11:00', '11:30', { textbookId: first, studyType: 'review' }); // 30
+      await add('2095-08-15', '09:00', '09:20', { textbookId: first }); // 20, this week
+      await add(today, '13:00', '13:45', { textbookId: second }); // 45
+      await add(today, '15:00', '15:10', {}); // 10, no textbook
+      await add('2095-08-20', '09:00', '10:00', { textbookId: first }); // after today
+
+      type Narrowed = Stats & { textbookId: number | null; type: string };
+      const stats = async (query: string) => {
+        const answer = await call(`/api/stats/study-time?${query}`);
+        assert.equal(answer.status, 200, JSON.stringify(answer.data));
+        return answer.data as Narrowed;
+      };
+      const one = await stats(`period=week&textbookId=${first}`);
+      assert.deepEqual(
+        [one.textbookId, one.totalMinutes, one.todayMinutes, one.cumulativeMinutes, one.studyDays],
+        [first, 110, 90, 110, 2],
+      );
+      assert.equal(one.daily.at(-1)?.minutes, 90);
+      // Together with the study type.
+      const review = await stats(`period=week&type=review&textbookId=${first}`);
+      assert.deepEqual([review.totalMinutes, review.cumulativeMinutes], [30, 30]);
+      assert.equal((await stats(`period=week&textbookId=${second}`)).totalMinutes, 45);
+      // "All" starts at the book's first log, not at anyone's.
+      const all = await stats(`period=all&textbookId=${first}`);
+      assert.deepEqual([all.from, all.days, all.totalMinutes], ['2095-08-15', 3, 110]);
+      // A book with no logs is zeros, from today.
+      const none = await stats(`period=all&textbookId=${empty}`);
+      assert.deepEqual(
+        [
+          none.totalMinutes,
+          none.cumulativeMinutes,
+          none.from,
+          none.days,
+          none.averageMinutesPerDay,
+        ],
+        [0, 0, today, 1, 0],
+      );
+      // Without one, every log counts and the answer says so.
+      const everything = await stats('period=week');
+      assert.equal(everything.textbookId, null);
+      assert.equal(everything.daily.at(-1)?.minutes, 60 + 30 + 45 + 10);
+
+      const missing = await call('/api/stats/study-time?textbookId=999999999999');
+      assert.equal(missing.status, 404);
+      assert.match(String(missing.data.error), /교재를 찾을 수 없습니다/);
+      for (const wrong of ['0', 'abc', '1.5', '']) {
+        const refused = await call(`/api/stats/study-time?textbookId=${wrong}`);
+        assert.equal(refused.status, 400, wrong);
+        assert.match(String(refused.data.error), /교재 ID가 올바르지 않습니다/);
+      }
+    },
+    { today: () => today },
+  );
+});

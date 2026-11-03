@@ -14,11 +14,18 @@ const query = z.object({
     .default('week'),
 });
 
-// Study time can be narrowed to one kind of study (#52).
+const textbookIdParam = z
+  .string({ error: '교재 ID가 올바르지 않습니다' })
+  .regex(/^[1-9]\d{0,14}$/, '교재 ID가 올바르지 않습니다')
+  .transform(Number)
+  .optional();
+
+// Study time can be narrowed to one kind of study (#52) and to the logs of one textbook (#180).
 const studyTimeQuery = query.extend({
   type: z
     .enum(['all', ...studyTypes], { error: '학습 유형은 전체, 신규, 복습 중에서 고르세요' })
     .default('all'),
+  textbookId: textbookIdParam,
 });
 
 // Calendar arithmetic on YYYY-MM-DD strings in UTC, so no local time zone shifts a day.
@@ -74,12 +81,13 @@ export function bucket(daily: Day[], keyOf: (date: string) => string) {
 const counted = `status <> 'planned' AND study_date <= $1`;
 
 // Minutes studied on every day from `from` to `to`, a day without study as 0; only one kind of
-// study when `studyType` is given.
+// study when `studyType` is given, and only one textbook's logs when `textbookId` is.
 const dailyMinutes = async (
   pool: Pool,
   from: string,
   to: string,
   studyType: string | null = null,
+  textbookId: number | null = null,
 ) =>
   (
     await pool.query<Day>(
@@ -87,8 +95,9 @@ const dailyMinutes = async (
        FROM generate_series($2::date, $1::date, interval '1 day') AS day
        LEFT JOIN study_logs l ON l.study_date = day::date AND l.status <> 'planned'
          AND ($3::text IS NULL OR l.study_type = $3)
+         AND ($4::bigint IS NULL OR l.textbook_id = $4)
        GROUP BY day ORDER BY day`,
-      [to, from, studyType],
+      [to, from, studyType, textbookId],
     )
   ).rows;
 
@@ -153,39 +162,42 @@ const patternQuery = z
     error: '시작일은 종료일보다 늦을 수 없습니다',
   });
 
-const textbookQuery = z.object({
-  textbookId: z
-    .string({ error: '교재 ID가 올바르지 않습니다' })
-    .regex(/^[1-9]\d{0,14}$/, '교재 ID가 올바르지 않습니다')
-    .transform(Number)
-    .optional(),
-});
+const textbookQuery = z.object({ textbookId: textbookIdParam });
 
 // Whole percent rounded down, so nearly all is not shown as all; none when there is nothing to count.
 export const percentDown = (part: number, whole: number) =>
   whole ? Math.floor((part * 100) / whole) : null;
 
-// Study time statistics (#47): /api/stats/study-time?period=week|month|3months|all&type=all|new|review
+// Study time statistics (#47):
+// /api/stats/study-time?period=week|month|3months|all&type=all|new|review&textbookId=
 export function statsRoutes(pool: Pool, today: () => string) {
   const router = Router();
 
   router.get('/study-time', async (req, res) => {
-    const { period, type } = studyTimeQuery.parse(req.query);
+    const { period, type, textbookId } = studyTimeQuery.parse(req.query);
     const studyType = type === 'all' ? null : type;
+    const bookId = textbookId ?? null;
+    // A book with no logs shows zeros; one that does not exist is not that.
+    if (bookId !== null) {
+      const book = await pool.query('SELECT 1 FROM textbooks WHERE id = $1', [bookId]);
+      if (!book.rowCount) return void res.status(404).json({ error: '교재를 찾을 수 없습니다' });
+    }
     const to = today();
     const totals = await pool.query<{ first: string | null; cumulative: number }>(
       `SELECT min(study_date) AS first, COALESCE(sum(duration_minutes), 0)::int AS cumulative
-       FROM study_logs WHERE ${counted} AND ($2::text IS NULL OR study_type = $2)`,
-      [to, studyType],
+       FROM study_logs WHERE ${counted} AND ($2::text IS NULL OR study_type = $2)
+         AND ($3::bigint IS NULL OR textbook_id = $3)`,
+      [to, studyType, bookId],
     );
     const { first, cumulative } = totals.rows[0];
     const from = periodStart(period, to, first ?? undefined);
-    const daily = await dailyMinutes(pool, from, to, studyType);
+    const daily = await dailyMinutes(pool, from, to, studyType, bookId);
     const totalMinutes = daily.reduce((sum, day) => sum + day.minutes, 0);
     const studyDays = daily.filter((day) => day.minutes > 0).length;
     res.json({
       period,
       type,
+      textbookId: bookId,
       from,
       to,
       totalMinutes,

@@ -17,8 +17,11 @@ export const statStudyTypeLabels: Record<StatStudyType, string> = {
   review: '복습',
 };
 
-export const studyTimePath = (period: StatPeriod, type: StatStudyType) =>
-  `/api/stats/study-time?period=${period}${type === 'all' ? '' : `&type=${type}`}`;
+// `textbookId` '' for every log, or one textbook's (#180).
+export const studyTimePath = (period: StatPeriod, type: StatStudyType, textbookId = '') =>
+  `/api/stats/study-time?period=${period}${type === 'all' ? '' : `&type=${type}`}${
+    textbookId ? `&textbookId=${textbookId}` : ''
+  }`;
 
 // The response of GET /api/stats/study-time (#47).
 export type StudyTimeStats = {
