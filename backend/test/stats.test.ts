@@ -133,9 +133,10 @@ test('all time of a study type without logs is just today, and the type reaches 
         [data.type, data.from, data.days, data.averageMinutesPerDay],
         ['review', '2026-10-23', 1, 0],
       );
+      // No textbook asked for, so none is looked up and none narrows the sums (#180).
       assert.deepEqual(sent, [
-        ['2026-10-23', 'review'],
-        ['2026-10-23', '2026-10-23', 'review'],
+        ['2026-10-23', 'review', null],
+        ['2026-10-23', '2026-10-23', 'review', null],
       ]);
     },
     { today: () => '2026-10-23' },
