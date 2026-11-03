@@ -29,3 +29,5 @@
 
 - `docs/next-steps/README.md`에 새로 적은 `pgpass.conf` 경로의 역슬래시가 빠져 있었다.
 - 이 기록의 변경 항목에 `docs/next-steps/README.md`의 로컬 환경 기록 추가가 빠져 있었다.
+
+2차 리뷰에서 1차 지적 두 가지가 반영된 것을 확인했고, 남은 결함은 없었다.
