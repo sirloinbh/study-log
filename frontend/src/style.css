@@ -689,6 +689,34 @@
   color: var(--foreground);
   padding: 9px 10px;
 }
+/* Changing a schedule's name in place of its heading (#179). */
+.schedule-rename {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px 12px;
+  margin-bottom: 12px;
+}
+.schedule-rename label {
+  flex: 1 1 240px;
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 500;
+}
+.schedule-rename .error {
+  flex: 1 1 100%;
+  margin: 0;
+}
+.schedule-rename input {
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 2px);
+  background: var(--card);
+  color: var(--foreground);
+  padding: 9px 10px;
+  font-size: 14px;
+}
 .schedule-move .schedule-later {
   display: flex;
   align-items: center;

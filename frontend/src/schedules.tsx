@@ -20,6 +20,8 @@ type Notice = { kind: 'status' | 'alert'; text: string } | undefined;
 // Study schedules (#35): a form that makes one from a period and daily hours, the schedules there
 // are, and the days of the one picked. A schedule's period and hours do not change once it is made
 // (docs/decisions/schedule-rules.md 6장), so this offers deleting rather than editing them.
+type Renaming = { id: number; title: string; error?: string };
+
 export function Schedules({ today }: { today: string }) {
   const [title, setTitle] = useState('');
   const [startDate, setStartDate] = useState(today);
@@ -46,6 +48,8 @@ export function Schedules({ today }: { today: string }) {
   const [confirming, setConfirming] = useState<number>();
   // The day being moved, and where to.
   const [moving, setMoving] = useState<{ id: number; date: string; withLater: boolean }>();
+  // The schedule whose name is being changed, the name typed and why it was refused (#179).
+  const [renaming, setRenaming] = useState<Renaming>();
   const [dayNotice, setDayNotice] = useState<Notice>(undefined);
   // Each next to the buttons that lead to it: the list can be scrolled far below the form.
   const [notice, setNotice] = useState<Notice>(undefined);
@@ -144,6 +148,7 @@ export function Schedules({ today }: { today: string }) {
     setListNotice(undefined);
     setDayNotice(undefined);
     setMoving(undefined);
+    setRenaming(undefined);
     setConfirming(undefined);
     try {
       const data = await requestJson<ScheduleDetail>('/api/schedules', {
@@ -253,6 +258,7 @@ export function Schedules({ today }: { today: string }) {
     setListNotice(undefined);
     setDayNotice(undefined);
     setMoving(undefined);
+    setRenaming(undefined);
     try {
       await requestJson(`/api/schedules/${id}`, { method: 'DELETE' });
       // At once, and even if reading the list again fails.
@@ -266,6 +272,51 @@ export function Schedules({ today }: { today: string }) {
       setWantFocus(status === 404 ? 'schedules-heading' : `schedule-delete-${id}`);
     } finally {
       setConfirming(undefined);
+      setReload((count) => count + 1);
+      end();
+    }
+  };
+
+  // Only the name changes after creating (docs/decisions/schedule-rules.md 6장, #179). The same
+  // checks as the server's, which also trims, so a long name is said rather than cut.
+  const rename = async (target: Renaming) => {
+    const refuse = (error: string) => {
+      setRenaming({ ...target, error });
+      setWantFocus('schedule-rename-input');
+    };
+    const trimmed = target.title.trim();
+    if (!trimmed) return refuse('일정 이름을 입력하세요');
+    if (trimmed.length > 200) return refuse('일정 이름 길이는 200자 이하여야 합니다');
+    nameNext('rename');
+    if (!begin()) return;
+    setNotice(undefined);
+    setListNotice(undefined);
+    setDayNotice(undefined);
+    setRenaming({ ...target, error: undefined });
+    try {
+      const data = await requestJson<ScheduleDetail>(`/api/schedules/${target.id}`, {
+        method: 'PUT',
+        body: { title: target.title },
+      });
+      setDetail(data);
+      // At once, and even if reading the list again fails.
+      setSchedules((all) =>
+        all?.map((item) =>
+          item.id === target.id ? { ...item, title: data.schedule.title } : item,
+        ),
+      );
+      setRenaming(undefined);
+      setDayNotice({ kind: 'status', text: '일정 이름을 바꿨습니다' });
+      setWantFocus('schedule-heading');
+    } catch (failure) {
+      const { status, message } = failure as RequestError;
+      if (status === 404) {
+        // Deleted elsewhere: its card goes with the reload.
+        setRenaming(undefined);
+        setListNotice({ kind: 'alert', text: message });
+        setWantFocus('schedules-heading');
+      } else refuse(message);
+    } finally {
       setReload((count) => count + 1);
       end();
     }
@@ -464,6 +515,7 @@ export function Schedules({ today }: { today: string }) {
                       setListNotice(undefined);
                       setDayNotice(undefined);
                       setMoving(undefined);
+                      setRenaming(undefined);
                       // Also the way to try again after its days could not be read: the
                       // error leaves first, so a second failure is shown and announced anew.
                       setDetailError(undefined);
@@ -534,9 +586,80 @@ export function Schedules({ today }: { today: string }) {
           {/* Days already read stay if reading them again fails. */}
           {shownDetail ? (
             <>
-              <h2 id="schedule-heading" tabIndex={-1}>
-                {shownDetail.schedule.title}
-              </h2>
+              {renaming?.id === shownDetail.schedule.id ? (
+                <form
+                  className="schedule-rename"
+                  aria-label="일정 이름 수정"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void rename(renaming);
+                  }}
+                >
+                  <label>
+                    새 일정 이름
+                    <input
+                      id="schedule-rename-input"
+                      required
+                      disabled={busy}
+                      value={renaming.title}
+                      aria-invalid={renaming.error ? 'true' : undefined}
+                      aria-describedby={renaming.error ? 'schedule-rename-error' : undefined}
+                      onChange={(event) => {
+                        setDayNotice(undefined);
+                        setRenaming({ ...renaming, title: event.target.value, error: undefined });
+                      }}
+                    />
+                  </label>
+                  <div className="actions">
+                    <button type="submit" className="primary" disabled={busy}>
+                      <ButtonSpinner when={action === 'rename'} />
+                      이름 저장
+                    </button>
+                    <button
+                      type="button"
+                      className="secondary"
+                      aria-label="이름 수정 취소"
+                      disabled={busy}
+                      onClick={() => {
+                        setDayNotice(undefined);
+                        setRenaming(undefined);
+                        setWantFocus('schedule-rename');
+                      }}
+                    >
+                      취소
+                    </button>
+                  </div>
+                  {/* Right under the name, apart from what the days say. */}
+                  {renaming.error && (
+                    <p id="schedule-rename-error" role="alert" className="error">
+                      {renaming.error}
+                    </p>
+                  )}
+                </form>
+              ) : (
+                <div className="log-head">
+                  <h2 id="schedule-heading" tabIndex={-1}>
+                    {shownDetail.schedule.title}
+                  </h2>
+                  <button
+                    type="button"
+                    id="schedule-rename"
+                    className="secondary"
+                    aria-label={`${shownDetail.schedule.title} 이름 수정`}
+                    disabled={busy}
+                    onClick={() => {
+                      setDayNotice(undefined);
+                      setRenaming({
+                        id: shownDetail.schedule.id,
+                        title: shownDetail.schedule.title,
+                      });
+                      setWantFocus('schedule-rename-input');
+                    }}
+                  >
+                    이름 수정
+                  </button>
+                </div>
+              )}
               {shownDetail.schedule.textbookTitle && (
                 <p className="status schedule-book">{shownDetail.schedule.textbookTitle}</p>
               )}
