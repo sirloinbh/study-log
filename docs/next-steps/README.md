@@ -10,7 +10,7 @@
 2. API 키(#129)가 준비되면 #33의 실제 응답을 먼저 확인하고, 실제 공휴일로 일정을 만들어 본다(아래 "확인 후 에이전트가 할 일"). Docker가 없어도 테스트 DB로 할 수 있다. 키가 없으면 실제 서버의 일정 생성은 503으로 거부되고 화면에 이유가 표시된다.
 3. 앱 DB 비밀번호가 정해지면(아래 1번) 앱 DB에 마이그레이션을 적용한다. #28(P2)은 저장 위치와 패키지 설치를 사용자가 정해야 한다. #29, #30(P3)은 #28에 묶여 있다.
 4. 사용자에게 아래 "사용자가 정할 것"을 묻는다.
-5. 위가 모두 막혀 있으면 "다음 이슈 후보"의 "키와 Docker 없이 할 수 있는 일"을 적힌 순서대로 한다.
+5. 위가 모두 막혀 있으면 "다음 이슈 후보"의 "API 키와 앱 DB 없이 할 수 있는 일"을 적힌 순서대로 한다.
 
 ## 사용자가 직접 할 일
 
@@ -40,7 +40,7 @@
 - 3번 완료 후:
   - 실제 키로 한 해를 조회해, 응답이 `backend/src/holidays.ts`의 해석과 맞는지 확인한다. 대체공휴일과 임시공휴일이 `isHoliday: Y`로 오는지, 빈 달의 `items` 모양과 키 오류 응답도 본다. 고정 공휴일이 주말일 때도 응답에 오는지 본다. `_type=json`은 공식 문서에 없어 이때 처음 확인된다.
   - 실제 공휴일로 일정을 만들어 설날이나 추석이 있는 기간의 분량을 브라우저에서 확인한다. 지금까지는 테스트 DB에 넣은 공휴일로만 확인했다.
-  - Docker가 없으면 앱 DB 대신 테스트 DB를 쓴다. `.env`에는 키만 있으면 되고, PowerShell에서 `$env:DATABASE_URL=[Environment]::GetEnvironmentVariable('TEST_DATABASE_URL','User'); $env:PGPASSFILE="$env:APPDATA\postgresql\pgpass.conf"; npm run dev`로 띄운다. 2026-11-01 브라우저 확인과 같은 방법이다. 이렇게 하면 `npm test`가 지우지 않는 행이 테스트 DB에 남으므로 끝나면 `schedules`, `holidays`, `holiday_years`에서 지운다. `holiday_years`만 남으면 7일 동안 API를 부르지 않아 공휴일 없는 일정이 만들어진다.
+  - 앱 DB(위 1번)가 준비되지 않았으면 테스트 DB를 쓴다. `.env`에는 키만 있으면 되고, PowerShell에서 `$env:DATABASE_URL=[Environment]::GetEnvironmentVariable('TEST_DATABASE_URL','User'); $env:PGPASSFILE="$env:APPDATA\postgresql\pgpass.conf"; npm run dev`로 띄운다. 2026-11-01 브라우저 확인과 같은 방법이다. 이렇게 하면 `npm test`가 지우지 않는 행이 테스트 DB에 남으므로 끝나면 `schedules`, `holidays`, `holiday_years`에서 지운다. `holiday_years`만 남으면 7일 동안 API를 부르지 않아 공휴일 없는 일정이 만들어진다.
 - 끝난 항목은 이 표에서 지우고 일일 기록에 남긴다.
 
 ## 로컬 환경 현황
@@ -63,7 +63,7 @@
 | #160 | 프런트 테스트의 간헐적 시간 초과 | P4       |                                 |
 | #159 | 형식이 틀린 날짜의 겹치는 문구   | P4       |                                 |
 
-키와 Docker 없이 할 수 있는 일(이 순서로 한다):
+API 키와 앱 DB 없이 할 수 있는 일(이 순서로 한다):
 
 1. `backend/src/holidays.ts`의 배열 스키마에 길이 제한이 없다는 `standards:check` 경고(`GHSA-mrhx-c7xc-m3w5`)를 고친다. 이슈가 아직 없으니 먼저 등록한다.
 2. #160

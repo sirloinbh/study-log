@@ -13,7 +13,7 @@
 - `.env.example`: `WEB_BIND=127.0.0.1`, `WEB_PORT=8102`를 적었다. `IMAGE_TAG`는 배포 스크립트가 커밋으로 정하므로 적지 않는다.
 - `docs/next-steps/README.md`: Docker가 실행되므로 SVM 항목을 지우고, 남은 사용자 단계(앱 DB 비밀번호)와 끝난 #146을 반영했다.
 
-`deploy/backup.sh`는 이미 `IMAGE_TAG`를 `.deployed` 값이나 `none`으로 채워 compose를 실행하고 서비스 이름 `db`만 쓴다. 기본값 `local`이 있어 `IMAGE_TAG` 없이도 compose 명령이 동작하므로 고칠 것이 없었다.
+`deploy/backup.sh`와 `deploy/report.sh`는 `IMAGE_TAG`를 `.deployed` 값이나 `none`으로 직접 채워 compose를 실행하고, 서비스 이름 `db`와 `docker compose ps -q`만 쓴다. 새 이미지 이름과 충돌하지 않아 고칠 것이 없었다. `${IMAGE_TAG:-local}`의 기본값은 서버에서는 쓰이지 않고, 로컬에서 `IMAGE_TAG` 없이 `docker compose`를 실행할 때를 위한 것이다.
 
 ## 검증
 
@@ -32,5 +32,16 @@ Docker Desktop(Client 29.9.2)에서 실제 앱 볼륨과 섞이지 않게 임시
 
 ## 제한·후속 작업
 
+- 예전 compose가 기본 이름으로 만든 이미지(`study-log-api`, `study-log-web`)는 배포 스크립트의 정리 대상(`study-backend`, `study-frontend`)이 아니다. 이 변경 전에 배포한 서버가 생기면 한 번 직접 지운다. 지금은 배포한 서버가 없다.
+
 - 실제 운영 서버 배포는 연결되어 있지 않아 서버에서는 확인하지 않았다.
 - 로컬 앱 DB는 `.env`의 비밀번호가 예시 값이라 아직 만들지 않았다. 사용자가 비밀번호를 정한 뒤 띄운다(`docs/next-steps/README.md`).
+
+## 리뷰
+
+1차 리뷰에서 병합을 막는 결함은 없었다. 이미지 이름, 빌드·마이그레이션·정리 단계, 헬스체크 포트, `backup.sh`·`report.sh`, `.standards/check.mjs`의 포트 검사, 로컬 개발 절차 모두 새 compose와 맞는다고 확인했다. 다음 문서 지적을 이 PR에서 고쳤다.
+
+- 전제 확인에 `deploy/report.sh`가 빠졌고, `IMAGE_TAG` 기본값의 쓰임새 설명이 정확하지 않았다. 둘 다 바로잡았다.
+- 예전 기본 이름 이미지가 서버 정리 대상이 아니라는 점을 제한 항목에 적었다.
+- `docs/next-steps/README.md`에 남은 "Docker가 없으면" 표현을 앱 DB 기준으로 바꿨다.
+- `.env.example`의 `WEB_BIND=127.0.0.1`을 서버에 그대로 복사하면 헬스체크는 통과하지만 외부 접속이 안 된다는 지적은, 주석에 `0.0.0.0` 안내가 있고 런북상 서버 user-data가 값을 넣으므로 고치지 않았다.
