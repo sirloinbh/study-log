@@ -294,8 +294,14 @@ export function scheduleRoutes(pool: Pool, today: () => string, fetcher: Holiday
   router.post('/:id/items/:itemId/complete', (req, res) =>
     changeItem(req.params, res, async (client, id, item, date) => {
       if (item.completedOn) return { status: 409, body: { error: '이미 완료한 항목입니다' } };
+      // A day reopened from the past goes back to its date and the day it was done, as if never
+      // reopened (#165): the reopening was most likely a mistake, and nothing else undoes it.
       await client.query(
-        'UPDATE schedule_items SET completed_on = $2, updated_at = now() WHERE id = $1',
+        `UPDATE schedule_items SET
+           item_date = COALESCE(reopened_from, item_date),
+           completed_on = COALESCE(reopened_completed_on, $2::date),
+           reopened_from = NULL, reopened_completed_on = NULL, updated_at = now()
+         WHERE id = $1`,
         [id, date],
       );
     }),
@@ -305,9 +311,12 @@ export function scheduleRoutes(pool: Pool, today: () => string, fetcher: Holiday
     changeItem(req.params, res, async (client, id, item, date) => {
       if (!item.completedOn) return { status: 409, body: { error: '완료하지 않은 항목입니다' } };
       // A day already past comes to today by itself: one mistaken click must not push the whole
-      // schedule by however long ago it was done, with no way back (rule 4장).
+      // schedule by however long ago it was done. Where it was is kept, so completing it again
+      // puts it back (rule 4장, #165).
       await client.query(
         `UPDATE schedule_items SET completed_on = NULL, updated_at = now(),
+           reopened_from = CASE WHEN item_date < $2::date THEN item_date END,
+           reopened_completed_on = CASE WHEN item_date < $2::date THEN completed_on END,
            item_date = GREATEST(item_date, $2::date)
          WHERE id = $1`,
         [id, date],
@@ -336,16 +345,19 @@ export function scheduleRoutes(pool: Pool, today: () => string, fetcher: Holiday
             status: 400,
             body: { error: `함께 옮기는 일정도 오늘부터 ${maxMoveDays}일 안이어야 합니다` },
           };
+        // A day moved by hand has a new place: completing it keeps it there (#165).
         await client.query(
           `UPDATE schedule_items i SET item_date = i.item_date + ($2::date - $3::date),
-             updated_at = now()
+             reopened_from = NULL, reopened_completed_on = NULL, updated_at = now()
            WHERE i.schedule_id = (SELECT schedule_id FROM schedule_items WHERE id = $1)
              AND i.completed_on IS NULL AND i.item_date >= $3::date`,
           [id, input.date, item.date],
         );
       } else
         await client.query(
-          'UPDATE schedule_items SET item_date = $2, updated_at = now() WHERE id = $1',
+          `UPDATE schedule_items SET item_date = $2, reopened_from = NULL,
+             reopened_completed_on = NULL, updated_at = now()
+           WHERE id = $1`,
           [id, input.date],
         );
     });

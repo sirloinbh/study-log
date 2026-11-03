@@ -201,6 +201,51 @@ test('a schedule follows what was done and what fell behind', { skip: !url }, as
         assert.deepEqual(dates(reopened.data as unknown as Detail), ['8041-08-25', '8041-08-26']);
       });
 
+      await t.test('completing a day reopened from the past puts it back (#165)', async () => {
+        today = '8041-12-01';
+        const { schedule, items } = await make('8041-12-01', '8041-12-03');
+        for (const [index, day] of ['8041-12-01', '8041-12-02', '8041-12-03'].entries()) {
+          today = day;
+          assert.equal((await complete(schedule.id, items[index].id)).status, 200);
+        }
+        const item = (detail: Detail) => detail.items.find((i) => i.id === items[0].id);
+
+        // A mistaken click weeks later, undone the same day.
+        today = '8041-12-20';
+        const reopened = (await reopen(schedule.id, items[0].id)).data as unknown as Detail;
+        assert.equal(item(reopened)?.date, '8041-12-20');
+        assert.equal(reopened.schedule.delayDays, 17);
+        const undone = (await complete(schedule.id, items[0].id)).data as unknown as Detail;
+        assert.equal(item(undone)?.date, '8041-12-01');
+        assert.equal(item(undone)?.completedOn, '8041-12-01');
+        assert.equal(undone.schedule.delayDays, 0);
+        assert.equal(undone.schedule.currentEndDate, '8041-12-03');
+
+        // Left open until it fell behind again, it still goes back.
+        await reopen(schedule.id, items[0].id);
+        today = '8041-12-22';
+        assert.equal(item(await read(schedule.id))?.date, '8041-12-22');
+        const later = (await complete(schedule.id, items[0].id)).data as unknown as Detail;
+        assert.equal(item(later)?.date, '8041-12-01');
+        assert.equal(item(later)?.completedOn, '8041-12-01');
+
+        // Moved by hand, it has a new place and is done the day it is completed.
+        await reopen(schedule.id, items[0].id);
+        assert.equal((await move(schedule.id, items[0].id, '8041-12-25')).status, 200);
+        const moved = (await complete(schedule.id, items[0].id)).data as unknown as Detail;
+        assert.equal(item(moved)?.date, '8041-12-25');
+        assert.equal(item(moved)?.completedOn, '8041-12-22');
+        assert.equal(moved.schedule.delayDays, 22);
+
+        // Taken along with an earlier day as well.
+        today = '8041-12-26';
+        await reopen(schedule.id, items[1].id);
+        await reopen(schedule.id, items[2].id);
+        assert.equal((await move(schedule.id, items[1].id, '8041-12-28', true)).status, 200);
+        const along = (await complete(schedule.id, items[2].id)).data as unknown as Detail;
+        assert.equal(along.items.find((i) => i.id === items[2].id)?.date, '8041-12-28');
+      });
+
       await t.test('moving keeps the target and chapters, and days can share a date', async () => {
         today = '8042-04-01';
         const book = await call('/api/textbooks', { method: 'POST', body: { title: '조정 교재' } });
