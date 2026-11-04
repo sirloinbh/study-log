@@ -159,7 +159,7 @@ test('reviews are listed by range and moved one round at a time', { skip: !url }
         for (const [dueDate, message] of [
           [undefined, '예정일을 입력하세요'],
           [20, '예정일 형식이 올바르지 않습니다'],
-          ['8044/01/01', '예정일은 YYYY-MM-DD 형식으로 입력하세요, 존재하지 않는 날짜입니다'],
+          ['8044/01/01', '예정일은 YYYY-MM-DD 형식으로 입력하세요'],
           ['8044-02-31', '존재하지 않는 날짜입니다'],
           ['0000-01-01', '존재하지 않는 날짜입니다'],
         ]) {
