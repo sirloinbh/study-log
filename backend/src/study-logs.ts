@@ -2,7 +2,7 @@ import { Router } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod/v4';
 
-import { isCalendarDate } from './dates.js';
+import { calendarDate } from './dates.js';
 import { syncFirstReview } from './reviews.js';
 import { inTransaction, likePattern } from './sql.js';
 import { missingOrInvalid } from './validation.js';
@@ -18,10 +18,10 @@ export function studyMinutes(startTime: string, endTime: string) {
   return minutes < 0 ? minutes + 24 * 60 : minutes;
 }
 
-const studyDate = z
-  .string(missingOrInvalid('학습일을 입력하세요', '학습일 형식이 올바르지 않습니다'))
-  .regex(/^\d{4}-\d{2}-\d{2}$/, '학습일은 YYYY-MM-DD 형식으로 입력하세요')
-  .refine(isCalendarDate, '존재하지 않는 날짜입니다');
+const studyDate = calendarDate(
+  z.string(missingOrInvalid('학습일을 입력하세요', '학습일 형식이 올바르지 않습니다')),
+  '학습일은 YYYY-MM-DD 형식으로 입력하세요',
+);
 
 const clock = (label: string) =>
   z

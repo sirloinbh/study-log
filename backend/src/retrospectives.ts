@@ -3,7 +3,7 @@ import type { Pool } from 'pg';
 import { z } from 'zod/v4';
 
 import { monthRange } from './calendar.js';
-import { isCalendarDate } from './dates.js';
+import { calendarDate } from './dates.js';
 import { addDays, weekStart } from './stats.js';
 import { missingOrInvalid } from './validation.js';
 
@@ -14,14 +14,13 @@ const kind = z.enum(retrospectiveKinds, { error: '회고 종류는 주간 또는
 
 // Years 1900 to 9998 only: a week around 0001-01-01 or 9999-12-31 would run into a year the
 // database cannot store and fail as a 500.
-const day = z
-  .string({ error: '날짜 형식이 올바르지 않습니다' })
-  .regex(/^\d{4}-\d{2}-\d{2}$/, '날짜는 YYYY-MM-DD 형식으로 입력하세요')
-  .refine(isCalendarDate, '존재하지 않는 날짜입니다')
-  .refine(
-    (value) => value >= '1900-01-01' && value <= '9998-12-31',
-    '회고 날짜는 1900년부터 9998년까지입니다',
-  );
+const day = calendarDate(
+  z.string({ error: '날짜 형식이 올바르지 않습니다' }),
+  '날짜는 YYYY-MM-DD 형식으로 입력하세요',
+).refine(
+  (value) => value >= '1900-01-01' && value <= '9998-12-31',
+  '회고 날짜는 1900년부터 9998년까지입니다',
+);
 
 const bodyInput = z.object(
   {

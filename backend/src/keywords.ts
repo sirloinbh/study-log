@@ -2,14 +2,14 @@ import { Router } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod/v4';
 
-import { isCalendarDate } from './dates.js';
+import { calendarDate } from './dates.js';
 import { likePattern } from './sql.js';
 import { missingOrInvalid } from './validation.js';
 
-const keywordDate = z
-  .string({ error: '날짜 형식이 올바르지 않습니다' })
-  .regex(/^\d{4}-\d{2}-\d{2}$/, '날짜는 YYYY-MM-DD 형식으로 입력하세요')
-  .refine(isCalendarDate, '존재하지 않는 날짜입니다');
+const keywordDate = calendarDate(
+  z.string({ error: '날짜 형식이 올바르지 않습니다' }),
+  '날짜는 YYYY-MM-DD 형식으로 입력하세요',
+);
 
 // `date` left out means today in the service time zone; the route fills it in.
 const keywordInput = z.object(

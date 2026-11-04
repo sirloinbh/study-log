@@ -2,7 +2,7 @@ import { Router } from 'express';
 import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod/v4';
 
-import { datePlusDays, isCalendarDate } from './dates.js';
+import { calendarDate, datePlusDays } from './dates.js';
 import { inTransaction } from './sql.js';
 import { missingOrInvalid } from './validation.js';
 
@@ -66,10 +66,10 @@ const idParam = z
 
 const dueDateInput = z.object(
   {
-    dueDate: z
-      .string(missingOrInvalid('예정일을 입력하세요', '예정일 형식이 올바르지 않습니다'))
-      .regex(/^\d{4}-\d{2}-\d{2}$/, '예정일은 YYYY-MM-DD 형식으로 입력하세요')
-      .refine(isCalendarDate, '존재하지 않는 날짜입니다'),
+    dueDate: calendarDate(
+      z.string(missingOrInvalid('예정일을 입력하세요', '예정일 형식이 올바르지 않습니다')),
+      '예정일은 YYYY-MM-DD 형식으로 입력하세요',
+    ),
   },
   { error: '예정일을 JSON 객체로 보내세요' },
 );

@@ -2,7 +2,7 @@ import { Router } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod/v4';
 
-import { isCalendarDate } from './dates.js';
+import { calendarDate } from './dates.js';
 import { studyTypes } from './study-logs.js';
 
 export const statPeriods = ['week', 'month', '3months', 'all'] as const;
@@ -147,16 +147,14 @@ export const completionRate = (completed: number, scheduled: number) =>
 // `maxSeriesDays` long, like the stats series.
 const patternQuery = z
   .object({
-    from: z
-      .string({ error: '시작일 형식이 올바르지 않습니다' })
-      .regex(/^\d{4}-\d{2}-\d{2}$/, '시작일은 YYYY-MM-DD 형식으로 입력하세요')
-      .refine(isCalendarDate, '존재하지 않는 날짜입니다')
-      .optional(),
-    to: z
-      .string({ error: '종료일 형식이 올바르지 않습니다' })
-      .regex(/^\d{4}-\d{2}-\d{2}$/, '종료일은 YYYY-MM-DD 형식으로 입력하세요')
-      .refine(isCalendarDate, '존재하지 않는 날짜입니다')
-      .optional(),
+    from: calendarDate(
+      z.string({ error: '시작일 형식이 올바르지 않습니다' }),
+      '시작일은 YYYY-MM-DD 형식으로 입력하세요',
+    ).optional(),
+    to: calendarDate(
+      z.string({ error: '종료일 형식이 올바르지 않습니다' }),
+      '종료일은 YYYY-MM-DD 형식으로 입력하세요',
+    ).optional(),
   })
   .refine((query) => !query.from || !query.to || query.from <= query.to, {
     error: '시작일은 종료일보다 늦을 수 없습니다',

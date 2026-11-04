@@ -2,7 +2,7 @@ import { type Response, Router } from 'express';
 import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod/v4';
 
-import { datePlusDays, isCalendarDate } from './dates.js';
+import { calendarDate, datePlusDays, isCalendarDate } from './dates.js';
 import { dayKind, HolidayError, type HolidayFetcher, loadHolidays } from './holidays.js';
 import { inTransaction } from './sql.js';
 import { bodyId } from './textbook-contents.js';
@@ -73,10 +73,10 @@ const title = z
   .refine((value) => value.length <= 200, '일정 이름 길이는 200자 이하여야 합니다');
 
 const dateField = (label: string) =>
-  z
-    .string(missingOrInvalid(`${label}을 입력하세요`, `${label} 형식이 올바르지 않습니다`))
-    .regex(/^\d{4}-\d{2}-\d{2}$/, `${label}은 YYYY-MM-DD 형식으로 입력하세요`)
-    .refine(isCalendarDate, '존재하지 않는 날짜입니다');
+  calendarDate(
+    z.string(missingOrInvalid(`${label}을 입력하세요`, `${label} 형식이 올바르지 않습니다`)),
+    `${label}은 YYYY-MM-DD 형식으로 입력하세요`,
+  );
 
 const minutes = (label: string) =>
   z
@@ -111,7 +111,8 @@ const createInput = z
     { error: '일정 내용을 JSON 객체로 보내세요' },
   )
   .superRefine((input, ctx) => {
-    // Field errors do not stop this check, and a date that is wrong says so itself.
+    // A missing, mistyped or wrong date already stops this check (#159) and says so itself; the
+    // guard keeps the period from being worked out on a wrong date if that ever changes.
     if (!isCalendarDate(input.startDate) || !isCalendarDate(input.endDate)) return;
     if (input.endDate < input.startDate)
       ctx.addIssue({ code: 'custom', message: '종료일은 시작일 이후여야 합니다' });
