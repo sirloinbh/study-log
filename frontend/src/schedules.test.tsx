@@ -1,12 +1,4 @@
-import {
-  cleanup,
-  configure,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-  within,
-} from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
 
 import {
@@ -22,7 +14,6 @@ import { fakeApi } from './test/fake-api';
 
 // As in screens.test.tsx: the first run after a change is slow.
 vi.setConfig({ testTimeout: 20_000 });
-configure({ asyncUtilTimeout: 10_000 });
 
 const today = '2026-03-02';
 

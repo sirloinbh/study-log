@@ -1,4 +1,4 @@
-import { configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
 
 import { Exercises } from './exercises';
@@ -7,10 +7,9 @@ import { fakeApi } from './test/fake-api';
 import { TextbookContents } from './textbook-contents';
 import { Textbooks } from './textbooks';
 
-// The whole page renders in each test and role queries are slow on the first run after a change,
-// which counts against both limits.
+// The whole page renders in each test and role queries are slow on the first run after a change.
+// The wait of `findBy` and `waitFor` is raised for all tests in test/setup.ts.
 vi.setConfig({ testTimeout: 20_000 });
-configure({ asyncUtilTimeout: 10_000 });
 
 const fill = (label: string, value: string) =>
   fireEvent.change(screen.getByLabelText(label), { target: { value } });

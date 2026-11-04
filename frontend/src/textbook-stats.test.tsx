@@ -1,4 +1,4 @@
-import { configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 
 import { chapterPercent, type TextbookStats as Stats, textbookStatsPath } from './study-stats';
@@ -7,7 +7,6 @@ import { TextbookStats } from './textbook-stats';
 
 // As in screens.test.tsx: the first run after a change is slow.
 vi.setConfig({ testTimeout: 20_000 });
-configure({ asyncUtilTimeout: 10_000 });
 
 const algebra = { id: 7, title: '선형대수', completedChapters: 1, totalChapters: 4 };
 const analysis = { id: 8, title: '해석학', completedChapters: 0, totalChapters: 0 };
