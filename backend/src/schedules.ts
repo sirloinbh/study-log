@@ -111,7 +111,8 @@ const createInput = z
     { error: '일정 내용을 JSON 객체로 보내세요' },
   )
   .superRefine((input, ctx) => {
-    // Field errors do not stop this check, and a date that is wrong says so itself.
+    // A missing, mistyped or wrong date already stops this check (#159) and says so itself; the
+    // guard keeps the period from being worked out on a wrong date if that ever changes.
     if (!isCalendarDate(input.startDate) || !isCalendarDate(input.endDate)) return;
     if (input.endDate < input.startDate)
       ctx.addIssue({ code: 'custom', message: '종료일은 시작일 이후여야 합니다' });
