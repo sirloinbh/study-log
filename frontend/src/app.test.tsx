@@ -3,6 +3,10 @@ import { expect, test, vi } from 'vitest';
 
 import { App } from './app';
 
+// The whole app renders here and one test opens all seven pages: 1.5 s alone, but up to 9.5 s when
+// the PC ran three test runs at once (#160), close to the usual limit.
+vi.setConfig({ testTimeout: 20_000 });
+
 // /api/health answers with the server date; other endpoints fail, so pages show their own errors.
 function server(health: { body: object; status?: number }) {
   vi.stubGlobal(

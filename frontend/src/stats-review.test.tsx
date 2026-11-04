@@ -1,4 +1,4 @@
-import { configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 
 import { Stats } from './stats';
@@ -22,7 +22,6 @@ vi.mock('recharts', () => {
 // The whole dashboard renders here and role queries are slow, most of all on the first run after a
 // change, when these tests can take longer than the usual limit.
 vi.setConfig({ testTimeout: 20_000 });
-configure({ asyncUtilTimeout: 10_000 });
 
 const studyTime = (totalMinutes: number) => ({
   period: 'week',

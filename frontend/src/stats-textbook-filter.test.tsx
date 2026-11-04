@@ -1,4 +1,4 @@
-import { configure, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 
 import { Stats } from './stats';
@@ -17,7 +17,6 @@ vi.mock('recharts', () => {
   };
 });
 vi.setConfig({ testTimeout: 20_000 });
-configure({ asyncUtilTimeout: 10_000 });
 
 const books = [
   { id: 7, title: '선형대수', author: '', edition: '' },
