@@ -52,7 +52,7 @@ const untouchedPool = {
   },
 } as unknown as Pool;
 
-test('invalid input is a Korean 400 before the DB or the holiday API', async () => {
+test('invalid input is an English 400 before the DB or the holiday API', async () => {
   const fine = {
     title: '알고리즘',
     startDate: '2026-11-02',
@@ -63,25 +63,25 @@ test('invalid input is a Korean 400 before the DB or the holiday API', async () 
   const { startDate: _start, ...noStart } = fine;
   const { weekdayMinutes: _weekday, ...noWeekday } = fine;
   const cases: [unknown, RegExp][] = [
-    [['목록'], /JSON 객체/],
-    [noTitle, /일정 이름을 입력하세요/],
-    [{ ...fine, title: '   ' }, /일정 이름을 입력하세요/],
-    [{ ...fine, title: '가'.repeat(201) }, /200자 이하/],
-    [noStart, /시작일을 입력하세요/],
-    [{ ...fine, startDate: '2026/11/02' }, /시작일은 YYYY-MM-DD/],
-    [{ ...fine, endDate: '2026-11-31' }, /존재하지 않는 날짜/],
-    [{ ...fine, endDate: '2026-11-01' }, /종료일은 시작일 이후/],
-    [{ ...fine, startDate: '2026-11-01', endDate: '2027-11-03' }, /366일 이하/],
-    [noWeekday, /평일 분량을 입력하세요/],
-    [{ ...fine, weekdayMinutes: '60' }, /평일 분량 형식/],
-    [{ ...fine, weekdayMinutes: 1.5 }, /분 단위 정수/],
-    [{ ...fine, weekdayMinutes: -1 }, /0시간 이상/],
-    [{ ...fine, restDayMinutes: 1441 }, /24시간 이하/],
-    [{ ...fine, weekdayMinutes: 0, restDayMinutes: 0 }, /모두 0시간/],
+    [['목록'], /JSON object/],
+    [noTitle, /Enter the schedule name/],
+    [{ ...fine, title: '   ' }, /Enter the schedule name/],
+    [{ ...fine, title: '가'.repeat(201) }, /at most 200 characters/],
+    [noStart, /Enter the start date/],
+    [{ ...fine, startDate: '2026/11/02' }, /start date must be in YYYY-MM-DD/],
+    [{ ...fine, endDate: '2026-11-31' }, /This date does not exist/],
+    [{ ...fine, endDate: '2026-11-01' }, /end date must be after the start date/],
+    [{ ...fine, startDate: '2026-11-01', endDate: '2027-11-03' }, /at most 366 days/],
+    [noWeekday, /Enter the weekday amount/],
+    [{ ...fine, weekdayMinutes: '60' }, /weekday amount format/],
+    [{ ...fine, weekdayMinutes: 1.5 }, /whole number of minutes/],
+    [{ ...fine, weekdayMinutes: -1 }, /at least 0 minutes/],
+    [{ ...fine, restDayMinutes: 1441 }, /at most 24 hours/],
+    [{ ...fine, weekdayMinutes: 0, restDayMinutes: 0 }, /both 0/],
     // Later than next year, though short.
-    [{ ...fine, startDate: '2027-12-31', endDate: '2028-01-01' }, /내년 말까지/],
+    [{ ...fine, startDate: '2027-12-31', endDate: '2028-01-01' }, /end of next year/],
     // A start in the past: yesterday by the service date, with a valid end.
-    [{ ...fine, startDate: '2026-10-31' }, /시작일은 오늘 이후/],
+    [{ ...fine, startDate: '2026-10-31' }, /start date must be today or later/],
   ];
   await withApi(
     untouchedPool,
@@ -93,8 +93,8 @@ test('invalid input is a Korean 400 before the DB or the holiday API', async () 
       }
       // A wrong date does not bring a false complaint about the other date or the period.
       for (const [dates, message] of [
-        [{ startDate: '2026-13-01', endDate: '2026-11-30' }, '존재하지 않는 날짜입니다'],
-        [{ startDate: '2026-11-02', endDate: '2028-02-31' }, '존재하지 않는 날짜입니다'],
+        [{ startDate: '2026-13-01', endDate: '2026-11-30' }, 'This date does not exist'],
+        [{ startDate: '2026-11-02', endDate: '2028-02-31' }, 'This date does not exist'],
       ] as const) {
         const { data } = await call('/api/schedules', {
           method: 'POST',
@@ -131,6 +131,6 @@ test('a schedule deleted right after its rename is 404, not an empty 200', async
       body: { title: '새 이름' },
     });
     assert.equal(status, 404);
-    assert.match(String(data.error), /일정을 찾을 수 없습니다/);
+    assert.match(String(data.error), /Schedule not found/);
   });
 });

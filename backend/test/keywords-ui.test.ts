@@ -73,17 +73,17 @@ function fakeApi(initial: Keyword[] = [], options: Options = {}) {
         memo: body.memo,
       };
       if (clash(row.date, row.keyword))
-        return reply(409, { error: '이 날짜에 이미 있는 키워드입니다' });
+        return reply(409, { error: 'This keyword already exists on this date' });
       rows.push(row);
       return reply(201, { keyword: row });
     }
     const one = base.match(/^\/api\/keywords\/(\d+)$/);
     assert.ok(one, 'unexpected request ' + path);
     const index = rows.findIndex((r) => r.id === Number(one[1]));
-    if (index < 0) return reply(404, { error: '키워드를 찾을 수 없습니다' });
+    if (index < 0) return reply(404, { error: 'Keyword not found' });
     if (method === 'PUT') {
       if (clash(body.date, body.keyword, rows[index].id))
-        return reply(409, { error: '이 날짜에 이미 있는 키워드입니다' });
+        return reply(409, { error: 'This keyword already exists on this date' });
       rows[index] = { ...rows[index], ...body };
       return reply(200, { keyword: rows[index] });
     }
@@ -102,8 +102,8 @@ const stored: Keyword[] = [
 type Ui = ReturnType<typeof mount>;
 const section = (ui: Ui, label: string) =>
   ui.find((n) => n.type === 'section' && n.props['aria-label'] === label)[0];
-const dayCard = (ui: Ui, date = today) => section(ui, `${date} 키워드`);
-const searchCard = (ui: Ui) => section(ui, '키워드 검색');
+const dayCard = (ui: Ui, date = today) => section(ui, `Keywords for ${date}`);
+const searchCard = (ui: Ui) => section(ui, 'Keyword search');
 // Each keyword of a list as "keyword:memo".
 const listed = (ui: Ui, scope: Node | undefined) =>
   scope
@@ -137,15 +137,15 @@ async function openKeywords(
 ) {
   const ui = mount(api.fetch, globals);
   await ui.settle();
-  await ui.click('키워드');
+  await ui.click('Keyword');
   return ui;
 }
 
 uiTest("the page opens on today's keywords", async () => {
   const api = fakeApi(stored);
   const ui = await openKeywords(api);
-  assert.equal(ui.field('날짜'), today);
-  assert.match(ui.text(dayCard(ui)), /오늘 \(2026-10-23\)의 키워드/);
+  assert.equal(ui.field('Date'), today);
+  assert.match(ui.text(dayCard(ui)), /Keywords for today \(2026-10-23\)/);
   assert.deepEqual(listed(ui, dayCard(ui)), ['고유값:Ax = λx', '대각화:']);
   assert.deepEqual(
     api.requests.map((r) => r.path),
@@ -155,7 +155,7 @@ uiTest("the page opens on today's keywords", async () => {
 
 uiTest('a day without keywords says so', async () => {
   const ui = await openKeywords(fakeApi());
-  assert.match(ui.text(dayCard(ui)), /이 날짜에 남긴 키워드가 없습니다/);
+  assert.match(ui.text(dayCard(ui)), /No keywords on this date/);
 });
 
 uiTest('quick add saves to the picked date, clears the form and refocuses', async () => {
@@ -163,9 +163,9 @@ uiTest('quick add saves to the picked date, clears the form and refocuses', asyn
   const document = { getElementById: (id: string) => ({ focus: () => focused.push(id) }) };
   const api = fakeApi();
   const ui = await openKeywords(api, { document });
-  await ui.fill('키워드', '고유벡터');
-  await ui.fill('메모', 'λ에 대응하는 벡터');
-  await ui.submit(section(ui, '키워드 입력'));
+  await ui.fill('Keyword', '고유벡터');
+  await ui.fill('Memo', 'λ에 대응하는 벡터');
+  await ui.submit(section(ui, 'Keyword entry'));
   assert.deepEqual(
     api.requests.find((r) => r.method === 'POST'),
     {
@@ -175,39 +175,42 @@ uiTest('quick add saves to the picked date, clears the form and refocuses', asyn
     },
   );
   assert.deepEqual(listed(ui, dayCard(ui)), ['고유벡터:λ에 대응하는 벡터']);
-  assert.equal(ui.field('키워드'), '');
-  assert.equal(ui.field('메모'), '');
-  assert.match(ui.text(section(ui, '키워드 입력')), /추가했습니다/);
+  assert.equal(ui.field('Keyword'), '');
+  assert.equal(ui.field('Memo'), '');
+  assert.match(ui.text(section(ui, 'Keyword entry')), /Added/);
   assert.deepEqual(focused, ['keyword-input']);
 });
 
-uiTest('picking another date lists and adds for that date, and 오늘로 comes back', async () => {
-  const api = fakeApi(stored);
-  const ui = await openKeywords(api);
-  await ui.fill('날짜', '2026-10-20');
-  assert.deepEqual(listed(ui, dayCard(ui, '2026-10-20')), ['행렬식:고유값 계산에 쓴다']);
-  await ui.fill('키워드', '여인수');
-  await ui.submit(section(ui, '키워드 입력'));
-  assert.equal(api.rows.at(-1)?.date, '2026-10-20');
-  await ui.click('오늘로');
-  assert.equal(ui.field('날짜'), today);
-  assert.deepEqual(listed(ui, dayCard(ui)), ['고유값:Ax = λx', '대각화:']);
-});
+uiTest(
+  'picking another date lists and adds for that date, and Back to today comes back',
+  async () => {
+    const api = fakeApi(stored);
+    const ui = await openKeywords(api);
+    await ui.fill('Date', '2026-10-20');
+    assert.deepEqual(listed(ui, dayCard(ui, '2026-10-20')), ['행렬식:고유값 계산에 쓴다']);
+    await ui.fill('Keyword', '여인수');
+    await ui.submit(section(ui, 'Keyword entry'));
+    assert.equal(api.rows.at(-1)?.date, '2026-10-20');
+    await ui.click('Back to today');
+    assert.equal(ui.field('Date'), today);
+    assert.deepEqual(listed(ui, dayCard(ui)), ['고유값:Ax = λx', '대각화:']);
+  },
+);
 
 uiTest('a duplicate keyword shows the server message and keeps the input', async () => {
   const ui = await openKeywords(fakeApi(stored));
-  await ui.fill('키워드', '고유값');
-  await ui.submit(section(ui, '키워드 입력'));
-  assert.match(alertText(ui), /이 날짜에 이미 있는 키워드입니다/);
-  assert.equal(ui.field('키워드'), '고유값');
+  await ui.fill('Keyword', '고유값');
+  await ui.submit(section(ui, 'Keyword entry'));
+  assert.match(alertText(ui), /This keyword already exists on this date/);
+  assert.equal(ui.field('Keyword'), '고유값');
 });
 
 uiTest('editing replaces the keyword, and moving it to another date says where', async () => {
   const api = fakeApi(stored);
   const ui = await openKeywords(api);
-  await ui.click('수정', item(ui, '대각화'));
+  await ui.click('Edit', item(ui, '대각화'));
   const editing = () => ui.find((n) => n.props.className === 'editing', dayCard(ui))[0];
-  await fillIn(ui, editing(), '메모', '대각 행렬로 바꾸기');
+  await fillIn(ui, editing(), 'Memo', '대각 행렬로 바꾸기');
   await ui.submit(editing());
   assert.deepEqual(api.requests.find((r) => r.method === 'PUT')?.body, {
     date: today,
@@ -215,29 +218,29 @@ uiTest('editing replaces the keyword, and moving it to another date says where',
     memo: '대각 행렬로 바꾸기',
   });
   assert.deepEqual(listed(ui, dayCard(ui)), ['고유값:Ax = λx', '대각화:대각 행렬로 바꾸기']);
-  assert.match(ui.text(section(ui, '키워드 입력')), /수정했습니다/);
+  assert.match(ui.text(section(ui, 'Keyword entry')), /Updated/);
 
-  await ui.click('수정', item(ui, '고유값'));
-  await fillIn(ui, editing(), '날짜', '2026-10-21');
+  await ui.click('Edit', item(ui, '고유값'));
+  await fillIn(ui, editing(), 'Date', '2026-10-21');
   await ui.submit(editing());
   assert.deepEqual(listed(ui, dayCard(ui)), ['대각화:대각 행렬로 바꾸기']);
-  assert.match(ui.text(section(ui, '키워드 입력')), /수정해서 2026-10-21로 옮겼습니다/);
+  assert.match(ui.text(section(ui, 'Keyword entry')), /Updated and moved to 2026-10-21/);
 });
 
 uiTest('deleting needs a confirmation', async () => {
   const api = fakeApi(stored);
   const ui = await openKeywords(api);
-  await ui.click('삭제', item(ui, '고유값'));
-  await ui.click('취소', item(ui, '고유값'));
+  await ui.click('Delete', item(ui, '고유값'));
+  await ui.click('Cancel', item(ui, '고유값'));
   assert.equal(api.requests.filter((r) => r.method === 'DELETE').length, 0);
-  await ui.click('삭제', item(ui, '고유값'));
-  await ui.click('삭제 확인', item(ui, '고유값'));
+  await ui.click('Delete', item(ui, '고유값'));
+  await ui.click('Confirm delete', item(ui, '고유값'));
   assert.deepEqual(
     api.requests.filter((r) => r.method === 'DELETE').map((r) => r.path),
     ['/api/keywords/1'],
   );
   assert.deepEqual(listed(ui, dayCard(ui)), ['대각화:']);
-  assert.match(ui.text(section(ui, '키워드 입력')), /삭제했습니다/);
+  assert.match(ui.text(section(ui, 'Keyword entry')), /Deleted/);
 });
 
 uiTest('saving an edit of a keyword deleted elsewhere closes the editor', async () => {
@@ -245,10 +248,10 @@ uiTest('saving an edit of a keyword deleted elsewhere closes the editor', async 
   const document = { getElementById: (id: string) => ({ focus: () => focused.push(id) }) };
   const api = fakeApi(stored);
   const ui = await openKeywords(api, { document });
-  await ui.click('수정', item(ui, '대각화'));
+  await ui.click('Edit', item(ui, '대각화'));
   api.rows.splice(1, 1);
   await ui.submit(ui.find((n) => n.props.className === 'editing', dayCard(ui))[0]);
-  assert.match(alertText(ui), /키워드를 찾을 수 없습니다/);
+  assert.match(alertText(ui), /Keyword not found/);
   assert.equal(ui.find((n) => n.props.className === 'editing', dayCard(ui)).length, 0);
   assert.deepEqual(listed(ui, dayCard(ui)), ['고유값:Ax = λx']);
   // The closed editor's buttons are gone; focus goes to the day heading.
@@ -258,33 +261,33 @@ uiTest('saving an edit of a keyword deleted elsewhere closes the editor', async 
 uiTest('search lists matches across dates and a date opens that day', async () => {
   const api = fakeApi(stored);
   const ui = await openKeywords(api);
-  await ui.fill('검색어', ' 고유값 ');
-  await ui.fill('시작일', '2026-10-01');
+  await ui.fill('Search term', ' 고유값 ');
+  await ui.fill('Start date', '2026-10-01');
   await ui.submit(searchCard(ui));
   assert.equal(
     api.requests.at(-1)?.path,
     '/api/keywords?q=%EA%B3%A0%EC%9C%A0%EA%B0%92&from=2026-10-01',
   );
-  assert.match(ui.text(searchCard(ui)), /2개를 찾았습니다/);
+  assert.match(ui.text(searchCard(ui)), /Found 2/);
   // Newest date first; a memo match counts too.
   assert.deepEqual(listed(ui, searchCard(ui)), ['고유값:Ax = λx', '행렬식:고유값 계산에 쓴다']);
   await ui.click('2026-10-20', searchCard(ui));
-  assert.equal(ui.field('날짜'), '2026-10-20');
+  assert.equal(ui.field('Date'), '2026-10-20');
   assert.deepEqual(listed(ui, dayCard(ui, '2026-10-20')), ['행렬식:고유값 계산에 쓴다']);
 
-  await ui.fill('검색어', '없는말');
+  await ui.fill('Search term', '없는말');
   await ui.submit(searchCard(ui));
-  assert.match(ui.text(searchCard(ui)), /검색 결과가 없습니다/);
+  assert.match(ui.text(searchCard(ui)), /No results/);
 });
 
 uiTest('changes refresh the shown search results', async () => {
   const api = fakeApi(stored);
   const ui = await openKeywords(api);
-  await ui.fill('검색어', '고유');
+  await ui.fill('Search term', '고유');
   await ui.submit(searchCard(ui));
   assert.equal(listed(ui, searchCard(ui)).length, 2);
-  await ui.fill('키워드', '고유벡터');
-  await ui.submit(section(ui, '키워드 입력'));
+  await ui.fill('Keyword', '고유벡터');
+  await ui.submit(section(ui, 'Keyword entry'));
   assert.deepEqual(listed(ui, searchCard(ui)), [
     '고유값:Ax = λx',
     '고유벡터:',
@@ -296,8 +299,8 @@ uiTest('controls are locked while a change is pending', async () => {
   let release = () => {};
   const api = fakeApi(stored, { holdChange: new Promise<void>((r) => (release = r)) });
   const ui = await openKeywords(api);
-  await ui.click('삭제', item(ui, '고유값'));
-  await ui.click('삭제 확인', item(ui, '고유값'));
+  await ui.click('Delete', item(ui, '고유값'));
+  await ui.click('Confirm delete', item(ui, '고유값'));
   const controls = ui.find(
     (n) => (n.type === 'button' || n.type === 'input') && n.props.disabled !== undefined,
     ui.find((n) => n.props.className === 'keywords')[0],
@@ -310,13 +313,13 @@ uiTest('controls are locked while a change is pending', async () => {
 
 uiTest('failed loads are reported instead of claiming there is nothing', async () => {
   const api = fakeApi(stored, {
-    reject: { method: 'GET', status: 500, error: '서버 오류가 발생했습니다' },
+    reject: { method: 'GET', status: 500, error: 'Server error' },
   });
   const ui = await openKeywords(api);
-  assert.match(ui.text(dayCard(ui)), /키워드를 불러오지 못했습니다: 서버 오류가 발생했습니다/);
-  assert.doesNotMatch(ui.text(dayCard(ui)), /남긴 키워드가 없습니다/);
+  assert.match(ui.text(dayCard(ui)), /Could not load the keywords: Server error/);
+  assert.doesNotMatch(ui.text(dayCard(ui)), /No keywords on this date/);
   await ui.submit(searchCard(ui));
-  assert.match(ui.text(searchCard(ui)), /검색하지 못했습니다: 서버 오류가 발생했습니다/);
+  assert.match(ui.text(searchCard(ui)), /Could not search: Server error/);
 });
 
 uiTest('keyword buttons name the keyword they act on', async () => {
@@ -324,7 +327,7 @@ uiTest('keyword buttons name the keyword they act on', async () => {
   const labels = ui
     .find((n) => n.type === 'button' && typeof n.props['aria-label'] === 'string', dayCard(ui))
     .map((n) => n.props['aria-label']);
-  assert.deepEqual(labels, ['대각화 수정', '대각화 삭제']);
+  assert.deepEqual(labels, ['대각화 edit', '대각화 delete']);
 });
 
 uiTest('the search request leaves out blank fields', () => {
@@ -340,8 +343,8 @@ uiTest('the search request leaves out blank fields', () => {
 
 uiTest('clearing the date field keeps the last picked date', async () => {
   const ui = await openKeywords(fakeApi(stored));
-  await ui.fill('날짜', '');
-  assert.equal(ui.field('날짜'), today);
+  await ui.fill('Date', '');
+  assert.equal(ui.field('Date'), today);
   assert.deepEqual(listed(ui, dayCard(ui)), ['고유값:Ax = λx', '대각화:']);
 });
 
@@ -349,16 +352,16 @@ uiTest('a failed search is not brought back by a later change', async () => {
   const options: Options = {};
   const api = fakeApi(stored, options);
   const ui = await openKeywords(api);
-  await ui.fill('검색어', '고유');
+  await ui.fill('Search term', '고유');
   await ui.submit(searchCard(ui));
   assert.equal(listed(ui, searchCard(ui)).length, 2);
-  await ui.fill('검색어', '행렬');
-  options.reject = { method: 'GET', status: 500, error: '서버 오류가 발생했습니다' };
+  await ui.fill('Search term', '행렬');
+  options.reject = { method: 'GET', status: 500, error: 'Server error' };
   await ui.submit(searchCard(ui));
   options.reject = undefined;
-  assert.match(ui.text(searchCard(ui)), /검색하지 못했습니다/);
-  await ui.fill('키워드', '여인수');
-  await ui.submit(section(ui, '키워드 입력'));
+  assert.match(ui.text(searchCard(ui)), /Could not search/);
+  await ui.fill('Keyword', '여인수');
+  await ui.submit(section(ui, 'Keyword entry'));
   // No results of the old "고유" search under the "행렬" query.
   assert.deepEqual(listed(ui, searchCard(ui)), []);
   assert.equal(
@@ -370,8 +373,8 @@ uiTest('a failed search is not brought back by a later change', async () => {
 
 uiTest('the search dates cannot cross', async () => {
   const ui = await openKeywords(fakeApi());
-  await ui.fill('시작일', '2026-10-10');
-  await ui.fill('종료일', '2026-10-20');
+  await ui.fill('Start date', '2026-10-10');
+  await ui.fill('End date', '2026-10-20');
   const [from, to] = ui.find((n) => n.type === 'input' && n.props.type === 'date', searchCard(ui));
   assert.equal(from.props.max, '2026-10-20');
   assert.equal(to.props.min, '2026-10-10');
@@ -381,12 +384,12 @@ uiTest('after an edit, a cancel or a delete the day heading takes focus', async 
   const focused: string[] = [];
   const document = { getElementById: (id: string) => ({ focus: () => focused.push(id) }) };
   const ui = await openKeywords(fakeApi(stored), { document });
-  await ui.click('수정', item(ui, '대각화'));
+  await ui.click('Edit', item(ui, '대각화'));
   await ui.submit(ui.find((n) => n.props.className === 'editing', dayCard(ui))[0]);
-  await ui.click('수정', item(ui, '대각화'));
-  await ui.click('취소', ui.find((n) => n.props.className === 'editing', dayCard(ui))[0]);
-  await ui.click('삭제', item(ui, '대각화'));
-  await ui.click('삭제 확인', item(ui, '대각화'));
+  await ui.click('Edit', item(ui, '대각화'));
+  await ui.click('Cancel', ui.find((n) => n.props.className === 'editing', dayCard(ui))[0]);
+  await ui.click('Delete', item(ui, '대각화'));
+  await ui.click('Confirm delete', item(ui, '대각화'));
   // Save, cancel, then the delete flow: its confirm button and the heading after (#86).
   assert.deepEqual(focused, [
     'keyword-day',
@@ -400,8 +403,8 @@ uiTest('after an edit, a cancel or a delete the day heading takes focus', async 
 uiTest('a double submit in the same tick adds the keyword once', async () => {
   const api = fakeApi();
   const ui = await openKeywords(api);
-  await ui.fill('키워드', '고유값');
-  const [form] = ui.find((n) => n.type === 'form', section(ui, '키워드 입력'));
+  await ui.fill('Keyword', '고유값');
+  const [form] = ui.find((n) => n.type === 'form', section(ui, 'Keyword entry'));
   const onSubmit = form.props.onSubmit as (event: { preventDefault(): void }) => unknown;
   void onSubmit({ preventDefault() {} });
   void onSubmit({ preventDefault() {} });
@@ -439,17 +442,17 @@ uiTest('keyword delete focus: back on cancel and on a failure, heading on 404', 
   const api = fakeApi(stored, options);
   const ui = await openKeywords(api, { document });
   state.ui = ui;
-  await press(ui, '대각화 삭제');
+  await press(ui, '대각화 delete');
   assert.equal(focused.at(-1), 'keyword-delete-confirm-2');
-  await press(ui, '대각화 삭제 취소');
+  await press(ui, '대각화 cancel deletion');
   assert.equal(focused.at(-1), 'keyword-delete-2');
-  options.reject = { method: 'DELETE', status: 500, error: '서버 오류가 발생했습니다' };
-  await press(ui, '대각화 삭제');
-  await press(ui, '대각화 삭제 확인');
+  options.reject = { method: 'DELETE', status: 500, error: 'Server error' };
+  await press(ui, '대각화 delete');
+  await press(ui, '대각화 confirm deletion');
   assert.equal(focused.at(-1), 'keyword-delete-2');
   options.reject = undefined;
   api.rows.splice(1, 1);
-  await press(ui, '대각화 삭제');
-  await press(ui, '대각화 삭제 확인');
+  await press(ui, '대각화 delete');
+  await press(ui, '대각화 confirm deletion');
   assert.equal(focused.at(-1), 'keyword-day');
 });

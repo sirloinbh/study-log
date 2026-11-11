@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import { chapterDays } from '../src/schedules.js';
 
 test('the example of the rules: longer days hold more of the book', () => {
-  // docs/decisions/schedule-rules.md 2장: boundaries at 5, 10, 15 and 20.
+  // docs/decisions/schedule-rules.md section 2: boundaries at 5, 10, 15 and 20.
   assert.deepEqual(chapterDays([2, 2, 2, 2, 2, 5, 5], 4), [[0], [0], [0, 1], [1], [1], [2], [3]]);
 });
 

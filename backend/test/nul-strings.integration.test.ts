@@ -7,12 +7,12 @@ import { withApi } from './helpers.js';
 
 const url = process.env.TEST_DATABASE_URL;
 
-const message = '입력에 사용할 수 없는 문자(NUL)가 있습니다';
+const message = 'Input contains a character that is not allowed (NUL)';
 
 // #58. Requires a dedicated test DB with database/migrations applied. Skipped (not passed)
 // without it.
 test(
-  'a NUL character anywhere in the input is a Korean 400 against the real database',
+  'a NUL character anywhere in the input is an English 400 against the real database',
   { skip: !url },
   async (t) => {
     const pool = new Pool({ connectionString: url });

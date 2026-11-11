@@ -292,11 +292,11 @@ test('textbooks and schedules are counted as the rules say', { skip: !url }, asy
         for (const query of ['textbookId=abc', 'textbookId=', 'textbookId=1&textbookId=2']) {
           const wrong = await call(`/api/stats/textbooks?${query}`);
           assert.equal(wrong.status, 400, query);
-          assert.match(String(wrong.data.error), /교재 ID/);
+          assert.match(String(wrong.data.error), /Invalid textbook ID/);
         }
         const none = await call('/api/stats/textbooks?textbookId=999999999999');
         assert.equal(none.status, 404);
-        assert.match(String(none.data.error), /교재를 찾을 수 없습니다/);
+        assert.match(String(none.data.error), /Textbook not found/);
       });
     },
     {

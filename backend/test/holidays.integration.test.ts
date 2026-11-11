@@ -68,7 +68,7 @@ test('holidays are kept per year and read again as the rules say', { skip: !url 
 
   await t.test('a failed or empty reading keeps the copy there is', async () => {
     answer = () => {
-      throw new HolidayError('공휴일 정보를 읽지 못했습니다');
+      throw new HolidayError('Could not read the holiday data');
     };
     assert.deepEqual([...(await load(2190, 2190, later(30)))].sort(), ['2190-05-05', '2190-05-06']);
     answer = () => [];
@@ -95,7 +95,7 @@ test('holidays are kept per year and read again as the rules say', { skip: !url 
     answer = () => [];
     await assert.rejects(load(2192, 2192), (error: Error) => {
       assert.ok(error instanceof HolidayError);
-      assert.match(error.message, /2192년 공휴일 정보가 없어 일정을 만들 수 없습니다/);
+      assert.match(error.message, /No holiday data for 2192, so the schedule cannot be made/);
       return true;
     });
     const none = await pool.query('SELECT 1 FROM holiday_years WHERE year = 2192');
@@ -107,7 +107,7 @@ test('holidays are kept per year and read again as the rules say', { skip: !url 
 
   await t.test('the reason for a refusal is passed on; any other failure is not', async () => {
     answer = () => {
-      throw new HolidayError('공휴일 API 키(HOLIDAY_API_KEY)가 서버에 설정되지 않았습니다');
+      throw new HolidayError('The holiday API key (HOLIDAY_API_KEY) is not set on the server');
     };
     await assert.rejects(load(2193, 2193), /HOLIDAY_API_KEY/);
     answer = () => {

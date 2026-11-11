@@ -138,41 +138,41 @@ test('reviews are listed by range and moved one round at a time', { skip: !url }
         await call(`/api/reviews/${id}/complete`, { method: 'POST' });
         for (const answer of [await snooze(id), await move(id, `${year}-09-01`)]) {
           assert.equal(answer.status, 409);
-          assert.equal(answer.data.error, '이미 완료한 복습입니다');
+          assert.equal(answer.data.error, 'This review is already completed');
         }
         assert.equal((await rows(logId))[0].due, `${year}-08-02`);
       });
 
-      await t.test('a review that does not exist answers a Korean 404', async () => {
+      await t.test('a review that does not exist answers an English 404', async () => {
         for (const answer of [
           await snooze(999_999_999_999_998),
           await move(999_999_999_999_998, `${year}-09-01`),
         ]) {
           assert.equal(answer.status, 404);
-          assert.equal(answer.data.error, '복습을 찾을 수 없습니다');
+          assert.equal(answer.data.error, 'Review not found');
         }
       });
 
-      await t.test('a bad date or id answers a Korean 400 and changes nothing', async () => {
+      await t.test('a bad date or id answers an English 400 and changes nothing', async () => {
         const logId = await create(`${year}-10-01`, '잘못된 날짜');
         const { id } = await find('잘못된 날짜');
         for (const [dueDate, message] of [
-          [undefined, '예정일을 입력하세요'],
-          [20, '예정일 형식이 올바르지 않습니다'],
-          ['8044/01/01', '예정일은 YYYY-MM-DD 형식으로 입력하세요'],
-          ['8044-02-31', '존재하지 않는 날짜입니다'],
-          ['0000-01-01', '존재하지 않는 날짜입니다'],
+          [undefined, 'Enter the due date'],
+          [20, 'The due date format is invalid'],
+          ['8044/01/01', 'The due date must be in YYYY-MM-DD format'],
+          ['8044-02-31', 'This date does not exist'],
+          ['0000-01-01', 'This date does not exist'],
         ]) {
           const { status, data } = await move(id, dueDate);
           assert.equal(status, 400);
           assert.equal(data.error, message);
         }
         const noBody = await call(`/api/reviews/${id}/due-date`, { method: 'PUT' });
-        assert.equal(noBody.data.error, '예정일을 JSON 객체로 보내세요');
+        assert.equal(noBody.data.error, 'Send the due date as a JSON object');
         assert.equal((await rows(logId))[0].due, `${year}-10-02`);
         const badId = await call('/api/reviews/abc/snooze', { method: 'POST' });
         assert.equal(badId.status, 400);
-        assert.equal(badId.data.error, '복습 ID가 올바르지 않습니다');
+        assert.equal(badId.data.error, 'Invalid review ID');
       });
     },
     { today: () => today },

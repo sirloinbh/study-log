@@ -15,35 +15,35 @@ import { Textbooks } from './textbooks';
 const pages = [
   {
     key: 'logs',
-    label: '학습 기록',
+    label: 'Study log',
     icon: NotebookPen,
-    description: '오늘 공부한 시간과 내용을 기록하고 최근 기록을 확인합니다',
+    description: 'Record the time and topics you studied today and review recent logs',
   },
   {
     key: 'textbooks',
-    label: '교재',
+    label: 'Textbook',
     icon: BookOpen,
-    description: '공부할 교재를 등록하고 제목·저자·판본을 관리합니다',
+    description: 'Register textbooks and manage the title, author, and edition',
   },
   {
     key: 'keywords',
-    label: '키워드',
+    label: 'Keyword',
     icon: Tags,
-    description: '공부하며 만난 중요한 키워드를 날짜별로 남기고 다시 찾습니다',
+    description: 'Save important keywords you meet while studying by date and find them again',
   },
   {
     key: 'stats',
-    label: '통계',
+    label: 'Stats',
     icon: ChartColumn,
-    description: '기간별 학습 시간과 하루 평균을 한눈에 봅니다',
+    description: 'See study time by period and the daily average at a glance',
   },
   {
     key: 'retrospectives',
-    label: '회고',
+    label: 'Retrospective',
     icon: NotebookText,
-    description: '한 주와 한 달의 공부를 돌아보며 회고를 남깁니다',
+    description: 'Look back on a week or a month of study and write a retrospective',
   },
-  { key: 'settings', label: '설정', icon: Settings2, description: '앱 환경과 데이터 관리' },
+  { key: 'settings', label: 'Settings', icon: Settings2, description: 'App settings and data management' },
 ];
 
 export function App() {
@@ -56,10 +56,10 @@ export function App() {
         setHealth(
           response.ok && data.today
             ? { state: 'ok', today: data.today }
-            : { state: 'error', message: data.error ?? '서버 상태를 확인할 수 없습니다' },
+            : { state: 'error', message: data.error ?? 'Cannot check the server status' },
         );
       })
-      .catch(() => setHealth({ state: 'error', message: '서버에 연결할 수 없습니다' }));
+      .catch(() => setHealth({ state: 'error', message: 'Cannot reach the server' }));
   }, []);
   const current = pages.find((item) => item.key === page) ?? pages[0];
   return (
@@ -67,7 +67,7 @@ export function App() {
       <aside>
         <a className="logo" href="#" onClick={() => setPage('logs')}>
           <span className="logo-mark">S</span>
-          <span>공부 기록</span>
+          <span>Study Log</span>
         </a>
         <nav aria-label="주요 메뉴">
           {pages.map((item) => (
@@ -113,8 +113,8 @@ export function App() {
         )}
         {current.key === 'settings' && (
           <section className="card empty">
-            <h2>아직 설정 항목이 없습니다</h2>
-            <p>설정은 관련 이슈 카드에서 추가합니다.</p>
+            <h2>No settings yet</h2>
+            <p>Settings are added in the related issue cards.</p>
           </section>
         )}
       </main>

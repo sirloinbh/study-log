@@ -16,7 +16,7 @@ const counting = () => {
   return { pool, counter };
 };
 
-test('requests over the limit get a Korean 429 and never reach the database', async () => {
+test('requests over the limit get an English 429 and never reach the database', async () => {
   const { pool, counter } = counting();
   await withApi(
     pool,
@@ -25,7 +25,7 @@ test('requests over the limit get a Korean 429 and never reach the database', as
       assert.equal((await call('/api/keywords')).status, 200);
       const refused = await call('/api/keywords');
       assert.equal(refused.status, 429);
-      assert.equal(refused.data.error, '요청이 너무 많습니다. 잠시 뒤 다시 시도하세요');
+      assert.equal(refused.data.error, 'Too many requests. Try again in a moment');
     },
     { requestsPerMinute: 2 },
   );

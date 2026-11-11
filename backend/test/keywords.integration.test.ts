@@ -44,7 +44,7 @@ test(
         // Same keyword on the same day, in any case, is refused; another day is fine.
         const again = await add({ keyword: '고유값', date: days[2] });
         assert.equal(again.status, 409);
-        assert.equal(again.data.error, '이 날짜에 이미 있는 키워드입니다');
+        assert.equal(again.data.error, 'This keyword already exists on this date');
         assert.equal((await add({ keyword: 'rank', date: days[1] })).status, 409);
         assert.equal((await add({ keyword: '고유값', date: days[1] })).status, 201);
 

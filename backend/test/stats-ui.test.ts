@@ -47,7 +47,7 @@ function fakeApi(options: Options = {}) {
     if (path === '/api/textbooks') return reply(200, { textbooks: [] });
     if (path === '/api/stats/heatmap')
       return options.heatmap === null
-        ? reply(500, { error: '서버 오류가 발생했습니다' })
+        ? reply(500, { error: 'Server error' })
         : reply(200, options.heatmap ?? { from: '2026-10-19', to: '2026-10-19', daily: [] });
     if (path.startsWith('/api/stats/reviews'))
       return reply(200, {
@@ -66,7 +66,7 @@ function fakeApi(options: Options = {}) {
     if (options.hold?.periods.includes(period)) await options.hold.until;
     return period in totals
       ? reply(200, { ...statsFor(period, totals[period]), ...options.series })
-      : reply(500, { error: '서버 오류가 발생했습니다' });
+      : reply(500, { error: 'Server error' });
   };
   return { fetch, asked };
 }
@@ -87,12 +87,12 @@ const pressed = (ui: Ui) =>
   ui
     .find((n) => n.type === 'button' && n.props['aria-pressed'] === true, periodGroup(ui))
     .map((n) => ui.text(n));
-const periodGroup = (ui: Ui) => ui.find((n) => n.props['aria-label'] === '기간')[0];
+const periodGroup = (ui: Ui) => ui.find((n) => n.props['aria-label'] === 'Period')[0];
 
 async function openStats(api: ReturnType<typeof fakeApi>) {
   const ui = mount(api.fetch);
   await ui.settle();
-  await ui.click('통계');
+  await ui.click('Stats');
   return ui;
 }
 
@@ -100,39 +100,39 @@ uiTest('the dashboard opens on this week with the four metric cards', async () =
   const api = fakeApi();
   const ui = await openStats(api);
   assert.deepEqual(api.asked, ['week']);
-  assert.deepEqual(pressed(ui), ['이번 주']);
+  assert.deepEqual(pressed(ui), ['This week']);
   assert.deepEqual(cards(ui), [
-    '총 학습 시간:11시간 5분',
-    '오늘:1시간 30분',
-    '이번 주:4시간 45분',
-    '하루 평균:57분',
+    'Total study time:11 h 5 min',
+    'Today:1 h 30 min',
+    'This week:4 h 45 min',
+    'Daily average:57 min',
   ]);
   assert.match(ui.text(), /2026-10-19 ~ 2026-10-23/);
-  assert.match(ui.text(), /5일 중 3일 공부/);
-  assert.match(ui.text(), /공부한 날만 1시간 35분/);
+  assert.match(ui.text(), /3 of 5 days studied/);
+  assert.match(ui.text(), /Study days only: 1 h 35 min/);
   // The cards hold more than the period (the all-time total), so their group is named neutrally.
   assert.equal(
     ui.find((n) => n.props.className === 'metric-grid')[0].props['aria-label'],
-    '학습 시간 지표',
+    'Study time metrics',
   );
 });
 
 uiTest('picking a period asks for it and relabels the period card', async () => {
   const api = fakeApi();
   const ui = await openStats(api);
-  await ui.click('이번 달');
+  await ui.click('This month');
   assert.deepEqual(api.asked, ['week', 'month']);
-  assert.deepEqual(pressed(ui), ['이번 달']);
+  assert.deepEqual(pressed(ui), ['This month']);
   assert.deepEqual(cards(ui), [
-    '총 학습 시간:11시간 5분',
-    '오늘:1시간 30분',
-    '이번 달:8시간 5분',
-    '하루 평균:21분',
+    'Total study time:11 h 5 min',
+    'Today:1 h 30 min',
+    'This month:8 h 5 min',
+    'Daily average:21 min',
   ]);
-  assert.match(ui.text(), /이번 달 기준/);
+  assert.match(ui.text(), /Based on This month/);
   for (const [label, period] of [
-    ['최근 3개월', '3months'],
-    ['전체', 'all'],
+    ['Last 3 months', '3months'],
+    ['All', 'all'],
   ]) {
     await ui.click(label);
     assert.equal(api.asked.at(-1), period);
@@ -144,26 +144,26 @@ uiTest("a slow answer for the previous period is not shown as the new one's", as
   const api = fakeApi({ hold: { periods: ['week'], until: new Promise((r) => (release = r)) } });
   const ui = await openStats(api);
   // Announced while waiting, so the change to the cards is not silent.
-  assert.match(ui.text(ui.find((n) => n.props.role === 'status').at(-1)), /불러오는 중/);
-  await ui.click('이번 달');
+  assert.match(ui.text(ui.find((n) => n.props.role === 'status').at(-1)), /Loading/);
+  await ui.click('This month');
   release();
   await ui.settle();
-  assert.deepEqual(pressed(ui), ['이번 달']);
-  assert.equal(cards(ui)[2], '이번 달:8시간 5분');
+  assert.deepEqual(pressed(ui), ['This month']);
+  assert.equal(cards(ui)[2], 'This month:8 h 5 min');
 });
 
 uiTest('a failed load is reported instead of empty cards', async () => {
   const api = fakeApi({ totals: { week: 285 } });
   const ui = await openStats(api);
-  await ui.click('이번 달');
+  await ui.click('This month');
   assert.match(
     ui.text(ui.find((n) => n.props.role === 'alert')),
-    /통계를 불러오지 못했습니다: 서버 오류가 발생했습니다/,
+    /Could not load the stats: Server error/,
   );
   assert.deepEqual(cards(ui), []);
-  assert.doesNotMatch(ui.text(), /불러오는 중/);
+  assert.doesNotMatch(ui.text(), /Loading/);
   // Going back to a period that loads shows its cards again.
-  await ui.click('이번 주');
+  await ui.click('This week');
   assert.equal(cards(ui).length, 4);
 });
 
@@ -208,23 +208,26 @@ uiTest('the heatmap shows each day in its band with a tooltip, by week columns',
     'future',
     'future',
   ]);
-  const [ninetyNine] = ui.find((n) => n.props.title === '2026-10-09: 1시간 59분');
+  const [ninetyNine] = ui.find((n) => n.props.title === '2026-10-09: 1 h 59 min');
   assert.ok(ninetyNine, 'tooltip of 2026-10-09');
   // One summary for screen readers.
   const [image] = ui.find((n) => n.props.role === 'img');
-  assert.equal(image.props['aria-label'], '2026-10-04부터 2026-10-13까지 7일 공부, 총 7시간 23분');
-  assert.match(ui.text(), /7일 공부 · 총 7시간 23분/);
+  assert.equal(
+    image.props['aria-label'],
+    '2026-10-04 to 2026-10-13: 7 study days, total 7 h 23 min',
+  );
+  assert.match(ui.text(), /7 study days · total 7 h 23 min/);
   assert.deepEqual(
     ui
       .find((n) => n.props.className === 'heat-legend')
       .flatMap((list) => ui.find((n) => n.type === 'li', list).map((n) => ui.text(n))),
-    ['0분', '30분 미만', '30분~1시간', '1~2시간', '2시간 이상'],
+    ['0 min', 'Under 30 min', '30 min–1 h', '1–2 h', '2 h or more'],
   );
 });
 
 uiTest('a failed heatmap load is reported and the metric cards stay', async () => {
   const ui = await openStats(fakeApi({ heatmap: null }));
-  assert.match(ui.text(), /히트맵을 불러오지 못했습니다: 서버 오류가 발생했습니다/);
+  assert.match(ui.text(), /Could not load the heatmap: Server error/);
   assert.equal(cards(ui).length, 4);
 });
 
@@ -253,7 +256,7 @@ uiTest('heatmap levels, weeks and month labels', () => {
       { date: '2026-09-28', minutes: 0 },
       { date: '2026-10-01', minutes: 0 },
     ]),
-    '10월',
+    'Oct',
   );
   assert.equal(logic.monthLabel([{ date: '2026-09-21', minutes: 0 }, null]), '');
 });
@@ -286,7 +289,7 @@ uiTest('the chart shows the period by day, with a sentence naming the busiest da
     chartData(ui).map((b) => `${b.label}:${b.hours}`),
     ['10/19:0', '10/20:1.5', '10/21:2.5', '10/22:0.8'],
   );
-  assert.match(ui.text(chart(ui)), /4개 날 중 가장 많이 공부한 날은 10\/21\(2시간 30분\)입니다/);
+  assert.match(ui.text(chart(ui)), /Busiest day of 4 days: 10\/21 \(2 h 30 min\)/);
   // Bars show hours; the tooltip shows the exact minutes.
   const [bar] = ui.find((n) => n.type === 'recharts:Bar', chart(ui));
   assert.equal(bar.props.dataKey, 'hours');
@@ -294,7 +297,7 @@ uiTest('the chart shows the period by day, with a sentence naming the busiest da
   const format = tooltip.props.formatter as (v: number, n: string, i: unknown) => unknown;
   assert.deepEqual(
     JSON.parse(JSON.stringify(format(2.5, 'hours', { payload: { minutes: 150 } }))),
-    ['2시간 30분', '학습 시간'],
+    ['2 h 30 min', 'Study time'],
   );
 });
 
@@ -306,38 +309,38 @@ uiTest(
       ui
         .find((n) => n.type === 'button' && n.props['aria-pressed'] === true, chart(ui))
         .map((n) => ui.text(n));
-    assert.deepEqual(unitPressed(), ['일']);
-    await ui.click('주', chart(ui));
-    assert.deepEqual(unitPressed(), ['주']);
+    assert.deepEqual(unitPressed(), ['Day']);
+    await ui.click('Week', chart(ui));
+    assert.deepEqual(unitPressed(), ['Week']);
     assert.deepEqual(
       chartData(ui).map((b) => `${b.label}:${b.minutes}`),
       ['10/11~:200', '10/18~:285'],
     );
-    assert.match(ui.text(chart(ui)), /2개 주 중 가장 많이 공부한 주는 10\/18~/);
-    await ui.click('월', chart(ui));
+    assert.match(ui.text(chart(ui)), /Busiest week of 2 weeks: 10\/18~/);
+    await ui.click('Month', chart(ui));
     // A single bar still draws and is named.
     assert.deepEqual(
       chartData(ui).map((b) => `${b.label}:${b.minutes}`),
       ['26.10:485'],
     );
-    assert.match(ui.text(chart(ui)), /1개 달 중 가장 많이 공부한 달은 26\.10\(8시간 5분\)/);
+    assert.match(ui.text(chart(ui)), /Busiest month of 1 month: 26\.10 \(8 h 5 min\)/);
     // Another period starts at its own unit; coming back keeps the pick.
-    await ui.click('최근 3개월');
-    assert.deepEqual(unitPressed(), ['주']);
-    await ui.click('이번 주');
-    assert.deepEqual(unitPressed(), ['월']);
+    await ui.click('Last 3 months');
+    assert.deepEqual(unitPressed(), ['Week']);
+    await ui.click('This week');
+    assert.deepEqual(unitPressed(), ['Month']);
   },
 );
 
 uiTest('a period without study says so instead of an empty chart', async () => {
   const ui = await openStats(fakeApi());
-  assert.match(ui.text(chart(ui)), /이 기간에는 학습 기록이 없습니다/);
+  assert.match(ui.text(chart(ui)), /There are no study logs in this period/);
   assert.equal(ui.find((n) => n.type === 'recharts:BarChart', chart(ui)).length, 0);
   const zeros = fakeApi({
     series: { daily: [{ date: '2026-10-19', minutes: 0 }], weekly: [], monthly: [] },
   });
   const ui2 = await openStats(zeros);
-  assert.match(ui2.text(chart(ui2)), /이 기간에는 학습 기록이 없습니다/);
+  assert.match(ui2.text(chart(ui2)), /There are no study logs in this period/);
 });
 
 uiTest('chart bars, labels and the busiest bar', () => {
@@ -369,7 +372,7 @@ uiTest('a chart that fails to load says so and keeps the summary sentence', asyn
   });
   const ui = mount(fakeApi({ series }).fetch, {}, modules);
   await ui.settle();
-  await ui.click('통계');
-  assert.match(ui.text(chart(ui)), /그래프를 불러오지 못했습니다: Failed to fetch/);
-  assert.match(ui.text(chart(ui)), /가장 많이 공부한 날은 10\/21/);
+  await ui.click('Stats');
+  assert.match(ui.text(chart(ui)), /Could not load the chart: Failed to fetch/);
+  assert.match(ui.text(chart(ui)), /Busiest day of 4 days: 10\/21/);
 });

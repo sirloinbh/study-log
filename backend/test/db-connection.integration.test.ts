@@ -63,7 +63,7 @@ test('losing database connections never ends the process', { skip: !url }, async
     await works();
   });
 
-  await t.test('a connection lost during a request: a Korean 500, then normal', async () => {
+  await t.test('a connection lost during a request: an English 500, then normal', async () => {
     await withApi(pool, async (call) => {
       const created = await call('/api/study-logs', {
         method: 'POST',
@@ -96,7 +96,7 @@ test('losing database connections never ends the process', { skip: !url }, async
         await kill(waiting);
         const { status, data } = await saving;
         assert.equal(status, 500);
-        assert.equal(data.error, '서버 오류가 발생했습니다');
+        assert.equal(data.error, 'Server error');
       } finally {
         await holder.query('ROLLBACK');
         holder.release();

@@ -73,38 +73,42 @@ test('without an answer only the problem is sent and the answer stays null', asy
 
 test('refusals, cut-off and unreadable replies and API failures become Korean errors', async () => {
   const cases: [() => unknown, number, RegExp][] = [
-    [() => message('', 'refusal'), 422, /번역할 수 없습니다/],
-    [() => message('{"body": "잘', 'max_tokens'), 502, /끝까지 받지 못했습니다/],
-    [() => message('not json'), 502, /번역 결과를 읽지 못했습니다/],
-    [() => message(JSON.stringify({ body: '  ', answer: '' })), 502, /번역 결과를 읽지 못했습니다/],
-    [() => message(JSON.stringify({ body: '가'.repeat(40001), answer: '' })), 502, /너무 깁니다/],
+    [() => message('', 'refusal'), 422, /cannot be translated/],
+    [() => message('{"body": "잘', 'max_tokens'), 502, /too long to receive in full/],
+    [() => message('not json'), 502, /Could not read the translation result/],
+    [
+      () => message(JSON.stringify({ body: '  ', answer: '' })),
+      502,
+      /Could not read the translation result/,
+    ],
+    [() => message(JSON.stringify({ body: '가'.repeat(40001), answer: '' })), 502, /too long/],
     [
       () => {
         throw new Anthropic.AuthenticationError(401, {}, 'invalid x-api-key', new Headers());
       },
       503,
-      /ANTHROPIC_API_KEY를 확인하세요/,
+      /Check ANTHROPIC_API_KEY/,
     ],
     [
       () => {
         throw new Anthropic.RateLimitError(429, {}, 'rate limited', new Headers());
       },
       429,
-      /잠시 뒤 다시 시도하세요/,
+      /Try again in a moment/,
     ],
     [
       () => {
         throw new Anthropic.InternalServerError(500, {}, 'overloaded', new Headers());
       },
       502,
-      /번역 서비스 오류가 발생했습니다 \(500\)/,
+      /Translation service error \(500\)/,
     ],
     [
       () => {
         throw new Anthropic.APIConnectionError({ message: 'Connection error.' });
       },
       502,
-      /연결하지 못했습니다/,
+      /Could not connect/,
     ],
     [
       () => {
@@ -114,14 +118,14 @@ test('refusals, cut-off and unreadable replies and API failures become Korean er
         );
       },
       503,
-      /ANTHROPIC_API_KEY\)가 서버에 설정되지 않았습니다/,
+      /ANTHROPIC_API_KEY\) is not set on the server/,
     ],
     [
       () => {
         throw new Anthropic.AnthropicError('Unexpected response');
       },
       502,
-      /번역 서비스 오류가 발생했습니다$/,
+      /Translation service error$/,
     ],
   ];
   for (const [reply, status, error] of cases) {
@@ -150,7 +154,7 @@ test('translation ids are checked and a missing exercise is a 404 before transla
         body: method === 'POST' ? {} : undefined,
       });
       assert.equal(status, 400, method);
-      assert.match(String(data.error), /연습문제 ID가 올바르지 않습니다/);
+      assert.match(String(data.error), /Invalid exercise ID/);
     }
   });
   let translated = 0;
@@ -164,7 +168,7 @@ test('translation ids are checked and a missing exercise is a 404 before transla
           body: method === 'POST' ? {} : undefined,
         });
         assert.equal(status, 404, method);
-        assert.equal(data.error, '연습문제를 찾을 수 없습니다');
+        assert.equal(data.error, 'Exercise not found');
       }
     },
     {
@@ -193,11 +197,11 @@ test('a failed translation answers its status and saves nothing', async () => {
         body: {},
       });
       assert.equal(status, 429);
-      assert.equal(data.error, '번역 요청이 많습니다. 잠시 뒤 다시 시도하세요');
+      assert.equal(data.error, 'Too many translation requests. Try again in a moment');
     },
     {
       translator: async () => {
-        throw new TranslationError(429, '번역 요청이 많습니다. 잠시 뒤 다시 시도하세요');
+        throw new TranslationError(429, 'Too many translation requests. Try again in a moment');
       },
     },
   );
@@ -227,7 +231,7 @@ test('translating takes only JSON, and one request per exercise at a time', asyn
       ]) {
         const { status, data } = await call('/api/exercises/7/translation', init);
         assert.equal(status, 415, JSON.stringify(init));
-        assert.equal(data.error, '번역 요청은 JSON으로 보내세요');
+        assert.equal(data.error, 'Send the translation request as JSON');
       }
       assert.equal(calls, 0);
       // A second request while the first is translating is refused, not paid for again.
@@ -235,7 +239,7 @@ test('translating takes only JSON, and one request per exercise at a time', asyn
       while (calls === 0) await new Promise((r) => setImmediate(r));
       const second = await call('/api/exercises/7/translation', { method: 'POST', body: {} });
       assert.equal(second.status, 409);
-      assert.equal(second.data.error, '이 문제는 이미 번역하는 중입니다');
+      assert.equal(second.data.error, 'This problem is already being translated');
       release();
       assert.equal((await first).status, 200);
       // Once done, the exercise can be translated again.

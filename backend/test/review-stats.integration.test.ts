@@ -122,10 +122,10 @@ test('review statistics follow the original due dates', { skip: !url }, async (t
         assert.equal(data.period, 'week');
       });
 
-      await t.test('an unknown period answers a Korean 400', async () => {
+      await t.test('an unknown period answers an English 400', async () => {
         const { status, data } = await call('/api/stats/reviews?period=year');
         assert.equal(status, 400);
-        assert.equal(data.error, '기간은 이번 주, 이번 달, 최근 3개월, 전체 중에서 고르세요');
+        assert.equal(data.error, 'The period must be this week, this month, last 3 months, or all');
       });
     },
     { today: () => today },

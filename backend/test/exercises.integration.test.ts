@@ -89,7 +89,7 @@ test(
       for (const init of [{}, { method: 'POST', body: { body: '문제' } }]) {
         const { status, data } = await call(path(linear, otherChapter), init);
         assert.equal(status, 404, init.method ?? 'GET');
-        assert.equal(data.error, '목차를 찾을 수 없습니다');
+        assert.equal(data.error, 'Contents entry not found');
       }
 
       const updated = await call(`/api/exercises/${exercise.id}`, {
@@ -216,14 +216,14 @@ test(
       assert.deepEqual((await call(answer(first))).data, { answer: null });
       const again = await call(answer(first), { method: 'DELETE' });
       assert.equal(again.status, 404);
-      assert.equal(again.data.error, '정답을 찾을 수 없습니다');
+      assert.equal(again.data.error, 'Answer not found');
 
       // A missing exercise has no answer to read or save.
       const missing = 999999999;
       assert.equal((await call(answer(missing))).status, 404);
       const orphan = await call(answer(missing), { method: 'PUT', body: { body: '답' } });
       assert.equal(orphan.status, 404);
-      assert.equal(orphan.data.error, '연습문제를 찾을 수 없습니다');
+      assert.equal(orphan.data.error, 'Exercise not found');
 
       // The database refuses a blank answer and a second answer for the same exercise.
       await call(answer(second), { method: 'PUT', body: { body: '정답' } });
@@ -335,10 +335,10 @@ test(
 
       const otherChapter = await call(`/api/textbooks/${book}/exercises?contentId=${limits}`);
       assert.equal(otherChapter.status, 404);
-      assert.equal(otherChapter.data.error, '목차를 찾을 수 없습니다');
+      assert.equal(otherChapter.data.error, 'Contents entry not found');
       const missing = await call('/api/textbooks/999999999/exercises');
       assert.equal(missing.status, 404);
-      assert.equal(missing.data.error, '교재를 찾을 수 없습니다');
+      assert.equal(missing.data.error, 'Textbook not found');
       assert.equal((await mark(999999999, true)).status, 404);
     });
   },

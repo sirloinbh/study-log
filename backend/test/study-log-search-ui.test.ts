@@ -85,7 +85,7 @@ function fakeApi(initial: Log[], options: { failSearch?: boolean } = {}) {
     );
     if (params.limit === '100') {
       searches.push(path);
-      if (options.failSearch) return reply(500, { error: '서버 오류가 발생했습니다' });
+      if (options.failSearch) return reply(500, { error: 'Server error' });
     }
     const words = (params.q ?? '').toLowerCase();
     const found = logs.filter(
@@ -102,7 +102,7 @@ function fakeApi(initial: Log[], options: { failSearch?: boolean } = {}) {
 }
 
 type Ui = ReturnType<typeof mount>;
-const card = (ui: Ui) => ui.find((n) => n.props['aria-label'] === '학습 기록 검색')[0];
+const card = (ui: Ui) => ui.find((n) => n.props['aria-label'] === 'Study log search')[0];
 const results = (ui: Ui) =>
   ui
     .find(
@@ -128,17 +128,17 @@ async function open(api: ReturnType<typeof fakeApi>) {
 uiTest('a search asks with every filled condition and lists the matches', async () => {
   const api = fakeApi(stored);
   const ui = await open(api);
-  await fillIn(ui, '검색어', ' 고유 ');
-  await fillIn(ui, '시작일', '2026-10-01');
+  await fillIn(ui, 'Search term', ' 고유 ');
+  await fillIn(ui, 'Start date', '2026-10-01');
   await ui.submit(card(ui));
   assert.deepEqual(api.searches, [
     '/api/study-logs?q=%EA%B3%A0%EC%9C%A0&from=2026-10-01&limit=100',
   ]);
-  assert.match(ui.text(card(ui)), /2개를 찾았습니다/);
+  assert.match(ui.text(card(ui)), /Found 2/);
   const found = results(ui);
   assert.equal(found.length, 2);
-  assert.match(found[0], /2026-10-20.*1시간.*완료.*선형대수.*고유값 정리/s);
-  assert.match(found[1], /어려웠던 부분: 고유벡터가 어려움/);
+  assert.match(found[0], /2026-10-20.*1 h.*Done.*선형대수.*고유값 정리/s);
+  assert.match(found[1], /Difficult parts: 고유벡터가 어려움/);
 });
 
 uiTest('the textbook condition narrows the search', async () => {
@@ -147,9 +147,9 @@ uiTest('the textbook condition narrows the search', async () => {
   const [select] = ui.find((n) => n.type === 'select', card(ui));
   assert.deepEqual(
     ui.find((n) => n.type === 'option', select).map((n) => ui.text(n)),
-    ['전체', '선형대수'],
+    ['All', '선형대수'],
   );
-  await fillIn(ui, '교재', '1');
+  await fillIn(ui, 'Textbook', '1');
   await ui.submit(card(ui));
   assert.equal(api.searches.at(-1), '/api/study-logs?textbookId=1&limit=100');
   assert.equal(results(ui).length, 1);
@@ -158,27 +158,27 @@ uiTest('the textbook condition narrows the search', async () => {
 uiTest('no match says so and a failed search is reported without old results', async () => {
   const api = fakeApi(stored);
   const ui = await open(api);
-  await fillIn(ui, '검색어', '없는말');
+  await fillIn(ui, 'Search term', '없는말');
   await ui.submit(card(ui));
-  assert.match(ui.text(card(ui)), /검색 결과가 없습니다/);
+  assert.match(ui.text(card(ui)), /No results/);
 
   const failing = fakeApi(stored, { failSearch: true });
   const ui2 = await open(failing);
   await ui2.submit(card(ui2));
-  assert.match(ui2.text(card(ui2)), /검색하지 못했습니다: 서버 오류가 발생했습니다/);
+  assert.match(ui2.text(card(ui2)), /Could not search: Server error/);
   assert.equal(results(ui2).length, 0);
 });
 
 uiTest('saving a log searches the shown results again', async () => {
   const api = fakeApi(stored);
   const ui = await open(api);
-  await fillIn(ui, '검색어', '고유');
+  await fillIn(ui, 'Search term', '고유');
   await ui.submit(card(ui));
   assert.equal(results(ui).length, 2);
   // The entry form is the page's first form.
-  await ui.fill('시작', '13:00');
-  await ui.fill('종료', '14:00');
-  await ui.fill('메모', '고유값 복습');
+  await ui.fill('Start', '13:00');
+  await ui.fill('End', '14:00');
+  await ui.fill('Memo', '고유값 복습');
   await ui.submit();
   assert.equal(api.searches.length, 2);
   assert.equal(results(ui).length, 3);

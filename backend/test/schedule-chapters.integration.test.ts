@@ -153,16 +153,16 @@ test('a book is laid out over a schedule, chapter by chapter', { skip: !url }, a
         const sectionId = (section.data.content as { id: number }).id;
         const [first, second] = four.chapters;
         const cases: [unknown, RegExp][] = [
-          [{ textbookId: 999_999_999_999 }, /교재를 찾을 수 없습니다/],
-          [{ textbookId: empty.id }, /목차에 장이 없어/],
-          [{ textbookId: four.id, fromContentId: other.chapters[0] }, /장을 찾을 수 없습니다/],
-          [{ textbookId: four.id, toContentId: sectionId }, /장을 찾을 수 없습니다/],
+          [{ textbookId: 999_999_999_999 }, /Textbook not found/],
+          [{ textbookId: empty.id }, /contents have no chapters/],
+          [{ textbookId: four.id, fromContentId: other.chapters[0] }, /Chapter not found/],
+          [{ textbookId: four.id, toContentId: sectionId }, /Chapter not found/],
           [
             { textbookId: four.id, fromContentId: second, toContentId: first },
-            /마지막 장은 첫 장 이후/,
+            /last chapter must come after the first/,
           ],
-          [{ textbookId: 'x' }, /교재 ID가 올바르지 않습니다/],
-          ['책', /장 범위를 JSON 객체로/],
+          [{ textbookId: 'x' }, /Invalid textbook ID/],
+          ['책', /chapter range as a JSON object/],
         ];
         for (const [chapters, message] of cases) {
           const before = holidayCalls;
@@ -221,7 +221,7 @@ test('a book is laid out over a schedule, chapter by chapter', { skip: !url }, a
         );
         whileReading = async () => undefined;
         assert.equal(refused.status, 400, JSON.stringify(refused.data));
-        assert.match(String(refused.data.error), /장을 찾을 수 없습니다/);
+        assert.match(String(refused.data.error), /Chapter not found/);
       });
 
       await t.test('creating waits for a change to the book in progress', async () => {
@@ -264,7 +264,7 @@ test('a book is laid out over a schedule, chapter by chapter', { skip: !url }, a
           );
           await finished;
           assert.equal(answered.status, 400, JSON.stringify(answered.data));
-          assert.match(String(answered.data.error), /장을 찾을 수 없습니다/);
+          assert.match(String(answered.data.error), /Chapter not found/);
         } finally {
           whileReading = async () => undefined;
           try {
@@ -286,7 +286,7 @@ test('a book is laid out over a schedule, chapter by chapter', { skip: !url }, a
         assert.equal(blockedBook.status, 409);
         assert.equal(
           blockedBook.data.error,
-          '학습 기록이나 일정이 연결된 교재는 삭제할 수 없습니다',
+          'A textbook with a study log or schedule attached cannot be deleted',
         );
         const blockedChapter = await call(
           `/api/textbooks/${kept.id}/contents/${kept.chapters[0]}`,
@@ -295,7 +295,7 @@ test('a book is laid out over a schedule, chapter by chapter', { skip: !url }, a
         assert.equal(blockedChapter.status, 409);
         assert.equal(
           blockedChapter.data.error,
-          '학습 기록이나 일정이 연결된 목차는 삭제할 수 없습니다',
+          'A contents entry with a study log or schedule attached cannot be deleted',
         );
 
         // A chapter added later is not laid out afterwards.

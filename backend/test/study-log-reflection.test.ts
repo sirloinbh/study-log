@@ -13,15 +13,18 @@ const untouchedPool = {
 
 const valid = { studyDate: '2026-10-21', startTime: '09:00', endTime: '10:30' };
 
-test('understanding, difficulties and goal answers are checked in Korean before the DB', async () => {
+test('understanding, difficulties and goal answers are checked in English before the DB', async () => {
   const cases: [Record<string, unknown>, RegExp][] = [
-    [{ ...valid, understanding: 0 }, /이해도는 1~5 사이 정수로 입력하세요/],
-    [{ ...valid, understanding: 6 }, /이해도는 1~5 사이 정수로 입력하세요/],
-    [{ ...valid, understanding: 3.5 }, /이해도는 1~5 사이 정수로 입력하세요/],
-    [{ ...valid, understanding: '4' }, /이해도는 1~5 사이 정수로 입력하세요/],
-    [{ ...valid, difficulties: 'x'.repeat(2001) }, /어려웠던 부분은 2000자 이하로 입력하세요/],
-    [{ ...valid, difficulties: 3 }, /어려웠던 부분 형식이 올바르지 않습니다/],
-    [{ ...valid, goalAchieved: 'yes' }, /목표 달성 여부 형식이 올바르지 않습니다/],
+    [{ ...valid, understanding: 0 }, /Understanding must be a whole number from 1 to 5/],
+    [{ ...valid, understanding: 6 }, /Understanding must be a whole number from 1 to 5/],
+    [{ ...valid, understanding: 3.5 }, /Understanding must be a whole number from 1 to 5/],
+    [{ ...valid, understanding: '4' }, /Understanding must be a whole number from 1 to 5/],
+    [
+      { ...valid, difficulties: 'x'.repeat(2001) },
+      /The difficult parts must be at most 2000 characters/,
+    ],
+    [{ ...valid, difficulties: 3 }, /The difficult-parts format is invalid/],
+    [{ ...valid, goalAchieved: 'yes' }, /The goal-achieved flag format is invalid/],
   ];
   await withApi(untouchedPool, async (call) => {
     for (const [body, message] of cases) {

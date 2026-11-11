@@ -22,35 +22,40 @@ test('a weekly period runs Sunday to Saturday and a monthly one 1st to last day 
   assert.deepEqual(periodOf('monthly', '2028-02-10'), { from: '2028-02-01', to: '2028-02-29' });
 });
 
-test('invalid periods and bodies are Korean 400s before touching the DB', async () => {
+test('invalid periods and bodies are English 400s before touching the DB', async () => {
   const week = '/api/retrospectives/weekly/2026-10-18';
   const cases: [string, string, unknown, RegExp][] = [
-    ['PUT', '/api/retrospectives/daily/2026-10-18', { body: '회고' }, /주간 또는 월간/],
+    ['PUT', '/api/retrospectives/daily/2026-10-18', { body: '회고' }, /weekly or monthly/],
     [
       'PUT',
       '/api/retrospectives/weekly/2026-10-19',
       { body: '회고' },
-      /주간 회고는 일요일부터 시작합니다/,
+      /A weekly retrospective starts on a Sunday/,
     ],
     [
       'PUT',
       '/api/retrospectives/monthly/2026-10-02',
       { body: '회고' },
-      /월간 회고는 1일부터 시작합니다/,
+      /A monthly retrospective starts on the 1st/,
     ],
-    ['PUT', '/api/retrospectives/weekly/2026-02-30', { body: '회고' }, /존재하지 않는 날짜/],
-    ['DELETE', '/api/retrospectives/weekly/2026-10-20', undefined, /주간 회고는 일요일부터/],
-    ['PUT', week, { body: ' \n ' }, /회고 내용을 입력하세요/],
-    ['PUT', week, {}, /회고 내용을 입력하세요/],
-    ['PUT', week, { body: 'x'.repeat(20001) }, /20000자 이하/],
-    ['PUT', week, ['회고'], /JSON 객체로 보내세요/],
-    ['GET', '/api/retrospectives/period?kind=yearly', undefined, /주간 또는 월간/],
-    ['GET', '/api/retrospectives/period?date=2026-13-01', undefined, /존재하지 않는 날짜/],
-    ['GET', '/api/retrospectives?limit=0', undefined, /1 이상/],
+    ['PUT', '/api/retrospectives/weekly/2026-02-30', { body: '회고' }, /This date does not exist/],
+    [
+      'DELETE',
+      '/api/retrospectives/weekly/2026-10-20',
+      undefined,
+      /weekly retrospective starts on a Sunday/,
+    ],
+    ['PUT', week, { body: ' \n ' }, /Enter the retrospective text/],
+    ['PUT', week, {}, /Enter the retrospective text/],
+    ['PUT', week, { body: 'x'.repeat(20001) }, /at most 20000 characters/],
+    ['PUT', week, ['회고'], /as a JSON object/],
+    ['GET', '/api/retrospectives/period?kind=yearly', undefined, /weekly or monthly/],
+    ['GET', '/api/retrospectives/period?date=2026-13-01', undefined, /This date does not exist/],
+    ['GET', '/api/retrospectives?limit=0', undefined, /at least 1/],
     // A week around these would leave the years the database stores: a 400, not a 500.
-    ['GET', '/api/retrospectives/period?date=0001-01-01', undefined, /1900년부터 9998년까지/],
-    ['GET', '/api/retrospectives/period?date=9999-12-31', undefined, /1900년부터 9998년까지/],
-    ['PUT', '/api/retrospectives/monthly/9999-12-01', { body: '회고' }, /1900년부터 9998년까지/],
+    ['GET', '/api/retrospectives/period?date=0001-01-01', undefined, /between 1900 and 9998/],
+    ['GET', '/api/retrospectives/period?date=9999-12-31', undefined, /between 1900 and 9998/],
+    ['PUT', '/api/retrospectives/monthly/9999-12-01', { body: '회고' }, /between 1900 and 9998/],
   ];
   await withApi(untouchedPool, async (call) => {
     for (const [method, path, body, message] of cases) {
@@ -88,7 +93,7 @@ test('writing passes the whole period; the period view defaults to this week', a
       assert.equal(period.data.retrospective, null);
       const gone = await call('/api/retrospectives/weekly/2026-10-18', { method: 'DELETE' });
       assert.equal(gone.status, 404);
-      assert.equal(gone.data.error, '회고를 찾을 수 없습니다');
+      assert.equal(gone.data.error, 'Retrospective not found');
     },
     { today: () => '2026-10-23' },
   );

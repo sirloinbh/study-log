@@ -15,19 +15,19 @@ const emptyPool = { query: async () => ({ rows: [], rowCount: 0 }) } as unknown 
 
 const list = '/api/textbooks/1/contents/2/exercises';
 
-test('invalid exercises are rejected with Korean messages before touching the DB', async () => {
+test('invalid exercises are rejected with English messages before touching the DB', async () => {
   const cases: [unknown, RegExp][] = [
-    [{ number: '1' }, /문제 본문을 입력하세요/],
-    [{ body: ' \n\t ' }, /문제 본문을 입력하세요/],
-    [{ body: 7 }, /문제 본문 형식이 올바르지 않습니다/],
-    [{ body: 'x'.repeat(20001) }, /문제 본문은 20000자 이하로 입력하세요/],
+    [{ number: '1' }, /Enter the problem text/],
+    [{ body: ' \n\t ' }, /Enter the problem text/],
+    [{ body: 7 }, /The problem text format is invalid/],
+    [{ body: 'x'.repeat(20001) }, /The problem text must be at most 20000 characters/],
     [
       { body: '행렬 A를 구하시오', number: 'x'.repeat(21) },
-      /문제 번호 길이는 20자 이하여야 합니다/,
+      /The problem number must be at most 20 characters/,
     ],
-    [{ body: '행렬 A를 구하시오', number: 3 }, /문제 번호 형식이 올바르지 않습니다/],
-    [{ body: '행렬 A를 구하시오', important: 'yes' }, /중요 표시 형식이 올바르지 않습니다/],
-    [[{ body: '행렬 A를 구하시오' }], /연습문제 내용을 JSON 객체로 보내세요/],
+    [{ body: '행렬 A를 구하시오', number: 3 }, /The problem number format is invalid/],
+    [{ body: '행렬 A를 구하시오', important: 'yes' }, /The important flag format is invalid/],
+    [[{ body: '행렬 A를 구하시오' }], /Send the exercise as a JSON object/],
   ];
   await withApi(untouchedPool, async (call) => {
     for (const [body, message] of cases) {
@@ -47,9 +47,9 @@ test('path ids are checked before touching the DB', async () => {
   await withApi(untouchedPool, async (call) => {
     for (const id of ['0', '1e3', '01', '99999999999999999999']) {
       for (const [path, message] of [
-        [`/api/textbooks/${id}/contents/2/exercises`, /교재 ID가 올바르지 않습니다/],
-        [`/api/textbooks/1/contents/${id}/exercises`, /목차 ID가 올바르지 않습니다/],
-        [`/api/exercises/${id}`, /연습문제 ID가 올바르지 않습니다/],
+        [`/api/textbooks/${id}/contents/2/exercises`, /Invalid textbook ID/],
+        [`/api/textbooks/1/contents/${id}/exercises`, /Invalid contents entry ID/],
+        [`/api/exercises/${id}`, /Invalid exercise ID/],
       ] as const) {
         for (const init of [{}, { method: 'PUT', body: { body: '문제' } }]) {
           // A list path has no PUT; only check the exercise path for it.
@@ -63,15 +63,15 @@ test('path ids are checked before touching the DB', async () => {
   });
 });
 
-test('a missing chapter or exercise answers a Korean 404', async () => {
+test('a missing chapter or exercise answers an English 404', async () => {
   await withApi(emptyPool, async (call) => {
     const listed = await call(list);
     assert.equal(listed.status, 404);
-    assert.equal(listed.data.error, '목차를 찾을 수 없습니다');
+    assert.equal(listed.data.error, 'Contents entry not found');
     for (const init of [{}, { method: 'PUT', body: { body: '문제' } }, { method: 'DELETE' }]) {
       const { status, data } = await call('/api/exercises/9', init);
       assert.equal(status, 404, JSON.stringify(init));
-      assert.equal(data.error, '연습문제를 찾을 수 없습니다');
+      assert.equal(data.error, 'Exercise not found');
     }
   });
   // Adding to a chapter that does not exist fails its foreign key.
@@ -83,7 +83,7 @@ test('a missing chapter or exercise answers a Korean 404', async () => {
   await withApi(foreignKeyPool, async (call) => {
     const { status, data } = await call(list, { method: 'POST', body: { body: '문제' } });
     assert.equal(status, 404);
-    assert.equal(data.error, '목차를 찾을 수 없습니다');
+    assert.equal(data.error, 'Contents entry not found');
   });
 });
 
@@ -105,13 +105,13 @@ test('the body keeps its line breaks and the number is trimmed', async () => {
 
 const answer = '/api/exercises/1/answer';
 
-test('invalid answers are rejected with Korean messages before touching the DB', async () => {
+test('invalid answers are rejected with English messages before touching the DB', async () => {
   const cases: [unknown, RegExp][] = [
-    [{}, /정답을 입력하세요/],
-    [{ body: ' \n\t ' }, /정답을 입력하세요/],
-    [{ body: 7 }, /정답 형식이 올바르지 않습니다/],
-    [{ body: 'x'.repeat(20001) }, /정답은 20000자 이하로 입력하세요/],
-    [['x'], /정답 내용을 JSON 객체로 보내세요/],
+    [{}, /Enter the answer/],
+    [{ body: ' \n\t ' }, /Enter the answer/],
+    [{ body: 7 }, /The answer format is invalid/],
+    [{ body: 'x'.repeat(20001) }, /The answer must be at most 20000 characters/],
+    [['x'], /Send the answer as a JSON object/],
   ];
   await withApi(untouchedPool, async (call) => {
     for (const [body, message] of cases) {
@@ -122,17 +122,17 @@ test('invalid answers are rejected with Korean messages before touching the DB',
     for (const init of [{}, { method: 'PUT', body: { body: '답' } }, { method: 'DELETE' }]) {
       const { status, data } = await call('/api/exercises/01/answer', init);
       assert.equal(status, 400, JSON.stringify(init));
-      assert.match(String(data.error), /연습문제 ID가 올바르지 않습니다/);
+      assert.match(String(data.error), /Invalid exercise ID/);
     }
   });
 });
 
-test('the answer of a missing exercise answers a Korean 404', async () => {
+test('the answer of a missing exercise answers an English 404', async () => {
   await withApi(emptyPool, async (call) => {
     for (const init of [{}, { method: 'DELETE' }]) {
       const { status, data } = await call(answer, init);
       assert.equal(status, 404, JSON.stringify(init));
-      assert.equal(data.error, '연습문제를 찾을 수 없습니다');
+      assert.equal(data.error, 'Exercise not found');
     }
   });
   const foreignKeyPool = {
@@ -143,7 +143,7 @@ test('the answer of a missing exercise answers a Korean 404', async () => {
   await withApi(foreignKeyPool, async (call) => {
     const { status, data } = await call(answer, { method: 'PUT', body: { body: '답' } });
     assert.equal(status, 404);
-    assert.equal(data.error, '연습문제를 찾을 수 없습니다');
+    assert.equal(data.error, 'Exercise not found');
   });
   // The exercise exists but has no answer to delete.
   const noAnswerPool = {
@@ -153,7 +153,7 @@ test('the answer of a missing exercise answers a Korean 404', async () => {
   await withApi(noAnswerPool, async (call) => {
     const { status, data } = await call(answer, { method: 'DELETE' });
     assert.equal(status, 404);
-    assert.equal(data.error, '정답을 찾을 수 없습니다');
+    assert.equal(data.error, 'Answer not found');
   });
 });
 
@@ -182,9 +182,9 @@ test('an exercise without an answer reads as null and the answer keeps its line 
 test('marking important takes a boolean and answers 404 for a missing exercise', async () => {
   await withApi(untouchedPool, async (call) => {
     for (const [body, message] of [
-      [{}, /중요 표시 여부를 보내세요/],
-      [{ important: 'true' }, /중요 표시 형식이 올바르지 않습니다/],
-      [[true], /중요 표시 여부를 JSON 객체로 보내세요/],
+      [{}, /Send the important flag/],
+      [{ important: 'true' }, /The important flag format is invalid/],
+      [[true], /Send the important flag as a JSON object/],
     ] as const) {
       const { status, data } = await call('/api/exercises/1/important', { method: 'PATCH', body });
       assert.equal(status, 400, JSON.stringify(body));
@@ -197,16 +197,16 @@ test('marking important takes a boolean and answers 404 for a missing exercise',
       body: { important: true },
     });
     assert.equal(status, 404);
-    assert.equal(data.error, '연습문제를 찾을 수 없습니다');
+    assert.equal(data.error, 'Exercise not found');
   });
 });
 
 test('textbook exercise filters are checked before touching the DB', async () => {
   await withApi(untouchedPool, async (call) => {
     for (const [path, message] of [
-      ['/api/textbooks/01/exercises', /교재 ID가 올바르지 않습니다/],
-      ['/api/textbooks/1/exercises?contentId=0', /목차 ID가 올바르지 않습니다/],
-      ['/api/textbooks/1/exercises?important=yes', /중요 표시 조건이 올바르지 않습니다/],
+      ['/api/textbooks/01/exercises', /Invalid textbook ID/],
+      ['/api/textbooks/1/exercises?contentId=0', /Invalid contents entry ID/],
+      ['/api/textbooks/1/exercises?important=yes', /The important filter is invalid/],
     ] as const) {
       const { status, data } = await call(path);
       assert.equal(status, 400, path);
@@ -215,13 +215,13 @@ test('textbook exercise filters are checked before touching the DB', async () =>
   });
 });
 
-test('a missing textbook or chapter of a textbook exercise list answers a Korean 404', async () => {
+test('a missing textbook or chapter of a textbook exercise list answers an English 404', async () => {
   for (const [found, path, message] of [
-    [{ textbook: false, content: false }, '/api/textbooks/9/exercises', '교재를 찾을 수 없습니다'],
+    [{ textbook: false, content: false }, '/api/textbooks/9/exercises', 'Textbook not found'],
     [
       { textbook: true, content: false },
       '/api/textbooks/9/exercises?contentId=3',
-      '목차를 찾을 수 없습니다',
+      'Contents entry not found',
     ],
   ] as const) {
     const pool = { query: async () => ({ rows: [found], rowCount: 1 }) } as unknown as Pool;
