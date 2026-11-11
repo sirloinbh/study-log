@@ -39,12 +39,12 @@ export function TextbookStats() {
   const choices = loaded[textbookStatsPath('')]?.textbooks ?? [];
 
   return (
-    <section className="card textbook-stats" aria-label="교재와 일정">
-      <h2>교재와 일정</h2>
+    <section className="card textbook-stats" aria-label="Textbooks and schedules">
+      <h2>Textbooks and schedules</h2>
       <label className="textbook-filter">
-        교재
+        Textbook
         <select value={textbookId} onChange={(event) => setTextbookId(event.target.value)}>
-          <option value="">전체</option>
+          <option value="">All</option>
           {choices.map((book) => (
             <option key={book.id} value={book.id}>
               {book.title}
@@ -55,7 +55,7 @@ export function TextbookStats() {
       {error ? (
         <>
           <p role="alert" className="error">
-            교재 통계를 불러오지 못했습니다: {error}
+            Could not load the textbook stats: {error}
           </p>
           {/* With the first answer lost there is no other pick to come back from. */}
           <button
@@ -66,41 +66,41 @@ export function TextbookStats() {
               setRetry((count) => count + 1);
             }}
           >
-            다시 불러오기
+            Reload
           </button>
         </>
       ) : !stats ? (
-        <Loading label="교재 통계를 불러오는 중" kind="text" />
+        <Loading label="Loading the textbook stats" kind="text" />
       ) : (
         <>
-          <dl className="retro-summary" aria-label="일정 지표">
+          <dl className="retro-summary" aria-label="Schedule metrics">
             <div>
-              <dt>달성률</dt>
+              <dt>Achievement rate</dt>
               <dd>{shownRate(stats.schedule.achievementRate)}</dd>
             </div>
             <div>
-              <dt>끝낸 목표 시간</dt>
+              <dt>Goal time done</dt>
               <dd>
                 {formatMinutes(stats.schedule.achievedMinutes)} /{' '}
                 {formatMinutes(stats.schedule.plannedMinutes)}
               </dd>
             </div>
             <div>
-              <dt>준수율</dt>
+              <dt>On-time rate</dt>
               <dd>{shownRate(stats.schedule.adherenceRate)}</dd>
             </div>
             <div>
-              <dt>제날짜에 끝낸 날</dt>
+              <dt>Days done on time</dt>
               <dd>
-                {stats.schedule.onTimeDays} / {stats.schedule.dueDays}일
+                {stats.schedule.onTimeDays} / {stats.schedule.dueDays} days
               </dd>
             </div>
           </dl>
           {stats.schedule.dueDays === 0 && (
-            <p className="status">아직 기한이 지난 일정이 없습니다</p>
+            <p className="status">No schedule has passed its due date yet</p>
           )}
           {stats.textbooks.length === 0 ? (
-            <p className="status">아직 등록한 교재가 없습니다</p>
+            <p className="status">No textbooks registered yet</p>
           ) : (
             <ul className="textbook-progress">
               {stats.textbooks.map((book) => (
@@ -109,14 +109,14 @@ export function TextbookStats() {
                     <span className="log-studied">{book.title}</span>
                     <span className="status">
                       {book.totalChapters === 0
-                        ? '목차 없음'
-                        : `${book.completedChapters} / ${book.totalChapters}장`}
+                        ? 'No contents'
+                        : `${book.completedChapters} / ${book.totalChapters} chapters`}
                     </span>
                   </p>
                   {book.totalChapters > 0 && (
                     <div
                       role="progressbar"
-                      aria-label={`${book.title} 완료한 장`}
+                      aria-label={`${book.title} completed chapters`}
                       aria-valuemin={0}
                       aria-valuemax={100}
                       aria-valuenow={chapterPercent(book)}

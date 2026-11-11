@@ -13,9 +13,9 @@ export type Review = {
 
 // What the page can list; each key is also the API path.
 export const reviewRanges = {
-  today: { label: '오늘', heading: '오늘의 복습', empty: '오늘 복습할 내용이 없습니다' },
-  week: { label: '이번 주', heading: '이번 주 복습', empty: '이번 주에 복습할 내용이 없습니다' },
-  all: { label: '전체', heading: '전체 복습', empty: '남은 복습이 없습니다' },
+  today: { label: 'Today', heading: 'Reviews for today', empty: 'Nothing to review today' },
+  week: { label: 'This week', heading: 'Reviews this week', empty: 'Nothing to review this week' },
+  all: { label: 'All', heading: 'All reviews', empty: 'No reviews left' },
 } as const;
 
 export type ReviewRange = keyof typeof reviewRanges;
@@ -29,7 +29,7 @@ export const overdueDays = (dueDate: string, today: string) =>
 // What was studied: the textbook and chapter, or else the date. The memo is Markdown, so it is
 // shown below the title rather than cut into it.
 export function reviewTitle(review: Review) {
-  if (!review.textbookTitle) return `${review.studyDate} 학습`;
+  if (!review.textbookTitle) return `${review.studyDate} study`;
   const content =
     review.contentTitle === null
       ? ''

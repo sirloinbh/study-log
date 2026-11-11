@@ -6,7 +6,7 @@ import { formatMinutes } from './study-logs-data';
 import { type DayMinutes, heatBands, heatLevel, heatWeeks, monthLabel } from './study-stats';
 
 // Rows run Sunday to Saturday (#96); Monday, Wednesday and Friday are labelled.
-const weekdays = ['', '월', '', '수', '', '금', ''];
+const weekdays = ['', 'Mon', '', 'Wed', '', 'Fri', ''];
 
 // The last year of study as a GitHub-style heatmap (#50): one column per week, Sunday on top.
 export function Heatmap() {
@@ -37,25 +37,25 @@ export function Heatmap() {
   const total = studied.reduce((sum, day) => sum + day.minutes, 0);
 
   return (
-    <section className="card heatmap-card" aria-label="최근 1년 학습">
-      <h2>최근 1년</h2>
+    <section className="card heatmap-card" aria-label="Study in the last year">
+      <h2>Last year</h2>
       {error ? (
         <p role="alert" className="error">
-          히트맵을 불러오지 못했습니다: {error}
+          Could not load the heatmap: {error}
         </p>
       ) : !data ? (
-        <Loading label="히트맵을 불러오는 중" kind="text" />
+        <Loading label="Loading the heatmap" kind="text" />
       ) : (
         <>
           <p className="status">
-            {studied.length}일 공부 · 총 {formatMinutes(total)}
+            {studied.length} study days · total {formatMinutes(total)}
           </p>
           <div className="heatmap-scroll" id="heatmap-scroll">
             {/* One image for screen readers; each day's value is in its tooltip for the mouse. */}
             <div
               className="heatmap"
               role="img"
-              aria-label={`${data.from}부터 ${data.to}까지 ${studied.length}일 공부, 총 ${formatMinutes(total)}`}
+              aria-label={`${data.from} to ${data.to}: ${studied.length} study days, total ${formatMinutes(total)}`}
             >
               <div className="heat-days" aria-hidden="true">
                 <span className="heat-month" />
@@ -81,7 +81,7 @@ export function Heatmap() {
               ))}
             </div>
           </div>
-          <ul className="heat-legend" aria-label="강도 구간">
+          <ul className="heat-legend" aria-label="Intensity levels">
             {heatBands.map((band) => (
               <li key={band.level}>
                 <span className={`heat-cell level-${band.level}`} aria-hidden="true" />

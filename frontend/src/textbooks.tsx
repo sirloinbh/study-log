@@ -107,7 +107,7 @@ export function Textbooks() {
       );
       setNotice({
         kind: 'status',
-        text: editingId === undefined ? '등록했습니다' : '수정했습니다',
+        text: editingId === undefined ? 'Registered' : 'Updated',
       });
       if (editingId === undefined) setForm(emptyTextbookForm());
       else leaveEdit();
@@ -144,7 +144,7 @@ export function Textbooks() {
     if (!begin()) return;
     try {
       await requestJson(`/api/textbooks/${id}`, { method: 'DELETE' });
-      setNotice({ kind: 'status', text: '삭제했습니다' });
+      setNotice({ kind: 'status', text: 'Deleted' });
       if (editingId === id) leaveEdit();
       setSelectedId(undefined);
       setReload((count) => count + 1);
@@ -162,10 +162,10 @@ export function Textbooks() {
   return (
     <div className="textbooks">
       <section className="card">
-        <h2>{editingId === undefined ? '교재 등록' : '교재 수정'}</h2>
+        <h2>{editingId === undefined ? 'Register a textbook' : 'Edit the textbook'}</h2>
         <form className="log-form textbook-form" onSubmit={(event) => void save(event)}>
           <label className="title">
-            제목
+            Title
             <input
               id="textbook-title"
               required
@@ -176,7 +176,7 @@ export function Textbooks() {
             />
           </label>
           <label>
-            저자
+            Author
             <input
               maxLength={limits.author}
               disabled={busy}
@@ -185,7 +185,7 @@ export function Textbooks() {
             />
           </label>
           <label>
-            판본
+            Edition
             <input
               maxLength={limits.edition}
               disabled={busy}
@@ -196,11 +196,11 @@ export function Textbooks() {
           <div className="actions wide">
             <button type="submit" className="primary" disabled={busy}>
               <ButtonSpinner when={action === 'save'} />
-              {editingId === undefined ? '등록' : '수정 저장'}
+              {editingId === undefined ? 'Register' : 'Save changes'}
             </button>
             {editingId !== undefined && (
               <button type="button" className="secondary" disabled={busy} onClick={leaveEdit}>
-                취소
+                Cancel
               </button>
             )}
           </div>
@@ -218,17 +218,17 @@ export function Textbooks() {
       <div className="textbook-browser">
         <section className="card">
           <h2 id="textbook-list" tabIndex={-1}>
-            교재 목록
+            Textbook list
           </h2>
           {loadError && (
             <p role="alert" className="error">
-              교재 목록을 불러오지 못했습니다: {loadError}
+              Could not load the textbooks: {loadError}
             </p>
           )}
           {books === undefined ? (
-            !loadError && <Loading label="교재를 불러오는 중" />
+            !loadError && <Loading label="Loading the textbooks" />
           ) : books.length === 0 ? (
-            <p className="status">아직 등록한 교재가 없습니다</p>
+            <p className="status">No textbooks registered yet</p>
           ) : (
             <ul className="log-list">
               {books.map((book) => (
@@ -247,23 +247,23 @@ export function Textbooks() {
             </ul>
           )}
         </section>
-        <section className="card" id="textbook-detail" tabIndex={-1} aria-label="교재 상세">
-          <h2>교재 상세</h2>
+        <section className="card" id="textbook-detail" tabIndex={-1} aria-label="Textbook details">
+          <h2>Textbook details</h2>
           {selected === undefined ? (
-            <p className="status">목록에서 교재를 선택하세요</p>
+            <p className="status">Choose a textbook from the list</p>
           ) : (
             <>
               <dl className="detail">
                 <div>
-                  <dt>제목</dt>
+                  <dt>Title</dt>
                   <dd>{selected.title}</dd>
                 </div>
                 <div>
-                  <dt>저자</dt>
+                  <dt>Author</dt>
                   <dd>{selected.author || '—'}</dd>
                 </div>
                 <div>
-                  <dt>판본</dt>
+                  <dt>Edition</dt>
                   <dd>{selected.edition || '—'}</dd>
                 </div>
               </dl>
@@ -275,23 +275,23 @@ export function Textbooks() {
                       id="textbook-delete-confirm"
                       className="danger"
                       disabled={busy}
-                      aria-label={`${selected.title} 교재 삭제 확인`}
+                      aria-label={`${selected.title} textbook confirm deletion`}
                       onClick={() => void remove(selected.id)}
                     >
                       <ButtonSpinner when={action === 'delete'} />
-                      삭제 확인
+                      Confirm delete
                     </button>
                     <button
                       type="button"
                       className="secondary"
                       disabled={busy}
-                      aria-label={`${selected.title} 교재 삭제 취소`}
+                      aria-label={`${selected.title} textbook cancel deletion`}
                       onClick={() => {
                         setConfirmingDelete(false);
                         setWantFocus('textbook-delete');
                       }}
                     >
-                      취소
+                      Cancel
                     </button>
                   </>
                 ) : (
@@ -300,23 +300,23 @@ export function Textbooks() {
                       type="button"
                       className="secondary"
                       disabled={busy}
-                      aria-label={`${selected.title} 교재 수정`}
+                      aria-label={`${selected.title} textbook edit`}
                       onClick={() => edit(selected)}
                     >
-                      수정
+                      Edit
                     </button>
                     <button
                       type="button"
                       id="textbook-delete"
                       className="secondary"
                       disabled={busy}
-                      aria-label={`${selected.title} 교재 삭제`}
+                      aria-label={`${selected.title} textbook delete`}
                       onClick={() => {
                         setConfirmingDelete(true);
                         setWantFocus('textbook-delete-confirm');
                       }}
                     >
-                      삭제
+                      Delete
                     </button>
                   </>
                 )}
@@ -326,7 +326,7 @@ export function Textbooks() {
         </section>
       </div>
       {selected && (
-        <section className="card" aria-label={`${selected.title} 목차`}>
+        <section className="card" aria-label={`${selected.title} contents`}>
           <TextbookContents
             key={selected.id}
             textbookId={selected.id}
@@ -336,7 +336,7 @@ export function Textbooks() {
         </section>
       )}
       {selected && (
-        <section className="card" aria-label={`${selected.title} 연습문제`}>
+        <section className="card" aria-label={`${selected.title} exercises`}>
           <Exercises
             key={selected.id}
             textbook={selected}
@@ -349,7 +349,7 @@ export function Textbooks() {
         </section>
       )}
       {selected && (
-        <section className="card" aria-label={`${selected.title} 중요 문제`}>
+        <section className="card" aria-label={`${selected.title} important problems`}>
           <ImportantExercises
             key={selected.id}
             textbook={selected}

@@ -120,7 +120,7 @@ export function Retrospectives({ today }: { today: string }) {
       // Show the saved text at once, not the old one until the reload comes back.
       setPeriods((all) => ({ ...all, [key]: { ...period, retrospective: data.retrospective } }));
       setDraft(undefined);
-      setNotice({ kind: 'status', text: '저장했습니다' });
+      setNotice({ kind: 'status', text: 'Saved' });
     });
   };
 
@@ -138,14 +138,14 @@ export function Retrospectives({ today }: { today: string }) {
       setWantFocus('retro-heading');
       setPeriods((all) => ({ ...all, [key]: { ...period, retrospective: null } }));
       setDraft(undefined);
-      setNotice({ kind: 'status', text: '삭제했습니다' });
+      setNotice({ kind: 'status', text: 'Deleted' });
     });
 
   return (
     <div className="retrospectives">
-      <section className="card" aria-label="회고 작성">
+      <section className="card" aria-label="Write a retrospective">
         <div className="calendar-head">
-          <div className="period-filter" role="group" aria-label="회고 종류">
+          <div className="period-filter" role="group" aria-label="Retrospective kind">
             {(['weekly', 'monthly'] as const).map((value) => (
               <button
                 key={value}
@@ -163,11 +163,11 @@ export function Retrospectives({ today }: { today: string }) {
             <button
               type="button"
               className="secondary"
-              aria-label={kind === 'weekly' ? '이전 주' : '이전 달'}
+              aria-label={kind === 'weekly' ? 'Previous week' : 'Previous month'}
               disabled={busy || !period}
               onClick={() => period && go(kind, shiftPeriod(kind, period.from, -1))}
             >
-              이전
+              Previous
             </button>
             {period && !thisPeriod && (
               <button
@@ -176,48 +176,49 @@ export function Retrospectives({ today }: { today: string }) {
                 disabled={busy}
                 onClick={() => go(kind, today)}
               >
-                {kind === 'weekly' ? '이번 주' : '이번 달'}
+                {kind === 'weekly' ? 'This week' : 'This month'}
               </button>
             )}
             <button
               type="button"
               className="secondary"
-              aria-label={kind === 'weekly' ? '다음 주' : '다음 달'}
+              aria-label={kind === 'weekly' ? 'Next week' : 'Next month'}
               disabled={busy || !period}
               onClick={() => period && go(kind, shiftPeriod(kind, period.from, 1))}
             >
-              다음
+              Next
             </button>
           </div>
         </div>
         {/* A failed reload keeps the period already shown (and any typing) under the error. */}
         {error && (
           <p role="alert" className="error">
-            회고를 불러오지 못했습니다: {error}
+            Could not load the retrospective: {error}
           </p>
         )}
         {!period ? (
-          !error && <Loading label="회고를 불러오는 중" kind="text" />
+          !error && <Loading label="Loading the retrospective" kind="text" />
         ) : (
           <>
             <h2 id="retro-heading" tabIndex={-1}>
-              {periodTitle(period.kind, period.from, period.to)} {kindLabels[period.kind]} 회고
+              {periodTitle(period.kind, period.from, period.to)} {kindLabels[period.kind]}{' '}
+              retrospective
             </h2>
-            <dl className="retro-summary" aria-label="이 기간의 학습">
+            <dl className="retro-summary" aria-label="Study in this period">
               <div>
-                <dt>학습 시간</dt>
+                <dt>Study time</dt>
                 <dd>{formatMinutes(period.summary.totalMinutes)}</dd>
               </div>
               <div>
-                <dt>공부한 날</dt>
-                <dd>{period.summary.studyDays}일</dd>
+                <dt>Study days</dt>
+                <dd>{period.summary.studyDays}</dd>
               </div>
               <div>
-                <dt>학습 기록</dt>
-                <dd>{period.summary.logs}개</dd>
+                <dt>Study logs</dt>
+                <dd>{period.summary.logs}</dd>
               </div>
               <div>
-                <dt>목표 달성</dt>
+                <dt>Goals achieved</dt>
                 <dd>
                   {period.summary.goalsChecked
                     ? `${period.summary.goalsAchieved} / ${period.summary.goalsChecked}`
@@ -227,12 +228,12 @@ export function Retrospectives({ today }: { today: string }) {
             </dl>
             <form className="log-form" onSubmit={save}>
               <label className="wide">
-                회고
+                Retrospective
                 <textarea
                   rows={8}
                   required
                   maxLength={retrospectiveLimit}
-                  placeholder="잘한 점, 아쉬운 점, 다음에 해 볼 것"
+                  placeholder="What went well, what did not, what to try next"
                   disabled={busy}
                   value={text}
                   onChange={(event) => {
@@ -244,7 +245,7 @@ export function Retrospectives({ today }: { today: string }) {
               <div className="actions wide">
                 <button type="submit" className="primary" disabled={busy}>
                   <ButtonSpinner when={action === 'save'} />
-                  {period.retrospective ? '수정 저장' : '저장'}
+                  {period.retrospective ? 'Save changes' : 'Save'}
                 </button>
                 {period.retrospective &&
                   (confirming ? (
@@ -260,7 +261,7 @@ export function Retrospectives({ today }: { today: string }) {
                         }}
                       >
                         <ButtonSpinner when={action === 'delete'} />
-                        삭제 확인
+                        Confirm delete
                       </button>
                       <button
                         type="button"
@@ -271,7 +272,7 @@ export function Retrospectives({ today }: { today: string }) {
                           setWantFocus('retro-delete');
                         }}
                       >
-                        취소
+                        Cancel
                       </button>
                     </>
                   ) : (
@@ -285,13 +286,13 @@ export function Retrospectives({ today }: { today: string }) {
                         setWantFocus('retro-delete-confirm');
                       }}
                     >
-                      삭제
+                      Delete
                     </button>
                   ))}
               </div>
             </form>
             {period.retrospective && (
-              <p className="status">마지막 저장 {period.retrospective.updatedAt}</p>
+              <p className="status">Last saved {period.retrospective.updatedAt}</p>
             )}
             <StudyPattern from={period.from} to={period.to} reloadKey={reload} />
           </>
@@ -307,12 +308,12 @@ export function Retrospectives({ today }: { today: string }) {
         )}
       </section>
 
-      <section className="card" aria-label="지난 회고">
-        <h2>지난 회고</h2>
+      <section className="card" aria-label="Past retrospectives">
+        <h2>Past retrospectives</h2>
         {recent === undefined ? (
-          <Loading label="회고 목록을 불러오는 중" />
+          <Loading label="Loading the retrospectives" />
         ) : recent.length === 0 ? (
-          <p className="status">아직 쓴 회고가 없습니다</p>
+          <p className="status">No retrospectives yet</p>
         ) : (
           <ul className="log-list">
             {recent.map((item) => (

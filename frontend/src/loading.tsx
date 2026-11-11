@@ -42,5 +42,5 @@ export function Loading({
 // Inside a button whose save or delete is under way; the button itself is already disabled. No top
 // margin: the screens' message rule for [role='status'] (style.css) also reaches this spinner.
 export function ButtonSpinner({ when }: { when: boolean }) {
-  return when ? <Spinner size="sm" label="처리하는 중" className="mt-0" /> : null;
+  return when ? <Spinner size="sm" label="Working" className="mt-0" /> : null;
 }

@@ -31,13 +31,17 @@ export function StudyTimeChart({
   const unit = picked[stats.period] ?? defaultChartUnit[stats.period];
   const bars = chartBars(stats, unit);
   const busiest = busiestBar(bars);
-  const [noun, topic] = { day: ['날', '날은'], week: ['주', '주는'], month: ['달', '달은'] }[unit];
+  const [noun, topic] = {
+    day: ['days', 'day'],
+    week: ['weeks', 'week'],
+    month: ['months', 'month'],
+  }[unit];
 
   return (
     <section className="card study-chart" aria-labelledby="study-chart-heading">
       <div className="chart-head">
-        <h2 id="study-chart-heading">학습 시간 추이</h2>
-        <div className="period-filter" role="group" aria-label="그래프 단위">
+        <h2 id="study-chart-heading">Study time trend</h2>
+        <div className="period-filter" role="group" aria-label="Chart unit">
           {chartUnits.map((key) => (
             <button
               key={key}
@@ -52,19 +56,19 @@ export function StudyTimeChart({
         </div>
       </div>
       {!busiest ? (
-        <p className="status">이 기간에는 학습 기록이 없습니다</p>
+        <p className="status">There are no study logs in this period</p>
       ) : (
         <>
           <p className="status">
-            {bars.length}개 {noun} 중 가장 많이 공부한 {topic} {busiest.label}(
-            {formatMinutes(busiest.minutes)})입니다.
+            Busiest {topic} of {bars.length} {bars.length === 1 ? topic : noun}: {busiest.label} (
+            {formatMinutes(busiest.minutes)}).
           </p>
           {chartError ? (
             <p role="alert" className="error">
-              그래프를 불러오지 못했습니다: {chartError}
+              Could not load the chart: {chartError}
             </p>
           ) : !R ? (
-            <Loading label="그래프를 불러오는 중" kind="text" />
+            <Loading label="Loading the chart" kind="text" />
           ) : (
             <div className="chart-box" aria-hidden="true">
               <R.ResponsiveContainer width="100%" height={240}>
@@ -76,7 +80,7 @@ export function StudyTimeChart({
                     cursor={{ fill: 'var(--muted)' }}
                     formatter={(_value, _name, item) => [
                       formatMinutes((item.payload as { minutes: number }).minutes),
-                      '학습 시간',
+                      'Study time',
                     ]}
                   />
                   <R.Bar

@@ -8,7 +8,7 @@ export class RequestError extends Error {
   }
 }
 
-// Resolves with the JSON body (undefined for 204) or rejects with the API's Korean message.
+// Resolves with the JSON body (undefined for 204) or rejects with the API's error message.
 export async function requestJson<T>(
   path: string,
   init: { method?: string; body?: unknown } = {},
@@ -21,11 +21,11 @@ export async function requestJson<T>(
       body: init.body === undefined ? undefined : JSON.stringify(init.body),
     });
   } catch {
-    throw new RequestError('서버에 연결할 수 없습니다');
+    throw new RequestError('Cannot reach the server');
   }
   if (response.status === 204) return undefined as T;
   const data = (await response.json().catch(() => ({}))) as { error?: string };
   if (!response.ok)
-    throw new RequestError(data.error ?? '요청을 처리하지 못했습니다', response.status);
+    throw new RequestError(data.error ?? 'Could not process the request', response.status);
   return data as T;
 }

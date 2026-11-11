@@ -27,7 +27,7 @@ const one: Stats = {
 const server = () => {
   fakeApi(({ path }) => ({ body: path.endsWith('textbookId=7') ? one : all }));
 };
-const card = () => within(screen.getByRole('region', { name: '교재와 일정' }));
+const card = () => within(screen.getByRole('region', { name: 'Textbooks and schedules' }));
 
 test('the path names the book, and a percent of chapters rounds down', () => {
   expect(textbookStatsPath('')).toBe('/api/stats/textbooks');
@@ -40,29 +40,29 @@ test('the path names the book, and a percent of chapters rounds down', () => {
 test('chapters per book and how schedules were kept are shown', async () => {
   server();
   render(<TextbookStats />);
-  const bar = await card().findByRole('progressbar', { name: '선형대수 완료한 장' });
+  const bar = await card().findByRole('progressbar', { name: '선형대수 completed chapters' });
   expect(bar).toHaveAttribute('aria-valuenow', '25');
   expect(bar.firstElementChild).toHaveStyle({ width: '25%' });
-  expect(card().getByText('1 / 4장')).toBeInTheDocument();
+  expect(card().getByText('1 / 4 chapters')).toBeInTheDocument();
   // A book with no contents has nothing to count.
-  expect(card().getByText('목차 없음')).toBeInTheDocument();
-  expect(card().queryByRole('progressbar', { name: '해석학 완료한 장' })).toBeNull();
+  expect(card().getByText('No contents')).toBeInTheDocument();
+  expect(card().queryByRole('progressbar', { name: '해석학 completed chapters' })).toBeNull();
   expect(card().getByText('40%')).toBeInTheDocument();
-  expect(card().getByText(/2시간 \/ 5시간/)).toBeInTheDocument();
+  expect(card().getByText(/2 h \/ 5 h/)).toBeInTheDocument();
   expect(card().getByText('25%')).toBeInTheDocument();
-  expect(card().getByText('1 / 4일')).toBeInTheDocument();
+  expect(card().getByText('1 / 4 days')).toBeInTheDocument();
 });
 
 test('picking a book narrows it, and every book stays a choice', async () => {
   server();
   render(<TextbookStats />);
   await card().findByRole('option', { name: '해석학' });
-  fireEvent.change(card().getByLabelText('교재'), { target: { value: '7' } });
+  fireEvent.change(card().getByLabelText('Textbook'), { target: { value: '7' } });
   await card().findByText('90%');
-  expect(card().queryByText('목차 없음')).toBeNull();
+  expect(card().queryByText('No contents')).toBeNull();
   expect(card().getByRole('option', { name: '해석학' })).toBeInTheDocument();
-  fireEvent.change(card().getByLabelText('교재'), { target: { value: '' } });
-  await card().findByText('목차 없음');
+  fireEvent.change(card().getByLabelText('Textbook'), { target: { value: '' } });
+  await card().findByText('No contents');
 });
 
 test('with nothing due yet the rates say so rather than zero', async () => {
@@ -76,8 +76,8 @@ test('with nothing due yet the rates say so rather than zero', async () => {
   };
   fakeApi(() => ({ body: { textbooks: [], schedule: none } }));
   render(<TextbookStats />);
-  expect(await card().findByText('아직 기한이 지난 일정이 없습니다')).toBeInTheDocument();
-  expect(card().getByText('아직 등록한 교재가 없습니다')).toBeInTheDocument();
+  expect(await card().findByText('No schedule has passed its due date yet')).toBeInTheDocument();
+  expect(card().getByText('No textbooks registered yet')).toBeInTheDocument();
   expect(card().getAllByText('—')).toHaveLength(2);
   expect(card().queryByText('0%')).toBeNull();
 });
@@ -85,13 +85,13 @@ test('with nothing due yet the rates say so rather than zero', async () => {
 test('a failure says so and can be tried again', async () => {
   let failing = true;
   fakeApi(() =>
-    failing ? { status: 500, body: { error: '서버 오류가 발생했습니다' } } : { body: all },
+    failing ? { status: 500, body: { error: 'A server error occurred' } } : { body: all },
   );
   render(<TextbookStats />);
-  expect(await card().findByRole('alert')).toHaveTextContent('교재 통계를 불러오지 못했습니다');
+  expect(await card().findByRole('alert')).toHaveTextContent('Could not load the textbook stats');
   failing = false;
-  fireEvent.click(card().getByRole('button', { name: '다시 불러오기' }));
-  await card().findByText('목차 없음');
+  fireEvent.click(card().getByRole('button', { name: 'Reload' }));
+  await card().findByText('No contents');
   expect(card().queryByRole('alert')).toBeNull();
   expect(card().getByRole('option', { name: '해석학' })).toBeInTheDocument();
 });
@@ -108,13 +108,13 @@ test('a slow answer for another pick is not shown', async () => {
     }),
   );
   render(<TextbookStats />);
-  await card().findByText('목차 없음');
-  fireEvent.change(card().getByLabelText('교재'), { target: { value: '7' } });
+  await card().findByText('No contents');
+  fireEvent.change(card().getByLabelText('Textbook'), { target: { value: '7' } });
   await waitFor(() => expect(late).toHaveLength(1));
-  fireEvent.change(card().getByLabelText('교재'), { target: { value: '' } });
-  await card().findByText('목차 없음');
+  fireEvent.change(card().getByLabelText('Textbook'), { target: { value: '' } });
+  await card().findByText('No contents');
   late.forEach((resolve) => resolve());
   await new Promise((resolve) => setTimeout(resolve, 20));
-  expect(card().getByText('목차 없음')).toBeInTheDocument();
+  expect(card().getByText('No contents')).toBeInTheDocument();
   expect(card().queryByText('90%')).toBeNull();
 });

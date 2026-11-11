@@ -49,26 +49,26 @@ const submit = () => fireEvent.submit(document.querySelector('form')!);
 test('a new log is new unless review is picked', async () => {
   const sent = server([]);
   render(<StudyLogs today={today} />);
-  const type = screen.getByLabelText<HTMLSelectElement>('유형');
+  const type = screen.getByLabelText<HTMLSelectElement>('Type');
   expect(type.value).toBe('new');
   fireEvent.change(type, { target: { value: 'review' } });
-  fireEvent.change(screen.getByLabelText('시작'), { target: { value: '09:00' } });
-  fireEvent.change(screen.getByLabelText('종료'), { target: { value: '10:00' } });
+  fireEvent.change(screen.getByLabelText('Start'), { target: { value: '09:00' } });
+  fireEvent.change(screen.getByLabelText('End'), { target: { value: '10:00' } });
   submit();
   await waitFor(() => expect(sent.length).toBe(1));
   expect(sent[0].body.studyType).toBe('review');
   // The form returns to the default for the next entry.
-  await waitFor(() => expect(screen.getByLabelText<HTMLSelectElement>('유형').value).toBe('new'));
+  await waitFor(() => expect(screen.getByLabelText<HTMLSelectElement>('Type').value).toBe('new'));
 });
 
 test('a review log is marked in the list and keeps its type when edited', async () => {
   const sent = server([log]);
   render(<StudyLogs today={today} />);
-  const editButton = await screen.findByRole('button', { name: /수정$/ });
+  const editButton = await screen.findByRole('button', { name: /edit$/ });
   const item = editButton.closest('li')!;
-  expect(within(item).getByText('복습')).toBeTruthy();
+  expect(within(item).getByText('Review')).toBeTruthy();
   fireEvent.click(editButton);
-  expect(screen.getByLabelText<HTMLSelectElement>('유형').value).toBe('review');
+  expect(screen.getByLabelText<HTMLSelectElement>('Type').value).toBe('review');
   submit();
   await waitFor(() => expect(sent.length).toBe(1));
   expect(sent[0]).toMatchObject({ method: 'PUT', body: { studyType: 'review' } });
@@ -78,16 +78,17 @@ test('search results and the calendar mark a review log too', async () => {
   server([log]);
   render(<StudyLogs today={today} />);
   const marks = () =>
-    [...document.querySelectorAll('.badge')].filter((badge) => badge.textContent === '복습').length;
+    [...document.querySelectorAll('.badge')].filter((badge) => badge.textContent === 'Review')
+      .length;
   // The recent list and the calendar's day.
   await waitFor(() => expect(marks()).toBe(2));
-  fireEvent.click(screen.getByRole('button', { name: '검색' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Search' }));
   await waitFor(() => expect(marks()).toBe(3));
 });
 
 test('a new log has no mark', async () => {
   server([{ ...log, studyType: 'new' }]);
   render(<StudyLogs today={today} />);
-  const editButton = await screen.findByRole('button', { name: /수정$/ });
-  expect(within(editButton.closest('li')!).queryByText('복습')).toBeNull();
+  const editButton = await screen.findByRole('button', { name: /edit$/ });
+  expect(within(editButton.closest('li')!).queryByText('Review')).toBeNull();
 });

@@ -58,7 +58,7 @@ function server(answers: { reviews?: unknown; reviewsStatus?: number } = {}) {
       if (url.startsWith('/api/stats/reviews'))
         return Promise.resolve(
           answers.reviewsStatus
-            ? new Response(JSON.stringify({ error: '서버 오류' }), {
+            ? new Response(JSON.stringify({ error: 'Server error' }), {
                 status: answers.reviewsStatus,
               })
             : new Response(JSON.stringify(answers.reviews ?? reviews)),
@@ -97,14 +97,18 @@ test('the completion rate and its counts are shown for the period', async () => 
   server();
   render(<Stats />);
   expect(await reviewCard().findByText('75%')).toBeTruthy();
-  expect(reviewCard().getByRole('heading', { name: '복습 완료율' })).toBeTruthy();
-  expect(reviewCard().getByText(/이번 주 예정 4회 중 3회 완료, 지연 2회입니다/)).toBeTruthy();
+  expect(reviewCard().getByRole('heading', { name: 'Review completion rate' })).toBeTruthy();
+  expect(
+    reviewCard().getByText(/This week: 3 of 4 scheduled reviews completed, 2 delayed/),
+  ).toBeTruthy();
 });
 
 test('the page holds the card of textbooks and schedules', async () => {
   server();
   render(<Stats />);
-  expect(await screen.findByRole('region', { name: '교재와 일정' })).toBeInTheDocument();
+  expect(
+    await screen.findByRole('region', { name: 'Textbooks and schedules' }),
+  ).toBeInTheDocument();
 });
 
 test('picking a period asks for its reviews too', async () => {
@@ -112,7 +116,9 @@ test('picking a period asks for its reviews too', async () => {
   render(<Stats />);
   await reviewCard().findByText('75%');
   fireEvent.click(
-    within(screen.getByRole('group', { name: '기간' })).getByRole('button', { name: '이번 달' }),
+    within(screen.getByRole('group', { name: 'Period' })).getByRole('button', {
+      name: 'This month',
+    }),
   );
   await waitFor(() => expect(asked).toContain('/api/stats/reviews?period=month'));
 });
@@ -120,7 +126,7 @@ test('picking a period asks for its reviews too', async () => {
 test('a period without scheduled reviews says so instead of a rate', async () => {
   server({ reviews: { ...reviews, scheduled: 0, completed: 0, delayed: 0, completionRate: null } });
   render(<Stats />);
-  expect(await reviewCard().findByText('이번 주에는 예정된 복습이 없습니다')).toBeTruthy();
+  expect(await reviewCard().findByText('No reviews were scheduled for this week')).toBeTruthy();
   expect(reviewCard().queryByText(/%$/)).toBeNull();
 });
 
@@ -128,25 +134,25 @@ test('a failed review load stays inside its card', async () => {
   server({ reviewsStatus: 500 });
   render(<Stats />);
   expect(await reviewCard().findByRole('alert')).toBeTruthy();
-  expect(await screen.findByRole('region', { name: '학습 시간 지표' })).toBeTruthy();
+  expect(await screen.findByRole('region', { name: 'Study time metrics' })).toBeTruthy();
 });
 
 test('the study type filter narrows study time and leaves reviews alone', async () => {
   const asked = server();
   render(<Stats />);
-  const metrics = await screen.findByRole('region', { name: '학습 시간 지표' });
-  await within(metrics).findAllByText('1시간 40분');
+  const metrics = await screen.findByRole('region', { name: 'Study time metrics' });
+  await within(metrics).findAllByText('1 h 40 min');
   await reviewCard().findByText('75%');
   const reviewAsks = asked.filter((url) => url.startsWith('/api/stats/reviews')).length;
 
-  const types = within(screen.getByRole('group', { name: '학습 유형' }));
-  expect(types.getByRole('button', { name: '전체' }).getAttribute('aria-pressed')).toBe('true');
-  fireEvent.click(types.getByRole('button', { name: '복습' }));
+  const types = within(screen.getByRole('group', { name: 'Study type' }));
+  expect(types.getByRole('button', { name: 'All' }).getAttribute('aria-pressed')).toBe('true');
+  fireEvent.click(types.getByRole('button', { name: 'Review' }));
 
   await waitFor(() => expect(asked).toContain('/api/stats/study-time?period=week&type=review'));
-  const narrowed = await screen.findByRole('region', { name: '학습 시간 지표' });
-  expect((await within(narrowed).findAllByText('40분')).length).toBeGreaterThan(0);
-  expect(within(narrowed).getByText('지금까지 기록한 복습')).toBeTruthy();
+  const narrowed = await screen.findByRole('region', { name: 'Study time metrics' });
+  expect((await within(narrowed).findAllByText('40 min')).length).toBeGreaterThan(0);
+  expect(within(narrowed).getByText('Recorded so far: Review')).toBeTruthy();
   expect(asked.filter((url) => url.startsWith('/api/stats/reviews')).length).toBe(reviewAsks);
   expect(reviewCard().getByText('75%')).toBeTruthy();
 });
@@ -159,5 +165,5 @@ test('the request leaves out the type when everything is wanted', () => {
 test('the bars are the three counts, in order', () => {
   expect(
     reviewBars({ ...reviews, delayed: 0 } as never).map((bar) => `${bar.label}:${bar.count}`),
-  ).toEqual(['예정 4회:4', '완료 3회:3', '지연 0회:0']);
+  ).toEqual(['Scheduled 4:4', 'Done 3:3', 'Delayed 0:0']);
 });

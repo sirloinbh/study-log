@@ -42,25 +42,27 @@ export function StudyPattern({
   const failed = error?.key === key ? error.message : undefined;
 
   return (
-    <section className="study-pattern" aria-label="학습 패턴">
-      <h3>학습 패턴</h3>
+    <section className="study-pattern" aria-label="Study pattern">
+      <h3>Study pattern</h3>
       {failed ? (
         <p role="alert" className="error">
-          학습 패턴을 불러오지 못했습니다: {failed}
+          Could not load the study pattern: {failed}
         </p>
       ) : !pattern ? (
-        <Loading label="학습 패턴을 불러오는 중" kind="text" />
+        <Loading label="Loading the study pattern" kind="text" />
       ) : pattern.topHour === null || pattern.topWeekday === null ? (
-        <p className="status">이 기간에는 학습 기록이 없어 패턴을 볼 수 없습니다</p>
+        <p className="status">
+          There are no study logs in this period, so there is no pattern to show
+        </p>
       ) : (
         <>
           <p className="pattern-summary">
-            가장 많이 공부한 시간대는 <strong>{hourLabel(pattern.topHour)}</strong>(
-            {formatMinutes(pattern.byHour[pattern.topHour])}), 요일은{' '}
-            <strong>{weekdayNames[pattern.topWeekday]}요일</strong>(
-            {formatMinutes(pattern.byWeekday[pattern.topWeekday])})입니다.
+            You study most at <strong>{hourLabel(pattern.topHour)}</strong> (
+            {formatMinutes(pattern.byHour[pattern.topHour])}), and on{' '}
+            <strong>{weekdayNames[pattern.topWeekday]}</strong> (
+            {formatMinutes(pattern.byWeekday[pattern.topWeekday])}).
           </p>
-          <div className="pattern-bars" aria-label="요일별 학습 시간">
+          <div className="pattern-bars" aria-label="Study time by weekday">
             {pattern.byWeekday.map((minutes, day) => (
               <div key={day} className="pattern-row">
                 <span className="pattern-name">{weekdayNames[day]}</span>
@@ -75,7 +77,7 @@ export function StudyPattern({
             ))}
           </div>
           {/* Twenty-four thin columns, midnight first; each hour's value is in its tooltip. */}
-          <div className="pattern-hours" role="img" aria-label="시간대별 학습 시간">
+          <div className="pattern-hours" role="img" aria-label="Study time by hour">
             {pattern.byHour.map((minutes, hour) => (
               <span
                 key={hour}
@@ -86,11 +88,11 @@ export function StudyPattern({
             ))}
           </div>
           <div className="pattern-axis" aria-hidden="true">
-            <span>0시</span>
-            <span>6시</span>
-            <span>12시</span>
-            <span>18시</span>
-            <span>24시</span>
+            <span>00:00</span>
+            <span>06:00</span>
+            <span>12:00</span>
+            <span>18:00</span>
+            <span>24:00</span>
           </div>
         </>
       )}

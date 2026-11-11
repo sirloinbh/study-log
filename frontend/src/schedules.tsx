@@ -19,7 +19,7 @@ type Notice = { kind: 'status' | 'alert'; text: string } | undefined;
 
 // Study schedules (#35): a form that makes one from a period and daily hours, the schedules there
 // are, and the days of the one picked. A schedule's period and hours do not change once it is made
-// (docs/decisions/schedule-rules.md 6장), so this offers deleting rather than editing them.
+// (docs/decisions/schedule-rules.md section 6), so this offers deleting rather than editing them.
 type Renaming = { id: number; title: string; error?: string };
 
 export function Schedules({ today }: { today: string }) {
@@ -130,15 +130,15 @@ export function Schedules({ today }: { today: string }) {
     const weekdayMinutes = hoursToMinutes(weekdayHours);
     const restDayMinutes = hoursToMinutes(restDayHours);
     if (weekdayMinutes === undefined || restDayMinutes === undefined) {
-      setNotice({ kind: 'alert', text: '하루 분량은 0시간에서 24시간 사이로 입력하세요' });
+      setNotice({ kind: 'alert', text: 'Enter a daily amount between 0 and 24 hours' });
       return;
     }
     // Without its chapters read there was no chance to pick a range, and a whole book cannot be
-    // narrowed afterwards (docs/decisions/schedule-rules.md 6장).
+    // narrowed afterwards (docs/decisions/schedule-rules.md section 6).
     if (textbookId && !bookChapters) {
       setNotice({
         kind: 'alert',
-        text: '교재의 목차를 아직 읽지 못했습니다. 잠시 뒤 다시 시도하거나 교재를 다시 고르세요',
+        text: 'The textbook contents have not been loaded yet. Try again in a moment or choose the textbook again',
       });
       return;
     }
@@ -172,7 +172,7 @@ export function Schedules({ today }: { today: string }) {
       setPickedId(data.schedule.id);
       setSchedules((all) => [data.schedule, ...(all ?? [])]);
       setTitle('');
-      setNotice({ kind: 'status', text: '일정을 만들었습니다' });
+      setNotice({ kind: 'status', text: 'Schedule created' });
       setWantFocus('schedule-heading');
       setReload((count) => count + 1);
     } catch (failure) {
@@ -233,7 +233,7 @@ export function Schedules({ today }: { today: string }) {
           `/api/schedules/${scheduleId}/items/${id}/${done ? 'reopen' : 'complete'}`,
           { method: 'POST' },
         ),
-      done ? '완료를 취소했습니다' : '완료로 표시했습니다',
+      done ? 'Completion undone' : 'Marked as done',
       `schedule-day-check-${id}`,
     );
 
@@ -246,7 +246,7 @@ export function Schedules({ today }: { today: string }) {
           method: 'PUT',
           body: { date: target.date, withLater: target.withLater },
         }),
-      target.withLater ? '이후 일정과 함께 옮겼습니다' : '날짜를 옮겼습니다',
+      target.withLater ? 'Moved along with the later days' : 'Moved the day',
       `schedule-day-move-${target.id}`,
       `schedule-day-date-${target.id}`,
     );
@@ -263,7 +263,7 @@ export function Schedules({ today }: { today: string }) {
       await requestJson(`/api/schedules/${id}`, { method: 'DELETE' });
       // At once, and even if reading the list again fails.
       setSchedules((all) => all?.filter((item) => item.id !== id));
-      setListNotice({ kind: 'status', text: '일정을 삭제했습니다' });
+      setListNotice({ kind: 'status', text: 'Schedule deleted' });
       setWantFocus('schedules-heading');
     } catch (failure) {
       const { status, message } = failure as RequestError;
@@ -277,7 +277,7 @@ export function Schedules({ today }: { today: string }) {
     }
   };
 
-  // Only the name changes after creating (docs/decisions/schedule-rules.md 6장, #179). The same
+  // Only the name changes after creating (docs/decisions/schedule-rules.md section 6, #179). The same
   // checks as the server's, which also trims, so a long name is said rather than cut.
   const rename = async (target: Renaming) => {
     const refuse = (error: string) => {
@@ -285,8 +285,8 @@ export function Schedules({ today }: { today: string }) {
       setWantFocus('schedule-rename-input');
     };
     const trimmed = target.title.trim();
-    if (!trimmed) return refuse('일정 이름을 입력하세요');
-    if (trimmed.length > 200) return refuse('일정 이름 길이는 200자 이하여야 합니다');
+    if (!trimmed) return refuse('Enter the schedule name');
+    if (trimmed.length > 200) return refuse('The schedule name must be at most 200 characters');
     nameNext('rename');
     if (!begin()) return;
     setNotice(undefined);
@@ -306,7 +306,7 @@ export function Schedules({ today }: { today: string }) {
         ),
       );
       setRenaming(undefined);
-      setDayNotice({ kind: 'status', text: '일정 이름을 바꿨습니다' });
+      setDayNotice({ kind: 'status', text: 'Schedule renamed' });
       setWantFocus('schedule-heading');
     } catch (failure) {
       const { status, message } = failure as RequestError;
@@ -332,22 +332,22 @@ export function Schedules({ today }: { today: string }) {
 
   return (
     <div className="schedules">
-      <section className="card" aria-label="일정 만들기">
-        <h2>일정 만들기</h2>
+      <section className="card" aria-label="Create a schedule">
+        <h2>Create a schedule</h2>
         <form className="log-form" onSubmit={(event) => void create(event)}>
           <label className="wide">
-            일정 이름
+            Schedule name
             <input
               required
               maxLength={200}
-              placeholder="예: 알고리즘 교재 1회독"
+              placeholder="e.g. Algorithms textbook, first pass"
               disabled={busy}
               value={title}
               onChange={typed(setTitle)}
             />
           </label>
           <label>
-            시작일
+            Start date
             <input
               type="date"
               required
@@ -358,7 +358,7 @@ export function Schedules({ today }: { today: string }) {
             />
           </label>
           <label>
-            종료일
+            End date
             <input
               type="date"
               required
@@ -369,7 +369,7 @@ export function Schedules({ today }: { today: string }) {
             />
           </label>
           <label>
-            평일 (시간)
+            Weekdays (hours)
             <input
               type="number"
               required
@@ -382,7 +382,7 @@ export function Schedules({ today }: { today: string }) {
             />
           </label>
           <label>
-            주말·공휴일 (시간)
+            Weekends and holidays (hours)
             <input
               type="number"
               required
@@ -395,7 +395,7 @@ export function Schedules({ today }: { today: string }) {
             />
           </label>
           <label className="half">
-            교재 (선택)
+            Textbook (optional)
             <select
               disabled={busy || !textbooks}
               value={textbookId}
@@ -409,7 +409,7 @@ export function Schedules({ today }: { today: string }) {
                 setChaptersFailed(undefined);
               }}
             >
-              <option value="">교재 없이 시간만</option>
+              <option value="">Time only, no textbook</option>
               {textbooks?.map((book) => (
                 <option key={book.id} value={book.id}>
                   {book.title}
@@ -420,13 +420,13 @@ export function Schedules({ today }: { today: string }) {
           {textbookId && (
             <>
               <label>
-                첫 장
+                First chapter
                 <select
                   disabled={busy || !bookChapters?.length}
                   value={fromContentId}
                   onChange={typed(setFromContentId)}
                 >
-                  <option value="">처음부터</option>
+                  <option value="">From the start</option>
                   {bookChapters?.map((chapter) => (
                     <option key={chapter.id} value={chapter.id}>
                       {contentLabel(chapter)}
@@ -435,13 +435,13 @@ export function Schedules({ today }: { today: string }) {
                 </select>
               </label>
               <label>
-                마지막 장
+                Last chapter
                 <select
                   disabled={busy || !bookChapters?.length}
                   value={toContentId}
                   onChange={typed(setToContentId)}
                 >
-                  <option value="">끝까지</option>
+                  <option value="">To the end</option>
                   {bookChapters?.map((chapter) => (
                     <option key={chapter.id} value={chapter.id}>
                       {contentLabel(chapter)}
@@ -451,17 +451,17 @@ export function Schedules({ today }: { today: string }) {
               </label>
             </>
           )}
-          {textbooksFailed && <p className="status wide">교재 목록을 불러오지 못했습니다</p>}
+          {textbooksFailed && <p className="status wide">Could not load the textbooks</p>}
           {chaptersFailed === textbookId && textbookId && (
-            <p className="status wide">이 교재의 목차를 불러오지 못했습니다</p>
+            <p className="status wide">Could not load the contents of this textbook</p>
           )}
           {bookChapters?.length === 0 && (
-            <p className="status wide">이 교재에는 장이 없습니다. 목차를 먼저 등록하세요</p>
+            <p className="status wide">This textbook has no chapters. Add its contents first</p>
           )}
           <div className="actions wide">
             <button type="submit" className="primary" disabled={busy}>
               <ButtonSpinner when={action === 'create'} />
-              일정 만들기
+              Create a schedule
             </button>
           </div>
         </form>
@@ -476,9 +476,9 @@ export function Schedules({ today }: { today: string }) {
         )}
       </section>
 
-      <section className="card" aria-label="내 일정">
+      <section className="card" aria-label="My schedules">
         <h2 id="schedules-heading" tabIndex={-1}>
-          내 일정
+          My schedules
         </h2>
         {/* Above the rows: a long list would put it out of sight. */}
         <p role="status" className="status">
@@ -491,13 +491,13 @@ export function Schedules({ today }: { today: string }) {
         )}
         {listError && (
           <p role="alert" className="error">
-            일정을 불러오지 못했습니다: {listError}
+            Could not load the schedules: {listError}
           </p>
         )}
         {schedules === undefined ? (
-          !listError && <Loading label="일정을 불러오는 중" />
+          !listError && <Loading label="Loading the schedules" />
         ) : schedules.length === 0 ? (
-          <p className="status">아직 만든 일정이 없습니다</p>
+          <p className="status">No schedules yet</p>
         ) : (
           <ul className="log-list">
             {schedules.map((item) => (
@@ -531,24 +531,24 @@ export function Schedules({ today }: { today: string }) {
                           type="button"
                           id={`schedule-delete-confirm-${item.id}`}
                           className="danger"
-                          aria-label={`${item.title} 삭제 확인`}
+                          aria-label={`${item.title} confirm deletion`}
                           disabled={busy}
                           onClick={() => void remove(item.id)}
                         >
                           <ButtonSpinner when={action === 'delete'} />
-                          삭제 확인
+                          Confirm delete
                         </button>
                         <button
                           type="button"
                           className="secondary"
-                          aria-label={`${item.title} 삭제 취소`}
+                          aria-label={`${item.title} cancel deletion`}
                           disabled={busy}
                           onClick={() => {
                             setConfirming(undefined);
                             setWantFocus(`schedule-delete-${item.id}`);
                           }}
                         >
-                          취소
+                          Cancel
                         </button>
                       </>
                     ) : (
@@ -556,14 +556,14 @@ export function Schedules({ today }: { today: string }) {
                         type="button"
                         id={`schedule-delete-${item.id}`}
                         className="secondary"
-                        aria-label={`${item.title} 삭제`}
+                        aria-label={`${item.title} delete`}
                         disabled={busy}
                         onClick={() => {
                           setConfirming(item.id);
                           setWantFocus(`schedule-delete-confirm-${item.id}`);
                         }}
                       >
-                        삭제
+                        Delete
                       </button>
                     )}
                   </div>
@@ -571,9 +571,9 @@ export function Schedules({ today }: { today: string }) {
                 <p className="status">
                   {item.textbookTitle && `${item.textbookTitle} · `}
                   {item.startDate} ~ {item.endDate}
-                  {item.delayDays > 0 && ` (${item.delayDays}일 늦어짐)`} · 진행{' '}
-                  {item.progressPercent}% · 목표 {formatMinutes(item.totalMinutes)} ·{' '}
-                  {item.itemCount}일
+                  {item.delayDays > 0 && ` (${item.delayDays} days late)`} · progress{' '}
+                  {item.progressPercent}% · goal {formatMinutes(item.totalMinutes)} ·{' '}
+                  {item.itemCount} days
                 </p>
               </li>
             ))}
@@ -582,21 +582,21 @@ export function Schedules({ today }: { today: string }) {
       </section>
 
       {shown && (
-        <section className="card" aria-label="날짜별 일정">
+        <section className="card" aria-label="Schedule by date">
           {/* Days already read stay if reading them again fails. */}
           {shownDetail ? (
             <>
               {renaming?.id === shownDetail.schedule.id ? (
                 <form
                   className="schedule-rename"
-                  aria-label="일정 이름 수정"
+                  aria-label="Edit schedule name"
                   onSubmit={(event) => {
                     event.preventDefault();
                     void rename(renaming);
                   }}
                 >
                   <label>
-                    새 일정 이름
+                    New schedule name
                     <input
                       id="schedule-rename-input"
                       required
@@ -613,12 +613,12 @@ export function Schedules({ today }: { today: string }) {
                   <div className="actions">
                     <button type="submit" className="primary" disabled={busy}>
                       <ButtonSpinner when={action === 'rename'} />
-                      이름 저장
+                      Save name
                     </button>
                     <button
                       type="button"
                       className="secondary"
-                      aria-label="이름 수정 취소"
+                      aria-label="Cancel renaming"
                       disabled={busy}
                       onClick={() => {
                         setDayNotice(undefined);
@@ -626,7 +626,7 @@ export function Schedules({ today }: { today: string }) {
                         setWantFocus('schedule-rename');
                       }}
                     >
-                      취소
+                      Cancel
                     </button>
                   </div>
                   {/* Right under the name, apart from what the days say. */}
@@ -645,7 +645,7 @@ export function Schedules({ today }: { today: string }) {
                     type="button"
                     id="schedule-rename"
                     className="secondary"
-                    aria-label={`${shownDetail.schedule.title} 이름 수정`}
+                    aria-label={`${shownDetail.schedule.title} rename`}
                     disabled={busy}
                     onClick={() => {
                       setDayNotice(undefined);
@@ -656,7 +656,7 @@ export function Schedules({ today }: { today: string }) {
                       setWantFocus('schedule-rename-input');
                     }}
                   >
-                    이름 수정
+                    Rename
                   </button>
                 </div>
               )}
@@ -665,16 +665,16 @@ export function Schedules({ today }: { today: string }) {
               )}
               <div className="schedule-progress">
                 <p>
-                  진행률 <strong>{shownDetail.schedule.progressPercent}%</strong>
+                  Progress <strong>{shownDetail.schedule.progressPercent}%</strong>
                   <span className="status">
                     {formatMinutes(shownDetail.schedule.completedMinutes)} /{' '}
                     {formatMinutes(shownDetail.schedule.totalMinutes)} ·{' '}
-                    {shownDetail.schedule.completedCount} / {shownDetail.schedule.itemCount}일
+                    {shownDetail.schedule.completedCount} / {shownDetail.schedule.itemCount} days
                   </span>
                 </p>
                 <div
                   role="progressbar"
-                  aria-label="일정 진행률"
+                  aria-label="Schedule progress"
                   aria-valuemin={0}
                   aria-valuemax={100}
                   aria-valuenow={shownDetail.schedule.progressPercent}
@@ -682,29 +682,28 @@ export function Schedules({ today }: { today: string }) {
                   <div style={{ width: `${shownDetail.schedule.progressPercent}%` }} />
                 </div>
               </div>
-              <dl className="retro-summary" aria-label="일정 요약">
+              <dl className="retro-summary" aria-label="Schedule summary">
                 <div>
-                  <dt>평일</dt>
+                  <dt>Weekdays</dt>
                   <dd>{formatMinutes(shownDetail.schedule.weekdayMinutes)}</dd>
                 </div>
                 <div>
-                  <dt>주말·공휴일</dt>
+                  <dt>Weekends and holidays</dt>
                   <dd>{formatMinutes(shownDetail.schedule.restDayMinutes)}</dd>
                 </div>
                 <div>
-                  <dt>전체 목표</dt>
+                  <dt>Total goal</dt>
                   <dd>{formatMinutes(shownDetail.schedule.totalMinutes)}</dd>
                 </div>
                 <div>
-                  <dt>학습일</dt>
-                  <dd>{shownDetail.schedule.itemCount}일</dd>
+                  <dt>Study days</dt>
+                  <dd>{shownDetail.schedule.itemCount}</dd>
                 </div>
               </dl>
               {shownDetail.schedule.delayDays > 0 && (
                 <p className="status">
-                  처음 정한 종료일 {shownDetail.schedule.endDate}에서{' '}
-                  {shownDetail.schedule.delayDays}일 늦어져 {shownDetail.schedule.currentEndDate}에
-                  끝납니다
+                  Ends on {shownDetail.schedule.currentEndDate}, {shownDetail.schedule.delayDays}{' '}
+                  days after the originally planned end date {shownDetail.schedule.endDate}
                 </p>
               )}
               <p role="status" className="status">
@@ -715,7 +714,7 @@ export function Schedules({ today }: { today: string }) {
                   {dayNotice.text}
                 </p>
               )}
-              <ul className="schedule-days" aria-label="날짜별 목표 시간">
+              <ul className="schedule-days" aria-label="Target time by date">
                 {shownDetail.items.map((item) => (
                   <li
                     key={item.id}
@@ -725,7 +724,7 @@ export function Schedules({ today }: { today: string }) {
                     <input
                       type="checkbox"
                       id={`schedule-day-check-${item.id}`}
-                      aria-label={`${names.get(item.id)} 완료`}
+                      aria-label={`${names.get(item.id)} complete`}
                       checked={item.completedOn !== null}
                       disabled={busy}
                       onChange={() =>
@@ -746,7 +745,7 @@ export function Schedules({ today }: { today: string }) {
                         type="button"
                         id={`schedule-day-move-${item.id}`}
                         className="secondary"
-                        aria-label={`${names.get(item.id)} 옮기기`}
+                        aria-label={`${names.get(item.id)} move`}
                         disabled={busy}
                         onClick={() => {
                           setDayNotice(undefined);
@@ -754,20 +753,20 @@ export function Schedules({ today }: { today: string }) {
                           setWantFocus(`schedule-day-date-${item.id}`);
                         }}
                       >
-                        옮기기
+                        Move
                       </button>
                     )}
                     {moving?.id === item.id && !item.completedOn && (
                       <form
                         className="schedule-move"
-                        aria-label={`${names.get(item.id)} 옮기기`}
+                        aria-label={`${names.get(item.id)} move`}
                         onSubmit={(event) => {
                           event.preventDefault();
                           void moveDay(shownDetail.schedule.id, moving);
                         }}
                       >
                         <label>
-                          옮길 날짜
+                          Move to
                           <input
                             type="date"
                             id={`schedule-day-date-${item.id}`}
@@ -791,12 +790,12 @@ export function Schedules({ today }: { today: string }) {
                               setMoving({ ...moving, withLater: event.target.checked });
                             }}
                           />
-                          이후 일정도 함께
+                          Move later days too
                         </label>
                         <div className="actions">
                           <button type="submit" className="primary" disabled={busy}>
                             <ButtonSpinner when={action === 'move'} />
-                            옮기기
+                            Move
                           </button>
                           <button
                             type="button"
@@ -808,7 +807,7 @@ export function Schedules({ today }: { today: string }) {
                               setWantFocus(`schedule-day-move-${item.id}`);
                             }}
                           >
-                            취소
+                            Cancel
                           </button>
                         </div>
                       </form>
@@ -819,10 +818,10 @@ export function Schedules({ today }: { today: string }) {
             </>
           ) : shownError ? (
             <p role="alert" className="error">
-              날짜별 일정을 불러오지 못했습니다: {shownError}
+              Could not load the schedule days: {shownError}
             </p>
           ) : (
-            <Loading label="날짜별 일정을 불러오는 중" />
+            <Loading label="Loading the schedule days" />
           )}
         </section>
       )}

@@ -92,12 +92,12 @@ export function parseToc(text: string): TocEntry[] {
 export function tocProblems(entries: TocEntry[]): string[] {
   const problems: string[] = [];
   if (entries.length > tocLimits.entries)
-    problems.push(`목차는 한 번에 ${tocLimits.entries}개까지 등록할 수 있습니다`);
+    problems.push(`At most ${tocLimits.entries} contents entries can be added at once`);
   for (const entry of entries) {
     if (entry.title.length > tocLimits.title)
-      problems.push(`${entry.line}번째 줄: 제목이 ${tocLimits.title}자를 넘습니다`);
+      problems.push(`Line ${entry.line}: the title is over ${tocLimits.title} characters`);
     if (entry.level >= tocLimits.levels)
-      problems.push(`${entry.line}번째 줄: 목차는 ${tocLimits.levels}단계까지입니다`);
+      problems.push(`Line ${entry.line}: contents can have at most ${tocLimits.levels} levels`);
   }
   return problems;
 }

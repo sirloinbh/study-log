@@ -39,7 +39,7 @@ export function ExerciseTranslation({ exerciseId, label }: { exerciseId: number;
   const translate = async () => {
     if (!begin()) return;
     const id = exerciseId;
-    setNotice({ exerciseId: id, kind: 'status', text: '번역하는 중… 몇 초 걸릴 수 있습니다' });
+    setNotice({ exerciseId: id, kind: 'status', text: 'Translating… this can take a few seconds' });
     try {
       const data = await requestJson<{ translation: Translation }>(
         `/api/exercises/${id}/translation`,
@@ -48,12 +48,12 @@ export function ExerciseTranslation({ exerciseId, label }: { exerciseId: number;
       );
       setLoaded({ exerciseId: id, translation: data.translation });
       setLoadError(undefined);
-      setNotice({ exerciseId: id, kind: 'status', text: '번역했습니다' });
+      setNotice({ exerciseId: id, kind: 'status', text: 'Translated' });
     } catch (failure) {
       setNotice({
         exerciseId: id,
         kind: 'alert',
-        text: `번역하지 못했습니다: ${(failure as RequestError).message}`,
+        text: `Could not translate: ${(failure as RequestError).message}`,
       });
     } finally {
       end();
@@ -61,35 +61,40 @@ export function ExerciseTranslation({ exerciseId, label }: { exerciseId: number;
   };
 
   return (
-    <section className="exercise-answer exercise-translation" aria-label={`${label} 한글 번역`}>
-      <p className="answer-label">한글 번역</p>
+    <section
+      className="exercise-answer exercise-translation"
+      aria-label={`${label} Korean translation`}
+    >
+      <p className="answer-label">Korean translation</p>
       {error && translation === undefined ? (
         <p role="alert" className="error">
-          번역을 불러오지 못했습니다: {error}
+          Could not load the translation: {error}
         </p>
       ) : translation === undefined ? (
-        <Loading label="번역을 불러오는 중" kind="text" />
+        <Loading label="Loading the translation" kind="text" />
       ) : translation === null ? (
-        <p className="status">아직 번역하지 않았습니다</p>
+        <p className="status">Not translated yet</p>
       ) : (
         <>
           {translation.stale && (
-            <p className="error">원문이나 정답이 번역한 뒤에 바뀌었습니다. 다시 번역하세요</p>
+            <p className="error">
+              The problem or answer changed after it was translated. Translate it again
+            </p>
           )}
           <p className="exercise-body" lang="ko">
             {translation.body}
           </p>
           {translation.answer !== null && (
             <>
-              <p className="answer-label">정답 번역</p>
+              <p className="answer-label">Answer translation</p>
               <p className="exercise-body" lang="ko">
                 {translation.answer}
               </p>
             </>
           )}
           <p className="status">
-            AI 번역({translation.model}, {translation.updatedAt})이라 틀릴 수 있습니다. 원문과 함께
-            확인하세요
+            AI translation ({translation.model}, {translation.updatedAt}) can be wrong. Check it
+            against the original
           </p>
         </>
       )}
@@ -97,10 +102,10 @@ export function ExerciseTranslation({ exerciseId, label }: { exerciseId: number;
         type="button"
         className="secondary"
         disabled={busy || (translation === undefined && !error)}
-        aria-label={`${label} ${translation ? '다시 번역' : '번역하기'}`}
+        aria-label={`${label} ${translation ? 'translate again' : 'translate'}`}
         onClick={() => void translate()}
       >
-        {translation ? '다시 번역' : '번역하기'}
+        {translation ? 'Translate again' : 'Translate'}
       </button>
       {/* Always mounted so screen readers announce each new message. */}
       <p role="status" className="status">

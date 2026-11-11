@@ -15,7 +15,7 @@ function server(health: { body: object; status?: number }) {
       Promise.resolve(
         url === '/api/health'
           ? new Response(JSON.stringify(health.body), { status: health.status ?? 200 })
-          : new Response(JSON.stringify({ error: '테스트 서버' }), { status: 500 }),
+          : new Response(JSON.stringify({ error: 'Test server' }), { status: 500 }),
       ),
     ),
   );
@@ -24,14 +24,14 @@ function server(health: { body: object; status?: number }) {
 test('the study log is the first page and shows the server date', async () => {
   server({ body: { today: '2026-10-26' } });
   render(<App />);
-  expect(screen.getByRole('heading', { level: 1, name: '학습 기록' })).toBeInTheDocument();
+  expect(screen.getByRole('heading', { level: 1, name: 'Study log' })).toBeInTheDocument();
   expect(await screen.findByText('Server connected · 2026-10-26')).toBeInTheDocument();
 });
 
 test('reports a server error as an alert and does not open the page body', async () => {
-  server({ body: { error: '데이터베이스에 연결할 수 없습니다' }, status: 503 });
+  server({ body: { error: 'Cannot connect to the database' }, status: 503 });
   render(<App />);
-  expect(await screen.findByRole('alert')).toHaveTextContent('데이터베이스에 연결할 수 없습니다');
+  expect(await screen.findByRole('alert')).toHaveTextContent('Cannot connect to the database');
   expect(document.querySelector('.legacy')).toBeNull();
 });
 
@@ -40,13 +40,13 @@ test('each page has its own address and is marked in the main menu', async () =>
   render(<App />);
   const menu = screen.getByRole('navigation', { name: 'Main menu' });
   for (const [label, path] of [
-    ['일정', '/schedules'],
-    ['복습', '/reviews'],
-    ['교재', '/textbooks'],
-    ['키워드', '/keywords'],
-    ['통계', '/stats'],
-    ['회고', '/retrospectives'],
-    ['설정', '/settings'],
+    ['Schedules', '/schedules'],
+    ['Reviews', '/reviews'],
+    ['Textbooks', '/textbooks'],
+    ['Keywords', '/keywords'],
+    ['Stats', '/stats'],
+    ['Retrospectives', '/retrospectives'],
+    ['Settings', '/settings'],
   ]) {
     fireEvent.click(within(menu).getByRole('link', { name: label }));
     expect(window.location.pathname).toBe(path);
@@ -89,26 +89,26 @@ test('saving a log and completing a review update the badge, and the pages stay 
       if (url.startsWith('/api/study-logs?')) return json({ studyLogs: [] });
       if (url.startsWith('/api/textbooks')) return json({ textbooks: [] });
       return Promise.resolve(
-        new Response(JSON.stringify({ error: '테스트 서버' }), { status: 500 }),
+        new Response(JSON.stringify({ error: 'Test server' }), { status: 500 }),
       );
     }),
   );
   window.history.replaceState(null, '', '/');
   render(<App />);
-  await screen.findByRole('link', { name: '오늘 복습 1개' });
+  await screen.findByRole('link', { name: '1 reviews today' });
 
   const form = document.querySelector('.study-logs form')!;
   fireEvent.submit(form);
-  await screen.findByRole('link', { name: '오늘 복습 2개' });
+  await screen.findByRole('link', { name: '2 reviews today' });
   // Counting again re-renders the app; a remounted page would lose what is being typed.
   expect(document.querySelector('.study-logs form')).toBe(form);
 
   const menu = screen.getByRole('navigation', { name: 'Main menu' });
-  fireEvent.click(within(menu).getByRole('link', { name: '복습' }));
-  const heading = await screen.findByRole('heading', { name: '오늘의 복습 2개' });
+  fireEvent.click(within(menu).getByRole('link', { name: 'Reviews' }));
+  const heading = await screen.findByRole('heading', { name: 'Reviews for today (2)' });
   const card = heading.closest('section');
-  fireEvent.click(screen.getAllByRole('button', { name: /복습 완료/ })[0]);
-  await screen.findByRole('link', { name: '오늘 복습 1개' });
+  fireEvent.click(screen.getAllByRole('button', { name: /complete review/ })[0]);
+  await screen.findByRole('link', { name: '1 reviews today' });
   expect(heading.closest('section')).toBe(card);
   expect(heading.isConnected).toBe(true);
 });
@@ -117,6 +117,6 @@ test('an unknown address falls back to the study log', async () => {
   server({ body: { today: '2026-10-26' } });
   window.history.replaceState(null, '', '/no-such-page');
   render(<App />);
-  expect(await screen.findByRole('heading', { level: 1, name: '학습 기록' })).toBeInTheDocument();
+  expect(await screen.findByRole('heading', { level: 1, name: 'Study log' })).toBeInTheDocument();
   expect(window.location.pathname).toBe('/');
 });

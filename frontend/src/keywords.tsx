@@ -122,7 +122,7 @@ export function Keywords({ today }: { today: string }) {
     void run(async () => {
       await requestJson('/api/keywords', { method: 'POST', body: { date, ...form } });
       setForm(emptyKeywordForm());
-      setNotice({ kind: 'status', text: '추가했습니다' });
+      setNotice({ kind: 'status', text: 'Added' });
       setWantFocus('keyword-input');
     });
   };
@@ -140,7 +140,7 @@ export function Keywords({ today }: { today: string }) {
       setWantFocus('keyword-day');
       setNotice({
         kind: 'status',
-        text: editor.date === date ? '수정했습니다' : `수정해서 ${editor.date}로 옮겼습니다`,
+        text: editor.date === date ? 'Updated' : `Updated and moved to ${editor.date}`,
       });
     }, editor.id);
   };
@@ -162,7 +162,7 @@ export function Keywords({ today }: { today: string }) {
       }
       if (editor?.id === keyword.id) setEditor(undefined);
       setWantFocus('keyword-day');
-      setNotice({ kind: 'status', text: '삭제했습니다' });
+      setNotice({ kind: 'status', text: 'Deleted' });
     }, keyword.id);
 
   const find = (event: { preventDefault(): void }) => {
@@ -194,27 +194,27 @@ export function Keywords({ today }: { today: string }) {
 
   return (
     <div className="keywords">
-      <section className="card" aria-label="키워드 입력">
-        <h2>오늘의 키워드</h2>
+      <section className="card" aria-label="Keyword entry">
+        <h2>Today's keyword</h2>
         <form className="log-form keyword-form" onSubmit={add}>
           <label>
-            날짜
+            Date
             <input type="date" required disabled={busy} value={date} onChange={pickDate} />
           </label>
           <label className="keyword-field">
-            키워드
+            Keyword
             <input
               id="keyword-input"
               required
               maxLength={keywordLimits.keyword}
-              placeholder="예: 고유값"
+              placeholder="e.g. eigenvalue"
               disabled={busy}
               value={form.keyword}
               onChange={changeForm('keyword')}
             />
           </label>
           <label className="wide">
-            메모 (선택)
+            Memo (optional)
             <input
               maxLength={keywordLimits.memo}
               disabled={busy}
@@ -225,7 +225,7 @@ export function Keywords({ today }: { today: string }) {
           <div className="actions wide">
             <button type="submit" className="primary" disabled={busy}>
               <ButtonSpinner when={action === 'add'} />
-              추가
+              Add
             </button>
             {date !== today && (
               <button
@@ -234,7 +234,7 @@ export function Keywords({ today }: { today: string }) {
                 disabled={busy}
                 onClick={() => pickDate({ target: { value: today } })}
               >
-                오늘로
+                Back to today
               </button>
             )}
           </div>
@@ -250,18 +250,18 @@ export function Keywords({ today }: { today: string }) {
         )}
       </section>
 
-      <section className="card" aria-label={`${date} 키워드`}>
+      <section className="card" aria-label={`Keywords for ${date}`}>
         <h2 id="keyword-day" tabIndex={-1}>
-          {date === today ? `오늘 (${date})` : date}의 키워드
+          Keywords for {date === today ? `today (${date})` : date}
         </h2>
         {error ? (
           <p role="alert" className="error">
-            키워드를 불러오지 못했습니다: {error}
+            Could not load the keywords: {error}
           </p>
         ) : keywords === undefined ? (
-          <Loading label="키워드를 불러오는 중" />
+          <Loading label="Loading the keywords" />
         ) : keywords.length === 0 ? (
-          <p className="status">이 날짜에 남긴 키워드가 없습니다</p>
+          <p className="status">No keywords on this date</p>
         ) : (
           <ul className="log-list keyword-list">
             {keywords.map((keyword) =>
@@ -269,7 +269,7 @@ export function Keywords({ today }: { today: string }) {
                 <li key={keyword.id} className="editing">
                   <form className="log-form keyword-form" onSubmit={save}>
                     <label>
-                      날짜
+                      Date
                       <input
                         type="date"
                         required
@@ -279,7 +279,7 @@ export function Keywords({ today }: { today: string }) {
                       />
                     </label>
                     <label className="keyword-field">
-                      키워드
+                      Keyword
                       <input
                         required
                         maxLength={keywordLimits.keyword}
@@ -289,7 +289,7 @@ export function Keywords({ today }: { today: string }) {
                       />
                     </label>
                     <label className="wide">
-                      메모
+                      Memo
                       <input
                         maxLength={keywordLimits.memo}
                         disabled={busy}
@@ -300,7 +300,7 @@ export function Keywords({ today }: { today: string }) {
                     <div className="actions wide">
                       <button type="submit" className="primary" disabled={busy}>
                         <ButtonSpinner when={action === 'save'} />
-                        수정 저장
+                        Save changes
                       </button>
                       <button
                         type="button"
@@ -311,7 +311,7 @@ export function Keywords({ today }: { today: string }) {
                           setWantFocus('keyword-day');
                         }}
                       >
-                        취소
+                        Cancel
                       </button>
                     </div>
                   </form>
@@ -330,26 +330,26 @@ export function Keywords({ today }: { today: string }) {
                           className="danger"
                           id={`keyword-delete-confirm-${keyword.id}`}
                           disabled={busy}
-                          aria-label={`${keyword.keyword} 삭제 확인`}
+                          aria-label={`${keyword.keyword} confirm deletion`}
                           onClick={() => {
                             nameNext('delete');
                             void remove(keyword);
                           }}
                         >
                           <ButtonSpinner when={action === 'delete'} />
-                          삭제 확인
+                          Confirm delete
                         </button>
                         <button
                           type="button"
                           className="secondary"
                           disabled={busy}
-                          aria-label={`${keyword.keyword} 삭제 취소`}
+                          aria-label={`${keyword.keyword} cancel deletion`}
                           onClick={() => {
                             setDeletingId(undefined);
                             setWantFocus(`keyword-delete-${keyword.id}`);
                           }}
                         >
-                          취소
+                          Cancel
                         </button>
                       </>
                     ) : (
@@ -358,7 +358,7 @@ export function Keywords({ today }: { today: string }) {
                           type="button"
                           className="secondary"
                           disabled={busy}
-                          aria-label={`${keyword.keyword} 수정`}
+                          aria-label={`${keyword.keyword} edit`}
                           onClick={() => {
                             setDeletingId(undefined);
                             setNotice(undefined);
@@ -369,20 +369,20 @@ export function Keywords({ today }: { today: string }) {
                             });
                           }}
                         >
-                          수정
+                          Edit
                         </button>
                         <button
                           type="button"
                           className="secondary"
                           id={`keyword-delete-${keyword.id}`}
                           disabled={busy}
-                          aria-label={`${keyword.keyword} 삭제`}
+                          aria-label={`${keyword.keyword} delete`}
                           onClick={() => {
                             setDeletingId(keyword.id);
                             setWantFocus(`keyword-delete-confirm-${keyword.id}`);
                           }}
                         >
-                          삭제
+                          Delete
                         </button>
                       </>
                     )}
@@ -394,22 +394,22 @@ export function Keywords({ today }: { today: string }) {
         )}
       </section>
 
-      <section className="card" aria-label="키워드 검색">
-        <h2>키워드 검색</h2>
+      <section className="card" aria-label="Keyword search">
+        <h2>Keyword search</h2>
         <form className="log-form keyword-search" onSubmit={find}>
           <label className="wide">
-            검색어
+            Search term
             <input
               type="search"
               maxLength={keywordLimits.query}
-              placeholder="키워드나 메모의 일부"
+              placeholder="Part of a keyword or memo"
               disabled={busy}
               value={search.q}
               onChange={changeSearch('q')}
             />
           </label>
           <label className="half">
-            시작일
+            Start date
             {/* The browser refuses a start after the end before asking the server. */}
             <input
               type="date"
@@ -420,7 +420,7 @@ export function Keywords({ today }: { today: string }) {
             />
           </label>
           <label className="half">
-            종료일
+            End date
             <input
               type="date"
               disabled={busy}
@@ -432,22 +432,22 @@ export function Keywords({ today }: { today: string }) {
           <div className="actions wide">
             <button type="submit" className="primary" disabled={busy}>
               <ButtonSpinner when={action === 'search'} />
-              검색
+              Search
             </button>
           </div>
         </form>
         {searchError && (
           <p role="alert" className="error">
-            검색하지 못했습니다: {searchError}
+            Could not search: {searchError}
           </p>
         )}
         {results &&
           !searchError &&
           (results.keywords.length === 0 ? (
-            <p className="status">검색 결과가 없습니다</p>
+            <p className="status">No results</p>
           ) : (
             <>
-              <p className="status">{results.keywords.length}개를 찾았습니다</p>
+              <p className="status">Found {results.keywords.length}</p>
               <ul className="log-list keyword-results">
                 {results.keywords.map((keyword) => (
                   <li key={keyword.id}>
@@ -457,7 +457,7 @@ export function Keywords({ today }: { today: string }) {
                         type="button"
                         className="secondary"
                         disabled={busy}
-                        aria-label={`${keyword.keyword} ${keyword.date} 보기`}
+                        aria-label={`View ${keyword.keyword} on ${keyword.date}`}
                         onClick={() => pickDate({ target: { value: keyword.date } })}
                       >
                         {keyword.date}

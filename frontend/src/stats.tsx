@@ -28,7 +28,7 @@ import { TextbookStats } from './textbook-stats';
 export function Stats() {
   const [period, setPeriod] = useState<StatPeriod>('week');
   const [studyType, setStudyType] = useState<StatStudyType>('all');
-  // '' for every log, or one textbook's (#180). Without the list there is only "전체".
+  // '' for every log, or one textbook's (#180). Without the list there is only "All".
   const [textbookId, setTextbookId] = useState('');
   const [textbooks, setTextbooks] = useState<Textbook[]>();
   const [textbooksFailed, setTextbooksFailed] = useState(false);
@@ -71,7 +71,7 @@ export function Stats() {
 
   return (
     <div className="stats">
-      <div className="period-filter" role="group" aria-label="기간">
+      <div className="period-filter" role="group" aria-label="Period">
         {statPeriods.map((key) => (
           <button
             key={key}
@@ -84,7 +84,7 @@ export function Stats() {
           </button>
         ))}
       </div>
-      <div className="period-filter" role="group" aria-label="학습 유형">
+      <div className="period-filter" role="group" aria-label="Study type">
         {statStudyTypes.map((key) => (
           <button
             key={key}
@@ -97,15 +97,15 @@ export function Stats() {
           </button>
         ))}
       </div>
-      {/* Named apart from the textbook filter of "교재와 일정" below, which covers only that card. */}
+      {/* Named apart from the textbook filter of "Textbooks and schedules" below, which covers only that card. */}
       <label className="textbook-filter">
-        교재
+        Textbook
         <select
-          aria-label="학습 시간 교재"
+          aria-label="Study time textbook"
           value={textbookId}
           onChange={(event) => setTextbookId(event.target.value)}
         >
-          <option value="">전체</option>
+          <option value="">All</option>
           {textbooks?.map((book) => (
             <option key={book.id} value={book.id}>
               {book.title}
@@ -114,26 +114,28 @@ export function Stats() {
         </select>
       </label>
       {textbooksFailed && (
-        <p className="status">교재 목록을 불러오지 못해 교재로 좁혀 볼 수 없습니다</p>
+        <p className="status">
+          Could not load the textbook list, so the view cannot be narrowed by textbook
+        </p>
       )}
       {error ? (
         <p role="alert" className="error">
-          통계를 불러오지 못했습니다: {error}
+          Could not load the stats: {error}
         </p>
       ) : !stats ? (
-        <Loading label="통계를 불러오는 중" kind="cards" />
+        <Loading label="Loading the stats" kind="cards" />
       ) : (
-        <section className="metric-grid" aria-label="학습 시간 지표">
+        <section className="metric-grid" aria-label="Study time metrics">
           <article className="card metric">
-            <h2>총 학습 시간</h2>
+            <h2>Total study time</h2>
             <p className="metric-value">{formatMinutes(stats.cumulativeMinutes)}</p>
             <p className="status">
-              지금까지 기록한 {statStudyTypeLabels[studyType]}
+              Recorded so far: {statStudyTypeLabels[studyType]}
               {bookTitle && ` · ${bookTitle}`}
             </p>
           </article>
           <article className="card metric">
-            <h2>오늘</h2>
+            <h2>Today</h2>
             <p className="metric-value">{formatMinutes(stats.todayMinutes)}</p>
             <p className="status">{stats.to}</p>
           </article>
@@ -146,14 +148,16 @@ export function Stats() {
               <span className="nowrap">{stats.to}</span>
             </p>
             <p className="status">
-              {stats.days}일 중 {stats.studyDays}일 공부
+              {stats.studyDays} of {stats.days} days studied
             </p>
           </article>
           <article className="card metric">
-            <h2>하루 평균</h2>
+            <h2>Daily average</h2>
             <p className="metric-value">{formatMinutes(stats.averageMinutesPerDay)}</p>
-            <p className="status">{label} 기준</p>
-            <p className="status">공부한 날만 {formatMinutes(stats.averageMinutesPerStudyDay)}</p>
+            <p className="status">Based on {label}</p>
+            <p className="status">
+              Study days only: {formatMinutes(stats.averageMinutesPerStudyDay)}
+            </p>
           </article>
         </section>
       )}
