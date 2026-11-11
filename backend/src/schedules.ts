@@ -38,7 +38,7 @@ export function plannedItems(
   }).filter((item) => item.targetMinutes > 0);
 }
 
-// Which chapters each day holds, as indexes, for days with these targets (rule 2장). Chapter k of n
+// Which chapters each day holds, as indexes, for days with these targets (rule section 2). Chapter k of n
 // ends on the first day whose running total reaches total × k ÷ n, compared in whole numbers. The
 // next one starts that same day when the total went past the boundary, and on the next day when it
 // landed exactly on it.
@@ -63,90 +63,91 @@ export function chapterDays(targets: number[], chapters: number): number[][] {
 // Same rule as the other ids: plain positive integers that stay exact in JS and fit bigint.
 const idParam = z
   .string()
-  .regex(/^[1-9]\d{0,14}$/, '일정 ID가 올바르지 않습니다')
+  .regex(/^[1-9]\d{0,14}$/, 'Invalid schedule ID')
   .transform(Number);
 
 const title = z
-  .string(missingOrInvalid('일정 이름을 입력하세요', '일정 이름 형식이 올바르지 않습니다'))
+  .string(missingOrInvalid('Enter the schedule name', 'The schedule name format is invalid'))
   .trim()
-  .refine((value) => value.length >= 1, '일정 이름을 입력하세요')
-  .refine((value) => value.length <= 200, '일정 이름 길이는 200자 이하여야 합니다');
+  .refine((value) => value.length >= 1, 'Enter the schedule name')
+  .refine((value) => value.length <= 200, 'The schedule name must be at most 200 characters');
 
 const dateField = (label: string) =>
   calendarDate(
-    z.string(missingOrInvalid(`${label}을 입력하세요`, `${label} 형식이 올바르지 않습니다`)),
-    `${label}은 YYYY-MM-DD 형식으로 입력하세요`,
+    z.string(missingOrInvalid(`Enter the ${label}`, `The ${label} format is invalid`)),
+    `The ${label} must be in YYYY-MM-DD format`,
   );
 
 const minutes = (label: string) =>
   z
-    .number(
-      missingOrInvalid(`${label} 분량을 입력하세요`, `${label} 분량 형식이 올바르지 않습니다`),
-    )
-    .int(`${label} 분량은 분 단위 정수로 입력하세요`)
-    .min(0, `${label} 분량은 0시간 이상이어야 합니다`)
-    .max(1440, `${label} 분량은 24시간 이하여야 합니다`);
+    .number(missingOrInvalid(`Enter the ${label} amount`, `The ${label} amount format is invalid`))
+    .int(`The ${label} amount must be a whole number of minutes`)
+    .min(0, `The ${label} amount must be at least 0 minutes`)
+    .max(1440, `The ${label} amount must be at most 24 hours`);
 
 const createInput = z
   .object(
     {
       title,
-      startDate: dateField('시작일'),
-      endDate: dateField('종료일'),
-      weekdayMinutes: minutes('평일'),
-      restDayMinutes: minutes('주말·공휴일'),
+      startDate: dateField('start date'),
+      endDate: dateField('end date'),
+      weekdayMinutes: minutes('weekday'),
+      restDayMinutes: minutes('weekend and holiday'),
       // Without it the schedule holds only time. Without an end of the range, it runs to that end
       // of the book.
       chapters: z
         .object(
           {
-            textbookId: bodyId('교재'),
-            fromContentId: bodyId('첫 장').nullable().default(null),
-            toContentId: bodyId('마지막 장').nullable().default(null),
+            textbookId: bodyId('textbook'),
+            fromContentId: bodyId('first chapter').nullable().default(null),
+            toContentId: bodyId('last chapter').nullable().default(null),
           },
-          { error: '장 범위를 JSON 객체로 보내세요' },
+          { error: 'Send the chapter range as a JSON object' },
         )
         .optional(),
     },
-    { error: '일정 내용을 JSON 객체로 보내세요' },
+    { error: 'Send the schedule as a JSON object' },
   )
   .superRefine((input, ctx) => {
     // A missing, mistyped or wrong date already stops this check (#159) and says so itself; the
     // guard keeps the period from being worked out on a wrong date if that ever changes.
     if (!isCalendarDate(input.startDate) || !isCalendarDate(input.endDate)) return;
     if (input.endDate < input.startDate)
-      ctx.addIssue({ code: 'custom', message: '종료일은 시작일 이후여야 합니다' });
+      ctx.addIssue({ code: 'custom', message: 'The end date must be after the start date' });
     else if (daysInPeriod(input.startDate, input.endDate) > maxScheduleDays)
-      ctx.addIssue({ code: 'custom', message: `일정 기간은 ${maxScheduleDays}일 이하여야 합니다` });
+      ctx.addIssue({
+        code: 'custom',
+        message: `A schedule can span at most ${maxScheduleDays} days`,
+      });
     // Refused here too, so no holidays are read for it.
     if (input.weekdayMinutes === 0 && input.restDayMinutes === 0)
-      ctx.addIssue({ code: 'custom', message: '평일과 주말·공휴일 분량이 모두 0시간입니다' });
+      ctx.addIssue({ code: 'custom', message: 'Weekday and weekend/holiday amounts are both 0' });
   });
 
 // The period and the amounts stay: changing them would need the holidays again, and they are read
-// only when creating (rule 3장, 6장).
-const updateInput = z.object({ title }, { error: '일정 내용을 JSON 객체로 보내세요' });
+// only when creating (rule sections 3, 6).
+const updateInput = z.object({ title }, { error: 'Send the schedule as a JSON object' });
 
 const itemIdParam = z
   .string()
-  .regex(/^[1-9]\d{0,14}$/, '일정 항목 ID가 올바르지 않습니다')
+  .regex(/^[1-9]\d{0,14}$/, 'Invalid schedule item ID')
   .transform(Number);
 
-// Moving a day (rule 4장). `withLater` takes the open days from it onward along, keeping their gaps.
+// Moving a day (rule section 4). `withLater` takes the open days from it onward along, keeping their gaps.
 const moveInput = z.object(
   {
-    date: dateField('이동일'),
-    withLater: z.boolean({ error: '이후 일정 이동 여부가 올바르지 않습니다' }).default(false),
+    date: dateField('move date'),
+    withLater: z.boolean({ error: 'The move-later flag is invalid' }).default(false),
   },
-  { error: '날짜를 JSON 객체로 보내세요' },
+  { error: 'Send the date as a JSON object' },
 );
 
 // For every day a move touches: far enough for any plan, near enough that repeated moves cannot run
 // a date off the calendar.
 const maxMoveDays = 730;
 
-const notFound = { error: '일정을 찾을 수 없습니다' };
-const itemNotFound = { error: '일정 항목을 찾을 수 없습니다' };
+const notFound = { error: 'Schedule not found' };
+const itemNotFound = { error: 'Schedule item not found' };
 
 const summaryColumns = `s.id, s.title, s.start_date AS "startDate", s.end_date AS "endDate",
   s.weekday_minutes AS "weekdayMinutes", s.rest_day_minutes AS "restDayMinutes",
@@ -189,7 +190,7 @@ async function loadSchedule(db: Pool | PoolClient, id: number) {
   return { schedule: rows[0], items: items.rows };
 }
 
-// Moves a schedule's open days so the earliest is today, when it fell behind (rule 4장). All of them
+// Moves a schedule's open days so the earliest is today, when it fell behind (rule section 4). All of them
 // by the same days: their gaps stay and none comes forward. The caller holds the schedule's lock,
 // so two reads cannot both move it.
 async function moveOverdue(client: PoolClient, scheduleId: number, today: string) {
@@ -205,7 +206,7 @@ async function moveOverdue(client: PoolClient, scheduleId: number, today: string
   );
 }
 
-// Run on every read (rule 4장), with no scheduler. Nothing is locked unless something is behind, each
+// Run on every read (rule section 4), with no scheduler. Nothing is locked unless something is behind, each
 // schedule in a transaction of its own.
 async function catchUp(pool: Pool, today: string, scheduleId?: number) {
   const { rows } = await pool.query<{ id: number }>(
@@ -229,24 +230,25 @@ type ChapterRange = {
 };
 
 // The chapters of the range in book order, or why there are none. A chapter is a top-level entry of
-// the contents (rule 2장), so a section or another book's chapter is not found here.
+// the contents (rule section 2), so a section or another book's chapter is not found here.
 async function chaptersInRange(
   db: Pool | PoolClient,
   { textbookId, fromContentId, toContentId }: ChapterRange,
 ): Promise<{ ids: number[] } | { error: string }> {
   const book = await db.query('SELECT 1 FROM textbooks WHERE id = $1', [textbookId]);
-  if (!book.rowCount) return { error: '교재를 찾을 수 없습니다' };
+  if (!book.rowCount) return { error: 'Textbook not found' };
   const { rows } = await db.query<{ id: number }>(
     `SELECT id FROM textbook_contents WHERE textbook_id = $1 AND parent_id IS NULL
      ORDER BY position`,
     [textbookId],
   );
   const ids = rows.map((row) => row.id);
-  if (ids.length === 0) return { error: '목차에 장이 없어 장 단위 일정을 만들 수 없습니다' };
+  if (ids.length === 0)
+    return { error: 'The contents have no chapters, so a chapter schedule cannot be made' };
   const from = fromContentId === null ? 0 : ids.indexOf(fromContentId);
   const to = toContentId === null ? ids.length - 1 : ids.indexOf(toContentId);
-  if (from < 0 || to < 0) return { error: '장을 찾을 수 없습니다' };
-  if (from > to) return { error: '마지막 장은 첫 장 이후여야 합니다' };
+  if (from < 0 || to < 0) return { error: 'Chapter not found' };
+  if (from > to) return { error: 'The last chapter must come after the first chapter' };
   return { ids: ids.slice(from, to + 1) };
 }
 
@@ -294,7 +296,8 @@ export function scheduleRoutes(pool: Pool, today: () => string, fetcher: Holiday
 
   router.post('/:id/items/:itemId/complete', (req, res) =>
     changeItem(req.params, res, async (client, id, item, date) => {
-      if (item.completedOn) return { status: 409, body: { error: '이미 완료한 항목입니다' } };
+      if (item.completedOn)
+        return { status: 409, body: { error: 'This item is already completed' } };
       // A day reopened from the past goes back to its date and the day it was done, as if never
       // reopened (#165): the reopening was most likely a mistake, and nothing else undoes it.
       await client.query(
@@ -310,10 +313,10 @@ export function scheduleRoutes(pool: Pool, today: () => string, fetcher: Holiday
 
   router.post('/:id/items/:itemId/reopen', (req, res) =>
     changeItem(req.params, res, async (client, id, item, date) => {
-      if (!item.completedOn) return { status: 409, body: { error: '완료하지 않은 항목입니다' } };
+      if (!item.completedOn) return { status: 409, body: { error: 'This item is not completed' } };
       // A day already past comes to today by itself: one mistaken click must not push the whole
       // schedule by however long ago it was done. Where it was is kept, so completing it again
-      // puts it back (rule 4장, #165).
+      // puts it back (rule section 4, #165).
       await client.query(
         `UPDATE schedule_items SET completed_on = NULL, updated_at = now(),
            reopened_from = CASE WHEN item_date < $2::date THEN item_date END,
@@ -329,11 +332,14 @@ export function scheduleRoutes(pool: Pool, today: () => string, fetcher: Holiday
     const input = moveInput.parse(req.body);
     await changeItem(req.params, res, async (client, id, item, today) => {
       if (item.completedOn)
-        return { status: 409, body: { error: '완료한 항목은 옮길 수 없습니다' } };
+        return { status: 409, body: { error: 'A completed item cannot be moved' } };
       if (input.date < today)
-        return { status: 400, body: { error: '날짜는 오늘 이후여야 합니다' } };
+        return { status: 400, body: { error: 'The date must be today or later' } };
       if (daysInPeriod(today, input.date) > maxMoveDays)
-        return { status: 400, body: { error: `날짜는 오늘부터 ${maxMoveDays}일 안이어야 합니다` } };
+        return {
+          status: 400,
+          body: { error: `The date must be within ${maxMoveDays} days from today` },
+        };
       if (input.withLater) {
         const last = await client.query<{ last: string }>(
           `SELECT max(item_date) + ($2::date - $3::date) AS last FROM schedule_items
@@ -344,7 +350,9 @@ export function scheduleRoutes(pool: Pool, today: () => string, fetcher: Holiday
         if (daysInPeriod(today, last.rows[0].last) > maxMoveDays)
           return {
             status: 400,
-            body: { error: `함께 옮기는 일정도 오늘부터 ${maxMoveDays}일 안이어야 합니다` },
+            body: {
+              error: `The schedule items moved along must also be within ${maxMoveDays} days from today`,
+            },
           };
         // A day moved by hand has a new place: completing it keeps it there (#165).
         await client.query(
@@ -384,14 +392,16 @@ export function scheduleRoutes(pool: Pool, today: () => string, fetcher: Holiday
 
   router.post('/', async (req, res) => {
     const input = createInput.parse(req.body);
-    // An item already overdue would be moved as soon as the schedule is read (rule 4장).
+    // An item already overdue would be moved as soon as the schedule is read (rule section 4).
     const date = today();
     if (input.startDate < date)
-      return void res.status(400).json({ error: '시작일은 오늘 이후여야 합니다' });
+      return void res.status(400).json({ error: 'The start date must be today or later' });
     // Years further on are not published: asking for them would only spend the API's daily calls,
-    // again on every request, since an empty year is not kept (rule 3장, 6장).
+    // again on every request, since an empty year is not kept (rule sections 3, 6).
     if (Number(input.endDate.slice(0, 4)) > Number(date.slice(0, 4)) + 1)
-      return void res.status(400).json({ error: '종료일은 내년 말까지 정할 수 있습니다' });
+      return void res
+        .status(400)
+        .json({ error: 'The end date can be at most the end of next year' });
     // Before the holidays, so a range that cannot work calls no API. Checked again below, under lock.
     if (input.chapters) {
       const chosen = await chaptersInRange(pool, input.chapters);
@@ -399,7 +409,7 @@ export function scheduleRoutes(pool: Pool, today: () => string, fetcher: Holiday
     }
     let holidays: Set<string>;
     try {
-      // Before the transaction: this may call the API (rule 3장).
+      // Before the transaction: this may call the API (rule section 3).
       holidays = await loadHolidays(
         pool,
         fetcher,
@@ -413,7 +423,7 @@ export function scheduleRoutes(pool: Pool, today: () => string, fetcher: Holiday
     }
     const items = plannedItems(input.startDate, input.endDate, holidays, input);
     if (items.length === 0)
-      return void res.status(400).json({ error: '이 기간에는 목표 시간이 있는 날이 없습니다' });
+      return void res.status(400).json({ error: 'No day in this period has a target time' });
     const reply = await inTransaction(pool, async (client) => {
       let chapterIds: number[] = [];
       if (input.chapters) {

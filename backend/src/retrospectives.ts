@@ -10,26 +10,36 @@ import { missingOrInvalid } from './validation.js';
 export const retrospectiveKinds = ['weekly', 'monthly'] as const;
 export type RetrospectiveKind = (typeof retrospectiveKinds)[number];
 
-const kind = z.enum(retrospectiveKinds, { error: '회고 종류는 주간 또는 월간이어야 합니다' });
+const kind = z.enum(retrospectiveKinds, {
+  error: 'The retrospective kind must be weekly or monthly',
+});
 
 // Years 1900 to 9998 only: a week around 0001-01-01 or 9999-12-31 would run into a year the
 // database cannot store and fail as a 500.
 const day = calendarDate(
-  z.string({ error: '날짜 형식이 올바르지 않습니다' }),
-  '날짜는 YYYY-MM-DD 형식으로 입력하세요',
+  z.string({ error: 'The date format is invalid' }),
+  'The date must be in YYYY-MM-DD format',
 ).refine(
   (value) => value >= '1900-01-01' && value <= '9998-12-31',
-  '회고 날짜는 1900년부터 9998년까지입니다',
+  'The retrospective date must be between 1900 and 9998',
 );
 
 const bodyInput = z.object(
   {
     body: z
-      .string(missingOrInvalid('회고 내용을 입력하세요', '회고 내용 형식이 올바르지 않습니다'))
-      .refine((body) => body.trim().length > 0, '회고 내용을 입력하세요')
-      .refine((body) => body.length <= 20000, '회고 내용은 20000자 이하로 입력하세요'),
+      .string(
+        missingOrInvalid(
+          'Enter the retrospective text',
+          'The retrospective text format is invalid',
+        ),
+      )
+      .refine((body) => body.trim().length > 0, 'Enter the retrospective text')
+      .refine(
+        (body) => body.length <= 20000,
+        'The retrospective text must be at most 20000 characters',
+      ),
   },
-  { error: '회고 내용을 JSON 객체로 보내세요' },
+  { error: 'Send the retrospective as a JSON object' },
 );
 
 // The week (Sunday to Saturday, #96) or month that holds `date`.
@@ -53,8 +63,8 @@ const periodPath = (params: Record<string, string>) => {
         path: ['start'],
         message:
           parsed.kind === 'weekly'
-            ? '주간 회고는 일요일부터 시작합니다'
-            : '월간 회고는 1일부터 시작합니다',
+            ? 'A weekly retrospective starts on a Sunday'
+            : 'A monthly retrospective starts on the 1st',
       },
     ]);
   return { kind: parsed.kind, ...period };
@@ -63,7 +73,7 @@ const periodPath = (params: Record<string, string>) => {
 const columns = `id, kind, period_start AS "from", period_end AS "to", body,
   to_char(updated_at AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD HH24:MI') AS "updatedAt"`;
 
-const notFound = { error: '회고를 찾을 수 없습니다' };
+const notFound = { error: 'Retrospective not found' };
 
 // Retrospectives (#19): /api/retrospectives
 export function retrospectiveRoutes(pool: Pool, today: () => string) {
@@ -104,10 +114,10 @@ export function retrospectiveRoutes(pool: Pool, today: () => string) {
       .object({
         kind: kind.optional(),
         limit: z.coerce
-          .number({ error: '조회 개수가 올바르지 않습니다' })
-          .int('조회 개수가 올바르지 않습니다')
-          .min(1, '조회 개수는 1 이상이어야 합니다')
-          .max(100, '조회 개수는 100 이하여야 합니다')
+          .number({ error: 'The limit is invalid' })
+          .int('The limit is invalid')
+          .min(1, 'The limit must be at least 1')
+          .max(100, 'The limit must be at most 100')
           .default(20),
       })
       .parse(req.query);

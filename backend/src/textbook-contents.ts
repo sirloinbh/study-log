@@ -9,13 +9,13 @@ import { missingOrInvalid } from './validation.js';
 const pathId = (label: string) =>
   z
     .string()
-    .regex(/^[1-9]\d{0,14}$/, `${label} ID가 올바르지 않습니다`)
+    .regex(/^[1-9]\d{0,14}$/, `Invalid ${label} ID`)
     .transform(Number);
-const textbookIdParam = pathId('교재');
-const contentIdParam = pathId('목차');
+const textbookIdParam = pathId('textbook');
+const contentIdParam = pathId('contents entry');
 
 export const bodyId = (label: string) => {
-  const message = `${label} ID가 올바르지 않습니다`;
+  const message = `Invalid ${label} ID`;
   return z
     .number({ error: message })
     .int(message)
@@ -23,24 +23,24 @@ export const bodyId = (label: string) => {
     .max(999_999_999_999_999, message);
 };
 
-const asObject = { error: '목차 내용을 JSON 객체로 보내세요' };
+const asObject = { error: 'Send the contents entry as a JSON object' };
 
 const entryFields = {
   number: z
-    .string({ error: '번호 형식이 올바르지 않습니다' })
+    .string({ error: 'The number format is invalid' })
     .trim()
-    .refine((value) => value.length <= 20, '번호 길이는 20자 이하여야 합니다')
+    .refine((value) => value.length <= 20, 'The number must be at most 20 characters')
     .default(''),
   title: z
-    .string(missingOrInvalid('목차 제목을 입력하세요', '목차 제목 형식이 올바르지 않습니다'))
+    .string(missingOrInvalid('Enter the contents title', 'The contents title format is invalid'))
     .trim()
-    .refine((value) => value.length >= 1, '목차 제목을 입력하세요')
-    .refine((value) => value.length <= 200, '목차 제목 길이는 200자 이하여야 합니다'),
+    .refine((value) => value.length >= 1, 'Enter the contents title')
+    .refine((value) => value.length <= 200, 'The contents title must be at most 200 characters'),
 };
 
 // A new entry goes last among its siblings; no parent means a top-level chapter.
 const createInput = z.object(
-  { parentId: bodyId('상위 목차').nullable().default(null), ...entryFields },
+  { parentId: bodyId('parent contents entry').nullable().default(null), ...entryFields },
   asObject,
 );
 const updateInput = z.object(entryFields, asObject);
@@ -49,13 +49,13 @@ const updateInput = z.object(entryFields, asObject);
 export const orderLimit = 1000;
 const orderInput = z.object(
   {
-    parentId: bodyId('상위 목차').nullable().default(null),
+    parentId: bodyId('parent contents entry').nullable().default(null),
     // .max() first: zod 4.6.7 rejects before reading the elements only when no refine precedes it.
     ids: z
-      .array(bodyId('목차'), { error: '순서를 바꿀 목차 ID 목록을 보내세요' })
-      .max(orderLimit, `목차 순서는 한 번에 ${orderLimit}개까지 바꿀 수 있습니다`)
-      .refine((value) => value.length >= 1, '순서를 바꿀 목차 ID 목록을 보내세요')
-      .refine((ids) => new Set(ids).size === ids.length, '목차 ID가 중복되었습니다'),
+      .array(bodyId('contents entry'), { error: 'Send the list of contents entry IDs to reorder' })
+      .max(orderLimit, `At most ${orderLimit} contents entries can be reordered at once`)
+      .refine((value) => value.length >= 1, 'Send the list of contents entry IDs to reorder')
+      .refine((ids) => new Set(ids).size === ids.length, 'Contents entry IDs are duplicated'),
   },
   asObject,
 );
@@ -71,26 +71,32 @@ const bulkInput = z.object(
         z.object(
           {
             level: z
-              .number(missingOrInvalid('목차 단계를 보내세요', '목차 단계가 올바르지 않습니다'))
-              .int('목차 단계가 올바르지 않습니다')
-              .min(0, '목차 단계가 올바르지 않습니다')
-              .max(bulkLimits.levels - 1, `목차는 ${bulkLimits.levels}단계까지입니다`),
+              .number(missingOrInvalid('Send the contents level', 'The contents level is invalid'))
+              .int('The contents level is invalid')
+              .min(0, 'The contents level is invalid')
+              .max(bulkLimits.levels - 1, `Contents can have at most ${bulkLimits.levels} levels`),
             ...entryFields,
           },
           asObject,
         ),
-        { error: '등록할 목차 목록을 보내세요' },
+        { error: 'Send the list of contents entries to add' },
       )
-      .max(bulkLimits.entries, `목차는 한 번에 ${bulkLimits.entries}개까지 등록할 수 있습니다`)
-      .refine((value) => value.length >= 1, '등록할 목차가 없습니다')
+      .max(
+        bulkLimits.entries,
+        `At most ${bulkLimits.entries} contents entries can be added at once`,
+      )
+      .refine((value) => value.length >= 1, 'There are no contents entries to add')
       .superRefine((entries, ctx) => {
         if (entries.length && entries[0].level !== 0)
-          ctx.addIssue({ code: 'custom', message: '첫 목차는 맨 위 단계여야 합니다' });
+          ctx.addIssue({
+            code: 'custom',
+            message: 'The first contents entry must be at the top level',
+          });
         const skipped = entries.findIndex((e, i) => i > 0 && e.level > entries[i - 1].level + 1);
         if (skipped > 0)
           ctx.addIssue({
             code: 'custom',
-            message: `${skipped + 1}번째 목차가 위 목차보다 두 단계 이상 깊습니다`,
+            message: `Contents entry ${skipped + 1} is two or more levels deeper than the one above`,
           });
       }),
   },
@@ -102,8 +108,8 @@ type Node = Entry & { children: Node[] };
 
 const columns = 'id, parent_id AS "parentId", number, title';
 
-const textbookNotFound = { error: '교재를 찾을 수 없습니다' };
-const contentNotFound = { error: '목차를 찾을 수 없습니다' };
+const textbookNotFound = { error: 'Textbook not found' };
+const contentNotFound = { error: 'Contents entry not found' };
 
 // Rows come ordered by (parent, position), so each parent's children are appended in order.
 async function loadTree(db: Pool | PoolClient, textbookId: number) {
@@ -170,7 +176,7 @@ export function textbookContentRoutes(pool: Pool) {
           [entry.parentId, textbookId],
         );
         if (!parent.rowCount)
-          return { status: 400, body: { error: '상위 목차를 찾을 수 없습니다' } };
+          return { status: 400, body: { error: 'Parent contents entry not found' } };
       }
       const { rows } = await client.query<Entry>(
         `INSERT INTO textbook_contents (textbook_id, parent_id, position, number, title)
@@ -228,7 +234,7 @@ export function textbookContentRoutes(pool: Pool) {
       if (siblings.size !== ids.length || ids.some((id) => !siblings.has(id)))
         return {
           status: 400,
-          body: { error: '같은 상위 목차의 모든 항목을 한 번씩 보내야 합니다' },
+          body: { error: 'Send every entry under the same parent exactly once' },
         };
       await client.query(
         `UPDATE textbook_contents AS c SET position = o.ord - 1, updated_at = now()
@@ -271,7 +277,9 @@ export function textbookContentRoutes(pool: Pool) {
         if ((error as { code?: string }).code !== '23503') throw error;
         return {
           status: 409,
-          body: { error: '학습 기록이나 일정이 연결된 목차는 삭제할 수 없습니다' },
+          body: {
+            error: 'A contents entry with a study log or schedule attached cannot be deleted',
+          },
         };
       }
       if (rows.length === 0) return { status: 404, body: contentNotFound };

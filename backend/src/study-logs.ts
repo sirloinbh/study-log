@@ -19,18 +19,18 @@ export function studyMinutes(startTime: string, endTime: string) {
 }
 
 const studyDate = calendarDate(
-  z.string(missingOrInvalid('학습일을 입력하세요', '학습일 형식이 올바르지 않습니다')),
-  '학습일은 YYYY-MM-DD 형식으로 입력하세요',
+  z.string(missingOrInvalid('Enter the study date', 'The study date format is invalid')),
+  'The study date must be in YYYY-MM-DD format',
 );
 
 const clock = (label: string) =>
   z
-    .string(missingOrInvalid(`${label}을 입력하세요`, `${label} 형식이 올바르지 않습니다`))
-    .regex(/^([01]\d|2[0-3]):[0-5]\d$/, `${label}은 HH:MM 형식으로 입력하세요`);
+    .string(missingOrInvalid(`Enter the ${label}`, `The ${label} format is invalid`))
+    .regex(/^([01]\d|2[0-3]):[0-5]\d$/, `The ${label} must be in HH:MM format`);
 
 // Optional reference ids in the body: a positive integer within the id limit, or null.
 const referenceId = (label: string) => {
-  const message = `${label} ID가 올바르지 않습니다`;
+  const message = `Invalid ${label} ID`;
   return z
     .number({ error: message })
     .int(message)
@@ -44,44 +44,47 @@ const studyLogInput = z
   .object(
     {
       studyDate,
-      startTime: clock('시작 시각'),
-      endTime: clock('종료 시각'),
+      startTime: clock('start time'),
+      endTime: clock('end time'),
       memo: z
-        .string({ error: '메모 형식이 올바르지 않습니다' })
-        .refine((value) => value.length <= 10000, '메모는 10000자 이하로 입력하세요')
+        .string({ error: 'The memo format is invalid' })
+        .refine((value) => value.length <= 10000, 'The memo must be at most 10000 characters')
         .default(''),
       status: z
-        .enum(studyStatuses, { error: '상태는 계획, 진행 중, 완료, 중단 중에서 선택하세요' })
+        .enum(studyStatuses, { error: 'The status must be planned, in progress, done, or stopped' })
         .default('planned'),
-      textbookId: referenceId('교재'),
-      contentId: referenceId('목차'),
+      textbookId: referenceId('textbook'),
+      contentId: referenceId('contents entry'),
       understanding: z
-        .number({ error: '이해도는 1~5 사이 정수로 입력하세요' })
-        .int('이해도는 1~5 사이 정수로 입력하세요')
-        .min(1, '이해도는 1~5 사이 정수로 입력하세요')
-        .max(5, '이해도는 1~5 사이 정수로 입력하세요')
+        .number({ error: 'Understanding must be a whole number from 1 to 5' })
+        .int('Understanding must be a whole number from 1 to 5')
+        .min(1, 'Understanding must be a whole number from 1 to 5')
+        .max(5, 'Understanding must be a whole number from 1 to 5')
         .nullable()
         .default(null),
       difficulties: z
-        .string({ error: '어려웠던 부분 형식이 올바르지 않습니다' })
-        .refine((value) => value.length <= 2000, '어려웠던 부분은 2000자 이하로 입력하세요')
+        .string({ error: 'The difficult-parts format is invalid' })
+        .refine(
+          (value) => value.length <= 2000,
+          'The difficult parts must be at most 2000 characters',
+        )
         .default(''),
       goalAchieved: z
-        .boolean({ error: '목표 달성 여부 형식이 올바르지 않습니다' })
+        .boolean({ error: 'The goal-achieved flag format is invalid' })
         .nullable()
         .default(null),
       studyType: z
-        .enum(studyTypes, { error: '학습 유형은 신규, 복습 중에서 선택하세요' })
+        .enum(studyTypes, { error: 'The study type must be new or review' })
         .default('new'),
     },
-    { error: '학습 기록 내용을 JSON 객체로 보내세요' },
+    { error: 'Send the study log as a JSON object' },
   )
   .refine((log) => log.startTime !== log.endTime, {
-    error: '종료 시각은 시작 시각과 달라야 합니다',
+    error: 'The end time must differ from the start time',
     path: ['endTime'],
   })
   .refine((log) => log.contentId === null || log.textbookId !== null, {
-    error: '목차를 고르려면 교재를 먼저 선택하세요',
+    error: 'Choose a textbook before choosing a contents entry',
     path: ['contentId'],
   });
 
@@ -89,7 +92,7 @@ const studyLogInput = z
 // or 20-digit ids would otherwise reach Postgres and fail as a 500.
 const idParam = z
   .string()
-  .regex(/^[1-9]\d{0,14}$/, '학습 기록 ID가 올바르지 않습니다')
+  .regex(/^[1-9]\d{0,14}$/, 'Invalid study log ID')
   .transform(Number);
 
 // ?date for one day in time order; otherwise the most recent logs, narrowed by ?textbookId, ?q
@@ -98,26 +101,26 @@ const listQuery = z
   .object({
     date: studyDate.optional(),
     q: z
-      .string({ error: '검색어 형식이 올바르지 않습니다' })
+      .string({ error: 'The search term format is invalid' })
       .trim()
-      .refine((value) => value.length <= 50, '검색어는 50자 이하로 입력하세요')
+      .refine((value) => value.length <= 50, 'The search term must be at most 50 characters')
       .optional(),
     from: studyDate.optional(),
     to: studyDate.optional(),
     textbookId: z
-      .string({ error: '교재 ID가 올바르지 않습니다' })
-      .regex(/^[1-9]\d{0,14}$/, '교재 ID가 올바르지 않습니다')
+      .string({ error: 'Invalid textbook ID' })
+      .regex(/^[1-9]\d{0,14}$/, 'Invalid textbook ID')
       .transform(Number)
       .optional(),
     limit: z.coerce
-      .number({ error: '조회 개수가 올바르지 않습니다' })
-      .int('조회 개수가 올바르지 않습니다')
-      .min(1, '조회 개수는 1 이상이어야 합니다')
-      .max(100, '조회 개수는 100 이하여야 합니다')
+      .number({ error: 'The limit is invalid' })
+      .int('The limit is invalid')
+      .min(1, 'The limit must be at least 1')
+      .max(100, 'The limit must be at most 100')
       .default(20),
   })
   .refine((query) => !query.from || !query.to || query.from <= query.to, {
-    error: '시작일은 종료일보다 늦을 수 없습니다',
+    error: 'The start date cannot be after the end date',
   });
 
 // `source` is study_logs or a CTE of written rows; the textbook and chapter names come along so
@@ -133,12 +136,12 @@ const select = (source: string) => `SELECT l.id, l.study_date AS "studyDate",
   LEFT JOIN textbooks t ON t.id = l.textbook_id
   LEFT JOIN textbook_contents c ON c.id = l.content_id`;
 
-const notFound = { error: '학습 기록을 찾을 수 없습니다' };
+const notFound = { error: 'Study log not found' };
 
 // A reference that does not exist (or a chapter of another textbook) fails its foreign key.
 const missingReference: Record<string, string> = {
-  study_logs_textbook_fkey: '교재를 찾을 수 없습니다',
-  study_logs_content_fkey: '목차를 찾을 수 없습니다',
+  study_logs_textbook_fkey: 'Textbook not found',
+  study_logs_content_fkey: 'Contents entry not found',
 };
 
 async function write<T>(run: () => Promise<T>) {

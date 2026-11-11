@@ -16,7 +16,7 @@ export const isCalendarDate = (value: string) => {
 export const calendarDate = (text: z.ZodString, formatMessage: string) =>
   text
     .regex(/^\d{4}-\d{2}-\d{2}$/, { error: formatMessage, abort: true })
-    .refine(isCalendarDate, { error: '존재하지 않는 날짜입니다', abort: true });
+    .refine(isCalendarDate, { error: 'This date does not exist', abort: true });
 
 // The API accepts dates up to here, and a later date would not fit YYYY-MM-DD.
 const lastDate = '9999-12-31';

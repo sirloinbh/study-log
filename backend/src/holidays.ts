@@ -4,7 +4,7 @@ import { z } from 'zod/v4';
 import { isCalendarDate } from './dates.js';
 import { inTransaction } from './sql.js';
 
-// Public holidays for schedules (#33, docs/decisions/schedule-rules.md 3장). The loader takes a
+// Public holidays for schedules (#33, docs/decisions/schedule-rules.md section 3). The loader takes a
 // `HolidayFetcher`, so tests hand in a stand-in and never call the API.
 export type Holiday = { date: string; name: string };
 export type HolidayFetcher = (year: number) => Promise<Holiday[]>;
@@ -29,7 +29,7 @@ const endpoint = 'https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoServi
 const yearTimeout = 30_000;
 // Rows asked for in one month. No month has nearly this many, and an answer with more is refused.
 const rowsPerMonth = 50;
-const unreadable = '공휴일 정보를 읽지 못했습니다. 잠시 뒤 다시 시도하세요';
+const unreadable = 'Could not read the holiday data. Try again in a moment';
 
 // Holidays on fixed dates, in every year. A reading without one of them is not complete.
 const fixedHolidays = ['01-01', '03-01', '05-05', '06-06', '08-15', '10-03', '10-09', '12-25'];
@@ -81,7 +81,8 @@ function monthHolidays(body: unknown, year: number, month: string): Holiday[] {
 export function dataPortalHolidays(fetchImpl: typeof fetch = fetch): HolidayFetcher {
   return async (year) => {
     const key = process.env.HOLIDAY_API_KEY;
-    if (!key) throw new HolidayError('공휴일 API 키(HOLIDAY_API_KEY)가 서버에 설정되지 않았습니다');
+    if (!key)
+      throw new HolidayError('The holiday API key (HOLIDAY_API_KEY) is not set on the server');
     // The portal issues the key in plain and in already encoded form; either may be configured.
     const serviceKey = key.includes('%') ? key : encodeURIComponent(key);
     const signal = AbortSignal.timeout(yearTimeout);
@@ -113,7 +114,7 @@ export function dataPortalHolidays(fetchImpl: typeof fetch = fetch): HolidayFetc
 const maxAgeMs = 7 * 24 * 60 * 60 * 1000;
 
 // The holiday dates of the years from `from` to `to`, for creating a schedule. Call it outside a
-// transaction, since it may call the API (rule 3장). A year is read again once its copy is seven
+// transaction, since it may call the API (rule section 3). A year is read again once its copy is seven
 // days old. An empty answer means a year not published yet and is not kept. A year that cannot be
 // read uses the copy there is, and without one this refuses: counting a holiday as a weekday would
 // make a wrong schedule.
@@ -149,7 +150,7 @@ export async function loadHolidays(
       if (failure instanceof HolidayError) throw failure;
       // Whatever else failed, its message stays out: it could quote the key.
       if (failure) throw new HolidayError(unreadable);
-      throw new HolidayError(`${year}년 공휴일 정보가 없어 일정을 만들 수 없습니다`);
+      throw new HolidayError(`No holiday data for ${year}, so the schedule cannot be made`);
     } else {
       console.error(
         JSON.stringify({

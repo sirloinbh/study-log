@@ -10,20 +10,20 @@ export type StatPeriod = (typeof statPeriods)[number];
 
 const query = z.object({
   period: z
-    .enum(statPeriods, { error: '기간은 이번 주, 이번 달, 최근 3개월, 전체 중에서 고르세요' })
+    .enum(statPeriods, { error: 'The period must be this week, this month, last 3 months, or all' })
     .default('week'),
 });
 
 const textbookIdParam = z
-  .string({ error: '교재 ID가 올바르지 않습니다' })
-  .regex(/^[1-9]\d{0,14}$/, '교재 ID가 올바르지 않습니다')
+  .string({ error: 'Invalid textbook ID' })
+  .regex(/^[1-9]\d{0,14}$/, 'Invalid textbook ID')
   .transform(Number)
   .optional();
 
 // Study time can be narrowed to one kind of study (#52) and to the logs of one textbook (#180).
 const studyTimeQuery = query.extend({
   type: z
-    .enum(['all', ...studyTypes], { error: '학습 유형은 전체, 신규, 복습 중에서 고르세요' })
+    .enum(['all', ...studyTypes], { error: 'The study type must be all, new, or review' })
     .default('all'),
   textbookId: textbookIdParam,
 });
@@ -148,16 +148,16 @@ export const completionRate = (completed: number, scheduled: number) =>
 const patternQuery = z
   .object({
     from: calendarDate(
-      z.string({ error: '시작일 형식이 올바르지 않습니다' }),
-      '시작일은 YYYY-MM-DD 형식으로 입력하세요',
+      z.string({ error: 'The start date format is invalid' }),
+      'The start date must be in YYYY-MM-DD format',
     ).optional(),
     to: calendarDate(
-      z.string({ error: '종료일 형식이 올바르지 않습니다' }),
-      '종료일은 YYYY-MM-DD 형식으로 입력하세요',
+      z.string({ error: 'The end date format is invalid' }),
+      'The end date must be in YYYY-MM-DD format',
     ).optional(),
   })
   .refine((query) => !query.from || !query.to || query.from <= query.to, {
-    error: '시작일은 종료일보다 늦을 수 없습니다',
+    error: 'The start date cannot be after the end date',
   });
 
 const textbookQuery = z.object({ textbookId: textbookIdParam });
@@ -178,7 +178,7 @@ export function statsRoutes(pool: Pool, today: () => string) {
     // A book with no logs shows zeros; one that does not exist is not that.
     if (bookId !== null) {
       const book = await pool.query('SELECT 1 FROM textbooks WHERE id = $1', [bookId]);
-      if (!book.rowCount) return void res.status(404).json({ error: '교재를 찾을 수 없습니다' });
+      if (!book.rowCount) return void res.status(404).json({ error: 'Textbook not found' });
     }
     const to = today();
     const totals = await pool.query<{ first: string | null; cumulative: number }>(
@@ -222,7 +222,7 @@ export function statsRoutes(pool: Pool, today: () => string) {
     res.json({ from, to, daily: await dailyMinutes(pool, from, to) });
   });
 
-  // How well reviews were kept (#46, docs/decisions/review-rules.md 5장): /api/stats/reviews?period=
+  // How well reviews were kept (#46, docs/decisions/review-rules.md section 5): /api/stats/reviews?period=
   // A round belongs to the period of its original due date, so moving it changes nothing here. A
   // round due today is not late yet. "All" has no first date to cut at: it counts every round.
   router.get('/reviews', async (req, res) => {
@@ -257,7 +257,7 @@ export function statsRoutes(pool: Pool, today: () => string) {
   });
 
   // Chapters done per textbook, and how schedules were kept (#51, docs/decisions/schedule-rules.md
-  // 7장): /api/stats/textbooks?textbookId=. A chapter is done by a done log on it or anywhere under
+  // section 7): /api/stats/textbooks?textbookId=. A chapter is done by a done log on it or anywhere under
   // it, dated today at the latest, as the other statistics count. A day counts once its first planned date has passed, or once it is done on that date; one
   // still open today is not late yet. Moves do not change that date, so this writes nothing.
   router.get('/textbooks', async (req, res) => {
@@ -282,7 +282,7 @@ export function statsRoutes(pool: Pool, today: () => string) {
       [id, today()],
     );
     if (id !== null && textbooks.length === 0)
-      return void res.status(404).json({ error: '교재를 찾을 수 없습니다' });
+      return void res.status(404).json({ error: 'Textbook not found' });
     const { rows } = await pool.query<{
       plannedMinutes: number;
       achievedMinutes: number;
@@ -320,7 +320,7 @@ export function statsRoutes(pool: Pool, today: () => string) {
     const to = query.to ?? today();
     const from = query.from ?? periodStart('3months', to);
     if (toDate(to).getTime() - toDate(from).getTime() >= maxSeriesDays * 86_400_000)
-      return void res.status(400).json({ error: '기간은 10년 이내로 지정하세요' });
+      return void res.status(400).json({ error: 'The period must be within 10 years' });
     const { rows } = await pool.query<{
       studyDate: string;
       startTime: string;

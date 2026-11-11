@@ -4,8 +4,8 @@ import { z } from 'zod/v4';
 
 const query = z.object({
   month: z
-    .string({ error: '월 형식이 올바르지 않습니다' })
-    .regex(/^(?!0000)\d{4}-(0[1-9]|1[0-2])$/, '월은 YYYY-MM 형식으로 입력하세요')
+    .string({ error: 'The month format is invalid' })
+    .regex(/^(?!0000)\d{4}-(0[1-9]|1[0-2])$/, 'The month must be in YYYY-MM format')
     .optional(),
 });
 

@@ -67,7 +67,7 @@ export function createApp(
       limit: options.requestsPerMinute ?? defaultRequestsPerMinute,
       standardHeaders: 'draft-8',
       legacyHeaders: false,
-      message: { error: '요청이 너무 많습니다. 잠시 뒤 다시 시도하세요' },
+      message: { error: 'Too many requests. Try again in a moment' },
       validate: { xForwardedForHeader: false, forwardedHeader: false },
       // Deploys and monitoring read health; busy pages must not make a healthy API look down.
       skip: (req) => (req.method === 'GET' || req.method === 'HEAD') && req.path === '/health',
@@ -95,7 +95,7 @@ export function createApp(
   app.use('/api/exercises', exerciseRoutes(pool, options.translator ?? claudeTranslator()));
   app.use('/api/textbooks', textbookRoutes(pool));
   app.use('/api', (_req, res) => {
-    res.status(404).json({ error: '요청한 API를 찾을 수 없습니다' });
+    res.status(404).json({ error: 'API not found' });
   });
   app.use(
     (err: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
@@ -109,27 +109,27 @@ export function createApp(
           : {};
       // express.json() rejects malformed or oversized bodies before any route runs.
       if (error.type === 'entity.parse.failed') {
-        res.status(400).json({ error: '요청 본문의 JSON 형식이 올바르지 않습니다' });
+        res.status(400).json({ error: 'Request body is not valid JSON' });
         return;
       }
       if (error.type === 'entity.too.large') {
-        res.status(413).json({ error: '요청 본문이 너무 큽니다' });
+        res.status(413).json({ error: 'Request body is too large' });
         return;
       }
       // Other client errors raised before routing (unsupported charset or encoding, aborted
       // request) keep their 4xx status instead of turning into a logged 500.
       if (typeof error.status === 'number' && error.status >= 400 && error.status < 500) {
-        res.status(error.status).json({ error: '요청을 처리할 수 없습니다' });
+        res.status(error.status).json({ error: 'Cannot process the request' });
         return;
       }
       // PostgreSQL text cannot hold a NUL character; it refuses the value as an invalid byte
       // sequence. That is the client's input, not a server fault (#58).
       if (error.code === '22021') {
-        res.status(400).json({ error: '입력에 사용할 수 없는 문자(NUL)가 있습니다' });
+        res.status(400).json({ error: 'Input contains a character that is not allowed (NUL)' });
         return;
       }
       if (error.code === '23505') {
-        res.status(409).json({ error: '이미 등록된 항목입니다' });
+        res.status(409).json({ error: 'This item already exists' });
         return;
       }
       console.error(
@@ -138,7 +138,7 @@ export function createApp(
           message: err instanceof Error ? err.message : String(err),
         }),
       );
-      res.status(500).json({ error: '서버 오류가 발생했습니다' });
+      res.status(500).json({ error: 'Server error' });
     },
   );
   return app;
