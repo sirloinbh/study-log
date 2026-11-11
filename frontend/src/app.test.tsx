@@ -25,7 +25,7 @@ test('the study log is the first page and shows the server date', async () => {
   server({ body: { today: '2026-10-26' } });
   render(<App />);
   expect(screen.getByRole('heading', { level: 1, name: '학습 기록' })).toBeInTheDocument();
-  expect(await screen.findByText('서버 연결됨 · 2026-10-26')).toBeInTheDocument();
+  expect(await screen.findByText('Server connected · 2026-10-26')).toBeInTheDocument();
 });
 
 test('reports a server error as an alert and does not open the page body', async () => {
@@ -38,7 +38,7 @@ test('reports a server error as an alert and does not open the page body', async
 test('each page has its own address and is marked in the main menu', async () => {
   server({ body: { today: '2026-10-26' } });
   render(<App />);
-  const menu = screen.getByRole('navigation', { name: '주 메뉴' });
+  const menu = screen.getByRole('navigation', { name: 'Main menu' });
   for (const [label, path] of [
     ['일정', '/schedules'],
     ['복습', '/reviews'],
@@ -103,7 +103,7 @@ test('saving a log and completing a review update the badge, and the pages stay 
   // Counting again re-renders the app; a remounted page would lose what is being typed.
   expect(document.querySelector('.study-logs form')).toBe(form);
 
-  const menu = screen.getByRole('navigation', { name: '주 메뉴' });
+  const menu = screen.getByRole('navigation', { name: 'Main menu' });
   fireEvent.click(within(menu).getByRole('link', { name: '복습' }));
   const heading = await screen.findByRole('heading', { name: '오늘의 복습 2개' });
   const card = heading.closest('section');
