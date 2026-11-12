@@ -1,103 +1,103 @@
-# 학습 일정 규칙
+# Study schedule rules
 
-이슈 [#32](https://github.com/sirloinbh/study-log/issues/32)에서 사용자가 정한 규칙이다. 일정 관련 이슈 #33~#38은 이 문서를 따른다. 날짜는 모두 서비스 시간대 `Asia/Seoul` 기준이다.
+These are the rules the user set in issue [#32](https://github.com/sirloinbh/study-log/issues/32). The schedule issues #33 to #38 follow this document. All dates use the service time zone `Asia/Seoul`.
 
-"사용자 결정"은 사용자가 고른 내용이고, "세부 규칙"은 그 결정을 구현할 수 있도록 에이전트가 채운 내용이다. 세부 규칙은 해당 구현 이슈에서 바꿀 수 있고, 바꾸면 이 문서도 함께 고친다.
+"User decision" is what the user chose, and "Detailed rules" is what the agent filled in so the decision can be implemented. A detailed rule can be changed in the implementing issue, and when it is, this document is updated too.
 
-## 1. 시간 분량
+## 1. Amount of time
 
-사용자 결정: **일정마다 수정한다.**
+User decision: **Edit it for each schedule.**
 
-세부 규칙:
+Detailed rules:
 
-- 일정 생성 화면에 평일 2시간, 주말·공휴일 5시간을 미리 채운다.
-- 입력한 분량은 그 일정에 저장한다. 별도 전역 설정은 만들지 않는다.
-- 분량은 하루 0~24시간이다. 공휴일을 판정한 뒤 기간 전체 목표 시간이 0이면, 즉 항목이 하루도 생기지 않으면 생성을 거부한다.
-- 분량이 0인 종류의 날에는 항목을 만들지 않는다. 예를 들어 평일을 0으로 정하면 주말·공휴일에만 항목이 생긴다.
-- 일정을 만든 뒤 기본값이 바뀌어도 기존 일정에는 영향이 없다.
+- The schedule creation screen is pre-filled with 2 hours for weekdays and 5 hours for weekends and holidays.
+- The amount you enter is saved with that schedule. Do not create a separate global setting.
+- The amount is 0 to 24 hours per day. If the target time for the whole period is 0 after holidays are determined, that is, if no day gets an item, reject the creation.
+- Do not create items on the kind of day whose amount is 0. For example, if you set weekdays to 0, items are created only on weekends and holidays.
+- If the defaults change after a schedule is created, existing schedules are not affected.
 
-## 2. 장 단위 배분
+## 2. Chapter-level allocation
 
-사용자 결정: **기간에 시간 비례로 배분한다.** 종료일까지 끝나도록 나누고, 학습 시간이 긴 날에 장을 더 많이 배정한다.
+User decision: **Allocate across the period in proportion to time.** Divide so the schedule finishes by the end date, and assign more chapters to days with longer study time.
 
-세부 규칙:
+Detailed rules:
 
-- 장은 목차의 최상위 항목이다. 절은 장에 포함된다.
-- 목차에 장이 없으면 장 단위 일정 생성을 거부한다.
-- 목차에 쪽수가 없으므로 장마다 분량이 같다고 본다.
-- 기간 전체 목표 시간을 `T`, 장 수를 `n`이라 하면 `k`번째 장은 누적 시간이 `T × k ÷ n` 이상이 되는 첫 날에 끝난다. 소수 오차를 피하려고 `누적 × n ≥ T × k`로 비교한다.
-- 다음 장은 앞 장이 끝난 날의 누적 시간이 경계보다 크면 그날 시작하고, 경계와 같으면 다음 항목 날짜에 시작한다.
-- 마지막 장의 경계는 `T`이므로 마지막 날에 반드시 끝난다.
-- 장이 날짜보다 많으면 하루에 여러 장을 배정하고, 날짜가 장보다 많으면 한 장을 여러 날에 걸쳐 배정한다.
-- 첫 장과 마지막 장으로 범위를 고른다. 고르지 않으면 책의 처음이나 끝까지이다(#36).
-- 일정이 연결된 교재와 장은 학습 기록과 마찬가지로 삭제할 수 없다. 일정을 지우면 다시 삭제할 수 있다. 일정을 만든 뒤 목차가 바뀌어도 배정은 다시 계산하지 않는다(#36).
+- A chapter is a top-level entry of the table of contents. Sections belong to a chapter.
+- If the table of contents has no chapters, reject creating a chapter-level schedule.
+- The table of contents has no page counts, so treat every chapter as the same size.
+- Let `T` be the target time for the whole period and `n` the number of chapters. Chapter `k` ends on the first day when the cumulative time reaches `T × k ÷ n` or more. To avoid fraction errors, compare with `cumulative × n ≥ T × k`.
+- The next chapter starts on the day the previous chapter ended if that day's cumulative time is greater than the boundary, and starts on the next item's date if it equals the boundary.
+- The boundary of the last chapter is `T`, so it always ends on the last day.
+- If there are more chapters than days, assign several chapters to one day, and if there are more days than chapters, assign one chapter across several days.
+- Pick the range with a first chapter and a last chapter. If you do not pick, it runs to the start or the end of the book (#36).
+- A textbook and chapters linked to a schedule cannot be deleted, just like with study records. If you delete the schedule, they can be deleted again. If the table of contents changes after a schedule is created, the assignment is not recalculated (#36).
 
-예: 2·2·2·2·2·5·5시간(합 20)에 4장이면 경계는 5·10·15·20이다. 1장은 1~3일째, 2장은 3~5일째, 3장은 6일째, 4장은 7일째이다.
+Example: with 2, 2, 2, 2, 2, 5, 5 hours (total 20) and 4 chapters, the boundaries are 5, 10, 15, 20. Chapter 1 is on days 1 to 3, chapter 2 on days 3 to 5, chapter 3 on day 6, and chapter 4 on day 7.
 
-## 3. 공휴일 데이터
+## 3. Holiday data
 
-사용자 결정: **공공데이터포털 API를 쓴다.**
+User decision: **Use the Public Data Portal API.**
 
-세부 규칙:
+Detailed rules:
 
-- 출처는 공공데이터포털의 한국천문연구원 특일 정보 API의 공휴일 정보 조회(`getRestDeInfo`)이다. `isHoliday`가 `Y`인 날을 공휴일로 본다.
-- API 키는 서버 환경변수 `HOLIDAY_API_KEY`로만 읽는다. 저장소, 로그, 브라우저로 보내는 응답에 넣지 않는다.
-- 문서상 월이 필수라 한 해를 12번 나눠 조회한다. 한 달이라도 실패하면 그 해 전체를 실패로 본다.
-- 응답은 엄격하게 읽는다. 본문이 없거나, 건수가 항목 수와 다르거나, `isHoliday`가 `Y`, `N`이 아니거나, 다른 달의 날짜가 있으면 실패이다.
-- 공휴일이 하나라도 있는데 고정 공휴일(1월 1일, 3월 1일, 5월 5일, 6월 6일, 8월 15일, 10월 3일, 10월 9일, 12월 25일)이 빠졌으면 그 해 전체를 실패로 본다.
-- 대체공휴일과 임시공휴일의 실제 응답은 키를 발급받은 뒤(#129) 확인한다. 그전까지는 공식 문서의 항목 설명과 이 API의 알려진 응답 형태에 맞춰 구현했다.
-- 공휴일 데이터는 일정을 생성할 때만 쓴다. 조회와 자동 밀기에는 쓰지 않는다.
-- 조회 결과는 연도별로 DB에 저장해 재사용한다. 저장한 지 7일이 지난 연도는 다음 생성 때 다시 조회한다.
-- 외부 API 호출은 DB 트랜잭션 밖에서 한다.
-- API가 오류 없이 빈 결과를 주면 아직 공표되지 않은 연도로 보고 저장하지 않는다. 조회 실패와 같게 처리한다.
-- 다시 조회하지 못하면 저장된 데이터를 쓴다.
-- 저장된 데이터도 없으면 일정 생성을 거부하고 한국어 오류를 보여 준다. 공휴일을 평일로 잘못 계산한 일정을 만들지 않기 위해서다.
-- 이미 만든 일정의 날짜와 분량은 공휴일 데이터가 바뀌어도 다시 계산하지 않는다.
+- The source is the holiday information lookup (`getRestDeInfo`) of the Korea Astronomy and Space Science Institute special day information API on the Public Data Portal. A day with `isHoliday` of `Y` is treated as a holiday.
+- Read the API key only from the server environment variable `HOLIDAY_API_KEY`. Do not put it in the repository, in logs, or in responses sent to the browser.
+- The documentation makes the month required, so look up one year in 12 requests. If even one month fails, treat the whole year as failed.
+- Read the response strictly. It is a failure if there is no body, if the count differs from the number of items, if `isHoliday` is neither `Y` nor `N`, or if there is a date from another month.
+- If there is at least one holiday but a fixed holiday (Jan 1, Mar 1, May 5, Jun 6, Aug 15, Oct 3, Oct 9, Dec 25) is missing, treat the whole year as failed.
+- Check the real responses for substitute holidays and temporary holidays after the key is issued (#129). Until then, it was implemented to match the item descriptions in the official documentation and the known response shape of this API.
+- Holiday data is used only when a schedule is created. It is not used for viewing or automatic pushing.
+- Save the lookup result in the DB per year and reuse it. A year saved more than 7 days ago is looked up again at the next creation.
+- Make the external API call outside a DB transaction.
+- If the API returns an empty result without an error, treat it as a year that is not published yet and do not save it. Handle it the same as a lookup failure.
+- If it cannot look up again, use the saved data.
+- If there is no saved data either, reject creating the schedule and show a Korean error. This is so that a schedule that wrongly calculates a holiday as a weekday is never created.
+- The dates and amounts of an already created schedule are not recalculated even if the holiday data changes.
 
-## 4. 지연 처리
+## 4. Handling delays
 
-사용자 결정: **이후 일정을 자동으로 민다.**
+User decision: **Automatically push later schedule items.**
 
-세부 규칙(구현은 #37):
+Detailed rules (implemented in #37):
 
-- 오늘보다 앞선 날짜에 미완료 항목이 있으면, 가장 이른 미완료 항목이 오늘로 오도록 지연 일수를 구한다.
-- 미완료 항목 전체를 지연 일수만큼 뒤로 민다. 항목 사이 간격이 유지되므로 수동으로 옮긴 날짜의 간격도 사라지지 않고, 어떤 항목도 앞당겨지지 않는다.
-- 완료한 항목은 움직이지 않는다. 밀린 항목이 완료한 항목과 같은 날짜에 놓일 수 있으므로, 일정과 날짜 조합에 유일 제약을 두지 않는다.
-- 항목의 목표 시간과 장 배정은 그대로 둔다. 옮겨 간 날이 평일이어도 다시 계산하지 않아, 일정 전체 목표 시간과 시간 비례 배분이 유지된다.
-- 별도 스케줄러 없이 서버가 일정을 조회할 때 트랜잭션으로 적용한다.
-- 종료일은 처음 정한 종료일과 마지막 항목 날짜 중 늦은 날이다. 화면에는 처음 정한 종료일과 늦어진 일수를 함께 보여 줘서, 늦어진 사실을 알 수 있게 한다.
-- 앞당기기와 항목별 수동 이동도 #37의 범위이다.
-- 항목은 오늘 이후로만 옮긴다. 지난 날짜로 옮기면 조회할 때 바로 밀리기 때문이다. 옮긴 항목과 함께 옮긴 항목은 오늘부터 730일 안이어야 한다.
-- 이후 일정도 함께 옮기면 그 항목과 그 날짜 이후의 미완료 항목을 같은 일수만큼 옮긴다. 항목 사이 간격이 유지된다.
-- 완료한 항목은 옮길 수 없다. 지난 날짜의 항목을 완료 취소하면 그 항목만 오늘로 옮긴다. 실수로 체크를 한 번 풀었다고 일정 전체가 완료한 지 지난 일수만큼 밀리고 되돌릴 수 없게 되지 않도록 하기 위해서이다.
-- 그렇게 오늘로 옮긴 항목을 다시 완료하면 취소하기 전의 날짜와 완료일로 되돌린다(사용자 결정, #165). 늦어짐 표시와 준수율이 실수로 바뀐 채 남지 않게 하기 위해서이다. 다시 완료하기 전에 그 항목을 직접 옮기면 새 날짜를 따르고, 다시 완료한 날이 완료일이 된다. 열려 있는 동안 하루가 지나면 그 항목이 가장 이른 미완료 항목이 되어 다른 미완료 항목도 밀리는데, 다시 완료해도 그 항목들은 되돌리지 않는다.
+- If there are incomplete items on dates earlier than today, find the number of delay days so that the earliest incomplete item lands on today.
+- Push all incomplete items back by the number of delay days. The gaps between items are kept, so the gaps from dates moved by hand do not disappear, and no item is pulled earlier.
+- Completed items do not move. A pushed item can land on the same date as a completed item, so there is no unique constraint on the combination of schedule and date.
+- The target time of an item and its chapter assignment stay as they are. Even if the day it moves to is a weekday, nothing is recalculated, so the schedule's total target time and the time-proportional allocation are kept.
+- There is no separate scheduler; the server applies it in a transaction when it reads the schedule.
+- The end date is the later of the originally set end date and the date of the last item. The screen shows the originally set end date together with the number of days it slipped, so you can see that it slipped.
+- Pulling items earlier and moving individual items by hand are also in the scope of #37.
+- An item can be moved only to today or later. If you move it to a past date, it would be pushed right away when read. The moved item and the items moved with it must be within 730 days of today.
+- If you also move later items, that item and the incomplete items on or after its date are moved by the same number of days. The gaps between items are kept.
+- A completed item cannot be moved. If you un-complete an item with a past date, only that item moves to today. This is so that un-checking by mistake once does not push the whole schedule back by the number of days since completion in a way that cannot be undone.
+- If you complete an item that was moved to today that way again, it goes back to the date and completion date it had before the cancel (user decision, #165). This is so that the lateness mark and the adherence rate are not left changed by a mistake. If you move that item by hand before completing it again, it follows the new date, and the day you complete it again becomes its completion date. If a day passes while it is open, that item becomes the earliest incomplete item and other incomplete items are pushed too; completing it again does not restore those items.
 
-## 5. 진행률
+## 5. Progress
 
-세부 규칙(#38):
+Detailed rules (#38):
 
-- 진행률은 완료한 항목의 목표 시간 ÷ 전체 목표 시간이다. 일정과 학습 기록은 연결되어 있지 않아 실제 학습 시간은 쓰지 않는다. 시간이 긴 날을 끝내면 그만큼 더 올라간다.
-- 백분율은 내림한다. 전부 끝내야 100%이다.
-- 항목을 옮겨도 진행률은 바뀌지 않는다.
+- Progress is the target time of completed items ÷ the total target time. Schedules and study records are not linked, so the actual study time is not used. Finishing a longer day raises it by more.
+- The percentage is rounded down. It is 100% only when everything is done.
+- Moving items does not change the progress.
 
-## 6. 생성 입력과 수정
+## 6. Creation input and editing
 
-세부 규칙(#34):
+Detailed rules (#34):
 
-- 일정에는 이름을 붙인다. 분량은 분 단위 정수로 저장한다.
-- 시작일은 오늘 이후여야 한다. 지난 날짜의 항목은 조회하자마자 4장의 자동 밀기로 옮겨지기 때문이다.
-- 기간은 366일 이하이다. 공휴일 조회가 일정 생성 요청을 붙잡으므로 조회할 연도를 둘로 제한한다.
-- 종료일은 내년 말까지이다. 그 뒤의 공휴일은 아직 공표되지 않아, 조회해도 API 호출 한도만 쓴다.
-- 만든 뒤에는 이름만 고친다. 기간이나 분량을 고치려면 공휴일을 다시 읽어야 하는데 3장은 생성할 때만 쓰게 하고, 다시 계산하면 완료하거나 옮긴 항목(#37)이 사라진다. 기간이나 분량이 달라지면 일정을 지우고 새로 만든다.
+- A schedule is given a name. The amount is saved as an integer number of minutes.
+- The start date must be today or later. Items on past dates would be moved by the automatic pushing in chapter 4 as soon as they are read.
+- The period is at most 366 days. The holiday lookup holds up the schedule creation request, so the years to look up are limited to two.
+- The end date is at most the end of next year. Holidays after that are not published yet, so looking them up only uses up the API call limit.
+- After creation, you can edit only the name. Changing the period or the amount would require reading the holidays again, but chapter 3 says to use them only at creation, and recalculating would lose the items that were completed or moved (#37). If the period or the amount changes, delete the schedule and create a new one.
 
-## 7. 교재와 일정 통계
+## 7. Textbook and schedule statistics
 
-세부 규칙(#51). 2026-11-03에 사용자가 이 기준을 그대로 두기로 했다.
+Detailed rules (#51). On 2026-11-03 the user decided to keep these criteria as they are.
 
-- 장은 그 장이나 그 아래 절에 완료한 학습 기록이 하나라도 있으면 완료이다. 다른 통계처럼 오늘 이전 날짜의 기록만 센다.
-- 항목의 원래 날짜는 일정을 만들 때의 날짜이고 바뀌지 않는다. 자동 밀기와 수동 이동은 현재 날짜만 바꾼다.
-- 집계 대상은 원래 날짜가 지났거나, 원래 날짜가 오늘이고 이미 완료한 항목이다. 오늘 항목을 아직 안 끝낸 것은 늦은 것이 아니다.
-- 달성률은 집계 대상의 목표 시간 중 끝낸 목표 시간의 비율이다.
-- 준수율은 집계 대상 중 원래 날짜까지 끝낸 항목의 비율이다.
-- 백분율은 내림한다. 집계 대상이 없으면 비율을 보여 주지 않는다.
-- 교재를 고르면 그 교재에 연결된 일정만 센다. 전체에는 교재 없는 일정도 들어간다.
+- A chapter is complete if there is at least one completed study record in that chapter or in a section under it. As with the other statistics, only records dated before today are counted.
+- An item's original date is its date when the schedule was created and does not change. Automatic pushing and manual moves change only the current date.
+- The items counted are those whose original date has passed, or whose original date is today and that are already completed. An item for today that is not finished yet is not late.
+- The achievement rate is the share of the counted items' target time that was finished.
+- The adherence rate is the share of counted items that were finished by their original date.
+- Percentages are rounded down. If there are no counted items, no rate is shown.
+- If you pick a textbook, only the schedules linked to that textbook are counted. All includes schedules without a textbook.

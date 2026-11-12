@@ -1,81 +1,81 @@
-# 복습 주기 규칙
+# Review interval rules
 
-이슈 [#41](https://github.com/sirloinbh/study-log/issues/41)에서 사용자가 정한 규칙이다. 복습 관련 이슈 #42~#46은 이 문서를 따른다. 날짜는 모두 서비스 시간대 `Asia/Seoul` 기준이다.
+These are the rules the user set in issue [#41](https://github.com/sirloinbh/study-log/issues/41). The review issues #42 to #46 follow this document. All dates use the service time zone `Asia/Seoul`.
 
-"사용자 결정"은 사용자가 고른 내용이고, "세부 규칙"은 그 결정을 구현할 수 있도록 에이전트가 채운 내용이다. 세부 규칙은 해당 구현 이슈에서 바꿀 수 있고, 바꾸면 이 문서도 함께 고친다.
+"User decision" is what the user chose, and "Detailed rules" is what the agent filled in so the decision can be implemented. A detailed rule can be changed in the implementing issue, and when it is, this document is updated too.
 
-## 1. 복습 대상
+## 1. What gets a review
 
-사용자 결정: **학습 기록 단위로 만든다.**
+User decision: **Create reviews per study record.**
 
-세부 규칙:
+Detailed rules:
 
-- 학습 기록의 상태가 완료가 아니던 것에서 완료로 바뀔 때, 또는 완료 상태로 새로 등록될 때 1회차를 만든다. 복습이 이미 있으면 새로 만들지 않는다.
-- 기능을 넣기 전에 이미 완료였던 기록에는 소급해서 만들지 않는다. 메모 수정처럼 상태가 그대로인 수정도 복습을 만들지 않는다.
-- 완료를 해제할 때 아직 완료한 회차가 없으면 1회차를 지운다. 다시 완료하면 그때의 학습일로 새로 만든다.
-- 완료한 회차가 있으면 완료를 해제해도 복습을 그대로 둔다.
-- 1회차를 완료하기 전에 학습일을 고치면 1회차의 예정일과 원래 예정일(3장)을 모두 새 학습일로 다시 계산한다. 앞서 미룬 날짜도 함께 사라진다.
-- 학습 기록을 삭제하면 그 기록의 복습도 함께 삭제한다.
+- When a study record's status changes from not completed to completed, or when it is newly registered as completed, create round 1. If a review already exists, do not create a new one.
+- Do not create reviews retroactively for records that were already completed before the feature was added. An edit that leaves the status unchanged, such as editing a note, does not create a review.
+- When you un-complete a record and no round has been completed yet, delete round 1. If you complete it again, create a new one from the study date at that time.
+- If a round has been completed, keep the review as it is even when you un-complete the record.
+- If you fix the study date before completing round 1, recalculate both the due date of round 1 and the original due date (chapter 3) from the new study date. Any earlier postponement is dropped too.
+- When you delete a study record, its reviews are deleted too.
 
-## 2. 기준일과 간격
+## 2. Base date and intervals
 
-사용자 결정: **직전 복습 완료일을 기준으로, 간격은 1·2·4·7·16일이다.** 제때 복습하면 학습 후 1·3·7·14·30일째가 되어 이슈 #7의 일정과 같다.
+User decision: **The base is the completion date of the previous review, and the intervals are 1, 2, 4, 7, and 16 days.** If you review on time, the rounds fall on days 1, 3, 7, 14, and 30 after studying, the same schedule as issue #7.
 
-| 회차 | 예정일              | 제때 복습했을 때 학습 후 |
-| ---- | ------------------- | ------------------------ |
-| 1    | 학습일 + 1일        | 1일째                    |
-| 2    | 1회차 완료일 + 2일  | 3일째                    |
-| 3    | 2회차 완료일 + 4일  | 7일째                    |
-| 4    | 3회차 완료일 + 7일  | 14일째                   |
-| 5    | 4회차 완료일 + 16일 | 30일째                   |
+| Round | Due date                          | Days after studying if reviewed on time |
+| ----- | --------------------------------- | --------------------------------------- |
+| 1     | study date + 1 day                | day 1                                   |
+| 2     | round 1 completion date + 2 days  | day 3                                   |
+| 3     | round 2 completion date + 4 days  | day 7                                   |
+| 4     | round 3 completion date + 7 days  | day 14                                  |
+| 5     | round 4 completion date + 16 days | day 30                                  |
 
-세부 규칙:
+Detailed rules:
 
-- 학습일은 9999-12-31까지 받으므로, 예정일이 그 뒤로 넘어가면 9999-12-31로 둔다. 이때 예정일이 기준일과 같을 수 있다.
-- 다음 회차는 앞 회차를 완료할 때 만든다. 미리 다섯 회차를 모두 만들지 않는다. 따라서 #42가 만드는 것은 1회차뿐이고, 2회차부터는 #43의 완료 처리가 만든다.
-- 회차 완료는 되돌리지 않는다. 잘못 완료했으면 다음 회차의 날짜를 #45의 수동 조정으로 고친다.
-- 학습일은 학습 기록의 날짜이다. 며칠 전 기록을 나중에 완료하면 1회차가 바로 지난 복습으로 나타날 수 있다.
-- 완료하지 않은 회차는 날짜가 지나도 목록에 남는다.
-- 5회차를 완료하면 그 기록의 복습이 끝난다.
-- 배지(#44)의 "남은 복습"은 예정일이 오늘이거나 지난 미완료 회차의 수이다. 앞으로 예정된 다음 회차는 세지 않는다.
+- A study date is accepted up to 9999-12-31, so if a due date would go past that, set it to 9999-12-31. The due date can then equal the base date.
+- The next round is created when the previous round is completed. Do not create all five rounds in advance. So #42 creates only round 1, and rounds 2 and later are created by the completion handling in #43.
+- Completing a round is not undone. If you completed one by mistake, fix the date of the next round with the manual adjustment in #45.
+- The study date is the date of the study record. If you complete a record from a few days ago later, round 1 can show up right away as an overdue review.
+- A round that is not completed stays in the list even after its date passes.
+- When you complete round 5, the reviews for that record are finished.
+- The "remaining reviews" on the badge (#44) is the number of incomplete rounds whose due date is today or earlier. Next rounds scheduled for the future are not counted.
 
-## 3. 미루기와 늦은 복습
+## 3. Postponing and late reviews
 
-사용자 결정: **미루기는 해당 회차만 이동한다.**
+User decision: **Postponing moves only that round.**
 
-세부 규칙:
+Detailed rules:
 
-- 하루 미루기는 그 회차의 예정일을 예정일과 오늘 중 늦은 날의 다음 날로 바꾼다. 수동 날짜 변경도 그 회차의 예정일만 바꾼다.
-- 다음 회차는 완료일을 기준으로 정해지므로, 미룬 뒤 늦게 완료하면 다음 회차도 그만큼 늦어진다. 미루기 자체가 다음 회차의 날짜를 계산에 넣는 것은 아니다.
-- 회차를 만들 때의 예정일을 원래 예정일로 따로 보존한다. 통계(#46)의 지연은 원래 예정일을 기준으로 세므로(5장), 미뤄서 지연이 가려지지 않는다.
+- Postponing by one day changes the round's due date to the day after the later of the due date and today. A manual date change also changes only that round's due date.
+- The next round is set from the completion date, so if you complete late after postponing, the next round is also that much later. Postponing itself does not feed into the next round's date calculation.
+- The due date at the time the round is created is kept separately as the original due date. Lateness in the statistics (#46) is counted from the original due date (chapter 5), so postponing does not hide lateness.
 
-## 4. 주기 변경
+## 4. Changing the intervals
 
-사용자 결정: **주기를 고정한다.** 설정 기능을 만들지 않는다. 개별 회차의 날짜는 #45의 수동 조정으로 바꿀 수 있다.
+User decision: **The intervals are fixed.** Do not build a settings feature. The date of an individual round can be changed with the manual adjustment in #45.
 
-## 5. 완료율 통계
+## 5. Completion rate statistics
 
-사용자 결정(#46, 2026-11-01):
+User decision (#46, 2026-11-01):
 
-- **기간:** 원래 예정일이 기간 안인 회차를 그 기간의 것으로 센다. 회차를 미루거나 예정일을 바꿔도 소속 기간은 바뀌지 않는다. 예외로, 1회차를 완료하기 전에 학습일을 고치면 원래 예정일도 다시 계산되어(1장) 소속 기간이 바뀔 수 있다.
-- **지연:** 원래 예정일보다 늦게 완료했거나, 원래 예정일이 지났는데 아직 완료하지 않은 회차이다.
-- **완료율:** 완료 ÷ 예정이다. 늦은 완료도 완료로 친다. 예정이 0이면 완료율은 없다.
+- **Period:** A round counts toward a period if its original due date falls in that period. Postponing a round or changing its due date does not change the period it belongs to. As an exception, if you fix the study date before completing round 1, the original due date is recalculated too (chapter 1), so the period it belongs to can change.
+- **Late:** A round that was completed later than its original due date, or whose original due date has passed and is not yet completed.
+- **Completion rate:** completed ÷ due. A late completion still counts as completed. If due is 0, there is no completion rate.
 
-세부 규칙:
+Detailed rules:
 
-- 기간은 학습 시간 통계와 같은 이번 주, 이번 달, 최근 3개월, 전체이고 끝은 오늘이다. 앞으로 예정된 회차는 세지 않는다.
-- 오늘이 원래 예정일인 미완료 회차는 예정에는 들어가지만 아직 지연이 아니다.
-- 완료율은 정수 퍼센트로 반올림한다.
-- 예정보다 일찍 완료한 회차도 원래 예정일의 기간에 속한다.
-- 다음 회차는 앞 회차를 완료할 때 만들어지므로, 완료하지 않은 회차 뒤의 회차는 예정에 들어가지 않는다.
+- The periods are the same as the study time statistics: this week, this month, the last 3 months, and all time, and the end is today. Rounds scheduled for the future are not counted.
+- An incomplete round whose original due date is today is included in due but is not late yet.
+- The completion rate is rounded to a whole percent.
+- A round completed earlier than due still belongs to the period of its original due date.
+- The next round is created when the previous one is completed, so rounds after an incomplete round are not included in due.
 
-## 6. 학습 유형
+## 6. Study type
 
-사용자 결정(#52, 2026-11-01): **학습 기록을 쓸 때 신규와 복습 중에서 직접 고른다.** 기본값은 신규이고, 기존 기록도 모두 신규로 시작한다. 필터는 통계 화면의 학습 시간 지표와 그래프에 적용한다.
+User decision (#52, 2026-11-01): **When you write a study record, pick between new and review yourself.** The default is new, and all existing records start as new. The filter applies to the study time metrics and charts on the statistics screen.
 
-세부 규칙:
+Detailed rules:
 
-- 유형은 학습 시간을 나누는 표시이다. 복습 회차를 완료해도 학습 기록이 생기지 않고, 유형이 복습인 기록을 저장해도 회차가 완료되지 않는다.
-- 유형이 복습인 기록도 완료하면 1장대로 복습 1회차가 만들어진다.
-- 필터를 고르면 총 학습 시간까지 그 유형으로 계산한다. 복습 완료율과 히트맵은 필터와 무관하다.
-- 전체 기간의 시작일은 고른 유형의 첫 기록일이다. 그래서 전체 기간의 하루 평균은 유형마다 나누는 일수가 다를 수 있다. 카드에 기간을 함께 보여 준다.
+- The type is a mark that splits study time. Completing a review round does not create a study record, and saving a record whose type is review does not complete a round.
+- A record whose type is review also creates review round 1 when it is completed, as in chapter 1.
+- When you pick a filter, even the total study time is calculated for that type. The review completion rate and the heatmap are independent of the filter.
+- The start of the all-time period is the first record date of the chosen type. So the daily average for all time can divide by a different number of days for each type. The card shows the period too.
