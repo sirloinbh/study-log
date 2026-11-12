@@ -1,8 +1,8 @@
 {
-  "name": "공부 기록",
-  "short_name": "공부 기록",
-  "description": "공부한 내용과 시간을 기록하고 학습 흐름을 돌아보는 개인 서비스. 사용자는 본인 한 명이며 로그인은 없다. 외부 공개 전에는 사설 접속 또는 인증을 먼저 설계한다.",
-  "lang": "ko",
+  "name": "Study Log",
+  "short_name": "Study Log",
+  "description": "A personal service for recording what and how long I study and looking back on how my learning goes. There is one user (me) and no login. Before any public exposure, design private access or authentication first.",
+  "lang": "en",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
