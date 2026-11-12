@@ -80,7 +80,7 @@ test('daily minutes are summed by key in order', () => {
   );
 });
 
-test('an unknown period is a Korean 400 before touching the DB', async () => {
+test('an unknown period is an English 400 before touching the DB', async () => {
   const untouchedPool = {
     query: async () => {
       throw new Error('DB must not be queried for invalid input');
@@ -89,7 +89,10 @@ test('an unknown period is a Korean 400 before touching the DB', async () => {
   await withApi(untouchedPool, async (call) => {
     const { status, data } = await call('/api/stats/study-time?period=year');
     assert.equal(status, 400);
-    assert.match(String(data.error), /기간은 이번 주, 이번 달, 최근 3개월, 전체 중에서 고르세요/);
+    assert.match(
+      String(data.error),
+      /The period must be this week, this month, last 3 months, or all/,
+    );
   });
 });
 
@@ -192,10 +195,10 @@ test('pattern dates are checked before touching the DB', async () => {
   } as unknown as Pool;
   await withApi(untouchedPool, async (call) => {
     for (const [query, message] of [
-      ['from=2026-10-23&to=2026-10-01', /시작일은 종료일보다 늦을 수 없습니다/],
-      ['from=2026-02-30', /존재하지 않는 날짜/],
-      ['to=2026/10/01', /종료일은 YYYY-MM-DD/],
-      ['from=2000-01-01&to=2026-10-23', /기간은 10년 이내로 지정하세요/],
+      ['from=2026-10-23&to=2026-10-01', /The start date cannot be after the end date/],
+      ['from=2026-02-30', /This date does not exist/],
+      ['to=2026/10/01', /end date must be in YYYY-MM-DD/],
+      ['from=2000-01-01&to=2026-10-23', /The period must be within 10 years/],
     ] as const) {
       const { status, data } = await call(`/api/stats/patterns?${query}`);
       assert.equal(status, 400, query);

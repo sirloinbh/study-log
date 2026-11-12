@@ -10,7 +10,7 @@ function counts(...values: (number | 'fail')[]) {
     const value = values.length > 1 ? values.shift()! : values[0];
     return Promise.resolve(
       value === 'fail'
-        ? new Response(JSON.stringify({ error: '오류' }), { status: 500 })
+        ? new Response(JSON.stringify({ error: 'Error' }), { status: 500 })
         : new Response(JSON.stringify({ count: value })),
     );
   });
@@ -25,7 +25,7 @@ const page = (version = 0) => (
   </MemoryRouter>
 );
 
-const badge = (count: number) => screen.findByRole('link', { name: `오늘 복습 ${count}개` });
+const badge = (count: number) => screen.findByRole('link', { name: `${count} reviews today` });
 
 test('due reviews show a count that links to the reviews page', async () => {
   const fetch = counts(3);
@@ -41,7 +41,7 @@ test('nothing due shows no badge', async () => {
   render(page());
   await waitFor(() => expect(fetch).toHaveBeenCalled());
   await act(async () => {});
-  expect(screen.queryByRole('link', { name: /오늘 복습/ })).toBeNull();
+  expect(screen.queryByRole('link', { name: /reviews today/ })).toBeNull();
 });
 
 test('a change a page reports counts again, down to no badge', async () => {
@@ -49,7 +49,7 @@ test('a change a page reports counts again, down to no badge', async () => {
   const { rerender } = render(page(0));
   await badge(1);
   rerender(page(1));
-  await waitFor(() => expect(screen.queryByRole('link', { name: /오늘 복습/ })).toBeNull());
+  await waitFor(() => expect(screen.queryByRole('link', { name: /reviews today/ })).toBeNull());
 });
 
 test('moving to another page counts again', async () => {

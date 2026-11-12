@@ -37,7 +37,7 @@ export function ReviewBadge({ to, version }: { to: string; version: number }) {
   return (
     <Link
       to={to}
-      aria-label={`오늘 복습 ${count}개`}
+      aria-label={`${count} reviews today`}
       className="flex min-h-11 items-center gap-1.5 rounded-md px-2 outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50"
     >
       <BellRing className="size-4 shrink-0" aria-hidden />

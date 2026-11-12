@@ -104,7 +104,10 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
     setNotice((current) =>
       current?.kind === 'alert' && current.reviewId !== closedId
         ? current
-        : { kind: 'status', text: '날짜를 바꾸던 복습이 목록에서 빠져 입력을 닫았습니다' },
+        : {
+            kind: 'status',
+            text: 'The review whose date you were changing left the list, so the input was closed',
+          },
     );
   }, [editedGone, editor?.id]);
 
@@ -158,8 +161,8 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
         setNotice({
           kind: 'status',
           text: next
-            ? `복습을 완료했습니다. 다음 복습은 ${next.dueDate}입니다`
-            : '복습을 완료했습니다. 이 기록의 복습을 모두 마쳤습니다',
+            ? `Review completed. The next review is on ${next.dueDate}`
+            : 'Review completed. All reviews of this log are done',
         });
       },
       headingId,
@@ -174,7 +177,7 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
           method: 'POST',
         });
         setEditor(undefined);
-        setNotice({ kind: 'status', text: `하루 미뤘습니다. 새 예정일은 ${dueDate}입니다` });
+        setNotice({ kind: 'status', text: `Postponed by a day. The new due date is ${dueDate}` });
       },
       snoozeId(review),
       snoozeId(review),
@@ -192,7 +195,7 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
           body: { dueDate: editor.dueDate },
         });
         setEditor(undefined);
-        setNotice({ kind: 'status', text: `예정일을 ${dueDate}로 바꿨습니다` });
+        setNotice({ kind: 'status', text: `Changed the due date to ${dueDate}` });
       },
       editId(review),
       dateInputId,
@@ -219,7 +222,7 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
   return (
     <div className="reviews">
       <section className="card" aria-label={heading}>
-        <div className="log-actions" role="group" aria-label="조회 범위">
+        <div className="log-actions" role="group" aria-label="View range">
           {(Object.keys(reviewRanges) as ReviewRange[]).map((key) => (
             <button
               key={key}
@@ -236,7 +239,7 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
         </div>
         <h2 id={headingId} className="reviews-heading" tabIndex={-1}>
           {heading}
-          {shown && shown.reviews.length > 0 ? ` ${shown.reviews.length}개` : ''}
+          {shown && shown.reviews.length > 0 ? ` (${shown.reviews.length})` : ''}
         </h2>
         {/* Always mounted so screen readers announce each new message. */}
         <p role="status" className="status">
@@ -249,18 +252,18 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
         )}
         {error && (
           <p role="alert" className="error">
-            복습 목록을 불러오지 못했습니다: {error}
+            Could not load the reviews: {error}
           </p>
         )}
         {shown === undefined ? (
-          !error && <Loading label="복습을 불러오는 중" />
+          !error && <Loading label="Loading the reviews" />
         ) : shown.reviews.length === 0 ? (
           <p className="status">{empty}</p>
         ) : (
           <ul className="log-list">
             {shown.reviews.map((review) => {
               const title = reviewTitle(review);
-              const name = `${title} ${review.round}회차`;
+              const name = `${title} round ${review.round}`;
               const late = overdueDays(review.dueDate, shown.today);
               return (
                 <li
@@ -270,17 +273,17 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
                 >
                   <div className="log-head">
                     <span className="log-date">{title}</span>
-                    <span className="badge">{review.round}회차</span>
-                    {late > 0 && <span className="badge stopped">{late}일 지남</span>}
+                    <span className="badge">Round {review.round}</span>
+                    {late > 0 && <span className="badge stopped">{late} days late</span>}
                   </div>
                   <p className="status">
-                    학습일 {review.studyDate} · 예정일 {review.dueDate}
+                    Studied {review.studyDate} · due {review.dueDate}
                   </p>
                   {review.memo.trim() && <Memo text={review.memo} clamp />}
                   {editor?.id === review.id ? (
                     <form className="log-form" onSubmit={(event) => saveDate(event, review)}>
                       <label className="half">
-                        새 예정일
+                        New due date
                         <input
                           id={dateInputId}
                           type="date"
@@ -297,22 +300,22 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
                           type="submit"
                           className="primary"
                           disabled={busy}
-                          aria-label={`${name} 예정일 저장`}
+                          aria-label={`${name} save due date`}
                         >
                           <ButtonSpinner when={action === 'date'} />
-                          저장
+                          Save
                         </button>
                         <button
                           type="button"
                           className="secondary"
                           disabled={busy}
-                          aria-label={`${name} 예정일 변경 취소`}
+                          aria-label={`${name} cancel due date change`}
                           onClick={() => {
                             setEditor(undefined);
                             setWantFocus(editId(review));
                           }}
                         >
-                          취소
+                          Cancel
                         </button>
                       </div>
                     </form>
@@ -323,30 +326,30 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
                         className="primary"
                         id={completeId(review)}
                         disabled={busy}
-                        aria-label={`${name} 복습 완료`}
+                        aria-label={`${name} complete review`}
                         onClick={() => void complete(review)}
                       >
-                        복습 완료
+                        Complete review
                       </button>
                       <button
                         type="button"
                         className="secondary"
                         id={snoozeId(review)}
                         disabled={busy}
-                        aria-label={`${name} 하루 미루기`}
+                        aria-label={`${name} postpone a day`}
                         onClick={() => void snooze(review)}
                       >
-                        하루 미루기
+                        Postpone a day
                       </button>
                       <button
                         type="button"
                         className="secondary"
                         id={editId(review)}
                         disabled={busy}
-                        aria-label={`${name} 날짜 변경`}
+                        aria-label={`${name} change date`}
                         onClick={() => openEditor(review)}
                       >
-                        날짜 변경
+                        Change date
                       </button>
                     </div>
                   )}

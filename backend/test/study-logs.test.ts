@@ -30,17 +30,17 @@ test('a session that passes midnight counts in full toward its start date', () =
   assert.equal(studyMinutes('23:59', '00:00'), 1);
 });
 
-test('invalid study logs are rejected with Korean messages before touching the DB', async () => {
+test('invalid study logs are rejected with English messages before touching the DB', async () => {
   const cases: [Record<string, unknown>, RegExp][] = [
-    [{ startTime: '09:00', endTime: '10:00' }, /학습일을 입력하세요/],
+    [{ startTime: '09:00', endTime: '10:00' }, /Enter the study date/],
     [{ ...valid, studyDate: '2026/10/21' }, /YYYY-MM-DD/],
-    [{ ...valid, studyDate: '2026-02-30' }, /존재하지 않는 날짜/],
-    [{ ...valid, studyDate: '0000-01-01' }, /존재하지 않는 날짜/],
-    [{ ...valid, startTime: '24:00' }, /시작 시각은 HH:MM/],
-    [{ ...valid, endTime: '9:5' }, /종료 시각은 HH:MM/],
-    [{ ...valid, endTime: '09:00' }, /종료 시각은 시작 시각과 달라야 합니다/],
-    [{ ...valid, status: 'finished' }, /계획, 진행 중, 완료, 중단/],
-    [{ ...valid, memo: 'a'.repeat(10001) }, /10000자 이하/],
+    [{ ...valid, studyDate: '2026-02-30' }, /This date does not exist/],
+    [{ ...valid, studyDate: '0000-01-01' }, /This date does not exist/],
+    [{ ...valid, startTime: '24:00' }, /start time must be in HH:MM/],
+    [{ ...valid, endTime: '9:5' }, /end time must be in HH:MM/],
+    [{ ...valid, endTime: '09:00' }, /The end time must differ from the start time/],
+    [{ ...valid, status: 'finished' }, /planned, in progress, done, or stopped/],
+    [{ ...valid, memo: 'a'.repeat(10001) }, /at most 10000 characters/],
   ];
   await withApi(untouchedPool, async (call) => {
     for (const [body, message] of cases) {
@@ -51,20 +51,20 @@ test('invalid study logs are rejected with Korean messages before touching the D
   });
 });
 
-test('invalid list queries and ids are rejected in Korean', async () => {
+test('invalid list queries and ids are rejected in English', async () => {
   await withApi(untouchedPool, async (call) => {
     assert.match(
       String((await call('/api/study-logs?date=2026-13-01')).data.error),
-      /존재하지 않는 날짜/,
+      /This date does not exist/,
     );
-    assert.match(String((await call('/api/study-logs?limit=500')).data.error), /100 이하/);
+    assert.match(String((await call('/api/study-logs?limit=500')).data.error), /at most 100/);
     const { status, data } = await call('/api/study-logs/abc');
     assert.equal(status, 400);
-    assert.match(String(data.error), /학습 기록 ID가 올바르지 않습니다/);
+    assert.match(String(data.error), /Invalid study log ID/);
   });
 });
 
-test('bodies that are not a JSON object are rejected in Korean before touching the DB', async () => {
+test('bodies that are not a JSON object are rejected in English before touching the DB', async () => {
   await withApi(untouchedPool, async (call) => {
     for (const init of [
       { method: 'POST' },
@@ -74,27 +74,27 @@ test('bodies that are not a JSON object are rejected in Korean before touching t
       const path = init.method === 'PUT' ? '/api/study-logs/1' : '/api/study-logs';
       const { status, data } = await call(path, init);
       assert.equal(status, 400, JSON.stringify(init));
-      assert.equal(data.error, '학습 기록 내용을 JSON 객체로 보내세요');
+      assert.equal(data.error, 'Send the study log as a JSON object');
     }
     // Broken JSON and bare JSON strings are refused by the JSON body parser itself.
     for (const rawBody of ['{"studyDate":', '"text"']) {
       const malformed = await call('/api/study-logs', { method: 'POST', rawBody });
       assert.equal(malformed.status, 400, rawBody);
-      assert.equal(malformed.data.error, '요청 본문의 JSON 형식이 올바르지 않습니다');
+      assert.equal(malformed.data.error, 'Request body is not valid JSON');
     }
     const tooLarge = await call('/api/study-logs', {
       method: 'POST',
       rawBody: JSON.stringify({ ...valid, memo: 'a'.repeat(300 * 1024) }),
     });
     assert.equal(tooLarge.status, 413);
-    assert.equal(tooLarge.data.error, '요청 본문이 너무 큽니다');
+    assert.equal(tooLarge.data.error, 'Request body is too large');
     const unsupported = await call('/api/study-logs', {
       method: 'POST',
       rawBody: JSON.stringify(valid),
       contentType: 'application/json; charset=latin1',
     });
     assert.equal(unsupported.status, 415);
-    assert.equal(unsupported.data.error, '요청을 처리할 수 없습니다');
+    assert.equal(unsupported.data.error, 'Cannot process the request');
   });
 });
 
@@ -104,24 +104,24 @@ test('ids that are not plain positive integers are rejected before touching the 
       for (const init of [{}, { method: 'PUT', body: valid }, { method: 'DELETE' }]) {
         const { status, data } = await call(`/api/study-logs/${id}`, init);
         assert.equal(status, 400, `${id} ${JSON.stringify(init)}`);
-        assert.match(String(data.error), /학습 기록 ID가 올바르지 않습니다/);
+        assert.match(String(data.error), /Invalid study log ID/);
       }
     }
   });
 });
 
-test('missing study logs answer a Korean 404 for read, update and delete', async () => {
+test('missing study logs answer an English 404 for read, update and delete', async () => {
   await withApi(emptyPool, async (call) => {
     for (const init of [{}, { method: 'PUT', body: valid }, { method: 'DELETE' }]) {
       const { status, data } = await call('/api/study-logs/999', init);
       assert.equal(status, 404);
-      assert.equal(data.error, '학습 기록을 찾을 수 없습니다');
+      assert.equal(data.error, 'Study log not found');
     }
   });
 });
 
 // #58: PostgreSQL refuses a NUL character in text as an invalid byte sequence (22021).
-test('a NUL character in the input is a Korean 400, not a logged server error', async () => {
+test('a NUL character in the input is an English 400, not a logged server error', async () => {
   const nulPool = {
     query: async () => {
       throw Object.assign(new Error('invalid byte sequence for encoding "UTF8": 0x00'), {
@@ -148,7 +148,7 @@ test('a NUL character in the input is a Korean 400, not a logged server error', 
         body: { ...valid, memo: '메모\u0000' },
       });
       assert.equal(status, 400);
-      assert.equal(data.error, '입력에 사용할 수 없는 문자(NUL)가 있습니다');
+      assert.equal(data.error, 'Input contains a character that is not allowed (NUL)');
     });
   } finally {
     console.error = original;
@@ -164,9 +164,12 @@ test('search conditions are checked before touching the DB (#18)', async () => {
   } as unknown as Pool;
   await withApi(untouchedPool, async (call) => {
     for (const [path, message] of [
-      ['/api/study-logs?q=' + 'x'.repeat(51), /검색어는 50자 이하로 입력하세요/],
-      ['/api/study-logs?from=2026-10-23&to=2026-10-01', /시작일은 종료일보다 늦을 수 없습니다/],
-      ['/api/study-logs?from=2026-02-30', /존재하지 않는 날짜/],
+      ['/api/study-logs?q=' + 'x'.repeat(51), /The search term must be at most 50 characters/],
+      [
+        '/api/study-logs?from=2026-10-23&to=2026-10-01',
+        /The start date cannot be after the end date/,
+      ],
+      ['/api/study-logs?from=2026-02-30', /This date does not exist/],
       ['/api/study-logs?to=2026/10/01', /YYYY-MM-DD/],
     ] as const) {
       const { status, data } = await call(path);

@@ -60,15 +60,14 @@ function fakeApi(
     if (pattern) {
       patterns.push(`${pattern[1]}~${pattern[2]}`);
       return options.pattern === null
-        ? reply(500, { error: '서버 오류가 발생했습니다' })
+        ? reply(500, { error: 'Server error' })
         : reply(200, { from: pattern[1], to: pattern[2], ...(options.pattern ?? emptyPattern) });
     }
     const period = path.match(/^\/api\/retrospectives\/period\?kind=(\w+)&date=(.+)$/);
     if (period) {
       periods.push(`${period[1]}:${period[2]}`);
-      if (options.failPeriod) return reply(500, { error: '서버 오류가 발생했습니다' });
-      if (options.failReload && periods.length > 1)
-        return reply(500, { error: '서버 오류가 발생했습니다' });
+      if (options.failPeriod) return reply(500, { error: 'Server error' });
+      if (options.failReload && periods.length > 1) return reply(500, { error: 'Server error' });
       const { from, to } = periodOf(period[1], period[2]);
       return reply(200, {
         kind: period[1],
@@ -88,7 +87,7 @@ function fakeApi(
     writes.push({ method, path, body });
     const index = rows.findIndex((r) => r.kind === one[1] && r.from === one[2]);
     if (method === 'DELETE') {
-      if (index < 0) return reply(404, { error: '회고를 찾을 수 없습니다' });
+      if (index < 0) return reply(404, { error: 'Retrospective not found' });
       rows.splice(index, 1);
       return reply(204);
     }
@@ -117,7 +116,7 @@ const emptyPattern = {
 };
 
 type Ui = ReturnType<typeof mount>;
-const writer = (ui: Ui) => ui.find((n) => n.props['aria-label'] === '회고 작성')[0];
+const writer = (ui: Ui) => ui.find((n) => n.props['aria-label'] === 'Write a retrospective')[0];
 const heading = (ui: Ui) => ui.text(ui.find((n) => n.type === 'h2', writer(ui))[0]);
 const field = (ui: Ui) => ui.find((n) => n.type === 'textarea', writer(ui))[0];
 const type = async (ui: Ui, value: string) => {
@@ -128,7 +127,7 @@ const type = async (ui: Ui, value: string) => {
 async function open(api: ReturnType<typeof fakeApi>, globals: Record<string, unknown> = {}) {
   const ui = mount(api.fetch, globals);
   await ui.settle();
-  await ui.click('회고');
+  await ui.click('Retrospective');
   return ui;
 }
 
@@ -136,15 +135,15 @@ uiTest("the page opens on this week's retrospective with the week's study summar
   const api = fakeApi();
   const ui = await open(api);
   assert.deepEqual(api.periods, [`weekly:${today}`]);
-  assert.equal(heading(ui), '2026년 10월 18일 ~ 10월 24일 주간 회고');
+  assert.equal(heading(ui), 'Oct 18 – Oct 24, 2026 Weekly retrospective');
   const summary = ui.find((n) => n.props.className === 'retro-summary', writer(ui))[0];
-  assert.match(ui.text(summary), /학습 시간4시간 30분/);
-  assert.match(ui.text(summary), /공부한 날2일/);
-  assert.match(ui.text(summary), /학습 기록3개/);
-  assert.match(ui.text(summary), /목표 달성1 \/ 2/);
+  assert.match(ui.text(summary), /Study time4 h 30 min/);
+  assert.match(ui.text(summary), /Study days2/);
+  assert.match(ui.text(summary), /Study logs3/);
+  assert.match(ui.text(summary), /Goals achieved1 \/ 2/);
   assert.equal(field(ui).props.value, '');
-  assert.match(ui.text(writer(ui)), /저장/);
-  assert.match(ui.text(), /아직 쓴 회고가 없습니다/);
+  assert.match(ui.text(writer(ui)), /Save/);
+  assert.match(ui.text(), /No retrospectives yet/);
 });
 
 uiTest('writing saves the whole week once, and saving again edits it', async () => {
@@ -159,10 +158,10 @@ uiTest('writing saves the whole week once, and saving again edits it', async () 
       body: { body: '행렬을 끝냈다.\n- 다음 주: 고유값' },
     },
   ]);
-  assert.match(ui.text(writer(ui)), /저장했습니다/);
-  assert.match(ui.text(writer(ui)), /수정 저장/);
-  assert.match(ui.text(writer(ui)), /마지막 저장 2026-10-23 21:00/);
-  assert.match(ui.text(), /주간 · 2026년 10월 18일 ~ 10월 24일/);
+  assert.match(ui.text(writer(ui)), /Saved/);
+  assert.match(ui.text(writer(ui)), /Save changes/);
+  assert.match(ui.text(writer(ui)), /Last saved 2026-10-23 21:00/);
+  assert.match(ui.text(), /Weekly · Oct 18 – Oct 24, 2026/);
   await type(ui, '고쳐 쓴 회고');
   await ui.submit(writer(ui));
   assert.equal(api.rows.length, 1);
@@ -173,18 +172,18 @@ uiTest('weeks and months move, and an unsaved draft waits for its period', async
   const api = fakeApi();
   const ui = await open(api);
   await type(ui, '쓰다 만 회고');
-  await ui.click('이전', writer(ui));
+  await ui.click('Previous', writer(ui));
   assert.equal(api.periods.at(-1), 'weekly:2026-10-11');
-  assert.equal(heading(ui), '2026년 10월 11일 ~ 10월 17일 주간 회고');
+  assert.equal(heading(ui), 'Oct 11 – Oct 17, 2026 Weekly retrospective');
   assert.equal(field(ui).props.value, '');
-  await ui.click('이번 주', writer(ui));
+  await ui.click('This week', writer(ui));
   assert.equal(field(ui).props.value, '쓰다 만 회고');
-  await ui.click('월간', writer(ui));
+  await ui.click('Monthly', writer(ui));
   // The week's Wednesday picks the month (#19 review).
   assert.equal(api.periods.at(-1), 'monthly:2026-10-21');
-  assert.equal(heading(ui), '2026년 10월 월간 회고');
-  await ui.click('다음', writer(ui));
-  assert.equal(heading(ui), '2026년 11월 월간 회고');
+  assert.equal(heading(ui), 'October 2026 Monthly retrospective');
+  await ui.click('Next', writer(ui));
+  assert.equal(heading(ui), 'November 2026 Monthly retrospective');
 });
 
 uiTest('deleting needs a confirmation and focus follows the flow', async () => {
@@ -202,19 +201,19 @@ uiTest('deleting needs a confirmation and focus follows the flow', async () => {
   ]);
   const ui = await open(api, { document });
   assert.equal(field(ui).props.value, '이번 주 회고');
-  await ui.click('삭제', writer(ui));
+  await ui.click('Delete', writer(ui));
   assert.equal(focused.at(-1), 'retro-delete-confirm');
-  await ui.click('취소', writer(ui));
+  await ui.click('Cancel', writer(ui));
   assert.equal(focused.at(-1), 'retro-delete');
   assert.equal(api.writes.length, 0);
-  await ui.click('삭제', writer(ui));
-  await ui.click('삭제 확인', writer(ui));
+  await ui.click('Delete', writer(ui));
+  await ui.click('Confirm delete', writer(ui));
   assert.deepEqual(
     api.writes.map((w) => `${w.method} ${w.path}`),
     ['DELETE /api/retrospectives/weekly/2026-10-18'],
   );
   assert.equal(focused.at(-1), 'retro-heading');
-  assert.match(ui.text(writer(ui)), /삭제했습니다/);
+  assert.match(ui.text(writer(ui)), /Deleted/);
   assert.equal(field(ui).props.value, '');
 });
 
@@ -230,15 +229,15 @@ uiTest('a past retrospective opens from the list', async () => {
     },
   ]);
   const ui = await open(api);
-  await ui.click('월간 · 2026년 9월');
+  await ui.click('Monthly · September 2026');
   assert.equal(api.periods.at(-1), 'monthly:2026-09-01');
-  assert.equal(heading(ui), '2026년 9월 월간 회고');
+  assert.equal(heading(ui), 'September 2026 Monthly retrospective');
   assert.equal(field(ui).props.value, '9월에는 미적분을 끝냈다');
 });
 
 uiTest('a failed load is reported instead of an empty form', async () => {
   const ui = await open(fakeApi([], { failPeriod: true }));
-  assert.match(ui.text(writer(ui)), /회고를 불러오지 못했습니다: 서버 오류가 발생했습니다/);
+  assert.match(ui.text(writer(ui)), /Could not load the retrospective: Server error/);
   assert.equal(field(ui), undefined);
 });
 
@@ -251,9 +250,9 @@ uiTest('period helpers: moving and titles', () => {
   assert.equal(retro.shiftPeriod('monthly', '2026-01-01', -1), '2025-12-01');
   assert.equal(
     retro.periodTitle('weekly', '2026-12-27', '2027-01-02'),
-    '2026년 12월 27일 ~ 2027년 1월 2일',
+    'Dec 27, 2026 – Jan 2, 2027',
   );
-  assert.equal(retro.periodTitle('monthly', '2026-03-01', '2026-03-31'), '2026년 3월');
+  assert.equal(retro.periodTitle('monthly', '2026-03-01', '2026-03-31'), 'March 2026');
 });
 
 uiTest('a save shows the saved text at once, even when the reload fails', async () => {
@@ -263,27 +262,28 @@ uiTest('a save shows the saved text at once, even when the reload fails', async 
   await ui.submit(writer(ui));
   // The period reload after the save failed: the error shows above the form, and the form
   // keeps the saved text.
-  assert.match(ui.text(writer(ui)), /회고를 불러오지 못했습니다/);
+  assert.match(ui.text(writer(ui)), /Could not load the retrospective/);
   assert.equal(field(ui).props.value, '새로 쓴 회고');
-  assert.match(ui.text(writer(ui)), /수정 저장/);
+  assert.match(ui.text(writer(ui)), /Save changes/);
 });
 
 uiTest('switching to monthly opens the month most of the week falls in', async () => {
   const api = fakeApi();
   const ui = await open(api);
   // Back to the week of Sunday 2026-11-29 to Saturday 12-05: five of its days are in December.
-  for (const _ of [1, 2, 3, 4, 5, 6]) await ui.click('다음', writer(ui));
-  assert.equal(heading(ui), '2026년 11월 29일 ~ 12월 5일 주간 회고');
-  await ui.click('월간', writer(ui));
+  for (const _ of [1, 2, 3, 4, 5, 6]) await ui.click('Next', writer(ui));
+  assert.equal(heading(ui), 'Nov 29 – Dec 5, 2026 Weekly retrospective');
+  await ui.click('Monthly', writer(ui));
   assert.equal(api.periods.at(-1), 'monthly:2026-12-02');
-  assert.equal(heading(ui), '2026년 12월 월간 회고');
+  assert.equal(heading(ui), 'December 2026 Monthly retrospective');
   // From this month back to weekly, the week of today.
-  await ui.click('이번 달', writer(ui));
-  await ui.click('주간', writer(ui));
-  assert.equal(heading(ui), '2026년 10월 18일 ~ 10월 24일 주간 회고');
+  await ui.click('This month', writer(ui));
+  await ui.click('Weekly', writer(ui));
+  assert.equal(heading(ui), 'Oct 18 – Oct 24, 2026 Weekly retrospective');
 });
 
-const pattern = (ui: Ui) => ui.find((n) => n.props['aria-label'] === '학습 패턴', writer(ui))[0];
+const pattern = (ui: Ui) =>
+  ui.find((n) => n.props['aria-label'] === 'Study pattern', writer(ui))[0];
 
 uiTest("the retrospective shows the period's study pattern", async () => {
   const byHour = Array(24).fill(0);
@@ -303,7 +303,7 @@ uiTest("the retrospective shows the period's study pattern", async () => {
   assert.deepEqual(api.patterns, ['2026-10-18~2026-10-24']);
   assert.match(
     ui.text(pattern(ui)),
-    /가장 많이 공부한 시간대는 21시~22시\(1시간 45분\), 요일은 수요일\(1시간 45분\)입니다/,
+    /You study most at 21:00–22:00 \(1 h 45 min\), and on Wed \(1 h 45 min\)/,
   );
   // Weekday bars from Sunday, widths relative to the busiest day.
   const bars = ui.find((n) => n.props.className === 'pattern-bar', pattern(ui));
@@ -317,17 +317,20 @@ uiTest("the retrospective shows the period's study pattern", async () => {
   );
   assert.equal(hours.length, 24);
   assert.equal(hours[21].props.className, 'pattern-hour top');
-  assert.equal(hours[0].props.title, '0시~1시: 1시간');
+  assert.equal(hours[0].props.title, '00:00–01:00: 1 h');
   // Moving to another week asks for its pattern.
-  await ui.click('이전', writer(ui));
+  await ui.click('Previous', writer(ui));
   assert.equal(api.patterns.at(-1), '2026-10-11~2026-10-17');
 });
 
 uiTest('a period without study or a failed pattern says so', async () => {
   const quiet = await open(fakeApi());
-  assert.match(ui2text(quiet), /학습 기록이 없어 패턴을 볼 수 없습니다/);
+  assert.match(
+    ui2text(quiet),
+    /There are no study logs in this period, so there is no pattern to show/,
+  );
   const failing = await open(fakeApi([], { pattern: null }));
-  assert.match(ui2text(failing), /학습 패턴을 불러오지 못했습니다: 서버 오류가 발생했습니다/);
+  assert.match(ui2text(failing), /Could not load the study pattern: Server error/);
 });
 
 const ui2text = (ui: Ui) => ui.text(pattern(ui));
@@ -337,8 +340,8 @@ uiTest('pattern helpers: hour labels and bar widths', () => {
     hourLabel(hour: number): string;
     barWidth(value: number, values: number[]): string;
   }>('study-stats.ts');
-  assert.equal(stats.hourLabel(23), '23시~0시');
-  assert.equal(stats.hourLabel(0), '0시~1시');
+  assert.equal(stats.hourLabel(23), '23:00–00:00');
+  assert.equal(stats.hourLabel(0), '00:00–01:00');
   assert.equal(stats.barWidth(30, [0, 30, 60]), '50%');
   assert.equal(stats.barWidth(0, [0, 0]), '0%');
 });

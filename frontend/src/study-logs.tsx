@@ -161,7 +161,7 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
       );
       setNotice({
         kind: 'status',
-        text: editingId === undefined ? '저장했습니다' : '수정했습니다',
+        text: editingId === undefined ? 'Saved' : 'Updated',
       });
       // A new entry keeps its date for the next session of the same day.
       if (editingId === undefined) setForm(emptyForm(form.studyDate));
@@ -202,7 +202,7 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
     if (!begin()) return;
     try {
       await requestJson(`/api/study-logs/${id}`, { method: 'DELETE' });
-      setNotice({ kind: 'status', text: '삭제했습니다' });
+      setNotice({ kind: 'status', text: 'Deleted' });
       if (editingId === id) leaveEdit();
       setReload((count) => count + 1);
       setWantFocus('study-log-list');
@@ -222,10 +222,10 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
   return (
     <div className="study-logs">
       <section className="card">
-        <h2>{editingId === undefined ? '학습 기록 입력' : '학습 기록 수정'}</h2>
+        <h2>{editingId === undefined ? 'Add a study log' : 'Edit the study log'}</h2>
         <form className="log-form" onSubmit={(event) => void save(event)}>
           <label>
-            학습일
+            Study date
             <input
               id="study-log-date"
               type="date"
@@ -236,7 +236,7 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
             />
           </label>
           <label>
-            시작
+            Start
             <input
               type="time"
               required
@@ -246,7 +246,7 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
             />
           </label>
           <label>
-            종료
+            End
             <input
               type="time"
               required
@@ -256,7 +256,7 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
             />
           </label>
           <label>
-            상태
+            Status
             <select disabled={busy} value={form.status} onChange={change('status')}>
               {(Object.keys(statusLabels) as StudyStatus[]).map((status) => (
                 <option key={status} value={status}>
@@ -266,9 +266,9 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
             </select>
           </label>
           <label className="half">
-            교재
+            Textbook
             <select disabled={busy} value={form.textbookId ?? ''} onChange={pick('textbookId')}>
-              <option value="">선택 안 함</option>
+              <option value="">None</option>
               {textbooks.map((book) => (
                 <option key={book.id} value={book.id}>
                   {book.title}
@@ -277,14 +277,14 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
             </select>
           </label>
           <label className="half">
-            장/절
+            Chapter/section
             <select
               disabled={busy || form.textbookId === null}
               value={form.contentId ?? ''}
               onChange={pick('contentId')}
             >
               <option value="">
-                {form.textbookId === null ? '교재를 먼저 선택' : '선택 안 함'}
+                {form.textbookId === null ? 'Choose a textbook first' : 'None'}
               </option>
               {chapters.map((chapter) => (
                 <option key={chapter.id} value={chapter.id}>
@@ -294,7 +294,7 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
             </select>
           </label>
           <label>
-            유형
+            Type
             <select disabled={busy} value={form.studyType} onChange={change('studyType')}>
               {(Object.keys(studyTypeLabels) as StudyType[]).map((type) => (
                 <option key={type} value={type}>
@@ -304,13 +304,13 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
             </select>
           </label>
           <label>
-            이해도
+            Understanding
             <select
               disabled={busy}
               value={form.understanding ?? ''}
               onChange={assess('understanding')}
             >
-              <option value="">선택 안 함</option>
+              <option value="">None</option>
               {Object.entries(understandingLabels).map(([score, label]) => (
                 <option key={score} value={score}>
                   {label}
@@ -319,19 +319,19 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
             </select>
           </label>
           <label className="half">
-            목표 달성
+            Goal achieved
             <select
               disabled={busy}
               value={form.goalAchieved === null ? '' : String(form.goalAchieved)}
               onChange={assess('goalAchieved')}
             >
-              <option value="">선택 안 함</option>
-              <option value="true">달성</option>
-              <option value="false">미달성</option>
+              <option value="">None</option>
+              <option value="true">Achieved</option>
+              <option value="false">Not achieved</option>
             </select>
           </label>
           <label className="wide">
-            어려웠던 부분
+            Difficult parts
             <textarea
               rows={2}
               maxLength={2000}
@@ -341,7 +341,7 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
             />
           </label>
           <label className="wide">
-            메모
+            Memo
             <textarea
               rows={3}
               maxLength={10000}
@@ -352,26 +352,26 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
             />
           </label>
           <p id="memo-hint" className="hint wide">
-            마크다운을 쓸 수 있습니다: # 제목, - 목록, **굵게**, `코드`, [링크](주소)
+            You can use Markdown: # heading, - list, **bold**, `code`, [link](url)
           </p>
           {form.memo.trim() && (
-            <section className="memo-preview wide" aria-label="메모 미리보기">
-              <h3>미리보기</h3>
+            <section className="memo-preview wide" aria-label="Memo preview">
+              <h3>Preview</h3>
               <Memo text={form.memo} />
             </section>
           )}
           <p className="duration wide" aria-live="polite">
-            학습 시간 <strong>{minutes === undefined ? '—' : formatMinutes(minutes)}</strong>
-            {crossesMidnight(form.startTime, form.endTime) ? ' (다음 날 종료)' : ''}
+            Study time <strong>{minutes === undefined ? '—' : formatMinutes(minutes)}</strong>
+            {crossesMidnight(form.startTime, form.endTime) ? ' (ends the next day)' : ''}
           </p>
           <div className="actions wide">
             <button type="submit" className="primary" disabled={busy}>
               <ButtonSpinner when={action === 'save'} />
-              {editingId === undefined ? '저장' : '수정 저장'}
+              {editingId === undefined ? 'Save' : 'Save changes'}
             </button>
             {editingId !== undefined && (
               <button type="button" className="secondary" disabled={busy} onClick={leaveEdit}>
-                취소
+                Cancel
               </button>
             )}
           </div>
@@ -388,17 +388,17 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
       </section>
       <section className="card">
         <h2 id="study-log-list" tabIndex={-1}>
-          최근 기록
+          Recent logs
         </h2>
         {loadError && (
           <p role="alert" className="error">
-            최근 기록을 불러오지 못했습니다: {loadError}
+            Could not load the recent logs: {loadError}
           </p>
         )}
         {logs === undefined ? (
-          !loadError && <Loading label="최근 기록을 불러오는 중" />
+          !loadError && <Loading label="Loading the recent logs" />
         ) : logs.length === 0 ? (
-          <p className="status">아직 학습 기록이 없습니다</p>
+          <p className="status">No study logs yet</p>
         ) : (
           <ul className="log-list">
             {logs.map((log) => (
@@ -410,11 +410,13 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
                   </span>
                   <strong>{formatMinutes(log.durationMinutes)}</strong>
                   <span className={`badge ${log.status}`}>{statusLabels[log.status]}</span>
-                  {log.studyType === 'review' && <span className="badge">복습</span>}
+                  {log.studyType === 'review' && <span className="badge">Review</span>}
                 </div>
                 {log.textbookTitle !== null && <p className="log-studied">{studiedLabel(log)}</p>}
                 {reflectionLabel(log) && <p className="log-studied">{reflectionLabel(log)}</p>}
-                {log.difficulties && <p className="log-memo">어려웠던 부분: {log.difficulties}</p>}
+                {log.difficulties && (
+                  <p className="log-memo">Difficult parts: {log.difficulties}</p>
+                )}
                 {log.memo && <Memo text={log.memo} clamp />}
                 <div className="log-actions">
                   {deletingId === log.id ? (
@@ -424,23 +426,23 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
                         id={`study-log-delete-confirm-${log.id}`}
                         className="danger"
                         disabled={busy}
-                        aria-label={`${describe(log)} 기록 삭제 확인`}
+                        aria-label={`${describe(log)} log confirm deletion`}
                         onClick={() => void remove(log.id)}
                       >
                         <ButtonSpinner when={action === 'delete'} />
-                        삭제 확인
+                        Confirm delete
                       </button>
                       <button
                         type="button"
                         className="secondary"
                         disabled={busy}
-                        aria-label={`${describe(log)} 기록 삭제 취소`}
+                        aria-label={`${describe(log)} log cancel deletion`}
                         onClick={() => {
                           setDeletingId(undefined);
                           setWantFocus(`study-log-delete-${log.id}`);
                         }}
                       >
-                        취소
+                        Cancel
                       </button>
                     </>
                   ) : (
@@ -449,23 +451,23 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
                         type="button"
                         className="secondary"
                         disabled={busy}
-                        aria-label={`${describe(log)} 기록 수정`}
+                        aria-label={`${describe(log)} log edit`}
                         onClick={() => edit(log)}
                       >
-                        수정
+                        Edit
                       </button>
                       <button
                         type="button"
                         id={`study-log-delete-${log.id}`}
                         className="secondary"
                         disabled={busy}
-                        aria-label={`${describe(log)} 기록 삭제`}
+                        aria-label={`${describe(log)} log delete`}
                         onClick={() => {
                           setDeletingId(log.id);
                           setWantFocus(`study-log-delete-confirm-${log.id}`);
                         }}
                       >
-                        삭제
+                        Delete
                       </button>
                     </>
                   )}

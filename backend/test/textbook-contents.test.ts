@@ -29,27 +29,37 @@ function missingTextbookPool() {
 
 const base = '/api/textbooks/1/contents';
 
-test('invalid contents are rejected with Korean messages before touching the DB', async () => {
+test('invalid contents are rejected with English messages before touching the DB', async () => {
   const cases: [string, string, unknown, RegExp][] = [
-    ['POST', base, { number: '1' }, /목차 제목을 입력하세요/],
-    ['POST', base, { title: '   ' }, /목차 제목을 입력하세요/],
-    ['POST', base, { title: 'a'.repeat(201) }, /목차 제목 길이는 200자 이하/],
-    ['POST', base, { title: '행렬', number: 'x'.repeat(21) }, /번호 길이는 20자 이하/],
-    ['POST', base, { title: '행렬', number: 3 }, /번호 형식이 올바르지 않습니다/],
-    ['POST', base, { title: '행렬', parentId: 0 }, /상위 목차 ID가 올바르지 않습니다/],
-    ['POST', base, { title: '행렬', parentId: '2' }, /상위 목차 ID가 올바르지 않습니다/],
-    ['POST', base, { title: '행렬', parentId: 1.5 }, /상위 목차 ID가 올바르지 않습니다/],
-    ['POST', base, [{ title: '행렬' }], /목차 내용을 JSON 객체로 보내세요/],
-    ['PUT', `${base}/1`, { title: '' }, /목차 제목을 입력하세요/],
-    ['PUT', `${base}/order`, {}, /순서를 바꿀 목차 ID 목록을 보내세요/],
-    ['PUT', `${base}/order`, { ids: [] }, /순서를 바꿀 목차 ID 목록을 보내세요/],
-    ['PUT', `${base}/order`, { ids: [1, 2, 1] }, /목차 ID가 중복되었습니다/],
-    ['PUT', `${base}/order`, { ids: [1, -2] }, /목차 ID가 올바르지 않습니다/],
+    ['POST', base, { number: '1' }, /Enter the contents title/],
+    ['POST', base, { title: '   ' }, /Enter the contents title/],
+    ['POST', base, { title: 'a'.repeat(201) }, /contents title must be at most 200 characters/],
+    [
+      'POST',
+      base,
+      { title: '행렬', number: 'x'.repeat(21) },
+      /number must be at most 20 characters/,
+    ],
+    ['POST', base, { title: '행렬', number: 3 }, /The number format is invalid/],
+    ['POST', base, { title: '행렬', parentId: 0 }, /Invalid parent contents entry ID/],
+    ['POST', base, { title: '행렬', parentId: '2' }, /Invalid parent contents entry ID/],
+    ['POST', base, { title: '행렬', parentId: 1.5 }, /Invalid parent contents entry ID/],
+    ['POST', base, [{ title: '행렬' }], /Send the contents entry as a JSON object/],
+    ['PUT', `${base}/1`, { title: '' }, /Enter the contents title/],
+    ['PUT', `${base}/order`, {}, /Send the list of contents entry IDs to reorder/],
+    ['PUT', `${base}/order`, { ids: [] }, /Send the list of contents entry IDs to reorder/],
+    ['PUT', `${base}/order`, { ids: [1, 2, 1] }, /Contents entry IDs are duplicated/],
+    ['PUT', `${base}/order`, { ids: [1, -2] }, /Invalid contents entry ID/],
     // A pasted table of contents (#23).
-    ['POST', `${base}/bulk`, {}, /등록할 목차 목록을 보내세요/],
-    ['POST', `${base}/bulk`, { entries: [] }, /등록할 목차가 없습니다/],
-    ['POST', `${base}/bulk`, { entries: [{ title: '벡터' }] }, /목차 단계를 보내세요/],
-    ['POST', `${base}/bulk`, { entries: [{ level: 1, title: '벡터' }] }, /첫 목차는 맨 위 단계/],
+    ['POST', `${base}/bulk`, {}, /Send the list of contents entries to add/],
+    ['POST', `${base}/bulk`, { entries: [] }, /There are no contents entries to add/],
+    ['POST', `${base}/bulk`, { entries: [{ title: '벡터' }] }, /Send the contents level/],
+    [
+      'POST',
+      `${base}/bulk`,
+      { entries: [{ level: 1, title: '벡터' }] },
+      /first contents entry must be at the top level/,
+    ],
     [
       'POST',
       `${base}/bulk`,
@@ -59,27 +69,27 @@ test('invalid contents are rejected with Korean messages before touching the DB'
           { level: 2, title: '내적' },
         ],
       },
-      /2번째 목차가 위 목차보다 두 단계 이상 깊습니다/,
+      /Contents entry 2 is two or more levels deeper/,
     ],
-    ['POST', `${base}/bulk`, { entries: [{ level: 10, title: '깊음' }] }, /10단계까지/],
+    ['POST', `${base}/bulk`, { entries: [{ level: 10, title: '깊음' }] }, /at most 10 levels/],
     [
       'POST',
       `${base}/bulk`,
       { entries: [{ level: 0.5, title: '벡터' }] },
-      /단계가 올바르지 않습니다/,
+      /contents level is invalid/,
     ],
-    ['POST', `${base}/bulk`, { entries: [{ level: 0, title: ' ' }] }, /목차 제목을 입력하세요/],
+    ['POST', `${base}/bulk`, { entries: [{ level: 0, title: ' ' }] }, /Enter the contents title/],
     [
       'POST',
       `${base}/bulk`,
       { entries: Array.from({ length: 501 }, () => ({ level: 0, title: '장' })) },
-      /한 번에 500개까지/,
+      /At most 500 contents entries can be added at once/,
     ],
     [
       'PUT',
       `${base}/order`,
       { ids: Array.from({ length: 1001 }, (_, i) => i + 1) },
-      /한 번에 1000개까지 바꿀 수 있습니다/,
+      /At most 1000 contents entries can be reordered at once/,
     ],
   ];
   await withApi(untouchedPool, async (call) => {
@@ -105,18 +115,18 @@ test('textbook and content ids in the path are checked before touching the DB', 
             : `/api/textbooks/${id}/contents`;
         const { status, data } = await call(path, { method, body });
         assert.equal(status, 400, `${method} ${id}`);
-        assert.match(String(data.error), /교재 ID가 올바르지 않습니다/);
+        assert.match(String(data.error), /Invalid textbook ID/);
       }
       for (const init of [{ method: 'PUT', body: { title: '행렬' } }, { method: 'DELETE' }]) {
         const { status, data } = await call(`${base}/${id}`, init);
         assert.equal(status, 400, `${init.method} content ${id}`);
-        assert.match(String(data.error), /목차 ID가 올바르지 않습니다/);
+        assert.match(String(data.error), /Invalid contents entry ID/);
       }
     }
   });
 });
 
-test('contents of a missing textbook answer a Korean 404 and writes roll back', async () => {
+test('contents of a missing textbook answer an English 404 and writes roll back', async () => {
   const { pool, statements, released } = missingTextbookPool();
   await withApi(pool, async (call) => {
     for (const [path, init] of [
@@ -128,11 +138,11 @@ test('contents of a missing textbook answer a Korean 404 and writes roll back', 
     ] as const) {
       const { status, data } = await call(path, init);
       assert.equal(status, 404, JSON.stringify(init));
-      assert.equal(data.error, '교재를 찾을 수 없습니다');
+      assert.equal(data.error, 'Textbook not found');
     }
     const updated = await call(`${base}/1`, { method: 'PUT', body: { title: '행렬' } });
     assert.equal(updated.status, 404);
-    assert.equal(updated.data.error, '목차를 찾을 수 없습니다');
+    assert.equal(updated.data.error, 'Contents entry not found');
   });
   // Four write transactions: each locks the textbook, finds nothing and rolls back.
   assert.equal(statements.filter((sql) => sql === 'ROLLBACK').length, 4);

@@ -62,22 +62,22 @@ export function StudyLogSearch({
     setSearch((current) => ({ ...current, [field]: event.target.value }));
 
   return (
-    <section className="card" aria-label="학습 기록 검색">
-      <h2>학습 기록 검색</h2>
+    <section className="card" aria-label="Study log search">
+      <h2>Study log search</h2>
       <form className="log-form" onSubmit={find}>
         <label className="wide">
-          검색어
+          Search term
           <input
             type="search"
             maxLength={50}
-            placeholder="메모나 어려웠던 부분의 일부"
+            placeholder="Part of a memo or difficult part"
             disabled={busy}
             value={search.q}
             onChange={change('q')}
           />
         </label>
         <label>
-          시작일
+          Start date
           <input
             type="date"
             disabled={busy}
@@ -87,7 +87,7 @@ export function StudyLogSearch({
           />
         </label>
         <label>
-          종료일
+          End date
           <input
             type="date"
             disabled={busy}
@@ -97,9 +97,9 @@ export function StudyLogSearch({
           />
         </label>
         <label className="half">
-          교재
+          Textbook
           <select disabled={busy} value={search.textbookId} onChange={change('textbookId')}>
-            <option value="">전체</option>
+            <option value="">All</option>
             {textbooks.map((book) => (
               <option key={book.id} value={String(book.id)}>
                 {book.title}
@@ -110,26 +110,26 @@ export function StudyLogSearch({
         <div className="actions wide">
           <button type="submit" className="primary" disabled={busy}>
             <ButtonSpinner when={action === 'search'} />
-            검색
+            Search
           </button>
         </div>
       </form>
       {error && (
         <p role="alert" className="error">
-          검색하지 못했습니다: {error}
+          Could not search: {error}
         </p>
       )}
       {results &&
         (results.logs.length === 0 ? (
           <p role="status" className="status">
-            검색 결과가 없습니다
+            No results
           </p>
         ) : (
           <>
             <p role="status" className="status">
               {results.logs.length === 100
-                ? '최근 100개까지 보여 줍니다'
-                : `${results.logs.length}개를 찾았습니다`}
+                ? 'Showing the latest 100'
+                : `Found ${results.logs.length}`}
             </p>
             <ul className="log-list search-results">
               {results.logs.map((log) => (
@@ -141,11 +141,11 @@ export function StudyLogSearch({
                     </span>
                     <strong>{formatMinutes(log.durationMinutes)}</strong>
                     <span className={`badge ${log.status}`}>{statusLabels[log.status]}</span>
-                    {log.studyType === 'review' && <span className="badge">복습</span>}
+                    {log.studyType === 'review' && <span className="badge">Review</span>}
                   </div>
                   {log.textbookTitle !== null && <p className="log-studied">{studiedLabel(log)}</p>}
                   {log.difficulties && (
-                    <p className="log-memo">어려웠던 부분: {log.difficulties}</p>
+                    <p className="log-memo">Difficult parts: {log.difficulties}</p>
                   )}
                   {log.memo && <Memo text={log.memo} clamp />}
                 </li>

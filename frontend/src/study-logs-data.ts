@@ -39,24 +39,24 @@ export type StudyLogForm = Pick<
 
 // Self-assessed understanding, 1 (low) to 5 (high).
 export const understandingLabels: Record<number, string> = {
-  1: '1 · 거의 모름',
-  2: '2 · 조금 이해',
-  3: '3 · 보통',
-  4: '4 · 대부분 이해',
-  5: '5 · 완전히 이해',
+  1: '1 · Barely understood',
+  2: '2 · Understood a little',
+  3: '3 · Average',
+  4: '4 · Mostly understood',
+  5: '5 · Fully understood',
 };
 
-// "이해도 4/5 · 목표 달성" from whichever answers were given; empty when none.
+// "Understanding 4/5 · Goal achieved" from whichever answers were given; empty when none.
 export function reflectionLabel(log: Pick<StudyLog, 'understanding' | 'goalAchieved'>) {
   return [
-    log.understanding === null ? '' : `이해도 ${log.understanding}/5`,
-    log.goalAchieved === null ? '' : log.goalAchieved ? '목표 달성' : '목표 미달성',
+    log.understanding === null ? '' : `Understanding ${log.understanding}/5`,
+    log.goalAchieved === null ? '' : log.goalAchieved ? 'Goal achieved' : 'Goal not achieved',
   ]
     .filter(Boolean)
     .join(' · ');
 }
 
-// "선형대수 · 1.2 내적" for a log linked to a textbook (and chapter); empty otherwise.
+// "Linear Algebra · 1.2 Dot product" for a log linked to a textbook (and chapter); empty otherwise.
 export function studiedLabel(log: StudyLog) {
   if (log.textbookTitle === null) return '';
   if (log.contentTitle === null) return log.textbookTitle;
@@ -64,13 +64,13 @@ export function studiedLabel(log: StudyLog) {
 }
 
 export const statusLabels: Record<StudyStatus, string> = {
-  planned: '계획',
-  in_progress: '진행 중',
-  done: '완료',
-  stopped: '중단',
+  planned: 'Planned',
+  in_progress: 'In progress',
+  done: 'Done',
+  stopped: 'Stopped',
 };
 
-export const studyTypeLabels: Record<StudyType, string> = { new: '신규', review: '복습' };
+export const studyTypeLabels: Record<StudyType, string> = { new: 'New', review: 'Review' };
 
 export const emptyForm = (studyDate: string): StudyLogForm => ({
   studyDate,
@@ -103,8 +103,8 @@ export const crossesMidnight = (startTime: string, endTime: string) =>
 export function formatMinutes(total: number) {
   const hours = Math.floor(total / 60);
   const minutes = total % 60;
-  if (hours === 0) return `${minutes}분`;
-  return minutes === 0 ? `${hours}시간` : `${hours}시간 ${minutes}분`;
+  if (hours === 0) return `${minutes} min`;
+  return minutes === 0 ? `${hours} h` : `${hours} h ${minutes} min`;
 }
 
 export type StudyLogSearch = { q: string; from: string; to: string; textbookId: string };

@@ -25,12 +25,12 @@ const log = {
 };
 
 test('a loading part is busy, named and announced from outside the busy region', () => {
-  render(<Loading label="교재를 불러오는 중" />);
-  const region = screen.getByRole('group', { name: '교재를 불러오는 중' });
+  render(<Loading label="Loading the textbooks" />);
+  const region = screen.getByRole('group', { name: 'Loading the textbooks' });
   expect(region.getAttribute('aria-busy')).toBe('true');
   expect(region.querySelector('[data-slot="skeleton-list"]')).toBeTruthy();
   const announced = screen.getByRole('status');
-  expect(announced.textContent).toBe('교재를 불러오는 중…');
+  expect(announced.textContent).toBe('Loading the textbooks…');
   expect(region.contains(announced)).toBe(false);
 });
 
@@ -38,7 +38,7 @@ test.each([
   ['text', 'skeleton-text', 1],
   ['cards', 'skeleton-card', 4],
 ] as const)('%s placeholders', (kind, slot, count) => {
-  render(<Loading label="통계" kind={kind} />);
+  render(<Loading label="Stats" kind={kind} />);
   expect(document.querySelectorAll(`[data-slot="${slot}"]`).length).toBe(count);
 });
 
@@ -46,7 +46,7 @@ test('a button shows the spinner only while waiting', () => {
   const { rerender } = render(<ButtonSpinner when={false} />);
   expect(screen.queryByRole('status')).toBeNull();
   rerender(<ButtonSpinner when />);
-  expect(screen.getByRole('status', { name: '처리하는 중' })).toBeTruthy();
+  expect(screen.getByRole('status', { name: 'Working' })).toBeTruthy();
 });
 
 // The requests answer when told to, so the waiting state can be looked at.
@@ -77,7 +77,7 @@ const spinners = () => document.querySelectorAll('[data-slot="spinner"]');
 test('saving spins on the save button only, and stops when done', async () => {
   const release = heldServer([log]);
   render(<StudyLogs today={today} />);
-  await screen.findByRole('button', { name: /삭제$/ });
+  await screen.findByRole('button', { name: /delete$/ });
   fireEvent.submit(document.querySelector('form')!);
   const save = document.querySelector<HTMLButtonElement>('form button[type="submit"]')!;
   await waitFor(() => expect(save.disabled).toBe(true));
@@ -90,12 +90,12 @@ test('saving spins on the save button only, and stops when done', async () => {
 test('deleting spins on the confirm button, not on save', async () => {
   const release = heldServer([log]);
   render(<StudyLogs today={today} />);
-  fireEvent.click(await screen.findByRole('button', { name: /삭제$/ }));
-  const confirm = await screen.findByRole('button', { name: /삭제 확인$/ });
+  fireEvent.click(await screen.findByRole('button', { name: /delete$/ }));
+  const confirm = await screen.findByRole('button', { name: /confirm deletion$/ });
   fireEvent.click(confirm);
   await waitFor(() => expect(spinners().length).toBe(1));
   expect(confirm.contains(spinners()[0])).toBe(true);
-  expect(within(confirm).getByRole('status', { name: '처리하는 중' })).toBeTruthy();
+  expect(within(confirm).getByRole('status', { name: 'Working' })).toBeTruthy();
   release[0]();
   await waitFor(() => expect(spinners().length).toBe(0));
 });

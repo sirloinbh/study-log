@@ -31,13 +31,13 @@ test('only files not yet applied are pending, in order', () => {
 test('history that no longer matches the files is refused', () => {
   const one = file('001_a.sql');
   const changed = file('001_a.sql', 'SELECT 2');
-  assert.match(planMigrations([], [row(one)]).errors[0], /파일이 없습니다: 001_a\.sql/);
-  assert.match(planMigrations([changed], [row(one)]).errors[0], /내용이 바뀌었습니다: 001_a\.sql/);
+  assert.match(planMigrations([], [row(one)]).errors[0], /file is missing: 001_a\.sql/);
+  assert.match(planMigrations([changed], [row(one)]).errors[0], /was changed: 001_a\.sql/);
 });
 
 test('a new file sorted before an applied one is refused', () => {
   const [one, two] = [file('001_a.sql'), file('002_b.sql')];
-  assert.match(planMigrations([one, two], [row(two)]).errors[0], /앞선 번호의 새 파일입니다/);
+  assert.match(planMigrations([one, two], [row(two)]).errors[0], /New file numbered before/);
 });
 
 test('reading a folder sorts files and refuses bad names and duplicate numbers', async (t) => {
@@ -52,9 +52,12 @@ test('reading a folder sorts files and refuses bad names and duplicate numbers',
   );
 
   await writeFile(join(dir, '002_c.sql'), 'SELECT 3');
-  await assert.rejects(readMigrations(dir), /번호가 중복됩니다: 002_b\.sql, 002_c\.sql/);
+  await assert.rejects(readMigrations(dir), /Duplicate migration number: 002_b\.sql, 002_c\.sql/);
   await rm(join(dir, '002_c.sql'));
 
   await writeFile(join(dir, '3-bad.sql'), 'SELECT 3');
-  await assert.rejects(readMigrations(dir), /NNN_name\.sql 형식이어야 합니다: 3-bad\.sql/);
+  await assert.rejects(
+    readMigrations(dir),
+    /Migration file names must look like NNN_name\.sql: 3-bad\.sql/,
+  );
 });

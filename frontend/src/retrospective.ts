@@ -26,7 +26,10 @@ export type RetrospectivePeriod = {
   summary: RetrospectiveSummary;
 };
 
-export const kindLabels: Record<RetrospectiveKind, string> = { weekly: '주간', monthly: '월간' };
+export const kindLabels: Record<RetrospectiveKind, string> = {
+  weekly: 'Weekly',
+  monthly: 'Monthly',
+};
 
 // Same limit as the API; the server still validates.
 export const retrospectiveLimit = 20000;
@@ -44,12 +47,23 @@ export function shiftPeriod(kind: RetrospectiveKind, from: string, delta: number
   return new Date(Date.UTC(year, month - 1 + delta, 1)).toISOString().slice(0, 10);
 }
 
-const monthDay = (day: string) => `${Number(day.slice(5, 7))}월 ${Number(day.slice(8))}일`;
+const monthDay = (day: string, withYear = false) =>
+  new Date(`${day}T00:00:00Z`).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    ...(withYear ? { year: 'numeric' } : {}),
+    timeZone: 'UTC',
+  });
 
-// "2026년 10월 18일 ~ 10월 24일" for a week (Sunday to Saturday), "2026년 10월" for a month.
+// "Oct 18 – Oct 24, 2026" for a week (Sunday to Saturday), "October 2026" for a month.
 export function periodTitle(kind: RetrospectiveKind, from: string, to: string) {
-  const year = `${Number(from.slice(0, 4))}년`;
-  if (kind === 'monthly') return `${year} ${Number(from.slice(5, 7))}월`;
-  const toYear = to.slice(0, 4) === from.slice(0, 4) ? '' : `${Number(to.slice(0, 4))}년 `;
-  return `${year} ${monthDay(from)} ~ ${toYear}${monthDay(to)}`;
+  if (kind === 'monthly') {
+    return new Date(`${from}T00:00:00Z`).toLocaleDateString('en-US', {
+      month: 'long',
+      year: 'numeric',
+      timeZone: 'UTC',
+    });
+  }
+  const sameYear = to.slice(0, 4) === from.slice(0, 4);
+  return `${monthDay(from, !sameYear)} – ${monthDay(to, true)}`;
 }

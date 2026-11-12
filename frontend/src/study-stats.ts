@@ -2,19 +2,19 @@ export const statPeriods = ['week', 'month', '3months', 'all'] as const;
 export type StatPeriod = (typeof statPeriods)[number];
 
 export const periodLabels: Record<StatPeriod, string> = {
-  week: '이번 주',
-  month: '이번 달',
-  '3months': '최근 3개월',
-  all: '전체',
+  week: 'This week',
+  month: 'This month',
+  '3months': 'Last 3 months',
+  all: 'All',
 };
 
 // What the study time figures cover (#52).
 export const statStudyTypes = ['all', 'new', 'review'] as const;
 export type StatStudyType = (typeof statStudyTypes)[number];
 export const statStudyTypeLabels: Record<StatStudyType, string> = {
-  all: '전체',
-  new: '신규',
-  review: '복습',
+  all: 'All',
+  new: 'New',
+  review: 'Review',
 };
 
 // `textbookId` '' for every log, or one textbook's (#180).
@@ -57,11 +57,11 @@ export type ReviewStats = {
 export const reviewBars = (stats: ReviewStats) =>
   (
     [
-      ['예정', stats.scheduled],
-      ['완료', stats.completed],
-      ['지연', stats.delayed],
+      ['Scheduled', stats.scheduled],
+      ['Done', stats.completed],
+      ['Delayed', stats.delayed],
     ] as const
-  ).map(([name, count]) => ({ label: `${name} ${count}회`, count }));
+  ).map(([name, count]) => ({ label: `${name} ${count}`, count }));
 
 export type DayMinutes = { date: string; minutes: number };
 
@@ -69,11 +69,11 @@ export type DayMinutes = { date: string; minutes: number };
 // so a level means the same thing every week: 0 none, 1 under 30 minutes, 2 under an hour,
 // 3 under two hours, 4 two hours or more.
 export const heatBands = [
-  { level: 0, label: '0분' },
-  { level: 1, label: '30분 미만' },
-  { level: 2, label: '30분~1시간' },
-  { level: 3, label: '1~2시간' },
-  { level: 4, label: '2시간 이상' },
+  { level: 0, label: '0 min' },
+  { level: 1, label: 'Under 30 min' },
+  { level: 2, label: '30 min–1 h' },
+  { level: 3, label: '1–2 h' },
+  { level: 4, label: '2 h or more' },
 ] as const;
 
 export function heatLevel(minutes: number) {
@@ -96,10 +96,15 @@ export function heatWeeks(daily: DayMinutes[]) {
   return weeks;
 }
 
-// "10월" above the first week that holds the 1st of a month, otherwise nothing.
+// "Oct" above the first week that holds the 1st of a month, otherwise nothing.
 export function monthLabel(week: (DayMinutes | null)[]) {
   const first = week.find((day) => day?.date.endsWith('-01'));
-  return first ? `${Number(first.date.slice(5, 7))}월` : '';
+  return first
+    ? new Date(`${first.date}T00:00:00Z`).toLocaleDateString('en-US', {
+        month: 'short',
+        timeZone: 'UTC',
+      })
+    : '';
 }
 
 // GET /api/stats/patterns (#20): minutes per hour (0 to 23) and per weekday (Sunday first).
@@ -133,10 +138,11 @@ export const textbookStatsPath = (textbookId: string) =>
 export const chapterPercent = (book: { completedChapters: number; totalChapters: number }) =>
   book.totalChapters ? Math.floor((book.completedChapters * 100) / book.totalChapters) : 0;
 
-export const weekdayNames = ['일', '월', '화', '수', '목', '금', '토'];
+export const weekdayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
-// "20시~21시" for the hour starting at 20.
-export const hourLabel = (hour: number) => `${hour}시~${(hour + 1) % 24}시`;
+// "20:00–21:00" for the hour starting at 20.
+const clockHour = (hour: number) => `${String(hour).padStart(2, '0')}:00`;
+export const hourLabel = (hour: number) => `${clockHour(hour)}–${clockHour((hour + 1) % 24)}`;
 
 // A bar's share of the largest value, as a CSS width; 0 when nothing was studied.
 export const barWidth = (value: number, values: number[]) => {
@@ -147,7 +153,11 @@ export const barWidth = (value: number, values: number[]) => {
 // Study time chart (#49): one bar per day, week (from its Sunday) or month.
 export const chartUnits = ['day', 'week', 'month'] as const;
 export type ChartUnit = (typeof chartUnits)[number];
-export const chartUnitLabels: Record<ChartUnit, string> = { day: '일', week: '주', month: '월' };
+export const chartUnitLabels: Record<ChartUnit, string> = {
+  day: 'Day',
+  week: 'Week',
+  month: 'Month',
+};
 // Bars that stay readable for each period: days for a week or month, weeks for three months,
 // months for everything.
 export const defaultChartUnit: Record<StatPeriod, ChartUnit> = {

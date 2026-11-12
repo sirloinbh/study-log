@@ -19,7 +19,7 @@ describe('month-calendar', () => {
     expect(shiftMonth('2026-12', 1)).toBe('2027-01');
     expect(shiftMonth('2026-01', -1)).toBe('2025-12');
     expect(shiftMonth('2026-10', 0)).toBe('2026-10');
-    expect(monthTitle('2026-03')).toBe('2026년 3월');
+    expect(monthTitle('2026-03')).toBe('March 2026');
   });
 
   test('the month starts on its weekday with Sunday first', () => {
@@ -35,9 +35,9 @@ describe('month-calendar', () => {
   test('a day cell shows a short amount, nothing without study', () => {
     expect(shortMinutes(0)).toBe('');
     expect(shortMinutes(-5)).toBe('');
-    expect(shortMinutes(45)).toBe('45분');
-    expect(shortMinutes(60)).toBe('1시간');
-    expect(shortMinutes(90)).toBe('1.5시간');
+    expect(shortMinutes(45)).toBe('45 min');
+    expect(shortMinutes(60)).toBe('1 h');
+    expect(shortMinutes(90)).toBe('1.5 h');
   });
 });
 
@@ -72,11 +72,11 @@ describe('toc', () => {
     const long = 'x'.repeat(tocLimits.title + 1);
     expect(tocProblems(parseToc('1 벡터'))).toEqual([]);
     expect(tocProblems(parseToc(`1 벡터\n2 ${long}`))).toEqual([
-      `2번째 줄: 제목이 ${tocLimits.title}자를 넘습니다`,
+      `Line 2: the title is over ${tocLimits.title} characters`,
     ]);
     const many = Array.from({ length: tocLimits.entries + 1 }, (_, i) => `${i + 1} 장`).join('\n');
     expect(tocProblems(parseToc(many))[0]).toBe(
-      `목차는 한 번에 ${tocLimits.entries}개까지 등록할 수 있습니다`,
+      `At most ${tocLimits.entries} contents entries can be added at once`,
     );
     const [first, second] = tocTree(parseToc('1 벡터\n1.1 내적\n2 행렬'));
     expect(first.children.map((node) => node.title)).toEqual(['내적']);
@@ -132,7 +132,7 @@ describe('study-stats', () => {
     const weeks = heatWeeks(daily);
     expect(weeks.map((week) => week.length)).toEqual([7, 7]);
     expect(weeks[1].slice(2)).toEqual([null, null, null, null, null]);
-    expect(monthLabel([{ date: '2026-10-01', minutes: 0 }, null])).toBe('10월');
+    expect(monthLabel([{ date: '2026-10-01', minutes: 0 }, null])).toBe('Oct');
     expect(monthLabel([{ date: '2026-10-02', minutes: 0 }, null])).toBe('');
   });
 
@@ -161,7 +161,7 @@ describe('study-stats', () => {
   });
 
   test('small labels and bar widths', () => {
-    expect(hourLabel(23)).toBe('23시~0시');
+    expect(hourLabel(23)).toBe('23:00–00:00');
     expect(barWidth(30, [30, 60])).toBe('50%');
     expect(barWidth(0, [0, 0])).toBe('0%');
   });

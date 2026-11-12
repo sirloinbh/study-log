@@ -165,13 +165,13 @@ test('a schedule follows what was done and what fell behind', { skip: !url }, as
         assert.equal(doneItem.completedOn, '8041-07-01');
         const again = await complete(schedule.id, items[0].id);
         assert.equal(again.status, 409);
-        assert.match(String(again.data.error), /이미 완료한/);
+        assert.match(String(again.data.error), /already completed/);
         const moved = await move(schedule.id, items[0].id, '8041-07-09');
         assert.equal(moved.status, 409);
-        assert.match(String(moved.data.error), /완료한 항목은 옮길 수 없습니다/);
+        assert.match(String(moved.data.error), /A completed item cannot be moved/);
         const open = await reopen(schedule.id, items[1].id);
         assert.equal(open.status, 409);
-        assert.match(String(open.data.error), /완료하지 않은/);
+        assert.match(String(open.data.error), /not completed/);
         assert.equal((await reopen(schedule.id, items[0].id)).status, 200);
         assert.equal((await read(schedule.id)).items[0].completedOn, null);
       });
@@ -421,7 +421,7 @@ test('a schedule follows what was done and what fell behind', { skip: !url }, as
         const lastAllowed = '8044-08-30';
         const edge = await move(schedule.id, items[0].id, lastAllowed, true);
         assert.equal(edge.status, 400);
-        assert.match(String(edge.data.error), /함께 옮기는 일정도/);
+        assert.match(String(edge.data.error), /moved along/);
         const fits = await move(schedule.id, items[0].id, '8044-08-29', true);
         assert.equal(fits.status, 200, JSON.stringify(fits.data));
         assert.deepEqual(dates(fits.data as unknown as Detail), ['8044-08-29', '8044-08-30']);
@@ -478,10 +478,10 @@ test('a schedule follows what was done and what fell behind', { skip: !url }, as
         const before = dates(await read(schedule.id));
         const past = await move(schedule.id, items[0].id, '8041-11-01');
         assert.equal(past.status, 400);
-        assert.match(String(past.data.error), /오늘 이후/);
+        assert.match(String(past.data.error), /today or later/);
         const far = await move(schedule.id, items[0].id, '8043-11-02');
         assert.equal(far.status, 400);
-        assert.match(String(far.data.error), /730일/);
+        assert.match(String(far.data.error), /730 days/);
         // The 730th day counting today, one before the one refused above.
         const edge = await move(schedule.id, items[1].id, '8043-11-01');
         assert.equal(edge.status, 200, JSON.stringify(edge.data));
@@ -508,11 +508,11 @@ test('a schedule follows what was done and what fell behind', { skip: !url }, as
         const second = await make('8042-01-04', '8042-01-05');
         const wrong = await complete(first.schedule.id, second.items[0].id);
         assert.equal(wrong.status, 404);
-        assert.match(String(wrong.data.error), /일정 항목을 찾을 수 없습니다/);
+        assert.match(String(wrong.data.error), /Schedule item not found/);
         assert.equal((await read(second.schedule.id)).items[0].completedOn, null);
         const none = await complete(999_999_999_999, second.items[0].id);
         assert.equal(none.status, 404);
-        assert.match(String(none.data.error), /일정을 찾을 수 없습니다/);
+        assert.match(String(none.data.error), /Schedule not found/);
       });
     },
     {

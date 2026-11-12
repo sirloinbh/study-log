@@ -83,7 +83,7 @@ test('migrations apply to an empty database and can run again', { skip: !url }, 
     const changed = files.map((file, index) =>
       index === 0 ? { ...file, sql: 'SELECT 2', checksum: checksum('SELECT 2') } : file,
     );
-    await assert.rejects(migrate(client, changed), /내용이 바뀌었습니다: 001_initial\.sql/);
+    await assert.rejects(migrate(client, changed), /was changed: 001_initial\.sql/);
   });
 
   await t.test('a failing file rolls back alone, names itself and can be fixed', async () => {
@@ -97,7 +97,7 @@ test('migrations apply to an empty database and can run again', { skip: !url }, 
       sql: 'CREATE TABLE migrate_partial (id int); SELECT no_such_column FROM migrate_partial',
       checksum: checksum('bad'),
     };
-    await assert.rejects(migrate(client, [...files, good, bad]), /901_bad\.sql 적용 실패/);
+    await assert.rejects(migrate(client, [...files, good, bad]), /Failed to apply 901_bad\.sql/);
     const found = await tables();
     assert.ok(found.includes('migrate_good'), 'the earlier file stays');
     assert.ok(!found.includes('migrate_partial'), 'the failed file left nothing');

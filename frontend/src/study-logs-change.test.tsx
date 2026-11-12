@@ -31,11 +31,11 @@ function server(saveStatus = 200, deleteStatus = 204) {
         return Promise.resolve(
           deleteStatus === 204
             ? new Response(null, { status: 204 })
-            : new Response(JSON.stringify({ error: '오류' }), { status: deleteStatus }),
+            : new Response(JSON.stringify({ error: 'Error' }), { status: deleteStatus }),
         );
       if (init?.method && init.method !== 'GET')
         return Promise.resolve(
-          new Response(JSON.stringify(saveStatus < 400 ? { studyLog: log } : { error: '오류' }), {
+          new Response(JSON.stringify(saveStatus < 400 ? { studyLog: log } : { error: 'Error' }), {
             status: saveStatus,
           }),
         );
@@ -56,7 +56,7 @@ test('saving a log reports a change, since it can make a review due', async () =
   server();
   const onChange = vi.fn();
   render(<StudyLogs today={today} onChange={onChange} />);
-  await screen.findByRole('button', { name: /삭제$/ });
+  await screen.findByRole('button', { name: /delete$/ });
   submit();
   await waitFor(() => expect(onChange).toHaveBeenCalledTimes(1));
 });
@@ -65,7 +65,7 @@ test('a failed save reports too: the server may have changed anyway', async () =
   server(500);
   const onChange = vi.fn();
   render(<StudyLogs today={today} onChange={onChange} />);
-  await screen.findByRole('button', { name: /삭제$/ });
+  await screen.findByRole('button', { name: /delete$/ });
   submit();
   await waitFor(() => expect(onChange).toHaveBeenCalledTimes(1));
 });
@@ -77,7 +77,7 @@ test.each([
   server(200, status);
   const onChange = vi.fn();
   render(<StudyLogs today={today} onChange={onChange} />);
-  fireEvent.click(await screen.findByRole('button', { name: /삭제$/ }));
-  fireEvent.click(await screen.findByRole('button', { name: /삭제 확인$/ }));
+  fireEvent.click(await screen.findByRole('button', { name: /delete$/ }));
+  fireEvent.click(await screen.findByRole('button', { name: /confirm deletion$/ }));
   await waitFor(() => expect(onChange).toHaveBeenCalledTimes(1));
 });

@@ -12,7 +12,7 @@ import {
 } from './month-calendar';
 import { formatMinutes, statusLabels, type StudyLog } from './study-logs-data';
 
-const weekdays = ['일', '월', '화', '수', '목', '금', '토'];
+const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 // Study log calendar (#17): a month of days with the time studied, and the logs of the picked
 // day. `reloadKey` changes when logs were saved or deleted on the page.
@@ -65,21 +65,21 @@ export function Calendar({ today, reloadKey }: { today: string; reloadKey?: numb
   const logsError = dayError?.date === selected ? dayError.message : undefined;
 
   const describe = (day: CalendarDay) =>
-    `${day.date}, ${day.minutes ? `학습 ${formatMinutes(day.minutes)}` : '학습 없음'}, ` +
-    `기록 ${day.logs}개`;
+    `${day.date}, ${day.minutes ? `studied ${formatMinutes(day.minutes)}` : 'no study'}, ` +
+    `${day.logs} ${day.logs === 1 ? 'log' : 'logs'}`;
 
   return (
-    <section className="card study-calendar" aria-label="학습 캘린더">
+    <section className="card study-calendar" aria-label="Study calendar">
       <div className="calendar-head">
         <h2>{monthTitle(month)}</h2>
         <div className="actions">
           <button
             type="button"
             className="secondary"
-            aria-label="이전 달"
+            aria-label="Previous month"
             onClick={() => setMonth(shiftMonth(month, -1))}
           >
-            이전
+            Previous
           </button>
           {month !== today.slice(0, 7) && (
             <button
@@ -90,26 +90,26 @@ export function Calendar({ today, reloadKey }: { today: string; reloadKey?: numb
                 setSelected(today);
               }}
             >
-              이번 달
+              This month
             </button>
           )}
           <button
             type="button"
             className="secondary"
-            aria-label="다음 달"
+            aria-label="Next month"
             onClick={() => setMonth(shiftMonth(month, 1))}
           >
-            다음
+            Next
           </button>
         </div>
       </div>
       {error && (
         <p role="alert" className="error">
-          캘린더를 불러오지 못했습니다: {error}
+          Could not load the calendar: {error}
         </p>
       )}
       {!days ? (
-        !error && <Loading label="달력을 불러오는 중" kind="text" />
+        !error && <Loading label="Loading the calendar" kind="text" />
       ) : (
         <div className="calendar-grid">
           {weekdays.map((name) => (
@@ -143,15 +143,15 @@ export function Calendar({ today, reloadKey }: { today: string; reloadKey?: numb
         </div>
       )}
       <div className="calendar-logs">
-        <h3>{selected} 일지</h3>
+        <h3>Logs for {selected}</h3>
         {logsError ? (
           <p role="alert" className="error">
-            일지를 불러오지 못했습니다: {logsError}
+            Could not load the logs: {logsError}
           </p>
         ) : logs === undefined ? (
-          <Loading label="일지를 불러오는 중" />
+          <Loading label="Loading the logs" />
         ) : logs.length === 0 ? (
-          <p className="status">이 날짜의 기록이 없습니다</p>
+          <p className="status">No logs on this date</p>
         ) : (
           <ul className="log-list">
             {logs.map((log) => (
@@ -162,7 +162,7 @@ export function Calendar({ today, reloadKey }: { today: string; reloadKey?: numb
                   </span>
                   <strong>{formatMinutes(log.durationMinutes)}</strong>
                   <span className={`badge ${log.status}`}>{statusLabels[log.status]}</span>
-                  {log.studyType === 'review' && <span className="badge">복습</span>}
+                  {log.studyType === 'review' && <span className="badge">Review</span>}
                 </div>
                 {log.memo && <Memo text={log.memo} />}
               </li>

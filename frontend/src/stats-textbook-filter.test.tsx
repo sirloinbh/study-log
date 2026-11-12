@@ -55,7 +55,7 @@ function server(
       asked.push(url);
       if (url === '/api/textbooks')
         return answers.textbooks
-          ? json({ error: '서버 오류' }, answers.textbooks)
+          ? json({ error: 'Server error' }, answers.textbooks)
           : json({ textbooks: books });
       if (url.startsWith('/api/stats/reviews'))
         return json({
@@ -88,94 +88,99 @@ function server(
   return asked;
 }
 
-const metrics = () => within(screen.getByRole('region', { name: '학습 시간 지표' }));
+const metrics = () => within(screen.getByRole('region', { name: 'Study time metrics' }));
 const totalCard = () =>
-  within(metrics().getByRole('heading', { name: '총 학습 시간' }).closest('article')!);
+  within(metrics().getByRole('heading', { name: 'Total study time' }).closest('article')!);
 // The metric cards are taken away while the next answer loads.
 const seeTotal = (text: string) =>
   waitFor(() => expect(totalCard().getByText(text)).toBeInTheDocument());
-const picker = () => screen.getByRole('combobox', { name: '학습 시간 교재' });
+const picker = () => screen.getByRole('combobox', { name: 'Study time textbook' });
 
-test('picking a textbook narrows the study time to its logs, and 전체 brings all back', async () => {
+test('picking a textbook narrows the study time to its logs, and All brings all back', async () => {
   const asked = server();
   render(<Stats />);
-  await seeTotal('5시간');
+  await seeTotal('5 h');
   await waitFor(() =>
     expect(
       within(picker())
         .getAllByRole('option')
         .map((option) => option.textContent),
-    ).toEqual(['전체', '선형대수', '미적분']),
+    ).toEqual(['All', '선형대수', '미적분']),
   );
 
   fireEvent.change(picker(), { target: { value: '7' } });
-  await seeTotal('1시간 30분');
-  expect(totalCard().getByText('지금까지 기록한 전체 · 선형대수')).toBeInTheDocument();
+  await seeTotal('1 h 30 min');
+  expect(totalCard().getByText('Recorded so far: All · 선형대수')).toBeInTheDocument();
   expect(asked).toContain('/api/stats/study-time?period=week&textbookId=7');
 
   // With the study type and the period as well.
   fireEvent.click(
-    within(screen.getByRole('group', { name: '학습 유형' })).getByRole('button', { name: '복습' }),
+    within(screen.getByRole('group', { name: 'Study type' })).getByRole('button', {
+      name: 'Review',
+    }),
   );
   fireEvent.click(
-    within(screen.getByRole('group', { name: '기간' })).getByRole('button', { name: '이번 달' }),
+    within(screen.getByRole('group', { name: 'Period' })).getByRole('button', {
+      name: 'This month',
+    }),
   );
   await waitFor(() =>
     expect(asked).toContain('/api/stats/study-time?period=month&type=review&textbookId=7'),
   );
 
   fireEvent.change(picker(), { target: { value: '' } });
-  await seeTotal('지금까지 기록한 복습');
+  await seeTotal('Recorded so far: Review');
   expect(asked.at(-1)).not.toContain('textbookId');
 });
 
 test('a textbook without logs shows zeros, not the last one picked', async () => {
   server();
   render(<Stats />);
-  await seeTotal('5시간');
+  await seeTotal('5 h');
   await waitFor(() => expect(within(picker()).getAllByRole('option')).toHaveLength(3));
   fireEvent.change(picker(), { target: { value: '8' } });
-  await seeTotal('지금까지 기록한 전체 · 미적분');
-  expect(totalCard().getByText('0분')).toBeInTheDocument();
+  await seeTotal('Recorded so far: All · 미적분');
+  expect(totalCard().getByText('0 min')).toBeInTheDocument();
 });
 
-test('the filter is named apart from the one of "교재와 일정"', async () => {
+test('the filter is named apart from the one of "Textbooks and schedules"', async () => {
   server();
   render(<Stats />);
-  await seeTotal('5시간');
-  expect(screen.getAllByRole('combobox', { name: '학습 시간 교재' })).toHaveLength(1);
-  const cardPicker = within(screen.getByRole('region', { name: '교재와 일정' })).getByRole(
-    'combobox',
-    { name: '교재' },
-  );
-  expect(screen.getAllByRole('combobox', { name: '교재' })).toEqual([cardPicker]);
+  await seeTotal('5 h');
+  expect(screen.getAllByRole('combobox', { name: 'Study time textbook' })).toHaveLength(1);
+  const cardPicker = within(
+    screen.getByRole('region', { name: 'Textbooks and schedules' }),
+  ).getByRole('combobox', { name: 'Textbook' });
+  expect(screen.getAllByRole('combobox', { name: 'Textbook' })).toEqual([cardPicker]);
 });
 
 test('without the textbook list, only every log can be seen, and it says why', async () => {
   server({ textbooks: 500 });
   render(<Stats />);
-  await seeTotal('5시간');
+  await seeTotal('5 h');
   expect(
-    await screen.findByText('교재 목록을 불러오지 못해 교재로 좁혀 볼 수 없습니다'),
+    await screen.findByText(
+      'Could not load the textbook list, so the view cannot be narrowed by textbook',
+    ),
   ).toBeInTheDocument();
   expect(within(picker()).getAllByRole('option')).toHaveLength(1);
 });
 
-test('a textbook deleted elsewhere is reported, and 전체 still works', async () => {
+test('a textbook deleted elsewhere is reported, and All still works', async () => {
   server({
     studyTime: (url) =>
       url.includes('textbookId=7')
-        ? new Response(JSON.stringify({ error: '교재를 찾을 수 없습니다' }), { status: 404 })
+        ? new Response(JSON.stringify({ error: 'Textbook not found' }), { status: 404 })
         : undefined,
   });
   render(<Stats />);
-  await seeTotal('5시간');
+  await seeTotal('5 h');
   await waitFor(() => expect(within(picker()).getAllByRole('option')).toHaveLength(3));
   fireEvent.change(picker(), { target: { value: '7' } });
   expect(await screen.findByRole('alert')).toHaveTextContent(
-    '통계를 불러오지 못했습니다: 교재를 찾을 수 없습니다',
+    'Could not load the stats: Textbook not found',
   );
   fireEvent.change(picker(), { target: { value: '' } });
-  await seeTotal('5시간');
+  await seeTotal('5 h');
   expect(screen.queryByRole('alert')).toBeNull();
 });

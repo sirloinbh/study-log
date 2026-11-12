@@ -11,10 +11,10 @@ function ReviewBars({ stats }: { stats: ReviewStats }) {
   if (chartError)
     return (
       <p role="alert" className="error">
-        그래프를 불러오지 못했습니다: {chartError}
+        Could not load the chart: {chartError}
       </p>
     );
-  if (!R) return <Loading label="그래프를 불러오는 중" kind="text" />;
+  if (!R) return <Loading label="Loading the chart" kind="text" />;
   return (
     <div className="chart-box" aria-hidden="true">
       <R.ResponsiveContainer width="100%" height={200}>
@@ -25,7 +25,7 @@ function ReviewBars({ stats }: { stats: ReviewStats }) {
           <R.YAxis hide allowDecimals={false} />
           <R.Tooltip
             cursor={{ fill: 'var(--muted)' }}
-            formatter={(value) => [`${String(value)}회`, '복습']}
+            formatter={(value) => [`${String(value)}`, 'Reviews']}
           />
           <R.Bar
             dataKey="count"
@@ -69,21 +69,22 @@ export function ReviewRateChart({ period }: { period: StatPeriod }) {
 
   return (
     <section className="card study-chart review-chart" aria-labelledby="review-chart-heading">
-      <h2 id="review-chart-heading">복습 완료율</h2>
+      <h2 id="review-chart-heading">Review completion rate</h2>
       {error ? (
         <p role="alert" className="error">
-          복습 통계를 불러오지 못했습니다: {error}
+          Could not load the review stats: {error}
         </p>
       ) : !stats ? (
-        <Loading label="복습 통계를 불러오는 중" kind="text" />
+        <Loading label="Loading the review stats" kind="text" />
       ) : stats.completionRate === null ? (
-        <p className="status">{periodLabels[period]}에는 예정된 복습이 없습니다</p>
+        <p className="status">No reviews were scheduled for {periodLabels[period].toLowerCase()}</p>
       ) : (
         <>
           <p className="metric-value">{stats.completionRate}%</p>
           <p className="status">
-            {periodLabels[period]} 예정 {stats.scheduled}회 중 {stats.completed}회 완료, 지연{' '}
-            {stats.delayed}회입니다. 지연은 늦게 완료했거나 지났는데 아직 완료하지 않은 회차입니다.
+            {periodLabels[period]}: {stats.completed} of {stats.scheduled} scheduled reviews
+            completed, {stats.delayed} delayed. Delayed means completed late, or past due and not
+            yet completed.
           </p>
           <ReviewBars stats={stats} />
         </>

@@ -20,7 +20,7 @@ test('health reports the service and the injected service date when the DB answe
   );
 });
 
-test('a DB failure becomes a Korean 500 without leaking the error', async () => {
+test('a DB failure becomes an English 500 without leaking the error', async () => {
   const original = console.error;
   console.error = () => {};
   try {
@@ -31,7 +31,7 @@ test('a DB failure becomes a Korean 500 without leaking the error', async () => 
       async (call) => {
         const { status, data } = await call('/api/health');
         assert.equal(status, 500);
-        assert.deepEqual(data, { error: '서버 오류가 발생했습니다' });
+        assert.deepEqual(data, { error: 'Server error' });
       },
     );
   } finally {
@@ -39,13 +39,13 @@ test('a DB failure becomes a Korean 500 without leaking the error', async () => 
   }
 });
 
-test('unknown API paths return a Korean 404 JSON body', async () => {
+test('unknown API paths return an English 404 JSON body', async () => {
   await withApi(
     pool(async () => ({ rows: [] })),
     async (call) => {
       const { status, data } = await call('/api/does-not-exist');
       assert.equal(status, 404);
-      assert.equal(data.error, '요청한 API를 찾을 수 없습니다');
+      assert.equal(data.error, 'API not found');
     },
   );
 });

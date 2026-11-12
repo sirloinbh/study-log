@@ -8,7 +8,9 @@ export function shiftMonth(month: string, delta: number) {
 }
 
 export const monthTitle = (month: string) =>
-  `${Number(month.slice(0, 4))}년 ${Number(month.slice(5, 7))}월`;
+  new Date(
+    Date.UTC(Number(month.slice(0, 4)), Number(month.slice(5, 7)) - 1, 1),
+  ).toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 
 // The month's days in rows of seven, Sunday first (#96); the slots before the 1st are null.
 export function calendarCells(days: CalendarDay[]) {
@@ -17,10 +19,10 @@ export function calendarCells(days: CalendarDay[]) {
   return [...Array<null>(weekday).fill(null), ...days];
 }
 
-// A short amount for a small day cell: "45분", "1.5시간", "2시간"; nothing for no study.
+// A short amount for a small day cell: "45 min", "1.5 h", "2 h"; nothing for no study.
 export function shortMinutes(minutes: number) {
   if (minutes <= 0) return '';
-  if (minutes < 60) return `${minutes}분`;
+  if (minutes < 60) return `${minutes} min`;
   const hours = Math.round((minutes / 60) * 10) / 10;
-  return `${hours}시간`;
+  return `${hours} h`;
 }

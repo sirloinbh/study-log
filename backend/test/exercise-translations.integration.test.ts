@@ -35,7 +35,7 @@ test(
     const given: TranslationSource[] = [];
     let fail = false;
     const translator = async (source: TranslationSource) => {
-      if (fail) throw new TranslationError(422, '이 내용은 번역할 수 없습니다');
+      if (fail) throw new TranslationError(422, 'This content cannot be translated');
       given.push(source);
       return {
         body: `번역: ${source.body}`,

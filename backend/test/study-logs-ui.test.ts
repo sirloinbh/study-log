@@ -101,7 +101,7 @@ function fakeApi(initial: Log[] = [], options: Options = {}) {
     if (reject && method !== 'GET') return reply(reject.status, { error: reject.error });
     const id = Number(path.split('/')[3]);
     if (method === 'GET') {
-      if (failGet?.(++gets)) return reply(500, { error: '서버 오류가 발생했습니다' });
+      if (failGet?.(++gets)) return reply(500, { error: 'Server error' });
       const sorted = [...logs].sort((a, b) =>
         (b.studyDate + b.startTime).localeCompare(a.studyDate + a.startTime),
       );
@@ -118,7 +118,7 @@ function fakeApi(initial: Log[] = [], options: Options = {}) {
       return reply(201, { studyLog: log });
     }
     const index = logs.findIndex((log) => log.id === id);
-    if (index < 0) return reply(404, { error: '학습 기록을 찾을 수 없습니다' });
+    if (index < 0) return reply(404, { error: 'Study log not found' });
     if (method === 'PUT') {
       logs[index] = {
         id,
@@ -161,7 +161,7 @@ uiTest('recent logs show date, time range, computed duration, status and memo', 
   const [item] = ui.find((n) => n.type === 'li');
   assert.ok(item, 'one recent log');
   const line = ui.text(item);
-  for (const part of ['2026-10-21', '09:00–10:30', '1시간 30분', '완료', '선형대수 2장 행렬 곱']) {
+  for (const part of ['2026-10-21', '09:00–10:30', '1 h 30 min', 'Done', '선형대수 2장 행렬 곱']) {
     assert.ok(line.includes(part), `${part} in ${line}`);
   }
   assert.deepEqual(api.requests, [
@@ -181,17 +181,17 @@ uiTest(
     assert.deepEqual(listed.props.children, ['# 행렬\n- 곱셈']);
     assert.ok(ui.find((n) => n.props.className === 'memo clamp', item).length);
 
-    const preview = () => ui.find((n) => n.props['aria-label'] === '메모 미리보기');
+    const preview = () => ui.find((n) => n.props['aria-label'] === 'Memo preview');
     assert.equal(preview().length, 0, 'no preview for an empty memo');
-    assert.match(ui.text(), /마크다운을 쓸 수 있습니다/);
-    await ui.fill('메모', '## 오늘\n**굵게**');
+    assert.match(ui.text(), /You can use Markdown/);
+    await ui.fill('Memo', '## 오늘\n**굵게**');
     const [shown] = preview();
     assert.ok(shown, 'preview while writing');
     const [rendered] = ui.find((n) => n.type === 'markdown', shown);
     assert.deepEqual(rendered.props.children, ['## 오늘\n**굵게**']);
     // The preview is not cut short like the list.
     assert.ok(ui.find((n) => n.props.className === 'memo', shown).length);
-    await ui.fill('메모', '  \n ');
+    await ui.fill('Memo', '  \n ');
     assert.equal(preview().length, 0, 'no preview for a blank memo');
   },
 );
@@ -199,7 +199,7 @@ uiTest(
 uiTest('an empty history says so instead of showing an empty list', async () => {
   const ui = mount(fakeApi().fetch);
   await ui.settle();
-  assert.match(ui.text(), /아직 학습 기록이 없습니다/);
+  assert.match(ui.text(), /No study logs yet/);
   assert.equal(ui.find((n) => n.type === 'li').length, 0);
 });
 
@@ -208,15 +208,15 @@ uiTest('entering a session previews its duration and saving adds it to the list'
   const ui = mount(api.fetch);
   await ui.settle();
   // The date defaults to the server's today.
-  assert.equal(ui.field('학습일'), '2026-10-22');
-  await ui.fill('시작', '23:20');
-  await ui.fill('종료', '00:50');
+  assert.equal(ui.field('Study date'), '2026-10-22');
+  await ui.fill('Start', '23:20');
+  await ui.fill('End', '00:50');
   assert.match(
     ui.text(ui.find((n) => n.props.className === 'duration wide')),
-    /1시간 30분 \(다음 날 종료\)/,
+    /1 h 30 min \(ends the next day\)/,
   );
-  await ui.fill('상태', 'in_progress');
-  await ui.fill('메모', '미적분 3장');
+  await ui.fill('Status', 'in_progress');
+  await ui.fill('Memo', '미적분 3장');
   await ui.submit();
 
   assert.deepEqual(api.requests[1], {
@@ -239,42 +239,42 @@ uiTest('entering a session previews its duration and saving adds it to the list'
   // The list is reloaded from the server after saving.
   assert.equal(api.requests[2].method, 'GET');
   const [item] = ui.find((n) => n.type === 'li');
-  assert.match(ui.text(item), /23:20–00:50.*1시간 30분.*진행 중/);
-  assert.match(ui.text(ui.find((n) => n.props.role === 'status')), /저장했습니다/);
+  assert.match(ui.text(item), /23:20–00:50.*1 h 30 min.*In progress/);
+  assert.match(ui.text(ui.find((n) => n.props.role === 'status')), /Saved/);
   // The form is cleared for the next entry but keeps the date.
-  assert.equal(ui.field('시작'), '');
-  assert.equal(ui.field('메모'), '');
-  assert.equal(ui.field('학습일'), '2026-10-22');
+  assert.equal(ui.field('Start'), '');
+  assert.equal(ui.field('Memo'), '');
+  assert.equal(ui.field('Study date'), '2026-10-22');
 });
 
-uiTest('a rejected save shows the server Korean message and keeps the input', async () => {
+uiTest('a rejected save shows the server message and keeps the input', async () => {
   const api = fakeApi([], {
-    reject: { status: 400, error: '종료 시각은 시작 시각과 달라야 합니다' },
+    reject: { status: 400, error: 'The end time must differ from the start time' },
   });
   const ui = mount(api.fetch);
   await ui.settle();
-  await ui.fill('시작', '10:00');
-  await ui.fill('종료', '10:00');
+  await ui.fill('Start', '10:00');
+  await ui.fill('End', '10:00');
   await ui.submit();
   assert.match(
     ui.text(ui.find((n) => n.props.role === 'alert')),
-    /종료 시각은 시작 시각과 달라야 합니다/,
+    /The end time must differ from the start time/,
   );
-  assert.equal(ui.field('시작'), '10:00');
-  assert.equal(ui.field('종료'), '10:00');
+  assert.equal(ui.field('Start'), '10:00');
+  assert.equal(ui.field('End'), '10:00');
 });
 
 uiTest('editing a log fills the form and saves it with PUT', async () => {
   const api = fakeApi([morning]);
   const ui = mount(api.fetch);
   await ui.settle();
-  await ui.click('수정', ui.find((n) => n.type === 'li')[0]);
-  assert.match(ui.text(ui.find((n) => n.type === 'h2')), /학습 기록 수정/);
-  assert.equal(ui.field('시작'), '09:00');
-  assert.equal(ui.field('메모'), '선형대수 2장 행렬 곱');
-  await ui.fill('종료', '11:00');
+  await ui.click('Edit', ui.find((n) => n.type === 'li')[0]);
+  assert.match(ui.text(ui.find((n) => n.type === 'h2')), /Edit the study log/);
+  assert.equal(ui.field('Start'), '09:00');
+  assert.equal(ui.field('Memo'), '선형대수 2장 행렬 곱');
+  await ui.fill('End', '11:00');
   const [submit] = ui.find((n) => n.type === 'button' && n.props.type === 'submit');
-  assert.equal(ui.text(submit), '수정 저장');
+  assert.equal(ui.text(submit), 'Save changes');
   await ui.submit();
 
   const put = api.requests.find((request) => request.method === 'PUT');
@@ -295,39 +295,39 @@ uiTest('editing a log fills the form and saves it with PUT', async () => {
       studyType: 'new',
     },
   });
-  assert.match(ui.text(ui.find((n) => n.type === 'li')[0]), /09:00–11:00.*2시간/);
-  assert.match(ui.text(ui.find((n) => n.props.role === 'status')), /수정했습니다/);
-  assert.match(ui.text(ui.find((n) => n.type === 'h2')), /학습 기록 입력/);
+  assert.match(ui.text(ui.find((n) => n.type === 'li')[0]), /09:00–11:00.*2 h/);
+  assert.match(ui.text(ui.find((n) => n.props.role === 'status')), /Updated/);
+  assert.match(ui.text(ui.find((n) => n.type === 'h2')), /Add a study log/);
   // Back to a new entry for today, not the edited log's date.
-  assert.equal(ui.field('학습일'), '2026-10-22');
-  assert.equal(ui.field('시작'), '');
+  assert.equal(ui.field('Study date'), '2026-10-22');
+  assert.equal(ui.field('Start'), '');
 });
 
 uiTest('deleting a log needs a second confirmation click', async () => {
   const api = fakeApi([morning]);
   const ui = mount(api.fetch);
   await ui.settle();
-  await ui.click('삭제', ui.find((n) => n.type === 'li')[0]);
+  await ui.click('Delete', ui.find((n) => n.type === 'li')[0]);
   assert.equal(api.requests.filter((request) => request.method === 'DELETE').length, 0);
-  await ui.click('삭제 확인');
+  await ui.click('Confirm delete');
   assert.deepEqual(
     api.requests.filter((request) => request.method === 'DELETE').map((request) => request.path),
     ['/api/study-logs/1'],
   );
   assert.equal(ui.find((n) => n.type === 'li').length, 0);
-  assert.match(ui.text(), /삭제했습니다/);
+  assert.match(ui.text(), /Deleted/);
 });
 
 uiTest('cancelling an edit restores the unsaved new entry', async () => {
   const ui = mount(fakeApi([morning]).fetch);
   await ui.settle();
-  await ui.fill('시작', '08:00');
-  await ui.click('수정', ui.find((n) => n.type === 'li')[0]);
-  assert.equal(ui.field('학습일'), '2026-10-21');
-  await ui.click('취소', ui.find((n) => n.type === 'form')[0]);
-  assert.match(ui.text(ui.find((n) => n.type === 'h2')), /학습 기록 입력/);
-  assert.equal(ui.field('학습일'), '2026-10-22');
-  assert.equal(ui.field('시작'), '08:00');
+  await ui.fill('Start', '08:00');
+  await ui.click('Edit', ui.find((n) => n.type === 'li')[0]);
+  assert.equal(ui.field('Study date'), '2026-10-21');
+  await ui.click('Cancel', ui.find((n) => n.type === 'form')[0]);
+  assert.match(ui.text(ui.find((n) => n.type === 'h2')), /Add a study log/);
+  assert.equal(ui.field('Study date'), '2026-10-22');
+  assert.equal(ui.field('Start'), '08:00');
 });
 
 uiTest('a failed first load reports the error instead of claiming there are no logs', async () => {
@@ -335,30 +335,27 @@ uiTest('a failed first load reports the error instead of claiming there are no l
   await ui.settle();
   assert.match(
     ui.text(ui.find((n) => n.props.role === 'alert')),
-    /최근 기록을 불러오지 못했습니다: 서버 오류가 발생했습니다/,
+    /Could not load the recent logs: Server error/,
   );
-  assert.doesNotMatch(ui.text(), /아직 학습 기록이 없습니다/);
+  assert.doesNotMatch(ui.text(), /No study logs yet/);
 });
 
 uiTest('a failed reload after saving keeps the list already on screen', async () => {
   const api = fakeApi([morning], { failGet: (count) => count > 1 });
   const ui = mount(api.fetch);
   await ui.settle();
-  await ui.fill('시작', '13:00');
-  await ui.fill('종료', '14:00');
+  await ui.fill('Start', '13:00');
+  await ui.fill('End', '14:00');
   await ui.submit();
-  assert.match(ui.text(ui.find((n) => n.props.role === 'status')), /저장했습니다/);
-  assert.match(
-    ui.text(ui.find((n) => n.props.role === 'alert')),
-    /최근 기록을 불러오지 못했습니다/,
-  );
+  assert.match(ui.text(ui.find((n) => n.props.role === 'status')), /Saved/);
+  assert.match(ui.text(ui.find((n) => n.props.role === 'alert')), /Could not load the recent logs/);
   assert.match(ui.text(ui.find((n) => n.type === 'li')), /09:00–10:30/);
 });
 
 uiTest('an unreachable server shows the connection message', async () => {
   const ui = mount(fakeApi([], { offline: true }).fetch);
   await ui.settle();
-  assert.match(ui.text(ui.find((n) => n.props.role === 'alert')), /서버에 연결할 수 없습니다/);
+  assert.match(ui.text(ui.find((n) => n.props.role === 'alert')), /Cannot reach the server/);
 });
 
 uiTest('buttons stay disabled while a delete is in flight, so it is sent once', async () => {
@@ -366,11 +363,11 @@ uiTest('buttons stay disabled while a delete is in flight, so it is sent once', 
   const api = fakeApi([morning], { holdDelete: new Promise<void>((r) => (release = r)) });
   const ui = mount(api.fetch);
   await ui.settle();
-  await ui.click('삭제', ui.find((n) => n.type === 'li')[0]);
-  await ui.click('삭제 확인');
+  await ui.click('Delete', ui.find((n) => n.type === 'li')[0]);
+  await ui.click('Confirm delete');
   const disabled = ui
     .find((n) => n.type === 'button')
-    .filter((n) => ['삭제 확인', '저장'].includes(ui.text(n)))
+    .filter((n) => ['Confirm delete', 'Save'].includes(ui.text(n)))
     .map((n) => n.props.disabled);
   assert.deepEqual(disabled, [true, true]);
   release();
@@ -383,11 +380,11 @@ uiTest('saving an edit of a log deleted elsewhere leaves edit mode and reloads',
   const api = fakeApi([morning]);
   const ui = mount(api.fetch);
   await ui.settle();
-  await ui.click('수정', ui.find((n) => n.type === 'li')[0]);
+  await ui.click('Edit', ui.find((n) => n.type === 'li')[0]);
   api.logs.splice(0, 1);
   await ui.submit();
-  assert.match(ui.text(ui.find((n) => n.props.role === 'alert')), /학습 기록을 찾을 수 없습니다/);
-  assert.match(ui.text(ui.find((n) => n.type === 'h2')), /학습 기록 입력/);
+  assert.match(ui.text(ui.find((n) => n.props.role === 'alert')), /Study log not found/);
+  assert.match(ui.text(ui.find((n) => n.type === 'h2')), /Add a study log/);
   assert.equal(ui.find((n) => n.type === 'li').length, 0);
 });
 
@@ -397,16 +394,16 @@ uiTest(
     const api = fakeApi([morning]);
     const ui = mount(api.fetch);
     await ui.settle();
-    await ui.click('삭제', ui.find((n) => n.type === 'li')[0]);
-    await ui.click('취소', ui.find((n) => n.type === 'li')[0]);
-    assert.match(ui.text(ui.find((n) => n.type === 'li')[0]), /수정삭제$/);
+    await ui.click('Delete', ui.find((n) => n.type === 'li')[0]);
+    await ui.click('Cancel', ui.find((n) => n.type === 'li')[0]);
+    assert.match(ui.text(ui.find((n) => n.type === 'li')[0]), /EditDelete$/);
     assert.equal(api.requests.filter((request) => request.method === 'DELETE').length, 0);
 
-    await ui.click('수정', ui.find((n) => n.type === 'li')[0]);
-    await ui.click('삭제', ui.find((n) => n.type === 'li')[0]);
-    await ui.click('삭제 확인');
-    assert.match(ui.text(ui.find((n) => n.type === 'h2')), /학습 기록 입력/);
-    assert.equal(ui.field('학습일'), '2026-10-22');
+    await ui.click('Edit', ui.find((n) => n.type === 'li')[0]);
+    await ui.click('Delete', ui.find((n) => n.type === 'li')[0]);
+    await ui.click('Confirm delete');
+    assert.match(ui.text(ui.find((n) => n.type === 'h2')), /Add a study log/);
+    assert.equal(ui.field('Study date'), '2026-10-22');
   },
 );
 
@@ -425,15 +422,15 @@ uiTest('a 404 when deleting another log keeps the current edit', async () => {
   await ui.settle();
   const [first, second] = ui.find((n) => n.type === 'li');
   assert.match(ui.text(first), /2026-10-21/);
-  await ui.click('수정', first);
-  await ui.fill('메모', '수정 중인 메모');
+  await ui.click('Edit', first);
+  await ui.fill('Memo', '수정 중인 메모');
   // The evening log disappears on the server before it is deleted here.
   api.logs.splice(1, 1);
-  await ui.click('삭제', second);
-  await ui.click('삭제 확인');
-  assert.match(ui.text(ui.find((n) => n.props.role === 'alert')), /학습 기록을 찾을 수 없습니다/);
-  assert.match(ui.text(ui.find((n) => n.type === 'h2')), /학습 기록 수정/);
-  assert.equal(ui.field('메모'), '수정 중인 메모');
+  await ui.click('Delete', second);
+  await ui.click('Confirm delete');
+  assert.match(ui.text(ui.find((n) => n.props.role === 'alert')), /Study log not found/);
+  assert.match(ui.text(ui.find((n) => n.type === 'h2')), /Edit the study log/);
+  assert.equal(ui.field('Memo'), '수정 중인 메모');
   assert.equal(ui.find((n) => n.type === 'li').length, 1);
 });
 
@@ -446,8 +443,8 @@ uiTest('fields are locked while a save is in flight', async () => {
     return api.fetch(path, init);
   });
   await ui.settle();
-  await ui.fill('시작', '13:00');
-  await ui.fill('종료', '14:00');
+  await ui.fill('Start', '13:00');
+  await ui.fill('End', '14:00');
   await ui.submit();
   // The entry form's fields (the search card below has its own lock).
   const [form] = ui.find((n) => n.type === 'form');
@@ -457,7 +454,7 @@ uiTest('fields are locked while a save is in flight', async () => {
   assert.deepEqual(disabled, Array(11).fill(true));
   release();
   await ui.settle();
-  assert.match(ui.text(ui.find((n) => n.props.role === 'status')), /저장했습니다/);
+  assert.match(ui.text(ui.find((n) => n.props.role === 'status')), /Saved/);
 });
 
 uiTest('list buttons name the log they act on', async () => {
@@ -469,8 +466,8 @@ uiTest('list buttons name the log they act on', async () => {
     .find((n) => n.type === 'button' && typeof n.props['aria-label'] === 'string', list)
     .map((n) => n.props['aria-label']);
   assert.deepEqual(labels, [
-    '2026-10-21 09:00–10:30 기록 수정',
-    '2026-10-21 09:00–10:30 기록 삭제',
+    '2026-10-21 09:00–10:30 log edit',
+    '2026-10-21 09:00–10:30 log delete',
   ]);
 });
 
@@ -488,22 +485,22 @@ uiTest('a log can be linked to a textbook and one of its chapters', async () => 
   const api = fakeApi();
   const ui = mount(api.fetch);
   await ui.settle();
-  assert.deepEqual(optionsOf(ui, '교재'), ['선택 안 함', '선형대수', '미적분']);
+  assert.deepEqual(optionsOf(ui, 'Textbook'), ['None', '선형대수', '미적분']);
   // Without a textbook there is no chapter to pick.
   const chapterSelect = () =>
     ui
-      .find((n) => n.type === 'label' && ui.text(n).startsWith('장/절'))
+      .find((n) => n.type === 'label' && ui.text(n).startsWith('Chapter/section'))
       .flatMap((n) => ui.find((c) => c.type === 'select', n))[0];
   assert.equal(chapterSelect().props.disabled, true);
-  assert.deepEqual(optionsOf(ui, '장/절'), ['교재를 먼저 선택']);
+  assert.deepEqual(optionsOf(ui, 'Chapter/section'), ['Choose a textbook first']);
 
-  await ui.fill('교재', '1');
+  await ui.fill('Textbook', '1');
   assert.equal(chapterSelect().props.disabled, false);
   // Sections are indented under their chapter.
-  assert.deepEqual(optionsOf(ui, '장/절'), ['선택 안 함', '1 벡터', '  1.2 내적']);
-  await ui.fill('장/절', '12');
-  await ui.fill('시작', '09:00');
-  await ui.fill('종료', '10:00');
+  assert.deepEqual(optionsOf(ui, 'Chapter/section'), ['None', '1 벡터', '  1.2 내적']);
+  await ui.fill('Chapter/section', '12');
+  await ui.fill('Start', '09:00');
+  await ui.fill('End', '10:00');
   await ui.submit();
 
   const post = api.requests.find((request) => request.method === 'POST')?.body as {
@@ -513,22 +510,22 @@ uiTest('a log can be linked to a textbook and one of its chapters', async () => 
   assert.deepEqual([post.textbookId, post.contentId], [1, 12]);
   assert.match(ui.text(ui.find((n) => n.type === 'li')[0]), /선형대수 · 1\.2 내적/);
   // The next entry keeps neither link.
-  assert.equal(ui.field('교재'), '');
-  assert.equal(ui.field('장/절'), '');
+  assert.equal(ui.field('Textbook'), '');
+  assert.equal(ui.field('Chapter/section'), '');
 });
 
 uiTest('picking another textbook clears the chapter of the previous one', async () => {
   const api = fakeApi();
   const ui = mount(api.fetch);
   await ui.settle();
-  await ui.fill('교재', '1');
-  await ui.fill('장/절', '11');
-  await ui.fill('교재', '2');
-  assert.equal(ui.field('장/절'), '');
-  assert.deepEqual(optionsOf(ui, '장/절'), ['선택 안 함', '극한']);
-  await ui.fill('교재', '');
-  assert.equal(ui.field('장/절'), '');
-  assert.deepEqual(optionsOf(ui, '장/절'), ['교재를 먼저 선택']);
+  await ui.fill('Textbook', '1');
+  await ui.fill('Chapter/section', '11');
+  await ui.fill('Textbook', '2');
+  assert.equal(ui.field('Chapter/section'), '');
+  assert.deepEqual(optionsOf(ui, 'Chapter/section'), ['None', '극한']);
+  await ui.fill('Textbook', '');
+  assert.equal(ui.field('Chapter/section'), '');
+  assert.deepEqual(optionsOf(ui, 'Chapter/section'), ['Choose a textbook first']);
 });
 
 uiTest('editing a linked log fills in its textbook and chapter', async () => {
@@ -544,10 +541,10 @@ uiTest('editing a linked log fills in its textbook and chapter', async () => {
   const ui = mount(api.fetch);
   await ui.settle();
   assert.match(ui.text(ui.find((n) => n.type === 'li')[0]), /선형대수 · 1 벡터/);
-  await ui.click('수정', ui.find((n) => n.type === 'li')[0]);
-  assert.equal(ui.field('교재'), 1);
-  assert.equal(ui.field('장/절'), 11);
-  await ui.fill('장/절', '');
+  await ui.click('Edit', ui.find((n) => n.type === 'li')[0]);
+  assert.equal(ui.field('Textbook'), 1);
+  assert.equal(ui.field('Chapter/section'), 11);
+  await ui.fill('Chapter/section', '');
   await ui.submit();
   const put = api.requests.find((request) => request.method === 'PUT');
   assert.equal((put?.body as { textbookId: number }).textbookId, 1);
@@ -560,19 +557,19 @@ uiTest('the self-assessment is saved with the log and shown in the list', async 
   const api = fakeApi();
   const ui = mount(api.fetch);
   await ui.settle();
-  assert.deepEqual(optionsOf(ui, '이해도'), [
-    '선택 안 함',
-    '1 · 거의 모름',
-    '2 · 조금 이해',
-    '3 · 보통',
-    '4 · 대부분 이해',
-    '5 · 완전히 이해',
+  assert.deepEqual(optionsOf(ui, 'Understanding'), [
+    'None',
+    '1 · Barely understood',
+    '2 · Understood a little',
+    '3 · Average',
+    '4 · Mostly understood',
+    '5 · Fully understood',
   ]);
-  await ui.fill('시작', '09:00');
-  await ui.fill('종료', '10:00');
-  await ui.fill('이해도', '4');
-  await ui.fill('목표 달성', 'false');
-  await ui.fill('어려웠던 부분', '고유값 분해');
+  await ui.fill('Start', '09:00');
+  await ui.fill('End', '10:00');
+  await ui.fill('Understanding', '4');
+  await ui.fill('Goal achieved', 'false');
+  await ui.fill('Difficult parts', '고유값 분해');
   await ui.submit();
   const post = api.requests.find((request) => request.method === 'POST')?.body as Record<
     string,
@@ -583,12 +580,12 @@ uiTest('the self-assessment is saved with the log and shown in the list', async 
     [4, false, '고유값 분해'],
   );
   const item = ui.text(ui.find((n) => n.type === 'li')[0]);
-  assert.match(item, /이해도 4\/5 · 목표 미달성/);
-  assert.match(item, /어려웠던 부분: 고유값 분해/);
+  assert.match(item, /Understanding 4\/5 · Goal not achieved/);
+  assert.match(item, /Difficult parts: 고유값 분해/);
   // The next entry starts unanswered.
-  assert.equal(ui.field('이해도'), '');
-  assert.equal(ui.field('목표 달성'), '');
-  assert.equal(ui.field('어려웠던 부분'), '');
+  assert.equal(ui.field('Understanding'), '');
+  assert.equal(ui.field('Goal achieved'), '');
+  assert.equal(ui.field('Difficult parts'), '');
 });
 
 uiTest('editing a log fills in and can clear its self-assessment', async () => {
@@ -596,13 +593,13 @@ uiTest('editing a log fills in and can clear its self-assessment', async () => {
   const api = fakeApi([assessed]);
   const ui = mount(api.fetch);
   await ui.settle();
-  assert.match(ui.text(ui.find((n) => n.type === 'li')[0]), /이해도 5\/5 · 목표 달성/);
-  await ui.click('수정', ui.find((n) => n.type === 'li')[0]);
-  assert.equal(ui.field('이해도'), 5);
-  assert.equal(ui.field('목표 달성'), 'true');
-  assert.equal(ui.field('어려웠던 부분'), '없음');
-  await ui.fill('이해도', '');
-  await ui.fill('목표 달성', '');
+  assert.match(ui.text(ui.find((n) => n.type === 'li')[0]), /Understanding 5\/5 · Goal achieved/);
+  await ui.click('Edit', ui.find((n) => n.type === 'li')[0]);
+  assert.equal(ui.field('Understanding'), 5);
+  assert.equal(ui.field('Goal achieved'), 'true');
+  assert.equal(ui.field('Difficult parts'), '없음');
+  await ui.fill('Understanding', '');
+  await ui.fill('Goal achieved', '');
   await ui.submit();
   const put = api.requests.find((request) => request.method === 'PUT')?.body as Record<
     string,
@@ -617,11 +614,17 @@ uiTest('reflection label joins whichever answers were given', () => {
     reflectionLabel(log: { understanding: number | null; goalAchieved: boolean | null }): string;
   }>('study-logs-data.ts');
   assert.equal(logic.reflectionLabel({ understanding: null, goalAchieved: null }), '');
-  assert.equal(logic.reflectionLabel({ understanding: 3, goalAchieved: null }), '이해도 3/5');
-  assert.equal(logic.reflectionLabel({ understanding: null, goalAchieved: false }), '목표 미달성');
+  assert.equal(
+    logic.reflectionLabel({ understanding: 3, goalAchieved: null }),
+    'Understanding 3/5',
+  );
+  assert.equal(
+    logic.reflectionLabel({ understanding: null, goalAchieved: false }),
+    'Goal not achieved',
+  );
   assert.equal(
     logic.reflectionLabel({ understanding: 1, goalAchieved: true }),
-    '이해도 1/5 · 목표 달성',
+    'Understanding 1/5 · Goal achieved',
   );
 });
 
@@ -656,11 +659,11 @@ uiTest('duration preview follows the API rule and formats hours and minutes', ()
   assert.equal(logic.crossesMidnight('23:00', '01:00'), true);
   assert.equal(logic.crossesMidnight('09:00', '10:00'), false);
   assert.deepEqual([0, 45, 60, 90, 1439].map(logic.formatMinutes), [
-    '0분',
-    '45분',
-    '1시간',
-    '1시간 30분',
-    '23시간 59분',
+    '0 min',
+    '45 min',
+    '1 h',
+    '1 h 30 min',
+    '23 h 59 min',
   ]);
 });
 
@@ -687,12 +690,12 @@ uiTest('focus follows the delete flow: confirm, back on cancel, the list after',
   state.ui = ui;
   await ui.settle();
   const item = () => ui.find((n) => n.type === 'li')[0];
-  await ui.click('삭제', item());
+  await ui.click('Delete', item());
   assert.deepEqual(focused, ['study-log-delete-confirm-1']);
-  await ui.click('취소', item());
+  await ui.click('Cancel', item());
   assert.deepEqual(focused.at(-1), 'study-log-delete-1');
-  await ui.click('삭제', item());
-  await ui.click('삭제 확인', item());
+  await ui.click('Delete', item());
+  await ui.click('Confirm delete', item());
   assert.deepEqual(focused.at(-1), 'study-log-list');
   const [heading] = ui.find((n) => n.props.id === 'study-log-list');
   assert.equal(heading.props.tabIndex, -1);
@@ -700,15 +703,15 @@ uiTest('focus follows the delete flow: confirm, back on cancel, the list after',
 
 uiTest('a failed delete puts focus back on the delete button, a 404 on the list', async () => {
   for (const [reject, target] of [
-    [{ status: 500, error: '서버 오류가 발생했습니다' }, 'study-log-delete-1'],
-    [{ status: 404, error: '학습 기록을 찾을 수 없습니다' }, 'study-log-list'],
+    [{ status: 500, error: 'Server error' }, 'study-log-delete-1'],
+    [{ status: 404, error: 'Study log not found' }, 'study-log-list'],
   ] as const) {
     const { focused, document, state } = focusRecorder();
     const ui = mount(fakeApi([morning], { reject }).fetch, { document });
     state.ui = ui;
     await ui.settle();
-    await ui.click('삭제', ui.find((n) => n.type === 'li')[0]);
-    await ui.click('삭제 확인');
+    await ui.click('Delete', ui.find((n) => n.type === 'li')[0]);
+    await ui.click('Confirm delete');
     assert.equal(focused.at(-1), target, String(reject.status));
   }
 });
@@ -718,8 +721,8 @@ uiTest('a double submit in the same tick saves the log once', async () => {
   const api = fakeApi();
   const ui = mount(api.fetch);
   await ui.settle();
-  await ui.fill('시작', '09:00');
-  await ui.fill('종료', '10:00');
+  await ui.fill('Start', '09:00');
+  await ui.fill('End', '10:00');
   const [form] = ui.find((n) => n.type === 'form');
   const onSubmit = form.props.onSubmit as (event: { preventDefault(): void }) => unknown;
   void onSubmit({ preventDefault() {} });

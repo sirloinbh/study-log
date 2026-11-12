@@ -17,7 +17,7 @@ import { ButtonSpinner, Loading } from './loading';
 import { type ContentNode, contentOptions, type Textbook } from './textbook';
 
 // The API's answer for a chapter that does not exist (or belongs to another textbook).
-const contentMissing = '목차를 찾을 수 없습니다';
+const contentMissing = 'Contents entry not found';
 
 type Notice = { kind: 'status' | 'alert'; text: string; contentId: number } | undefined;
 
@@ -212,13 +212,13 @@ export function Exercises({
     void run(async () => {
       if (open.id === undefined) {
         await requestJson(url, { method: 'POST', body: open.form });
-        say('status', '추가했습니다');
+        say('status', 'Added');
         // Stays open, empty, for typing the next exercise.
         setEditor({ ...open, form: emptyExerciseForm() });
         setWantFocus('exercise-body');
       } else {
         await requestJson(`/api/exercises/${open.id}`, { method: 'PUT', body: open.form });
-        say('status', '수정했습니다');
+        say('status', 'Updated');
         setEditor(undefined);
       }
     }, open.id);
@@ -239,7 +239,7 @@ export function Exercises({
       } finally {
         setDeleting(undefined);
       }
-      say('status', '삭제했습니다');
+      say('status', 'Deleted');
       setWantFocus('exercise-heading');
       if (open?.id === exercise.id) setEditor(undefined);
     }, exercise.id);
@@ -253,7 +253,7 @@ export function Exercises({
         method: 'PATCH',
         body: { important },
       });
-      say('status', important ? '중요 문제로 표시했습니다' : '중요 표시를 해제했습니다');
+      say('status', important ? 'Marked as important' : 'Removed the important mark');
       setEditor(
         (current) =>
           current &&
@@ -294,16 +294,16 @@ export function Exercises({
           body: { body: draft },
         });
         body = data.answer.body;
-        say('status', '정답을 저장했습니다');
+        say('status', 'Saved the answer');
       } else if (panel.body) {
         try {
           await requestJson(path, { method: 'DELETE' });
         } catch (failure) {
           // Already deleted elsewhere: the answer is gone as asked. A missing exercise still fails.
-          if ((failure as RequestError).message !== '정답을 찾을 수 없습니다') throw failure;
+          if ((failure as RequestError).message !== 'Answer not found') throw failure;
         }
         body = null;
-        say('status', '정답을 지웠습니다');
+        say('status', 'Cleared the answer');
       } else {
         body = null;
       }
@@ -321,9 +321,9 @@ export function Exercises({
       const clipboard = globalThis.navigator?.clipboard;
       if (!clipboard) throw new Error('no clipboard');
       await clipboard.writeText(questionText(textbook, path, exercise));
-      say('status', `${label} 질문을 복사했습니다`);
+      say('status', `Copied the question for ${label}`);
     } catch {
-      say('alert', '클립보드에 복사하지 못했습니다. 문제 본문을 직접 선택해 복사하세요');
+      say('alert', 'Could not copy to the clipboard. Select and copy the problem text yourself');
     }
   };
 
@@ -347,7 +347,7 @@ export function Exercises({
     <div className="exercises">
       <div className="contents-head">
         <h3 id="exercise-heading" tabIndex={-1}>
-          연습문제
+          Exercises
         </h3>
         <button
           type="button"
@@ -355,20 +355,20 @@ export function Exercises({
           disabled={busy || exercises === undefined}
           onClick={startAdd}
         >
-          문제 추가
+          Add problem
         </button>
       </div>
       {treeFailed ? (
-        <p className="status">목차를 불러오지 못해 단원을 고를 수 없습니다</p>
+        <p className="status">Could not load the contents, so a section cannot be chosen</p>
       ) : tree === undefined ? (
-        <Loading label="목차를 불러오는 중" kind="text" />
+        <Loading label="Loading the contents" kind="text" />
       ) : options.length === 0 ? (
-        <p className="status">목차를 먼저 추가하면 장·절별로 문제를 입력할 수 있습니다</p>
+        <p className="status">Add contents first to enter problems by chapter and section</p>
       ) : (
         <>
           <div className="log-form exercise-picker">
             <label className="wide">
-              단원
+              Section
               <select disabled={busy} value={contentId} onChange={pick}>
                 {options.map((option) => (
                   <option key={option.id} value={option.id}>
@@ -381,13 +381,13 @@ export function Exercises({
           {open && (
             <form key={open.id ?? 'new'} className="log-form exercise-form" onSubmit={save}>
               <p className="wide content-form-heading">
-                {open.id === undefined ? '문제 추가' : '문제 수정'}
+                {open.id === undefined ? 'Add problem' : 'Edit problem'}
               </p>
               <label>
-                문제 번호
+                Problem number
                 <input
                   maxLength={exerciseLimits.number}
-                  placeholder="예: 3"
+                  placeholder="e.g. 3"
                   disabled={busy}
                   value={open.form.number}
                   onChange={change('number')}
@@ -400,10 +400,10 @@ export function Exercises({
                   checked={open.form.important}
                   onChange={toggleImportant}
                 />
-                중요 문제로 표시
+                Mark as important
               </label>
               <label className="wide">
-                문제 본문
+                Problem text
                 <textarea
                   id="exercise-body"
                   required
@@ -417,7 +417,7 @@ export function Exercises({
               <div className="actions wide">
                 <button type="submit" className="primary" disabled={busy}>
                   <ButtonSpinner when={action === 'save'} />
-                  {open.id === undefined ? '추가' : '수정 저장'}
+                  {open.id === undefined ? 'Add' : 'Save changes'}
                 </button>
                 <button
                   type="button"
@@ -425,7 +425,7 @@ export function Exercises({
                   disabled={busy}
                   onClick={() => setEditor(undefined)}
                 >
-                  {open.id === undefined ? '닫기' : '취소'}
+                  {open.id === undefined ? 'Close' : 'Cancel'}
                 </button>
               </div>
             </form>
@@ -437,7 +437,7 @@ export function Exercises({
         {shown?.kind === 'status'
           ? shown.text
           : chapterGone
-            ? `선택한 단원이 다른 곳에서 삭제되었습니다. ${options.length ? '첫 단원을 보여 줍니다' : ''}`.trim()
+            ? `The selected section was deleted elsewhere. ${options.length ? 'Showing the first section' : ''}`.trim()
             : ''}
       </p>
       {shown?.kind === 'alert' && (
@@ -447,14 +447,14 @@ export function Exercises({
       )}
       {error && (
         <p role="alert" className="error">
-          연습문제를 불러오지 못했습니다: {error}
+          Could not load the exercises: {error}
         </p>
       )}
       {contentId !== undefined &&
         (exercises === undefined ? (
-          !error && <Loading label="연습문제를 불러오는 중" />
+          !error && <Loading label="Loading the exercises" />
         ) : exercises.length === 0 ? (
-          <p className="status">이 단원에 입력한 문제가 없습니다</p>
+          <p className="status">No problems entered for this section</p>
         ) : (
           <ul className="log-list exercise-list">
             {exercises.map((exercise, index) => {
@@ -463,7 +463,7 @@ export function Exercises({
                 <li key={exercise.id} className={open?.id === exercise.id ? 'editing' : ''}>
                   <div className="log-head">
                     <span className="log-date">{label}</span>
-                    {exercise.important && <span className="badge important">중요</span>}
+                    {exercise.important && <span className="badge important">Important</span>}
                   </div>
                   <p className="exercise-body">{exercise.body}</p>
                   {translationShown === exercise.id && (
@@ -474,7 +474,7 @@ export function Exercises({
                       {answerShown.draft !== undefined ? (
                         <form className="log-form answer-form" onSubmit={saveAnswer}>
                           <label className="wide">
-                            정답
+                            Answer
                             <textarea
                               id="answer-body"
                               // eslint-disable-next-line jsx-a11y-x/no-autofocus -- this field opens on a click, so focus follows that action.
@@ -486,11 +486,11 @@ export function Exercises({
                               onChange={changeAnswer}
                             />
                           </label>
-                          <p className="wide status">비워 두고 저장하면 정답을 지웁니다</p>
+                          <p className="wide status">Saving it empty clears the answer</p>
                           <div className="actions wide">
                             <button type="submit" className="primary" disabled={busy}>
                               <ButtonSpinner when={action === 'answer'} />
-                              정답 저장
+                              Save answer
                             </button>
                             <button
                               type="button"
@@ -500,21 +500,21 @@ export function Exercises({
                                 setAnswer((panel) => panel && { ...panel, draft: undefined })
                               }
                             >
-                              취소
+                              Cancel
                             </button>
                           </div>
                         </form>
                       ) : answerShown.error ? (
                         <p role="alert" className="error">
-                          정답을 불러오지 못했습니다: {answerShown.error}
+                          Could not load the answer: {answerShown.error}
                         </p>
                       ) : answerShown.body === undefined ? (
-                        <Loading label="정답을 불러오는 중" kind="text" />
+                        <Loading label="Loading the answer" kind="text" />
                       ) : (
                         <>
-                          <p className="answer-label">정답</p>
+                          <p className="answer-label">Answer</p>
                           {answerShown.body === null ? (
-                            <p className="status">입력한 정답이 없습니다</p>
+                            <p className="status">No answer entered</p>
                           ) : (
                             <p className="exercise-body">{answerShown.body}</p>
                           )}
@@ -522,12 +522,12 @@ export function Exercises({
                             type="button"
                             className="secondary"
                             disabled={busy}
-                            aria-label={`${label} 정답 ${answerShown.body === null ? '입력' : '수정'}`}
+                            aria-label={`${label} ${answerShown.body === null ? 'add answer' : 'edit answer'}`}
                             onClick={() =>
                               setAnswer((panel) => panel && { ...panel, draft: panel.body ?? '' })
                             }
                           >
-                            {answerShown.body === null ? '정답 입력' : '정답 수정'}
+                            {answerShown.body === null ? 'Add answer' : 'Edit answer'}
                           </button>
                         </>
                       )}
@@ -541,26 +541,26 @@ export function Exercises({
                           id={`exercise-delete-confirm-${exercise.id}`}
                           className="danger"
                           disabled={busy}
-                          aria-label={`${label} 삭제 확인`}
+                          aria-label={`${label} confirm deletion`}
                           onClick={() => {
                             nameNext('delete');
                             void remove(exercise);
                           }}
                         >
                           <ButtonSpinner when={action === 'delete'} />
-                          삭제 확인
+                          Confirm delete
                         </button>
                         <button
                           type="button"
                           className="secondary"
                           disabled={busy}
-                          aria-label={`${label} 삭제 취소`}
+                          aria-label={`${label} cancel deletion`}
                           onClick={() => {
                             setDeleting(undefined);
                             setWantFocus(`exercise-delete-${exercise.id}`);
                           }}
                         >
-                          취소
+                          Cancel
                         </button>
                       </>
                     ) : (
@@ -568,27 +568,27 @@ export function Exercises({
                         <button
                           type="button"
                           className="secondary"
-                          aria-label={`${label} 질문 복사`}
+                          aria-label={`${label} copy question`}
                           onClick={() => void copy(exercise, label)}
                         >
-                          질문 복사
+                          Copy question
                         </button>
                         <button
                           type="button"
                           className="secondary"
                           disabled={busy}
                           aria-expanded={answerShown?.id === exercise.id}
-                          aria-label={`${label} 정답 ${answerShown?.id === exercise.id ? '닫기' : '보기'}`}
+                          aria-label={`${label} ${answerShown?.id === exercise.id ? 'hide answer' : 'show answer'}`}
                           onClick={() => toggleAnswer(exercise)}
                         >
-                          {answerShown?.id === exercise.id ? '정답 닫기' : '정답 보기'}
+                          {answerShown?.id === exercise.id ? 'Hide answer' : 'Show answer'}
                         </button>
                         <button
                           type="button"
                           className="secondary"
                           disabled={busy}
                           aria-expanded={translationShown === exercise.id}
-                          aria-label={`${label} 번역 ${translationShown === exercise.id ? '닫기' : '보기'}`}
+                          aria-label={`${label} ${translationShown === exercise.id ? 'hide translation' : 'show translation'}`}
                           onClick={() =>
                             setTranslating(
                               translationShown === exercise.id
@@ -597,38 +597,40 @@ export function Exercises({
                             )
                           }
                         >
-                          {translationShown === exercise.id ? '번역 닫기' : '번역 보기'}
+                          {translationShown === exercise.id
+                            ? 'Hide translation'
+                            : 'Show translation'}
                         </button>
                         <button
                           type="button"
                           className="secondary"
                           disabled={busy}
-                          aria-label={`${label} ${exercise.important ? '중요 해제' : '중요 표시'}`}
+                          aria-label={`${label} ${exercise.important ? 'unmark important' : 'mark important'}`}
                           onClick={() => void markImportant(exercise)}
                         >
-                          {exercise.important ? '중요 해제' : '중요 표시'}
+                          {exercise.important ? 'Unmark important' : 'Mark important'}
                         </button>
                         <button
                           type="button"
                           className="secondary"
                           disabled={busy}
-                          aria-label={`${label} 수정`}
+                          aria-label={`${label} edit`}
                           onClick={() => startEdit(exercise)}
                         >
-                          수정
+                          Edit
                         </button>
                         <button
                           type="button"
                           className="secondary"
                           disabled={busy}
                           id={`exercise-delete-${exercise.id}`}
-                          aria-label={`${label} 삭제`}
+                          aria-label={`${label} delete`}
                           onClick={() => {
                             setDeleting({ contentId: exercise.contentId, id: exercise.id });
                             setWantFocus(`exercise-delete-confirm-${exercise.id}`);
                           }}
                         >
-                          삭제
+                          Delete
                         </button>
                       </>
                     )}

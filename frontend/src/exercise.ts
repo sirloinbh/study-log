@@ -38,9 +38,9 @@ export function contentPath(nodes: ContentNode[], id: number): ContentNode[] | u
   return undefined;
 }
 
-// "문제 3", or its place in the list when it has no number.
+// "Problem 3", or its place in the list when it has no number.
 export const exerciseLabel = (exercise: { number: string }, index: number) =>
-  exercise.number.trim() ? `문제 ${exercise.number.trim()}` : `${index + 1}번째 문제`;
+  exercise.number.trim() ? `Problem ${exercise.number.trim()}` : `Problem #${index + 1}`;
 
 // The text copied for asking an AI: where the problem comes from, the problem as typed, and the
 // request. Blank lines around the body are dropped; its line breaks and indentation are kept.
@@ -51,16 +51,16 @@ export function questionText(
 ) {
   const meta = textbookMeta(book);
   const lines = [
-    `교재: ${book.title}${meta ? ` (${meta})` : ''}`,
-    `단원: ${path.map(contentLabel).join(' > ')}`,
+    `Textbook: ${book.title}${meta ? ` (${meta})` : ''}`,
+    `Section: ${path.map(contentLabel).join(' > ')}`,
   ];
-  if (exercise.number.trim()) lines.push(`문제 번호: ${exercise.number.trim()}`);
+  if (exercise.number.trim()) lines.push(`Problem number: ${exercise.number.trim()}`);
   const body = exercise.body.replace(/^(?:[ \t]*\r?\n)+/, '').trimEnd();
   return [
     ...lines,
     '',
     body,
     '',
-    '이 연습문제의 풀이를 단계별로 설명해 주세요. 필요한 개념도 함께 알려 주세요.',
+    'Please explain how to solve this exercise step by step, and mention the concepts it needs.',
   ].join('\n');
 }

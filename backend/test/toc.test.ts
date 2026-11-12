@@ -130,12 +130,14 @@ uiTest('problems that block saving, and the preview tree', () => {
   const { parseToc, tocProblems, tocTree } = toc();
   assert.deepEqual(tocProblems(parseToc('1 벡터\n1.1 내적')), []);
   assert.deepEqual(tocProblems(parseToc(`1 벡터\n2 ${'가'.repeat(201)}`)), [
-    '2번째 줄: 제목이 200자를 넘습니다',
+    'Line 2: the title is over 200 characters',
   ]);
   const deep = Array.from({ length: 11 }, (_, i) => ' '.repeat(i * 2) + `단계 ${i + 1}`).join('\n');
-  assert.deepEqual(tocProblems(parseToc(deep)), ['11번째 줄: 목차는 10단계까지입니다']);
+  assert.deepEqual(tocProblems(parseToc(deep)), ['Line 11: contents can have at most 10 levels']);
   const many = Array.from({ length: 501 }, (_, i) => `${i + 1} 항목`).join('\n');
-  assert.deepEqual(tocProblems(parseToc(many)), ['목차는 한 번에 500개까지 등록할 수 있습니다']);
+  assert.deepEqual(tocProblems(parseToc(many)), [
+    'At most 500 contents entries can be added at once',
+  ]);
 
   const tree = tocTree(parseToc('1 벡터\n1.1 내적\n1.2 외적\n2 행렬'));
   assert.deepEqual(

@@ -9,59 +9,59 @@ import { missingOrInvalid } from './validation.js';
 const pathId = (label: string) =>
   z
     .string()
-    .regex(/^[1-9]\d{0,14}$/, `${label} ID가 올바르지 않습니다`)
+    .regex(/^[1-9]\d{0,14}$/, `Invalid ${label} ID`)
     .transform(Number);
-const textbookIdParam = pathId('교재');
-const contentIdParam = pathId('목차');
-const exerciseIdParam = pathId('연습문제');
+const textbookIdParam = pathId('textbook');
+const contentIdParam = pathId('contents entry');
+const exerciseIdParam = pathId('exercise');
 
 // The body keeps its line breaks and indentation as typed, so it is not trimmed; it only has to
 // contain something other than whitespace.
 const exerciseInput = z.object(
   {
     number: z
-      .string({ error: '문제 번호 형식이 올바르지 않습니다' })
+      .string({ error: 'The problem number format is invalid' })
       .trim()
-      .refine((value) => value.length <= 20, '문제 번호 길이는 20자 이하여야 합니다')
+      .refine((value) => value.length <= 20, 'The problem number must be at most 20 characters')
       .default(''),
     body: z
-      .string(missingOrInvalid('문제 본문을 입력하세요', '문제 본문 형식이 올바르지 않습니다'))
-      .refine((body) => body.trim().length > 0, '문제 본문을 입력하세요')
-      .refine((body) => body.length <= 20000, '문제 본문은 20000자 이하로 입력하세요'),
-    important: z.boolean({ error: '중요 표시 형식이 올바르지 않습니다' }).default(false),
+      .string(missingOrInvalid('Enter the problem text', 'The problem text format is invalid'))
+      .refine((body) => body.trim().length > 0, 'Enter the problem text')
+      .refine((body) => body.length <= 20000, 'The problem text must be at most 20000 characters'),
+    important: z.boolean({ error: 'The important flag format is invalid' }).default(false),
   },
-  { error: '연습문제 내용을 JSON 객체로 보내세요' },
+  { error: 'Send the exercise as a JSON object' },
 );
 
 // The answer body follows the exercise body: line breaks kept, not trimmed.
 const answerInput = z.object(
   {
     body: z
-      .string(missingOrInvalid('정답을 입력하세요', '정답 형식이 올바르지 않습니다'))
-      .refine((body) => body.trim().length > 0, '정답을 입력하세요')
-      .refine((body) => body.length <= 20000, '정답은 20000자 이하로 입력하세요'),
+      .string(missingOrInvalid('Enter the answer', 'The answer format is invalid'))
+      .refine((body) => body.trim().length > 0, 'Enter the answer')
+      .refine((body) => body.length <= 20000, 'The answer must be at most 20000 characters'),
   },
-  { error: '정답 내용을 JSON 객체로 보내세요' },
+  { error: 'Send the answer as a JSON object' },
 );
 
 const importantInput = z.object(
   {
     important: z.boolean(
-      missingOrInvalid('중요 표시 여부를 보내세요', '중요 표시 형식이 올바르지 않습니다'),
+      missingOrInvalid('Send the important flag', 'The important flag format is invalid'),
     ),
   },
-  { error: '중요 표시 여부를 JSON 객체로 보내세요' },
+  { error: 'Send the important flag as a JSON object' },
 );
 
 // Filters for a textbook's exercises: one chapter (with its sections) and the important mark.
 const textbookListQuery = z.object({
   contentId: z
-    .string({ error: '목차 ID가 올바르지 않습니다' })
-    .regex(/^[1-9]\d{0,14}$/, '목차 ID가 올바르지 않습니다')
+    .string({ error: 'Invalid contents entry ID' })
+    .regex(/^[1-9]\d{0,14}$/, 'Invalid contents entry ID')
     .transform(Number)
     .optional(),
   important: z
-    .enum(['true', 'false'], { error: '중요 표시 조건이 올바르지 않습니다' })
+    .enum(['true', 'false'], { error: 'The important filter is invalid' })
     .transform((value) => value === 'true')
     .optional(),
 });
@@ -69,9 +69,9 @@ const textbookListQuery = z.object({
 const columns = `id, textbook_id AS "textbookId", content_id AS "contentId",
   number, body, important`;
 
-const contentNotFound = { error: '목차를 찾을 수 없습니다' };
-const notFound = { error: '연습문제를 찾을 수 없습니다' };
-const answerNotFound = { error: '정답을 찾을 수 없습니다' };
+const contentNotFound = { error: 'Contents entry not found' };
+const notFound = { error: 'Exercise not found' };
+const answerNotFound = { error: 'Answer not found' };
 
 // Listing and adding the exercises of one chapter: /api/textbooks/:textbookId/contents/:contentId/exercises
 export function contentExerciseRoutes(pool: Pool) {
@@ -129,7 +129,7 @@ export function textbookExerciseRoutes(pool: Pool) {
       [textbookId, contentId ?? null],
     );
     const { textbook, content } = found.rows[0] as { textbook: boolean; content: boolean };
-    if (!textbook) return void res.status(404).json({ error: '교재를 찾을 수 없습니다' });
+    if (!textbook) return void res.status(404).json({ error: 'Textbook not found' });
     if (contentId !== undefined && !content) return void res.status(404).json(contentNotFound);
     // Walks the tree from the top-level chapters, or from the one chapter asked for, keeping the
     // sibling positions on the way down so the rows come out in contents order.
@@ -257,10 +257,10 @@ export function exerciseRoutes(pool: Pool, translator: Translator) {
     // Only a JSON request, which another site's page cannot send without a CORS preflight this
     // server never allows: translating costs money, so a form or a no-cors fetch must not start it.
     if (!req.is('application/json'))
-      return void res.status(415).json({ error: '번역 요청은 JSON으로 보내세요' });
+      return void res.status(415).json({ error: 'Send the translation request as JSON' });
     const id = exerciseIdParam.parse(req.params.id);
     if (translating.has(id))
-      return void res.status(409).json({ error: '이 문제는 이미 번역하는 중입니다' });
+      return void res.status(409).json({ error: 'This problem is already being translated' });
     translating.add(id);
     try {
       await translate(id, res);

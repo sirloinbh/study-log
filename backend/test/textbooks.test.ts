@@ -13,13 +13,13 @@ const untouchedPool = {
 } as unknown as Pool;
 const emptyPool = { query: async () => ({ rows: [], rowCount: 0 }) } as unknown as Pool;
 
-test('invalid textbooks are rejected with Korean messages before touching the DB', async () => {
+test('invalid textbooks are rejected with English messages before touching the DB', async () => {
   const cases: [Record<string, unknown>, RegExp][] = [
-    [{ author: 'Strang' }, /제목을 입력하세요/],
-    [{ title: '   ' }, /제목을 입력하세요/],
-    [{ title: 'a'.repeat(201) }, /제목 길이는 200자 이하/],
-    [{ title: 'Linear Algebra', author: 7 }, /저자 형식이 올바르지 않습니다/],
-    [{ title: 'Linear Algebra', edition: 'x'.repeat(51) }, /판본 길이는 50자 이하/],
+    [{ author: 'Strang' }, /Enter the title/],
+    [{ title: '   ' }, /Enter the title/],
+    [{ title: 'a'.repeat(201) }, /title must be at most 200 characters/],
+    [{ title: 'Linear Algebra', author: 7 }, /author format is invalid/],
+    [{ title: 'Linear Algebra', edition: 'x'.repeat(51) }, /edition must be at most 50 characters/],
   ];
   await withApi(untouchedPool, async (call) => {
     for (const [body, message] of cases) {
@@ -35,7 +35,7 @@ test('invalid textbooks are rejected with Korean messages before touching the DB
   });
 });
 
-test('textbook bodies that are not a JSON object are rejected in Korean before touching the DB', async () => {
+test('textbook bodies that are not a JSON object are rejected in English before touching the DB', async () => {
   await withApi(untouchedPool, async (call) => {
     for (const init of [
       { method: 'POST' },
@@ -45,11 +45,11 @@ test('textbook bodies that are not a JSON object are rejected in Korean before t
       const path = init.method === 'PUT' ? '/api/textbooks/1' : '/api/textbooks';
       const { status, data } = await call(path, init);
       assert.equal(status, 400, JSON.stringify(init));
-      assert.equal(data.error, '교재 내용을 JSON 객체로 보내세요');
+      assert.equal(data.error, 'Send the textbook as a JSON object');
     }
     const malformed = await call('/api/textbooks', { method: 'POST', rawBody: '{"title":' });
     assert.equal(malformed.status, 400);
-    assert.equal(malformed.data.error, '요청 본문의 JSON 형식이 올바르지 않습니다');
+    assert.equal(malformed.data.error, 'Request body is not valid JSON');
   });
 });
 
@@ -63,24 +63,24 @@ test('textbook ids that are not plain positive integers are rejected before touc
       ]) {
         const { status, data } = await call(`/api/textbooks/${id}`, init);
         assert.equal(status, 400, `${id} ${JSON.stringify(init)}`);
-        assert.match(String(data.error), /교재 ID가 올바르지 않습니다/);
+        assert.match(String(data.error), /Invalid textbook ID/);
       }
     }
   });
 });
 
-test('missing textbooks answer a Korean 404 for read, update and delete', async () => {
+test('missing textbooks answer an English 404 for read, update and delete', async () => {
   await withApi(emptyPool, async (call) => {
     for (const init of [{}, { method: 'PUT', body: { title: '미적분학' } }, { method: 'DELETE' }]) {
       const { status, data } = await call('/api/textbooks/999', init);
       assert.equal(status, 404);
-      assert.equal(data.error, '교재를 찾을 수 없습니다');
+      assert.equal(data.error, 'Textbook not found');
     }
   });
 });
 
 // #58: PostgreSQL refuses a NUL character in text as an invalid byte sequence (22021).
-test('a NUL character in the input is a Korean 400, not a logged server error', async () => {
+test('a NUL character in the input is an English 400, not a logged server error', async () => {
   const nulPool = {
     query: async () => {
       throw Object.assign(new Error('invalid byte sequence for encoding "UTF8": 0x00'), {
@@ -107,7 +107,7 @@ test('a NUL character in the input is a Korean 400, not a logged server error', 
         body: { title: 'a\u0000b' },
       });
       assert.equal(status, 400);
-      assert.equal(data.error, '입력에 사용할 수 없는 문자(NUL)가 있습니다');
+      assert.equal(data.error, 'Input contains a character that is not allowed (NUL)');
     });
   } finally {
     console.error = original;

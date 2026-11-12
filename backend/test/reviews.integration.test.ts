@@ -186,7 +186,7 @@ test('saving a study log keeps its first review in step', { skip: !url }, async 
         body: { ...body('done'), textbookId: 999_999_999_999_999 },
       });
       assert.equal(failed.status, 400);
-      assert.equal(failed.data.error, '교재를 찾을 수 없습니다');
+      assert.equal(failed.data.error, 'Textbook not found');
       assert.deepEqual(await rounds(id), []);
       const kept = await call(`/api/study-logs/${id}`);
       assert.equal((kept.data.studyLog as { status: string }).status, 'planned');

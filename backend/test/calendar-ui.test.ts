@@ -23,7 +23,7 @@ const log = (id: number, studyDate: string, minutes: number, status = 'done'): L
   startTime: '09:00',
   endTime: '10:00',
   durationMinutes: minutes,
-  memo: `메모 ${id}`,
+  memo: `Memo ${id}`,
   status,
 });
 
@@ -47,7 +47,7 @@ function fakeApi(
     if (month) {
       calendar.push(path);
       if (options.failCalendar || options.failMonths?.includes(month[1]))
-        return reply(500, { error: '서버 오류가 발생했습니다' });
+        return reply(500, { error: 'Server error' });
       const [year, number] = month[1].split('-').map(Number);
       const last = new Date(Date.UTC(year, number, 0)).getUTCDate();
       const days = Array.from({ length: last }, (_, i) => {
@@ -66,8 +66,7 @@ function fakeApi(
     const day = path.match(/^\/api\/study-logs\?date=(.+)$/);
     if (day) {
       calendar.push(path);
-      if (options.failDays?.includes(day[1]))
-        return reply(500, { error: '서버 오류가 발생했습니다' });
+      if (options.failDays?.includes(day[1])) return reply(500, { error: 'Server error' });
       return reply(200, { studyLogs: logs.filter((l) => l.studyDate === day[1]) });
     }
     if (path.startsWith('/api/study-logs?limit=')) return reply(200, { studyLogs: logs });
@@ -90,7 +89,7 @@ const logs = [
 ];
 
 type Ui = ReturnType<typeof mount>;
-const card = (ui: Ui) => ui.find((n) => n.props['aria-label'] === '학습 캘린더')[0];
+const card = (ui: Ui) => ui.find((n) => n.props['aria-label'] === 'Study calendar')[0];
 const dayButton = (ui: Ui, date: string) =>
   ui.find(
     (n) =>
@@ -109,7 +108,7 @@ async function open(api: ReturnType<typeof fakeApi>) {
 uiTest('the calendar shows this month from Sunday with each day’s study time', async () => {
   const api = fakeApi(logs);
   const ui = await open(api);
-  assert.match(ui.text(card(ui)), /2026년 10월/);
+  assert.match(ui.text(card(ui)), /October 2026/);
   // 2026-10-01 is a Thursday: four empty slots (Sun to Wed) before it (#96).
   const grid = ui.find((n) => n.props.className === 'calendar-grid', card(ui))[0];
   const slots = (grid.props.children as unknown[])
@@ -118,18 +117,21 @@ uiTest('the calendar shows this month from Sunday with each day’s study time',
     .map((n) => n.type);
   // Seven weekday names (Sunday first), then four empty slots, then the 1st.
   assert.deepEqual(slots.slice(7, 12), ['span', 'span', 'span', 'span', 'button']);
-  assert.equal(dayButton(ui, '2026-10-01').props['aria-label'], '2026-10-01, 학습 45분, 기록 1개');
+  assert.equal(
+    dayButton(ui, '2026-10-01').props['aria-label'],
+    '2026-10-01, studied 45 min, 1 log',
+  );
   // The planned log counts as a log but not as time.
   const todayButton = dayButton(ui, today);
-  assert.equal(todayButton.props['aria-label'], '2026-10-22, 학습 1시간 30분, 기록 2개');
-  assert.match(ui.text(todayButton), /1\.5시간/);
+  assert.equal(todayButton.props['aria-label'], '2026-10-22, studied 1 h 30 min, 2 logs');
+  assert.match(ui.text(todayButton), /1\.5 h/);
   assert.match(String(todayButton.props.className), /today/);
   assert.equal(todayButton.props['aria-pressed'], true);
-  assert.equal(dayButton(ui, '2026-10-02').props['aria-label'], '2026-10-02, 학습 없음, 기록 0개');
+  assert.equal(dayButton(ui, '2026-10-02').props['aria-label'], '2026-10-02, no study, 0 logs');
   // Today's logs are listed under the calendar.
-  assert.match(ui.text(card(ui)), /2026-10-22 일지/);
-  assert.match(ui.text(card(ui)), /메모 2/);
-  assert.match(ui.text(card(ui)), /메모 3/);
+  assert.match(ui.text(card(ui)), /Logs for 2026-10-22/);
+  assert.match(ui.text(card(ui)), /Memo 2/);
+  assert.match(ui.text(card(ui)), /Memo 3/);
 });
 
 uiTest('picking a day lists its logs; a day without any says so', async () => {
@@ -138,24 +140,24 @@ uiTest('picking a day lists its logs; a day without any says so', async () => {
   await ui.click('1', dayButton(ui, '2026-10-01'));
   assert.equal(dayButton(ui, '2026-10-01').props['aria-pressed'], true);
   assert.equal(api.calendar.at(-1), '/api/study-logs?date=2026-10-01');
-  assert.match(ui.text(card(ui)), /2026-10-01 일지/);
-  assert.match(ui.text(card(ui)), /메모 1/);
+  assert.match(ui.text(card(ui)), /Logs for 2026-10-01/);
+  assert.match(ui.text(card(ui)), /Memo 1/);
   await ui.click('2', dayButton(ui, '2026-10-02'));
-  assert.match(ui.text(card(ui)), /이 날짜의 기록이 없습니다/);
+  assert.match(ui.text(card(ui)), /No logs on this date/);
 });
 
 uiTest('months move back and forth and 이번 달 returns to today', async () => {
   const api = fakeApi(logs);
   const ui = await open(api);
-  await ui.click('이전', card(ui));
-  assert.match(ui.text(card(ui)), /2026년 9월/);
+  await ui.click('Previous', card(ui));
+  assert.match(ui.text(card(ui)), /September 2026/);
   assert.equal(api.calendar.at(-1), '/api/study-logs/calendar?month=2026-09');
-  assert.equal(dayButton(ui, '2026-09-30').props['aria-label'], '2026-09-30, 학습 2시간, 기록 1개');
-  await ui.click('다음', card(ui));
-  await ui.click('다음', card(ui));
-  assert.match(ui.text(card(ui)), /2026년 11월/);
-  await ui.click('이번 달', card(ui));
-  assert.match(ui.text(card(ui)), /2026년 10월/);
+  assert.equal(dayButton(ui, '2026-09-30').props['aria-label'], '2026-09-30, studied 2 h, 1 log');
+  await ui.click('Next', card(ui));
+  await ui.click('Next', card(ui));
+  assert.match(ui.text(card(ui)), /November 2026/);
+  await ui.click('This month', card(ui));
+  assert.match(ui.text(card(ui)), /October 2026/);
   assert.equal(dayButton(ui, today).props['aria-pressed'], true);
 });
 
@@ -163,19 +165,19 @@ uiTest('saving a log on the page reloads the calendar', async () => {
   const api = fakeApi(logs);
   const ui = await open(api);
   const before = api.calendar.length;
-  await ui.fill('시작', '13:00');
-  await ui.fill('종료', '14:00');
+  await ui.fill('Start', '13:00');
+  await ui.fill('End', '14:00');
   await ui.submit();
   assert.deepEqual(api.calendar.slice(before), [
     '/api/study-logs/calendar?month=2026-10',
     '/api/study-logs?date=2026-10-22',
   ]);
-  assert.equal(dayButton(ui, today).props['aria-label'], '2026-10-22, 학습 2시간 30분, 기록 3개');
+  assert.equal(dayButton(ui, today).props['aria-label'], '2026-10-22, studied 2 h 30 min, 3 logs');
 });
 
 uiTest('a failed calendar load is reported', async () => {
   const ui = await open(fakeApi(logs, { failCalendar: true }));
-  assert.match(ui.text(card(ui)), /캘린더를 불러오지 못했습니다: 서버 오류가 발생했습니다/);
+  assert.match(ui.text(card(ui)), /Could not load the calendar: Server error/);
 });
 
 uiTest('calendar helpers: months, Sunday-first slots and short amounts', () => {
@@ -187,7 +189,7 @@ uiTest('calendar helpers: months, Sunday-first slots and short amounts', () => {
   }>('month-calendar.ts');
   assert.equal(calendar.shiftMonth('2026-01', -1), '2025-12');
   assert.equal(calendar.shiftMonth('2026-12', 1), '2027-01');
-  assert.equal(calendar.monthTitle('2026-03'), '2026년 3월');
+  assert.equal(calendar.monthTitle('2026-03'), 'March 2026');
   // Sunday first (#96): 2026-03-01 is a Sunday (no empty slot); 2026-06-01 a Monday (one).
   assert.equal(calendar.calendarCells([{ date: '2026-03-01' }])[0] !== null, true);
   assert.equal(
@@ -201,10 +203,10 @@ uiTest('calendar helpers: months, Sunday-first slots and short amounts', () => {
   );
   assert.deepEqual([0, 45, 60, 90, 125].map(calendar.shortMinutes), [
     '',
-    '45분',
-    '1시간',
-    '1.5시간',
-    '2.1시간',
+    '45 min',
+    '1 h',
+    '1.5 h',
+    '2.1 h',
   ]);
 });
 
@@ -213,18 +215,18 @@ uiTest('a failed day and a failed month are reported apart and never hide each o
   const ui = await open(api);
   // Only the day failed: the month stays, the logs area says so instead of loading forever.
   await ui.click('2', dayButton(ui, '2026-10-02'));
-  assert.match(ui.text(card(ui)), /일지를 불러오지 못했습니다: 서버 오류가 발생했습니다/);
-  assert.doesNotMatch(ui.text(card(ui)), /캘린더를 불러오지 못했습니다/);
+  assert.match(ui.text(card(ui)), /Could not load the logs: Server error/);
+  assert.doesNotMatch(ui.text(card(ui)), /Could not load the calendar/);
   assert.ok(dayButton(ui, '2026-10-01'), 'the month is still shown');
   // Another day loads fine: its logs show and the day error is gone.
   await ui.click('1', dayButton(ui, '2026-10-01'));
-  assert.doesNotMatch(ui.text(card(ui)), /일지를 불러오지 못했습니다/);
-  assert.match(ui.text(card(ui)), /메모 1/);
+  assert.doesNotMatch(ui.text(card(ui)), /Could not load the logs/);
+  assert.match(ui.text(card(ui)), /Memo 1/);
   // A failed month is reported as the calendar; its day logs below are unaffected.
-  await ui.click('이전', card(ui));
-  assert.match(ui.text(card(ui)), /캘린더를 불러오지 못했습니다/);
-  assert.match(ui.text(card(ui)), /메모 1/);
+  await ui.click('Previous', card(ui));
+  assert.match(ui.text(card(ui)), /Could not load the calendar/);
+  assert.match(ui.text(card(ui)), /Memo 1/);
   // Back to a month that loads: the month error is not shown there.
-  await ui.click('다음', card(ui));
-  assert.doesNotMatch(ui.text(card(ui)), /캘린더를 불러오지 못했습니다/);
+  await ui.click('Next', card(ui));
+  assert.doesNotMatch(ui.text(card(ui)), /Could not load the calendar/);
 });

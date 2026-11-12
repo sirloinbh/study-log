@@ -184,7 +184,7 @@ test(
         assert.equal(((await call('/api/stats/study-time')).data as { type: string }).type, 'all');
         const refused = await call('/api/stats/study-time?type=exam');
         assert.equal(refused.status, 400);
-        assert.match(String(refused.data.error), /학습 유형은 전체, 신규, 복습 중에서 고르세요/);
+        assert.match(String(refused.data.error), /The study type must be all, new, or review/);
 
         // Without a period it is this week; an empty one is refused like any unknown one.
         assert.equal(((await call('/api/stats/study-time')).data as Stats).period, 'week');
@@ -275,11 +275,11 @@ test('study time can be narrowed to one textbook', { skip: !url }, async (t) => 
 
       const missing = await call('/api/stats/study-time?textbookId=999999999999');
       assert.equal(missing.status, 404);
-      assert.match(String(missing.data.error), /교재를 찾을 수 없습니다/);
+      assert.match(String(missing.data.error), /Textbook not found/);
       for (const wrong of ['0', 'abc', '1.5', '']) {
         const refused = await call(`/api/stats/study-time?textbookId=${wrong}`);
         assert.equal(refused.status, 400, wrong);
-        assert.match(String(refused.data.error), /교재 ID가 올바르지 않습니다/);
+        assert.match(String(refused.data.error), /Invalid textbook ID/);
       }
     },
     { today: () => today },

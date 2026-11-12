@@ -77,10 +77,10 @@ test(
         body: { ...session, startTime: '13:00', endTime: '14:00' },
       });
 
-      // Missing textbooks and chapters of another textbook are refused in Korean.
+      // Missing textbooks and chapters of another textbook are refused in English.
       for (const [body, message] of [
-        [{ ...session, textbookId: 999_999_999 }, '교재를 찾을 수 없습니다'],
-        [{ ...session, textbookId: linear, contentId: otherChapter }, '목차를 찾을 수 없습니다'],
+        [{ ...session, textbookId: 999_999_999 }, 'Textbook not found'],
+        [{ ...session, textbookId: linear, contentId: otherChapter }, 'Contents entry not found'],
       ] as const) {
         const refused = await call('/api/study-logs', { method: 'POST', body });
         assert.equal(refused.status, 400);
@@ -115,11 +115,17 @@ test(
       // What a log points to cannot be deleted: the textbook, the section or its chapter.
       const blockedBook = await call(`/api/textbooks/${linear}`, { method: 'DELETE' });
       assert.equal(blockedBook.status, 409);
-      assert.equal(blockedBook.data.error, '학습 기록이나 일정이 연결된 교재는 삭제할 수 없습니다');
+      assert.equal(
+        blockedBook.data.error,
+        'A textbook with a study log or schedule attached cannot be deleted',
+      );
       for (const id of [section, chapter]) {
         const blocked = await call(`/api/textbooks/${linear}/contents/${id}`, { method: 'DELETE' });
         assert.equal(blocked.status, 409, `content ${id}`);
-        assert.equal(blocked.data.error, '학습 기록이나 일정이 연결된 목차는 삭제할 수 없습니다');
+        assert.equal(
+          blocked.data.error,
+          'A contents entry with a study log or schedule attached cannot be deleted',
+        );
       }
       const stillThere = (await call(`/api/textbooks/${linear}/contents`)).data.contents as {
         children: unknown[];

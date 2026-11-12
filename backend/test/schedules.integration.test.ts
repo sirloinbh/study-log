@@ -152,7 +152,7 @@ test(
           // Saturday and Sunday only, with nothing for those.
           const weekend = await create(body('8034-03-04', '8034-03-05', 120, 0));
           assert.equal(weekend.status, 400);
-          assert.match(String(weekend.data.error), /목표 시간이 있는 날이 없습니다/);
+          assert.match(String(weekend.data.error), /has a target time/);
           // A holiday is not a weekday: 8034-03-01 is a Wednesday.
           const holiday = await create(body('8034-03-01', '8034-03-01', 120, 0));
           assert.equal(holiday.status, 400);
@@ -176,23 +176,23 @@ test(
           asked.length = 0;
           const later = await create(body('8035-12-31', '8036-01-01'));
           assert.equal(later.status, 400);
-          assert.match(String(later.data.error), /내년 말까지/);
+          assert.match(String(later.data.error), /end of next year/);
           assert.deepEqual(asked, []);
         });
 
         await t.test('holidays that cannot be read refuse with their own message', async () => {
           today = '8036-01-01';
           answer = async () => {
-            throw new HolidayError('공휴일 정보를 읽지 못했습니다. 잠시 뒤 다시 시도하세요');
+            throw new HolidayError('Could not read the holiday data. Try again in a moment');
           };
           const failed = await create(body('8036-03-03', '8036-03-04'));
           assert.equal(failed.status, 503);
-          assert.match(String(failed.data.error), /공휴일 정보를 읽지 못했습니다/);
+          assert.match(String(failed.data.error), /Could not read the holiday data/);
           // A year not published yet.
           answer = async () => [];
           const empty = await create(body('8036-03-03', '8036-03-04'));
           assert.equal(empty.status, 503);
-          assert.match(String(empty.data.error), /8036년 공휴일 정보가 없어/);
+          assert.match(String(empty.data.error), /No holiday data for 8036/);
           assert.equal(await rowsOf('schedules', 'start_date = $1', '8036-03-03'), 0);
           // The second year missing refuses the whole schedule too.
           answer = async (year) =>
@@ -251,7 +251,7 @@ test(
           ] as const) {
             const missing = await call(`/api/schedules/${firstId}`, { method, body: requestBody });
             assert.equal(missing.status, 404, method);
-            assert.match(String(missing.data.error), /일정을 찾을 수 없습니다/);
+            assert.match(String(missing.data.error), /Schedule not found/);
           }
         });
       },

@@ -61,21 +61,21 @@ export async function syncFirstReview(
 // Same rule as the other ids: plain positive integers that stay exact in JS and fit bigint.
 const idParam = z
   .string()
-  .regex(/^[1-9]\d{0,14}$/, '복습 ID가 올바르지 않습니다')
+  .regex(/^[1-9]\d{0,14}$/, 'Invalid review ID')
   .transform(Number);
 
 const dueDateInput = z.object(
   {
     dueDate: calendarDate(
-      z.string(missingOrInvalid('예정일을 입력하세요', '예정일 형식이 올바르지 않습니다')),
-      '예정일은 YYYY-MM-DD 형식으로 입력하세요',
+      z.string(missingOrInvalid('Enter the due date', 'The due date format is invalid')),
+      'The due date must be in YYYY-MM-DD format',
     ),
   },
-  { error: '예정일을 JSON 객체로 보내세요' },
+  { error: 'Send the due date as a JSON object' },
 );
 
-const notFound = { error: '복습을 찾을 수 없습니다' };
-const alreadyCompleted = { error: '이미 완료한 복습입니다' };
+const notFound = { error: 'Review not found' };
+const alreadyCompleted = { error: 'This review is already completed' };
 
 type Reply = { status: number; body: object };
 

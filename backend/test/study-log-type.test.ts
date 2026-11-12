@@ -7,7 +7,7 @@ import { withApi } from './helpers.js';
 
 const url = process.env.TEST_DATABASE_URL;
 
-test('an unknown study type is a Korean 400 before touching the DB', async () => {
+test('an unknown study type is an English 400 before touching the DB', async () => {
   const untouchedPool = {
     query: async () => {
       throw new Error('DB must not be queried for invalid input');
@@ -23,11 +23,11 @@ test('an unknown study type is a Korean 400 before touching the DB', async () =>
         body: { studyDate: '2199-03-01', startTime: '09:00', endTime: '10:00', studyType },
       });
       assert.equal(status, 400, String(studyType));
-      assert.match(String(data.error), /학습 유형은 신규, 복습 중에서 선택하세요/);
+      assert.match(String(data.error), /The study type must be new or review/);
     }
     const stats = await call('/api/stats/study-time?type=exam');
     assert.equal(stats.status, 400);
-    assert.match(String(stats.data.error), /학습 유형은 전체, 신규, 복습 중에서 고르세요/);
+    assert.match(String(stats.data.error), /The study type must be all, new, or review/);
   });
 });
 

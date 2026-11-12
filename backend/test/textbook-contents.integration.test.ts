@@ -100,7 +100,7 @@ test(
           body: { parentId: ch2.id, ids },
         });
         assert.equal(rejected.status, 400);
-        assert.equal(rejected.data.error, '같은 상위 목차의 모든 항목을 한 번씩 보내야 합니다');
+        assert.equal(rejected.data.error, 'Send every entry under the same parent exactly once');
       }
       const topLevel = await call(`${path}/order`, {
         method: 'PUT',
@@ -127,7 +127,7 @@ test(
         body: { title: '극한', parentId: ch1.id },
       });
       assert.equal(foreign.status, 400);
-      assert.equal(foreign.data.error, '상위 목차를 찾을 수 없습니다');
+      assert.equal(foreign.data.error, 'Parent contents entry not found');
       assert.equal(
         (await call(`${otherPath}/${s11.id}`, { method: 'PUT', body: { title: 'x' } })).status,
         404,

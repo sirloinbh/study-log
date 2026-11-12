@@ -19,7 +19,7 @@ export type ContentNode = {
   children: ContentNode[];
 };
 
-// "1.2 내적", or just the title when there is no number.
+// "1.2 Dot product", or just the title when there is no number.
 export const contentLabel = (content: { number: string; title: string }) =>
   content.number.trim() ? `${content.number} ${content.title}` : content.title;
 
@@ -31,6 +31,6 @@ export function contentOptions(nodes: ContentNode[], depth = 0): { id: number; l
   ]);
 }
 
-// "저자 · 판본", leaving out whichever is blank.
+// "Author · Edition", leaving out whichever is blank.
 export const textbookMeta = (book: TextbookForm) =>
   [book.author, book.edition].filter((part) => part.trim() !== '').join(' · ');

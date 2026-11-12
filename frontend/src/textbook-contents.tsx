@@ -135,7 +135,7 @@ export function TextbookContents({
     setEditor({
       textbookId,
       parentId: parent?.id ?? null,
-      heading: parent ? `'${contentLabel(parent)}' 아래에 추가` : '장 추가',
+      heading: parent ? `Add under '${contentLabel(parent)}'` : 'Add chapter',
       number: '',
       title: '',
     });
@@ -150,7 +150,7 @@ export function TextbookContents({
       textbookId,
       parentId: null,
       id: node.id,
-      heading: '목차 수정',
+      heading: 'Edit contents entry',
       number: node.number,
       title: node.title,
     });
@@ -172,7 +172,7 @@ export function TextbookContents({
           method: 'PUT',
           body,
         });
-      say('status', open.id === undefined ? '추가했습니다' : '수정했습니다');
+      say('status', open.id === undefined ? 'Added' : 'Updated');
       setEditor(undefined);
     }, open.id);
   };
@@ -191,26 +191,26 @@ export function TextbookContents({
     const id = textbookId;
     const tell = (kind: 'status' | 'alert', text: string) =>
       setNotice({ kind, text, textbookId: id });
-    if (file.size > pdfSizeLimit) return tell('alert', 'PDF는 50MB 이하만 읽을 수 있습니다');
+    if (file.size > pdfSizeLimit) return tell('alert', 'Only PDFs of 50 MB or less can be read');
     const seq = ++readSeq.current;
     setReadingPdf({ textbookId: id, seq });
-    tell('status', 'PDF를 읽는 중…');
+    tell('status', 'Reading the PDF…');
     try {
       const toc = await readPdfToc(file);
       if (readSeq.current !== seq) return;
       const text = toc.lines.join('\n').slice(0, tocLimits.text);
       if (!text.trim())
-        return tell('alert', 'PDF에서 글을 찾지 못했습니다. 스캔한 PDF의 글자는 읽을 수 없습니다');
+        return tell('alert', 'No text was found in the PDF. Text in scanned PDFs cannot be read');
       setPaste({ textbookId: id, text });
       tell(
         'status',
         toc.source === 'outline'
-          ? `PDF 책갈피에서 목차 ${toc.lines.length}줄을 가져왔습니다`
-          : `책갈피 목차가 없어 앞 ${toc.pages}쪽의 글을 가져왔습니다. 목차가 아닌 줄은 지우세요`,
+          ? `Imported ${toc.lines.length} contents lines from the PDF bookmarks`
+          : `No bookmarks, so the text of the first ${toc.pages} pages was imported. Delete the lines that are not contents`,
       );
     } catch (failure) {
       if (readSeq.current === seq)
-        tell('alert', `PDF를 읽지 못했습니다: ${(failure as Error).message}`);
+        tell('alert', `Could not read the PDF: ${(failure as Error).message}`);
     } finally {
       setReadingPdf((current) => (current?.seq === seq ? undefined : current));
     }
@@ -230,7 +230,7 @@ export function TextbookContents({
         },
       );
       setLoaded({ textbookId, tree: data.contents });
-      say('status', `목차 ${pasted.length}개를 추가했습니다`);
+      say('status', `Added ${pasted.length} contents entries`);
       setPaste(undefined);
       return true;
     });
@@ -268,7 +268,7 @@ export function TextbookContents({
         setDeleting(undefined);
       }
       setWantFocus('contents-heading');
-      say('status', '삭제했습니다');
+      say('status', 'Deleted');
       if (open?.id === node.id) setEditor(undefined);
     }, node.id);
 
@@ -307,26 +307,26 @@ export function TextbookContents({
                       id={`content-delete-confirm-${node.id}`}
                       className="danger"
                       disabled={busy}
-                      aria-label={`${label} 목차 삭제 확인`}
+                      aria-label={`${label} contents entry confirm deletion`}
                       onClick={() => {
                         nameNext('delete');
                         void remove(node);
                       }}
                     >
                       <ButtonSpinner when={action === 'delete'} />
-                      삭제 확인
+                      Confirm delete
                     </button>
                     <button
                       type="button"
                       className="secondary"
                       disabled={busy}
-                      aria-label={`${label} 목차 삭제 취소`}
+                      aria-label={`${label} contents cancel deletion`}
                       onClick={() => {
                         setDeleting(undefined);
                         setWantFocus(`content-delete-${node.id}`);
                       }}
                     >
-                      취소
+                      Cancel
                     </button>
                   </>
                 ) : (
@@ -335,50 +335,50 @@ export function TextbookContents({
                       type="button"
                       className="secondary"
                       disabled={busy || index === 0}
-                      aria-label={`${label} 위로 이동`}
+                      aria-label={`${label} move up`}
                       onClick={() => void move(nodes, index, -1, parentId)}
                     >
-                      위로
+                      Up
                     </button>
                     <button
                       type="button"
                       className="secondary"
                       disabled={busy || index === nodes.length - 1}
-                      aria-label={`${label} 아래로 이동`}
+                      aria-label={`${label} move down`}
                       onClick={() => void move(nodes, index, 1, parentId)}
                     >
-                      아래로
+                      Down
                     </button>
                     <button
                       type="button"
                       className="secondary"
                       disabled={busy}
-                      aria-label={`${label} 하위 추가`}
+                      aria-label={`${label} add child`}
                       onClick={() => startAdd(node)}
                     >
-                      하위 추가
+                      Add child
                     </button>
                     <button
                       type="button"
                       className="secondary"
                       disabled={busy}
-                      aria-label={`${label} 목차 수정`}
+                      aria-label={`${label} contents entry edit`}
                       onClick={() => startEdit(node)}
                     >
-                      수정
+                      Edit
                     </button>
                     <button
                       type="button"
                       className="secondary"
                       disabled={busy}
                       id={`content-delete-${node.id}`}
-                      aria-label={`${label} 목차 삭제`}
+                      aria-label={`${label} contents entry delete`}
                       onClick={() => {
                         setDeleting({ textbookId, id: node.id });
                         setWantFocus(`content-delete-confirm-${node.id}`);
                       }}
                     >
-                      삭제
+                      Delete
                     </button>
                   </>
                 )}
@@ -395,7 +395,7 @@ export function TextbookContents({
     <div className="contents">
       <div className="contents-head">
         <h3 id="contents-heading" tabIndex={-1}>
-          목차
+          Contents
         </h3>
         <div className="log-actions">
           <button
@@ -404,7 +404,7 @@ export function TextbookContents({
             disabled={busy || tree === undefined}
             onClick={startPaste}
           >
-            목차 붙여넣기
+            Paste contents
           </button>
           <button
             type="button"
@@ -412,14 +412,14 @@ export function TextbookContents({
             disabled={busy || tree === undefined}
             onClick={() => startAdd()}
           >
-            장 추가
+            Add chapter
           </button>
         </div>
       </div>
       {pasting && (
         <form className="log-form content-form toc-paste" onSubmit={savePaste}>
           <label className="wide">
-            목차 텍스트
+            Contents text
             <textarea
               // eslint-disable-next-line jsx-a11y-x/no-autofocus -- this field opens on a click, so focus follows that action.
               autoFocus
@@ -432,7 +432,7 @@ export function TextbookContents({
             />
           </label>
           <label className="wide">
-            PDF에서 가져오기
+            Import from PDF
             <input
               type="file"
               accept="application/pdf,.pdf"
@@ -446,14 +446,16 @@ export function TextbookContents({
             />
           </label>
           <p id="toc-paste-hint" className="hint wide">
-            한 줄에 하나씩 붙여넣거나 PDF에서 가져오세요(책갈피가 있으면 책갈피, 없으면 앞 20쪽의
-            글). 1, 1.1, Chapter 1, 제1장 같은 번호로 단계를 나누고, 번호가 없는 줄은 들여쓰기를
-            따릅니다. 쪽 번호는 빠집니다. 미리보기가 다르면 글을 고치세요.
+            Paste one entry per line or import from a PDF (its bookmarks if it has them, otherwise
+            the text of the first 20 pages). Levels are split by numbers such as 1, 1.1, Chapter 1,
+            or 제1장 (Korean chapter); lines without a number follow their indentation. Page numbers
+            are dropped. If the preview is wrong, fix the text.
           </p>
           {pasted.length > 0 && (
-            <section className="toc-preview wide" aria-label="목차 미리보기">
+            <section className="toc-preview wide" aria-label="Contents preview">
               <h4>
-                미리보기 · {pasted.length}개{tree?.length ? ' (기존 목차 뒤에 추가)' : ''}
+                Preview · {pasted.length}
+                {tree?.length ? ' (added after the existing contents)' : ''}
               </h4>
               {renderPreview(tocTree(pasted))}
             </section>
@@ -472,7 +474,7 @@ export function TextbookContents({
               disabled={busy || reading || !pasted.length || pasteProblems.length > 0}
             >
               <ButtonSpinner when={action === 'paste'} />
-              {pasted.length ? `${pasted.length}개 저장` : '저장'}
+              {pasted.length ? `Save ${pasted.length}` : 'Save'}
             </button>
             <button
               type="button"
@@ -484,7 +486,7 @@ export function TextbookContents({
                 setPaste(undefined);
               }}
             >
-              취소
+              Cancel
             </button>
           </div>
         </form>
@@ -498,17 +500,17 @@ export function TextbookContents({
         >
           <p className="wide content-form-heading">{open.heading}</p>
           <label>
-            번호
+            Number
             <input
               maxLength={20}
-              placeholder="예: 1.2"
+              placeholder="e.g. 1.2"
               disabled={busy}
               value={open.number}
               onChange={change('number')}
             />
           </label>
           <label className="title">
-            목차 제목
+            Contents title
             <input
               // eslint-disable-next-line jsx-a11y-x/no-autofocus -- this field opens on a click, so focus follows that action.
               autoFocus
@@ -522,7 +524,7 @@ export function TextbookContents({
           <div className="actions wide">
             <button type="submit" className="primary" disabled={busy}>
               <ButtonSpinner when={action === 'save'} />
-              {open.id === undefined ? '추가' : '수정 저장'}
+              {open.id === undefined ? 'Add' : 'Save changes'}
             </button>
             <button
               type="button"
@@ -530,7 +532,7 @@ export function TextbookContents({
               disabled={busy}
               onClick={() => setEditor(undefined)}
             >
-              취소
+              Cancel
             </button>
           </div>
         </form>
@@ -546,13 +548,13 @@ export function TextbookContents({
       )}
       {error && (
         <p role="alert" className="error">
-          목차를 불러오지 못했습니다: {error}
+          Could not load the contents: {error}
         </p>
       )}
       {tree === undefined ? (
-        !error && <Loading label="목차를 불러오는 중" />
+        !error && <Loading label="Loading the contents" />
       ) : tree.length === 0 ? (
-        <p className="status">아직 목차가 없습니다</p>
+        <p className="status">No contents yet</p>
       ) : (
         renderNodes(tree, null)
       )}

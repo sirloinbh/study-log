@@ -6,33 +6,33 @@ import { missingOrInvalid } from './validation.js';
 
 const text = (label: string, max: number) =>
   z
-    .string({ error: `${label} 형식이 올바르지 않습니다` })
+    .string({ error: `The ${label} format is invalid` })
     .trim()
-    .refine((value) => value.length <= max, `${label} 길이는 ${max}자 이하여야 합니다`);
+    .refine((value) => value.length <= max, `The ${label} must be at most ${max} characters`);
 
 const textbookInput = z.object(
   {
     title: z
-      .string(missingOrInvalid('제목을 입력하세요', '제목 형식이 올바르지 않습니다'))
+      .string(missingOrInvalid('Enter the title', 'The title format is invalid'))
       .trim()
-      .refine((value) => value.length >= 1, '제목을 입력하세요')
-      .refine((value) => value.length <= 200, '제목 길이는 200자 이하여야 합니다'),
-    author: text('저자', 200).default(''),
-    edition: text('판본', 50).default(''),
+      .refine((value) => value.length >= 1, 'Enter the title')
+      .refine((value) => value.length <= 200, 'The title must be at most 200 characters'),
+    author: text('author', 200).default(''),
+    edition: text('edition', 50).default(''),
   },
-  { error: '교재 내용을 JSON 객체로 보내세요' },
+  { error: 'Send the textbook as a JSON object' },
 );
 
 // Only plain positive integers that stay exact in JS and fit the bigint column; "1e3", "0x10"
 // or 20-digit ids would otherwise reach Postgres and fail as a 500.
 const idParam = z
   .string()
-  .regex(/^[1-9]\d{0,14}$/, '교재 ID가 올바르지 않습니다')
+  .regex(/^[1-9]\d{0,14}$/, 'Invalid textbook ID')
   .transform(Number);
 
 const columns = 'id, title, author, edition';
 
-const notFound = { error: '교재를 찾을 수 없습니다' };
+const notFound = { error: 'Textbook not found' };
 
 export function textbookRoutes(pool: Pool) {
   const router = Router();
@@ -81,7 +81,7 @@ export function textbookRoutes(pool: Pool) {
       if ((error as { code?: string }).code !== '23503') throw error;
       return void res
         .status(409)
-        .json({ error: '학습 기록이나 일정이 연결된 교재는 삭제할 수 없습니다' });
+        .json({ error: 'A textbook with a study log or schedule attached cannot be deleted' });
     }
     if (!rowCount) return void res.status(404).json(notFound);
     res.status(204).end();

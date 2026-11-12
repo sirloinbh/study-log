@@ -7,8 +7,8 @@ import { likePattern } from './sql.js';
 import { missingOrInvalid } from './validation.js';
 
 const keywordDate = calendarDate(
-  z.string({ error: '날짜 형식이 올바르지 않습니다' }),
-  '날짜는 YYYY-MM-DD 형식으로 입력하세요',
+  z.string({ error: 'The date format is invalid' }),
+  'The date must be in YYYY-MM-DD format',
 );
 
 // `date` left out means today in the service time zone; the route fills it in.
@@ -16,17 +16,17 @@ const keywordInput = z.object(
   {
     date: keywordDate.optional(),
     keyword: z
-      .string(missingOrInvalid('키워드를 입력하세요', '키워드 형식이 올바르지 않습니다'))
+      .string(missingOrInvalid('Enter a keyword', 'The keyword format is invalid'))
       .trim()
-      .refine((value) => value.length >= 1, '키워드를 입력하세요')
-      .refine((value) => value.length <= 50, '키워드는 50자 이하로 입력하세요')
-      .regex(/^[^\r\n]*$/, '키워드는 한 줄로 입력하세요'),
+      .refine((value) => value.length >= 1, 'Enter a keyword')
+      .refine((value) => value.length <= 50, 'The keyword must be at most 50 characters')
+      .regex(/^[^\r\n]*$/, 'The keyword must be on one line'),
     memo: z
-      .string({ error: '메모 형식이 올바르지 않습니다' })
-      .refine((value) => value.length <= 2000, '메모는 2000자 이하로 입력하세요')
+      .string({ error: 'The memo format is invalid' })
+      .refine((value) => value.length <= 2000, 'The memo must be at most 2000 characters')
       .default(''),
   },
-  { error: '키워드 내용을 JSON 객체로 보내세요' },
+  { error: 'Send the keyword as a JSON object' },
 );
 
 // ?date for one day; otherwise the most recent keywords, narrowed by ?q (keyword or memo, any
@@ -35,33 +35,33 @@ const listQuery = z
   .object({
     date: keywordDate.optional(),
     q: z
-      .string({ error: '검색어 형식이 올바르지 않습니다' })
+      .string({ error: 'The search term format is invalid' })
       .trim()
-      .refine((value) => value.length <= 50, '검색어는 50자 이하로 입력하세요')
+      .refine((value) => value.length <= 50, 'The search term must be at most 50 characters')
       .optional(),
     from: keywordDate.optional(),
     to: keywordDate.optional(),
     limit: z.coerce
-      .number({ error: '조회 개수가 올바르지 않습니다' })
-      .int('조회 개수가 올바르지 않습니다')
-      .min(1, '조회 개수는 1 이상이어야 합니다')
-      .max(200, '조회 개수는 200 이하여야 합니다')
+      .number({ error: 'The limit is invalid' })
+      .int('The limit is invalid')
+      .min(1, 'The limit must be at least 1')
+      .max(200, 'The limit must be at most 200')
       .default(50),
   })
   .refine((query) => !query.from || !query.to || query.from <= query.to, {
-    error: '시작일은 종료일보다 늦을 수 없습니다',
+    error: 'The start date cannot be after the end date',
   });
 
 // Same rule as the other ids: plain positive integers that stay exact in JS and fit bigint.
 const idParam = z
   .string()
-  .regex(/^[1-9]\d{0,14}$/, '키워드 ID가 올바르지 않습니다')
+  .regex(/^[1-9]\d{0,14}$/, 'Invalid keyword ID')
   .transform(Number);
 
 const columns = `id, keyword_date AS date, keyword, memo`;
 
-const notFound = { error: '키워드를 찾을 수 없습니다' };
-const duplicate = { error: '이 날짜에 이미 있는 키워드입니다' };
+const notFound = { error: 'Keyword not found' };
+const duplicate = { error: 'This keyword already exists on this date' };
 
 const isDuplicate = (error: unknown) =>
   (error as { code?: string; constraint?: string }).code === '23505' &&

@@ -117,7 +117,10 @@ test('today lists due reviews until they are completed', { skip: !url }, async (
         const review = (await listed()).find((r) => r.memo === '두 번 완료')!;
         const answers = await Promise.all([complete(review.id), complete(review.id)]);
         assert.deepEqual(answers.map((a) => a.status).sort(), [200, 409]);
-        assert.equal(answers.find((a) => a.status === 409)?.data.error, '이미 완료한 복습입니다');
+        assert.equal(
+          answers.find((a) => a.status === 409)?.data.error,
+          'This review is already completed',
+        );
         const { rows } = await pool.query(
           `SELECT count(*)::int AS n FROM reviews
            WHERE round = 2 AND study_log_id = (SELECT study_log_id FROM reviews WHERE id = $1)`,
@@ -198,7 +201,7 @@ test('today lists due reviews until they are completed', { skip: !url }, async (
           'DELETE FROM reviews WHERE study_log_id = $1 AND round = 1 AND completed_on IS NULL',
         ]);
         assert.equal(status, 404);
-        assert.equal(data.error, '복습을 찾을 수 없습니다');
+        assert.equal(data.error, 'Review not found');
         const { rows } = await pool.query('SELECT 1 FROM reviews WHERE study_log_id = $1', [logId]);
         assert.deepEqual(rows, []);
       });
@@ -213,16 +216,16 @@ test('today lists due reviews until they are completed', { skip: !url }, async (
         assert.equal(status, 404);
       });
 
-      await t.test('a review that does not exist answers a Korean 404', async () => {
+      await t.test('a review that does not exist answers an English 404', async () => {
         const { status, data } = await complete(999_999_999_999_998);
         assert.equal(status, 404);
-        assert.equal(data.error, '복습을 찾을 수 없습니다');
+        assert.equal(data.error, 'Review not found');
       });
 
-      await t.test('an invalid id answers a Korean 400', async () => {
+      await t.test('an invalid id answers an English 400', async () => {
         const { status, data } = await call('/api/reviews/abc/complete', { method: 'POST' });
         assert.equal(status, 400);
-        assert.equal(data.error, '복습 ID가 올바르지 않습니다');
+        assert.equal(data.error, 'Invalid review ID');
       });
     },
     { today: () => today },

@@ -38,14 +38,14 @@ const pages = {
 
 // Main menu (LNB) items, in display order.
 const nav: NavItem[] = [
-  { to: pages.logs, label: '학습 기록', icon: NotebookPen },
-  { to: pages.schedules, label: '일정', icon: CalendarDays },
-  { to: pages.reviews, label: '복습', icon: CalendarCheck },
-  { to: pages.textbooks, label: '교재', icon: BookOpen },
-  { to: pages.keywords, label: '키워드', icon: Tags },
-  { to: pages.stats, label: '통계', icon: ChartColumn },
-  { to: pages.retrospectives, label: '회고', icon: NotebookText },
-  { to: pages.settings, label: '설정', icon: Settings2 },
+  { to: pages.logs, label: 'Study log', icon: NotebookPen },
+  { to: pages.schedules, label: 'Schedules', icon: CalendarDays },
+  { to: pages.reviews, label: 'Reviews', icon: CalendarCheck },
+  { to: pages.textbooks, label: 'Textbooks', icon: BookOpen },
+  { to: pages.keywords, label: 'Keywords', icon: Tags },
+  { to: pages.stats, label: 'Stats', icon: ChartColumn },
+  { to: pages.retrospectives, label: 'Retrospectives', icon: NotebookText },
+  { to: pages.settings, label: 'Settings', icon: Settings2 },
 ];
 
 function useHealth() {
@@ -57,10 +57,10 @@ function useHealth() {
         setHealth(
           response.ok && data.today
             ? { state: 'ok', today: data.today }
-            : { state: 'error', message: data.error ?? '서버 상태를 확인할 수 없습니다' },
+            : { state: 'error', message: data.error ?? 'Cannot check the server status' },
         );
       })
-      .catch(() => setHealth({ state: 'error', message: '서버에 연결할 수 없습니다' }));
+      .catch(() => setHealth({ state: 'error', message: 'Cannot reach the server' }));
   }, []);
   return health;
 }
@@ -106,7 +106,7 @@ export function App() {
   return (
     <BrowserRouter>
       <AppShell
-        appName="공부 기록"
+        appName="Study Log"
         nav={nav}
         actions={<ReviewBadge to={pages.reviews} version={reviewVersion} />}
       >
@@ -115,8 +115,8 @@ export function App() {
             path={pages.logs}
             element={
               <Page
-                title="학습 기록"
-                description="오늘 공부한 시간과 내용을 기록하고 최근 기록을 확인합니다"
+                title="Study log"
+                description="Record the time and topics you studied today and review recent logs"
                 health={health}
               >
                 {(today) => <StudyLogs today={today} onChange={reviewsChanged} />}
@@ -127,8 +127,8 @@ export function App() {
             path={pages.schedules}
             element={
               <Page
-                title="일정"
-                description="기간과 하루 분량을 정해 날짜별 학습 목표를 만듭니다"
+                title="Schedules"
+                description="Set a period and a daily amount to make a study goal for each day"
                 health={health}
               >
                 {(today) => <Schedules today={today} />}
@@ -139,8 +139,8 @@ export function App() {
             path={pages.reviews}
             element={
               <Page
-                title="복습"
-                description="복습할 내용을 기간별로 확인하고, 완료로 표시하거나 날짜를 조정합니다"
+                title="Reviews"
+                description="Check what to review by period, then mark it done or change its date"
                 health={health}
               >
                 {() => <Reviews onChange={reviewsChanged} />}
@@ -151,8 +151,8 @@ export function App() {
             path={pages.textbooks}
             element={
               <Page
-                title="교재"
-                description="공부할 교재를 등록하고 제목·저자·판본을 관리합니다"
+                title="Textbooks"
+                description="Register textbooks and manage the title, author, and edition"
                 health={health}
               >
                 {() => <Textbooks />}
@@ -163,8 +163,8 @@ export function App() {
             path={pages.keywords}
             element={
               <Page
-                title="키워드"
-                description="공부하며 만난 중요한 키워드를 날짜별로 남기고 다시 찾습니다"
+                title="Keywords"
+                description="Save important keywords you meet while studying by date and find them again"
                 health={health}
               >
                 {(today) => <Keywords today={today} />}
@@ -175,8 +175,8 @@ export function App() {
             path={pages.stats}
             element={
               <Page
-                title="통계"
-                description="기간별 학습 시간과 하루 평균을 한눈에 봅니다"
+                title="Stats"
+                description="See study time by period and the daily average at a glance"
                 health={health}
               >
                 {() => <Stats />}
@@ -187,8 +187,8 @@ export function App() {
             path={pages.retrospectives}
             element={
               <Page
-                title="회고"
-                description="한 주와 한 달의 공부를 돌아보며 회고를 남깁니다"
+                title="Retrospectives"
+                description="Look back on a week or a month of study and write a retrospective"
                 health={health}
               >
                 {(today) => <Retrospectives today={today} />}
@@ -198,11 +198,11 @@ export function App() {
           <Route
             path={pages.settings}
             element={
-              <Page title="설정" description="앱 환경과 데이터 관리" health={health}>
+              <Page title="Settings" description="App settings and data management" health={health}>
                 {() => (
                   <EmptyState
-                    title="아직 설정 항목이 없습니다"
-                    description="설정은 관련 이슈 카드에서 추가합니다."
+                    title="No settings yet"
+                    description="Settings are added in the related issue cards."
                   />
                 )}
               </Page>

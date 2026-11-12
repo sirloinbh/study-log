@@ -53,21 +53,21 @@ function explain(error: unknown): never {
   )
     throw new TranslationError(
       503,
-      '번역 API 인증에 실패했습니다. 서버의 ANTHROPIC_API_KEY를 확인하세요',
+      'Translation API authentication failed. Check ANTHROPIC_API_KEY on the server',
     );
   if (error instanceof Anthropic.RateLimitError)
-    throw new TranslationError(429, '번역 요청이 많습니다. 잠시 뒤 다시 시도하세요');
+    throw new TranslationError(429, 'Too many translation requests. Try again in a moment');
   if (error instanceof Anthropic.APIConnectionError)
-    throw new TranslationError(502, '번역 서비스에 연결하지 못했습니다');
+    throw new TranslationError(502, 'Could not connect to the translation service');
   if (error instanceof Anthropic.APIError)
-    throw new TranslationError(
-      502,
-      `번역 서비스 오류가 발생했습니다 (${error.status ?? '응답 없음'})`,
-    );
+    throw new TranslationError(502, `Translation service error (${error.status ?? 'no response'})`);
   if (error instanceof Error && error.message.startsWith('Could not resolve authentication method'))
-    throw new TranslationError(503, '번역 API 키(ANTHROPIC_API_KEY)가 서버에 설정되지 않았습니다');
+    throw new TranslationError(
+      503,
+      'The translation API key (ANTHROPIC_API_KEY) is not set on the server',
+    );
   if (error instanceof Anthropic.AnthropicError)
-    throw new TranslationError(502, '번역 서비스 오류가 발생했습니다');
+    throw new TranslationError(502, 'Translation service error');
   throw error;
 }
 
@@ -92,12 +92,12 @@ export function claudeTranslator(client?: Anthropic): Translator {
         messages: [{ role: 'user', content: texts }],
       });
       if (response.stop_reason === 'refusal')
-        throw new TranslationError(422, '이 내용은 번역할 수 없습니다');
+        throw new TranslationError(422, 'This content cannot be translated');
       if (response.stop_reason === 'max_tokens')
-        throw new TranslationError(502, '번역이 너무 길어 끝까지 받지 못했습니다');
+        throw new TranslationError(502, 'The translation was too long to receive in full');
       const text = response.content.find((block) => block.type === 'text');
       const parsed = reply.safeParse(text ? JSON.parse(text.text) : undefined);
-      if (!parsed.success) throw new TranslationError(502, '번역 결과를 읽지 못했습니다');
+      if (!parsed.success) throw new TranslationError(502, 'Could not read the translation result');
       const translated = {
         body: parsed.data.body,
         answer: source.answer === null ? null : parsed.data.answer,
@@ -107,11 +107,11 @@ export function claudeTranslator(client?: Anthropic): Translator {
         translated.body.length > translationLimit ||
         (translated.answer?.length ?? 0) > translationLimit
       )
-        throw new TranslationError(502, '번역 결과가 너무 깁니다');
+        throw new TranslationError(502, 'The translation result is too long');
       return translated;
     } catch (error) {
       if (error instanceof SyntaxError)
-        throw new TranslationError(502, '번역 결과를 읽지 못했습니다');
+        throw new TranslationError(502, 'Could not read the translation result');
       explain(error);
     }
   };

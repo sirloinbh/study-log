@@ -14,7 +14,7 @@ test('a month runs from its 1st to its last day (#17)', () => {
   assert.deepEqual(monthRange('2026-04'), { from: '2026-04-01', to: '2026-04-30' });
 });
 
-test('an invalid month is a Korean 400 before touching the DB', async () => {
+test('an invalid month is an English 400 before touching the DB', async () => {
   const untouchedPool = {
     query: async () => {
       throw new Error('DB must not be queried for invalid input');
@@ -24,7 +24,7 @@ test('an invalid month is a Korean 400 before touching the DB', async () => {
     for (const month of ['2026-13', '2026-00', '2026-1', '0000-05', 'abc', '2026-10-01']) {
       const { status, data } = await call(`/api/study-logs/calendar?month=${month}`);
       assert.equal(status, 400, month);
-      assert.match(String(data.error), /월은 YYYY-MM 형식으로 입력하세요/);
+      assert.match(String(data.error), /The month must be in YYYY-MM format/);
     }
   });
 });

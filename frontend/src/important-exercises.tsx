@@ -8,10 +8,12 @@ import { contentLabel, type ContentNode, contentOptions, type Textbook } from '.
 
 type Notice = { kind: 'status' | 'alert'; text: string } | undefined;
 
-// "1 벡터 > 1.2 내적 · 문제 3": where an exercise is, for a list that spans chapters.
+// "1 Vectors > 1.2 Dot product · Problem 3": where an exercise is, for a list that spans chapters.
 function importantLabel(tree: ContentNode[], exercise: Exercise) {
   const path = (contentPath(tree, exercise.contentId) ?? []).map(contentLabel).join(' > ');
-  const number = exercise.number.trim() ? `문제 ${exercise.number.trim()}` : '번호 없는 문제';
+  const number = exercise.number.trim()
+    ? `Problem ${exercise.number.trim()}`
+    : 'Unnumbered problem';
   return path ? `${path} · ${number}` : number;
 }
 
@@ -71,7 +73,7 @@ export function ImportantExercises({
         method: 'PATCH',
         body: { important: false },
       });
-      setNotice({ kind: 'status', text: `${label} 중요 표시를 해제했습니다` });
+      setNotice({ kind: 'status', text: `Removed the important mark from ${label}` });
     } catch (failure) {
       setNotice({ kind: 'alert', text: (failure as RequestError).message });
     } finally {
@@ -90,16 +92,18 @@ export function ImportantExercises({
   return (
     <div className="important-exercises">
       <div className="contents-head">
-        <h3>중요 문제</h3>
+        <h3>Important problems</h3>
       </div>
       {treeFailed ? (
-        <p className="status">목차를 불러오지 못해 중요 문제를 모을 수 없습니다</p>
+        <p className="status">
+          Could not load the contents, so important problems cannot be gathered
+        </p>
       ) : !tree ? (
-        <Loading label="목차를 불러오는 중" kind="text" />
+        <Loading label="Loading the contents" kind="text" />
       ) : (
         <div className="log-form exercise-picker">
           <label className="wide">
-            범위
+            Scope
             <select
               disabled={busy}
               value={scope}
@@ -108,7 +112,7 @@ export function ImportantExercises({
                 setNotice(undefined);
               }}
             >
-              <option value={0}>교재 전체</option>
+              <option value={0}>Whole textbook</option>
               {options.map((option) => (
                 <option key={option.id} value={option.id}>
                   {option.label}
@@ -129,15 +133,15 @@ export function ImportantExercises({
       )}
       {error && (
         <p role="alert" className="error">
-          중요 문제를 불러오지 못했습니다: {error}
+          Could not load the important problems: {error}
         </p>
       )}
       {tree &&
         (exercises === undefined ? (
-          !error && <Loading label="중요 문제를 불러오는 중" />
+          !error && <Loading label="Loading the important problems" />
         ) : exercises.length === 0 ? (
           <p className="status">
-            {scope ? '이 단원에 중요 표시한 문제가 없습니다' : '중요 표시한 문제가 없습니다'}
+            {scope ? 'No important problems in this section' : 'No important problems'}
           </p>
         ) : (
           <ul className="log-list exercise-list">
@@ -154,10 +158,10 @@ export function ImportantExercises({
                       type="button"
                       className="secondary"
                       disabled={busy}
-                      aria-label={`${label} 중요 해제`}
+                      aria-label={`${label} unmark important`}
                       onClick={() => void unmark(exercise, label)}
                     >
-                      중요 해제
+                      Unmark important
                     </button>
                   </div>
                 </li>
