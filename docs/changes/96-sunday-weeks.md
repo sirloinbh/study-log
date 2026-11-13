@@ -1,65 +1,65 @@
-# #96 통계·히트맵·캘린더의 주 시작을 일요일로 변경
+# #96 Change the week start in the statistics, heatmap, and calendar to Sunday
 
-- 이슈: [#96](https://github.com/sirloinbh/study-log/issues/96)
-- 브랜치: `feat/96-sunday-weeks`
+- Issue: [#96](https://github.com/sirloinbh/study-log/issues/96)
+- Branch: `feat/96-sunday-weeks`
 
-## 목적
+## Purpose
 
-#19(주간 회고) 착수 전 확인에서 사용자가 주의 시작 요일을 **일요일**로 정했다(2026-10-23). 이미 월요일 시작으로 구현된 통계(#47)·히트맵(#50)·캘린더(#17)도 모두 일요일 시작으로 바꾸도록 요청했다. 앞으로의 주간 회고와 같은 기준을 쓰기 위해서다.
+In the check before starting #19 (the weekly retrospective), the user decided that the week starts on **Sunday** (2026-10-23). The user also asked to change the statistics (#47), heatmap (#50), and calendar (#17), which were already implemented with a Monday start, to start on Sunday too. This is to use the same criterion as the upcoming weekly retrospective.
 
-## 변경
+## Changes
 
-- `backend/src/stats.ts`: `weekStart`를 그 주의 일요일로 바꿨다. 이것 하나로 다음이 함께 바뀐다.
-  - 통계 "이번 주" 기간: 일요일 ~ 오늘
-  - 주별 합계의 묶음 기준(`weekly[].weekStart`가 일요일)
-  - 히트맵 범위: 52주 전 일요일부터
-- `frontend/src/Heatmap.tsx`: 칸 순서가 일요일 ~ 토요일(위에서 아래)이다. 요일 표시는 월·수·금 줄에 둔다.
-- `frontend/src/Calendar.tsx`, `frontend/src/month-calendar.ts`: 머리글이 "일 월 화 수 목 금 토"이고, 1일 앞 빈칸 수는 1일의 요일 번호(일요일 0)다.
-- `frontend/src/study-stats.ts`: 주 단위 묶기 설명을 일요일 기준으로 고쳤다. 동작은 받은 날짜 순서대로 7개씩이라 그대로다.
-- 이전 작업 기록(`docs/changes/47-…`, `50-…`, `17-…`)의 "월요일 시작"은 당시의 결정 기록이라 고치지 않는다. 이 문서가 변경을 기록한다.
+- `backend/src/stats.ts`: changed `weekStart` to that week's Sunday. This one change also changes the following.
+  - The statistics "this week" period: Sunday to today
+  - The grouping basis of weekly totals (`weekly[].weekStart` is a Sunday)
+  - The heatmap range: from the Sunday 52 weeks ago
+- `frontend/src/Heatmap.tsx`: the cell order is Sunday to Saturday (top to bottom). The weekday labels go on the Monday, Wednesday, and Friday rows.
+- `frontend/src/Calendar.tsx`, `frontend/src/month-calendar.ts`: the header is "일 월 화 수 목 금 토" (Sun Mon Tue Wed Thu Fri Sat), and the number of blank cells before the 1st is the weekday number of the 1st (Sunday is 0).
+- `frontend/src/study-stats.ts`: fixed the description of grouping by week to be based on Sunday. The behavior is unchanged because it groups 7 at a time in the order of the dates received.
+- "Monday start" in the earlier work records (`docs/changes/47-…`, `50-…`, `17-…`) is a record of the decision at the time, so I do not fix it. This document records the change.
 
-## 테스트
+## Tests
 
-일요일 기준으로 기대값을 다시 계산해 고쳤다.
+I recalculated and fixed the expected values on a Sunday basis.
 
 - `backend/test/stats.test.ts`
-  - 주 시작: 금요일 → 그 주 일요일, 토요일 → 앞 일요일, 일요일 → 그날, 연말 넘김
-  - "이번 주" 기간 시작, 주별 묶음 키, 히트맵 시작일. 일요일이 오늘이면 이번 주는 하루다.
-- `backend/test/stats.integration.test.ts`(실제 DB, "오늘" 2096-05-16 수요일)
-  - 이번 주: 5/13(일) ~ 5/16, 4일, 170분. 일요일 5/13 기록이 이번 주에 들어간다. 월요일 기준일 때는 3일, 150분이었다.
-  - 이번 달 주별 묶음: 4/29 45분, 5/6 0분, 5/13 170분
-  - 히트맵: 2095-05-15(일)부터 368일
-- `backend/test/stats-ui.test.ts`: 히트맵 2주 예시를 일요일(10/4)부터 시작하도록 옮겼다.
-- `backend/test/calendar-ui.test.ts`: 10/1(목) 앞 빈칸 4개(일~수), 빈칸 계산 함수(3/1 일요일 0개, 6/1 월요일 1개, 10/1 목요일 4개)
-- 수정 전(월요일) 코드에서 바뀐 테스트 6건이 실패하고, 수정 후 통과하는 것을 확인했다.
+  - Week start: Friday -> that week's Sunday, Saturday -> the preceding Sunday, Sunday -> that day, crossing the year end
+  - The start of the "this week" period, the weekly grouping key, and the heatmap start date. If Sunday is today, this week is one day.
+- `backend/test/stats.integration.test.ts` (a real DB, "today" is Wednesday 2096-05-16)
+  - This week: 5/13 (Sun) to 5/16, 4 days, 170 minutes. The record on Sunday 5/13 goes into this week. On a Monday basis it was 3 days and 150 minutes.
+  - Weekly grouping of this month: 4/29 45 minutes, 5/6 0 minutes, 5/13 170 minutes
+  - Heatmap: 368 days from 2095-05-15 (Sun)
+- `backend/test/stats-ui.test.ts`: moved the heatmap 2-week example to start on Sunday (10/4).
+- `backend/test/calendar-ui.test.ts`: 4 blank cells before 10/1 (Thu) (Sun to Wed), and the blank cell function (3/1 Sunday 0, 6/1 Monday 1, 10/1 Thursday 4)
+- I confirmed that the 6 changed tests fail on the code before the fix (Monday) and pass after the fix.
 
-## 검증
+## Verification
 
-| 명령                   | 환경                                                        | 결과                                                        |
-| ---------------------- | ----------------------------------------------------------- | ----------------------------------------------------------- |
-| `npm run check`        | 로컬, `TEST_DATABASE_URL` 미설정                            | exit 0. backend tests 210, pass 195, fail 0, skipped 15(DB) |
-| `npm test` (기본 병렬) | 로컬 Docker `postgres:17-alpine`, 마이그레이션 001~009 적용 | exit 0. tests 210, pass 210, fail 0, skipped 0              |
+| Command                       | Environment                                                      | Result                                                       |
+| ----------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------ |
+| `npm run check`               | Local, `TEST_DATABASE_URL` not set                               | exit 0. backend tests 210, pass 195, fail 0, skipped 15 (DB) |
+| `npm test` (default parallel) | Local Docker `postgres:17-alpine`, migrations 001 to 009 applied | exit 0. tests 210, pass 210, fail 0, skipped 0               |
 
-- 브라우저: Playwright(Chromium)로 Vite 개발 서버와 이 브랜치 API(로컬 Docker 테스트 DB)를 띄워 확인했다(오늘 2026-10-23 금요일).
-  - API: "이번 주" 2026-10-18(일) ~ 10-23, 6일. 히트맵 시작 2025-10-19(일요일).
-  - 모바일 390×844
-    - 캘린더 머리글 "일월화수목금토", 10월 첫 줄 빈칸 4개 뒤 1·2·3일
-    - 통계 "이번 주" 카드 "2026-10-18 ~ 2026-10-23, 6일 중 4일 공부"
-    - 히트맵 요일 열은 일요일이 맨 위이고 월·수·금에 이름이 붙는다.
-    - 가로 스크롤 없음
-  - PC 1440×900: 통계 카드와 히트맵, 가로 스크롤 없음
-  - 스크린샷: [캘린더 모바일](assets/96-calendar-mobile-390x844.png), [히트맵 모바일](assets/96-heatmap-mobile-390x844.png), [PC 1440×900](assets/96-pc-1440x900.png)
+- Browser: I checked by starting the Vite dev server and this branch's API (a local Docker test DB) with Playwright (Chromium) (today is Friday 2026-10-23).
+  - API: "this week" 2026-10-18 (Sun) to 10-23, 6 days. The heatmap starts 2025-10-19 (Sunday).
+  - Mobile 390×844
+    - The calendar header "일월화수목금토", and after 4 blank cells in the first row of October, the 1st, 2nd, and 3rd
+    - The statistics "this week" card "2026-10-18 ~ 2026-10-23, 4 of 6 days studied" (shown in Korean)
+    - In the heatmap weekday column, Sunday is at the top, and names are attached to Monday, Wednesday, and Friday.
+    - No horizontal scroll
+  - PC 1440×900: the statistics card and the heatmap, no horizontal scroll
+  - Screenshots: [calendar mobile](assets/96-calendar-mobile-390x844.png), [heatmap mobile](assets/96-heatmap-mobile-390x844.png), [PC 1440×900](assets/96-pc-1440x900.png)
 
-## 자동 코드 리뷰 1차
+## Automated code review, round 1
 
-별도 읽기 전용 리뷰 에이전트가 검토했다. 지적이 없어 2차 리뷰는 하지 않는다. 분리할 이슈도 없다.
+A separate read-only review agent reviewed it. There were no comments, so I do not do a second review. There is no issue to split off either.
 
-- 확인된 사항
-  - 월요일 기준 코드가 남아 있지 않다. 남은 "월요일" 언급은 이전 작업 기록뿐이다.
-  - 히트맵 열이 일요일 ~ 토요일로 맞고, 요일 표시도 일치한다.
-  - 캘린더 빈칸 계산이 맞다. 다시 계산한 테스트 기대값(368일, 주별 묶음 등)도 손으로 확인했다.
-  - 오늘이 일요일이면 이번 주가 하루지만, 0으로 나누지 않는다.
+- Confirmed points
+  - No code based on Monday remains. The remaining mentions of "Monday" are only in earlier work records.
+  - The heatmap columns are right as Sunday to Saturday, and the weekday labels match.
+  - The calendar blank cell calculation is right. I also checked by hand the expected values of the recalculated tests (368 days, weekly grouping, and so on).
+  - If today is Sunday, this week is one day, but it does not divide by zero.
 
-## 한계·후속
+## Limits and follow-up
 
-- #19 주간 회고는 이 기준(일요일 시작)으로 구현한다.
+- The #19 weekly retrospective is implemented with this criterion (the week starts on Sunday).

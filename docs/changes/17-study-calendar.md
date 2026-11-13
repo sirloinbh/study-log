@@ -1,101 +1,101 @@
-# #17 학습 일지 캘린더 뷰
+# #17 Study log calendar view
 
-- 이슈: [#17](https://github.com/sirloinbh/study-log/issues/17) (상위 #9)
-- 브랜치: `feat/17-study-calendar`
-- 선행: #10 학습 기록 DB·API (병합 완료)
+- Issue: [#17](https://github.com/sirloinbh/study-log/issues/17) (parent #9)
+- Branch: `feat/17-study-calendar`
+- Prerequisite: #10 study log DB and API (merged)
 
-## 목적
+## Purpose
 
-달력에서 날짜별 학습 여부와 시간을 한눈에 보고, 날짜를 골라 그날의 일지를 본다.
+See at a glance whether you studied and for how long on each date in a calendar, and pick a date to see that day's log.
 
-## 결정
+## Decisions
 
-정해지지 않은 규칙은 아래 기준으로 정했다. [이슈 코멘트](https://github.com/sirloinbh/study-log/issues/17#issuecomment-6358642189)에도 남겼다.
+I set the undecided rules by the criteria below. I also left them in an [issue comment](https://github.com/sirloinbh/study-log/issues/17#issuecomment-6358642189).
 
-- **날짜별 학습 시간:** 통계(#47)와 같이 "계획" 상태를 뺀 시간만 더한다.
-- **기록 개수:** 계획을 포함한 모든 기록을 센다. 계획만 있는 날도 그날 일지로 들어갈 수 있게 하기 위해서다.
-- **월 경계:** 학습일은 이미 `Asia/Seoul` 날짜다. 그래서 그 달 1일 ~ 말일의 학습일로 나눈다. 자정을 넘긴 기록은 시작 날짜에 속한다. 기본 월은 서비스 기준 오늘이 든 달이다.
-- **모양:** 월요일 시작(통계·히트맵과 같음), 학습 기록 화면에 둔다.
+- **Study time per date:** as in the statistics (#47), add only the time without the "planned" status.
+- **Number of records:** count all records including planned ones. This is so a day with only planned records can also be entered as that day's log.
+- **Month boundary:** the study date is already an `Asia/Seoul` date. So it is divided by the study dates from the 1st to the last day of that month. A record that crosses midnight belongs to its start date. The default month is the month that has today in the service time.
+- **Shape:** the week starts on Monday (same as the statistics and heatmap), and it goes on the study log screen.
 
-## 변경
+## Changes
 
-- `backend/src/calendar.ts`(새 파일), `backend/src/app.ts`
-  - `GET /api/study-logs/calendar?month=YYYY-MM` → `{ month, days: [{ date, minutes, logs }] }`. 그 달의 모든 날짜를 준다(빈 날 0).
-  - 학습 기록 라우터보다 먼저 연결한다. 그러지 않으면 `calendar`가 학습 기록 ID로 읽혀 400이 된다.
-  - 잘못된 월(13월, 0000년, `2026-1` 등)은 "월은 YYYY-MM 형식으로 입력하세요" 400.
-  - `monthRange`: 그 달의 1일과 말일(윤년 포함)
-- `frontend/src/Calendar.tsx`(새 파일), `frontend/src/month-calendar.ts`(새 파일), `frontend/src/StudyLogs.tsx`
-  - 학습 기록 화면 맨 아래에 "YYYY년 M월" 달력 카드를 둔다. 이전·다음 달 버튼이 있고, 다른 달을 보고 있으면 "이번 달" 버튼이 나온다.
-  - 날짜 칸
-    - 날짜와 짧은 학습 시간(45분, 1.5시간)을 보여 준다.
-    - 공부한 날은 연한 배경, 오늘은 굵은 날짜, 고른 날짜는 테두리로 표시한다(`aria-pressed`).
-    - 화면 낭독기용 이름: "날짜, 학습 N시간 M분(또는 학습 없음), 기록 N개"
-  - 날짜를 누르면 그날의 일지(시간·학습 시간·상태·메모)를 달력 아래에 보여 준다. 처음에는 오늘이 골라져 있다.
-  - 같은 화면에서 학습 기록을 저장·삭제하면 달력과 그날 일지를 다시 불러온다(`reloadKey`).
-  - 달·날짜별 응답을 따로 보관한다. 늦게 도착한 다른 달의 응답이 섞이지 않는다.
-  - 보조 파일 이름은 `month-calendar.ts`다. `Calendar.tsx`와 대소문자만 다른 이름은 Windows에서 충돌한다(#48 참고).
-- `frontend/src/style.css`: 7칸 달력 격자, 날짜 칸 표시
+- `backend/src/calendar.ts` (a new file), `backend/src/app.ts`
+  - `GET /api/study-logs/calendar?month=YYYY-MM` -> `{ month, days: [{ date, minutes, logs }] }`. It gives every date of that month (0 on empty days).
+  - It is connected before the study log router. Otherwise `calendar` would be read as a study log ID and give 400.
+  - A wrong month (month 13, year 0000, `2026-1`, and so on) gives 400 "월은 YYYY-MM 형식으로 입력하세요" ("Enter the month in YYYY-MM format").
+  - `monthRange`: the 1st and the last day of that month (including leap years)
+- `frontend/src/Calendar.tsx` (a new file), `frontend/src/month-calendar.ts` (a new file), `frontend/src/StudyLogs.tsx`
+  - Put a "YYYY년 M월" ("Month M of YYYY") calendar card at the bottom of the study log screen. It has previous and next month buttons, and if you are viewing another month, a "이번 달" ("This month") button appears.
+  - Date cells
+    - They show the date and a short study time (45 minutes, 1.5 hours).
+    - A day studied has a light background, today has a bold date, and the chosen date has a border (`aria-pressed`).
+    - Name for screen readers: "date, studied N hours M minutes (or no study), N records"
+  - When you press a date, that day's log (time, study time, status, and note) is shown below the calendar. At first today is picked.
+  - If you save or delete a study log on the same screen, the calendar and that day's log are loaded again (`reloadKey`).
+  - Responses are kept separately per month and per date. A late response for another month does not mix in.
+  - The helper file is named `month-calendar.ts`. A name that differs from `Calendar.tsx` only by case collides on Windows (see #48).
+- `frontend/src/style.css`: the 7-column calendar grid and the date cell display
 
-## 테스트
+## Tests
 
-- `backend/test/calendar.test.ts`: 월 범위(30·31일, 평년·윤년 2월, 12월), 잘못된 월 400, 기본 월 = 오늘이 든 달
-- `backend/test/calendar.integration.test.ts`(실제 DB, 2100년): 월 경계를 확인한다.
-  - 전월 말일과 다음 달 1일은 들어오지 않는다.
-  - 자정을 넘긴 기록은 1일에 속한다.
-  - 계획 기록은 개수에만 들어간다.
-  - 2100년 2월은 평년이라 28일이다.
-  - 기본 월이 맞다.
-  - 날짜는 다른 테스트 파일과 겹치지 않는 해로 골랐다. 통계 테스트가 2096-05-16까지의 누적을 기준값으로 비교하므로, 그보다 앞선 해(처음 고른 2095년)는 병렬 실행 때 그 테스트를 흔들 수 있었다.
-- `backend/test/calendar-ui.test.ts`(새 파일, 1차 리뷰 반영 후 7건)
-  - 월요일 시작: 10/1(목) 앞 빈칸 3개
-  - 날짜 칸 이름과 짧은 시간, 오늘·선택 표시
-  - 날짜 선택 시 그날 일지와 빈 날 안내
-  - 이전·다음·이번 달 이동
-  - 학습 기록 저장 후 다시 불러오기, 불러오기 실패 표시
-  - 보조 함수(달 이동, 빈칸 수, 짧은 시간)
+- `backend/test/calendar.test.ts`: month ranges (30 and 31 days, February in a common year and a leap year, December), a wrong month 400, and the default month = the month that has today
+- `backend/test/calendar.integration.test.ts` (a real DB, year 2100): it checks the month boundary.
+  - The last day of the previous month and the 1st of the next month do not come in.
+  - A record that crosses midnight belongs to the 1st.
+  - Planned records go only into the count.
+  - February 2100 is a common year, so it is 28 days.
+  - The default month is right.
+  - I picked a year that does not overlap with other test files. The statistics test compares the cumulative total up to 2096-05-16 as the baseline, so a year before that (the 2095 I first picked) could shake that test in a parallel run.
+- `backend/test/calendar-ui.test.ts` (a new file, 7 tests after the first-review fixes)
+  - Week start on Monday: 3 blank cells before 10/1 (Thu)
+  - Date cell names and short times, the today and selected marks
+  - When you pick a date, that day's log and the empty day notice
+  - Moving to the previous, next, and this month
+  - Loading again after saving a study log, and the load failure display
+  - Helper functions (moving months, the number of blank cells, the short time)
 - `backend/test/study-logs-ui.test.ts`
-  - 학습 기록 화면 테스트는 최근 목록을 검증하므로, 가짜 API가 달력 요청에 빈 답을 주고 요청 기록에서 뺀다.
-  - 버튼 이름 테스트는 최근 목록 안으로 범위를 좁혔다.
+  - The study log screen test verifies the recent list, so the fake API gives an empty answer to the calendar request and leaves it out of the request record.
+  - The button name test is narrowed to inside the recent list.
 
-## 검증
+## Verification
 
-| 명령                   | 환경                                                        | 결과                                                        |
-| ---------------------- | ----------------------------------------------------------- | ----------------------------------------------------------- |
-| `npm run check`        | 로컬, `TEST_DATABASE_URL` 미설정                            | exit 0. backend tests 201, pass 187, fail 0, skipped 14(DB) |
-| `npm test` (기본 병렬) | 로컬 Docker `postgres:17-alpine`, 마이그레이션 001~009 적용 | exit 0. tests 201, pass 201, fail 0, skipped 0              |
+| Command                       | Environment                                                      | Result                                                       |
+| ----------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------ |
+| `npm run check`               | Local, `TEST_DATABASE_URL` not set                               | exit 0. backend tests 201, pass 187, fail 0, skipped 14 (DB) |
+| `npm test` (default parallel) | Local Docker `postgres:17-alpine`, migrations 001 to 009 applied | exit 0. tests 201, pass 201, fail 0, skipped 0               |
 
-- 처음 `npm run check`는 새 테스트의 타입 오류로 exit 2였다. 고친 뒤 위 결과다. `npm test`는 타입 검사를 하지 않아 그때도 통과했었다.
-- 브라우저: Playwright(Chromium)로 Vite 개발 서버와 이 브랜치 API(로컬 Docker 테스트 DB)를 띄워 확인했다.
-  - 모바일 390×844
-    - "2026년 10월", 1일(목) 앞 빈칸 3개
-    - 날짜별 짧은 시간이 API 값과 일치
-    - 14일을 누르면 그날 일지 1건(19:00–21:00 2시간)
-    - 카드 넘침·가로 스크롤 없음
-  - PC 1440×900: 7칸 달력과 그날 일지, 가로 스크롤 없음
-  - 스크린샷: [모바일 390×844 (달력 카드)](assets/17-mobile-390x844.png), [PC 1440×900](assets/17-pc-1440x900.png)
+- The first `npm run check` was exit 2 because of a type error in the new tests. After fixing it, the result is the one above. `npm test` does not do a type check, so it passed even then.
+- Browser: I checked by starting the Vite dev server and this branch's API (a local Docker test DB) with Playwright (Chromium).
+  - Mobile 390×844
+    - "2026년 10월", 3 blank cells before the 1st (Thu)
+    - The short times per date match the API values
+    - Pressing the 14th shows 1 log for that day (19:00-21:00, 2 hours)
+    - No card overflow and no horizontal scroll
+  - PC 1440×900: the 7-column calendar and that day's log, no horizontal scroll
+  - Screenshots: [mobile 390×844 (calendar card)](assets/17-mobile-390x844.png), [PC 1440×900](assets/17-pc-1440x900.png)
 
-## 자동 코드 리뷰 1차
+## Automated code review, round 1
 
-별도 읽기 전용 리뷰 에이전트가 검토했다. 백엔드 지적은 없었다. 분리할 이슈도 없다.
+A separate read-only review agent reviewed it. There were no backend comments. There is no issue to split off either.
 
-- 확인된 사항(백엔드): 라우트 연결 순서, 월 정규식(0000년, 00·13월), `FILTER`·`count`로 빈 날 0, 윤년 월 범위.
-- 반영(중요): 달과 날짜 불러오기가 오류 상태 하나를 같이 썼다.
-  - 날짜 일지만 실패해도 "캘린더를 불러오지 못했습니다"가 뜨고, 일지 영역은 "불러오는 중…"에 멈췄다.
-  - 한쪽이 성공하면 다른 쪽 오류가 지워지거나, 반대로 남았다.
-  - 고침: 달 오류와 날짜 오류를 각각 달·날짜로 태그해 나눴다. 날짜 오류는 일지 영역에 "일지를 불러오지 못했습니다"로 보여 준다.
-  - 회귀 테스트("날짜 실패와 달 실패를 따로 보여 준다")를 추가했다. 수정 전 코드에서 실패하고 수정 후 통과하는 것을 확인했다.
-- 참고(유지)
-  - 이미 본 달·날짜로 돌아가면 새로 받는 동안 보관한 값을 보여 준다. 새 값이 오면 바뀐다.
-  - 저장·삭제 후 달력 다시 불러오기는 `calendar-ui.test.ts`의 "학습 기록 저장 후 다시 불러오기" 테스트가 확인한다.
+- Confirmed points (backend): the route connection order, the month regular expression (year 0000, months 00 and 13), 0 on empty days with `FILTER` and `count`, and the leap year month range.
+- Applied (important): loading the month and loading the date shared one error state.
+  - Even if only the date log failed, "캘린더를 불러오지 못했습니다" ("Could not load the calendar") appeared, and the log area stalled at "불러오는 중…" ("Loading…").
+  - If one side succeeded, the other side's error was cleared or, conversely, remained.
+  - Fix: I split the month error and the date error by tagging them with the month and the date. The date error is shown in the log area as "일지를 불러오지 못했습니다" ("Could not load the log").
+  - I added a regression test ("shows a date failure and a month failure separately"). I confirmed it fails on the code before the fix and passes after the fix.
+- Note (kept)
+  - If you go back to a month or date you already saw, the kept value is shown while the new one is received. It changes when the new value arrives.
+  - Loading the calendar again after save and delete is checked by the "loading again after saving a study log" test in `calendar-ui.test.ts`.
 
-## 자동 코드 리뷰 2차
+## Automated code review, round 2
 
-별도 읽기 전용 리뷰 에이전트가 1차 반영과 최종 PR 전체를 다시 확인했다. 리뷰는 최대 2회이므로 3차 리뷰는 하지 않는다.
+A separate read-only review agent checked the first-round fixes and the whole final PR again. The review is limited to 2 rounds, so I do not do a third.
 
-- 달·날짜 오류가 각자의 태그로만 보이고 지워진다. 다시 불러와서 성공하면 오류가 지워지고, 실패한 달에서도 "불러오는 중"에 멈추지 않는다고 확인됐다.
-- 지적과 분리할 이슈는 없었다.
+- It was confirmed that the month and date errors are shown and cleared only by their own tags. If a reload succeeds, the error is cleared, and even in a failed month it does not stall at "loading".
+- There were no comments and no issue to split off.
 
-## 한계·후속
+## Limits and follow-up
 
-- 달력은 최근 기록 목록 아래에 있다. 최근 기록이 많으면 스크롤해야 보인다.
-- 달력의 일지 목록은 읽기 전용이다. 수정·삭제는 위의 최근 목록에서 한다.
+- The calendar is under the recent records list. If there are many recent records, you must scroll to see it.
+- The log list in the calendar is read-only. Edit and delete are done in the recent list above.

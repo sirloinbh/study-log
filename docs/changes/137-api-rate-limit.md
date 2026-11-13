@@ -1,46 +1,46 @@
-# #137 API 서버에 요청 속도 제한 추가
+# #137 Add a request rate limit to the API server
 
-- 이슈: [#137](https://github.com/sirloinbh/study-log/issues/137)
-- 브랜치: `feat/137-api-rate-limit`
+- Issue: [#137](https://github.com/sirloinbh/study-log/issues/137)
+- Branch: `feat/137-api-rate-limit`
 
-## 목적
+## Purpose
 
-CodeQL이 Express 미들웨어만 인식해 새 라우트마다 `js/missing-rate-limiting` 경고를 낸다. 지금까지 34건을 오탐으로 닫았고, PR #135도 같은 경고에 막혔다. 사용자가 오탐 처리 대신 Express 제한을 추가하기로 정했다(2026-10-31).
+CodeQL recognizes only Express middleware, so it raises a `js/missing-rate-limiting` warning for each new route. So far 34 were closed as false positives, and PR #135 was blocked by the same warning. The user decided to add an Express limit instead of dismissing them as false positives (2026-10-31).
 
-## 변경
+## Changes
 
-- `backend/package.json`: `express-rate-limit` 8.7.2를 추가했다. 사용자가 `--ignore-scripts`로 설치했다.
-- `backend/src/app.ts`: `/api` 전체를 분당 1200회로 제한한다. 넘으면 한국어 429로 답한다. 본문 파싱보다 앞에 두어 거절한 요청은 파싱하지 않는다.
+- `backend/package.json`: added `express-rate-limit` 8.7.2. The user installed it with `--ignore-scripts`.
+- `backend/src/app.ts`: limits all of `/api` to 1200 per minute. Above that, it answers with a Korean 429. It is placed before body parsing so rejected requests are not parsed.
 
-## 결정한 점
+## Decisions
 
-- 한도는 nginx의 초당 10회(분당 600회)보다 넉넉하게 잡았다. 사용자별 제한은 nginx가 맡고, Express는 안전망이다.
-- `frontend/nginx.conf`가 클라이언트 주소를 `X-Forwarded-For`에 넣지 않으므로, nginx를 거친 요청은 Express에서 모두 한 클라이언트로 센다. 이슈의 "IP별 제한"과 다르지만, 사용자가 한 명이고 IP별 제한은 nginx가 이미 하므로 이대로 둔다.
-- `trust proxy`는 켜지 않았다. nginx는 클라이언트가 보낸 헤더를 그대로 넘기므로, 켜면 위조된 헤더를 믿게 된다. 끈 상태에서는 헤더를 무시한다. 다만 라이브러리가 이 헤더를 보면 오류 로그를 남기므로 해당 검증 2개를 껐다.
-- `/api/health`의 GET과 HEAD는 제한에서 뺐다. 배포와 감시가 이 응답을 보므로, 다른 요청이 많다고 정상 API를 장애로 판단하면 안 된다.
-- 서버를 재시작하면 카운터가 초기화된다. 메모리 저장소이며 API는 한 프로세스로 돈다.
+- I set the limit more generously than nginx's 10 per second (600 per minute). nginx handles the per-user limit, and Express is a safety net.
+- `frontend/nginx.conf` does not put the client address in `X-Forwarded-For`, so requests that went through nginx are all counted as one client in Express. This differs from the issue's "per-IP limit", but there is one user and nginx already limits per IP, so I leave it.
+- I did not turn on `trust proxy`. nginx passes the header the client sent as it is, so turning it on would trust a forged header. With it off, the header is ignored. But the library writes an error log when it sees this header, so I turned off those 2 validations.
+- I excluded GET and HEAD of `/api/health` from the limit. Deployment and monitoring look at this response, so a normal API must not be judged as down because there are many other requests.
+- Restarting the server resets the counter. It is an in-memory store, and the API runs as one process.
 
-## 테스트
+## Tests
 
-`backend/test/rate-limit.test.ts`: 한도 초과 시 한국어 429와 DB 미접근, 잘못된 본문도 거절 우선, 상태 확인 제외, 위조 헤더로 우회 불가와 로그 없음, 기본 한도에서 동시 100건 통과.
+`backend/test/rate-limit.test.ts`: a Korean 429 and no DB access above the limit, a bad body is rejected first, the health check is excluded, a forged header cannot bypass it and there is no log, and 100 concurrent requests pass at the default limit.
 
-## 리뷰
+## Review
 
-1차 리뷰에서 3건이 나왔다.
+The first review had 3 findings.
 
-- nginx가 클라이언트의 `X-Forwarded-For`를 그대로 넘겨 오류 로그가 남고, 문서의 설명도 틀렸다. 검증을 끄고 문서를 고쳤다.
-- `/api/health`가 다른 요청과 한도를 나눠 쓰고 있었다. 제한에서 뺐다.
-- `frontend/nginx.conf`의 "API 자체에는 제한이 없다"는 주석이 이 앱에서 맞지 않게 됐다. 중앙 관리 파일이라 `sirloinbh/project-standards`에 이슈를 남긴다.
+- nginx passes the client's `X-Forwarded-For` as it is, so an error log was written, and the explanation in the document was wrong. I turned off the validation and fixed the document.
+- `/api/health` shared the limit with other requests. I excluded it from the limit.
+- The comment "there is no limit on the API itself" in `frontend/nginx.conf` is no longer correct for this app. It is a centrally managed file, so I leave an issue in `sirloinbh/project-standards`.
 
-## 알려진 문제
+## Known problem
 
-`npm audit`의 high 1건은 이번 패키지가 아니라 기존 `zod` 3.25.76이다(4.6.6 미만 영향). PR #115가 다루는 주 버전 올리기라 이 PR에서 고치지 않는다.
+The 1 high in `npm audit` is not from this package but the existing `zod` 3.25.76 (affects versions before 4.6.6). It is the major version upgrade that PR #115 handles, so I do not fix it in this PR.
 
-2차 리뷰에서 health 제외가 메서드를 보지 않아 `POST /api/health`도 제한 없이 본문을 파싱한다는 지적이 나왔다. GET과 HEAD로 좁히고 테스트를 더했다. 리뷰는 최대 2회이므로 3차 리뷰는 하지 않았다.
+In the second review, it was pointed out that the health exclusion does not look at the method, so `POST /api/health` also parses a body without a limit. I narrowed it to GET and HEAD and added a test. The review is limited to 2 rounds, so I did not do a third review.
 
-## 검증
+## Verification
 
-- `TEST_DATABASE_URL`을 설정한 `npm run check`가 통과했다. 백엔드 285건, 스킬 4건이 모두 통과했다(건너뜀 0).
-- 프런트는 52건 통과, 2건 건너뜀이다. 건너뛴 2건은 중앙 표준에서 온 다크 전용 앱 테스트로, 이 앱에는 해당하지 않는다.
-- `npm run standards:check`와 `npm run lockfiles:sync`(변경 없음)를 확인했다.
-- CodeQL이 이 미들웨어를 인식하는지는 새 라우트가 있는 PR #135에서 확인한다.
+- `npm run check` with `TEST_DATABASE_URL` set passed. Backend 285 and skills 4 all passed (0 skipped).
+- The frontend had 52 passed and 2 skipped. The 2 skipped are dark-only app tests that came from the central standards and do not apply to this app.
+- I checked `npm run standards:check` and `npm run lockfiles:sync` (no change).
+- Whether CodeQL recognizes this middleware is checked in PR #135, which has a new route.

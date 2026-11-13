@@ -1,57 +1,57 @@
-# #42 복습 일정 DB와 학습 완료 시 자동 생성
+# #42 Review schedule DB and automatic creation when studying is completed
 
-- 이슈: [#42](https://github.com/sirloinbh/study-log/issues/42)
-- 브랜치: `feat/42-review-schedule`
-- 규칙: [복습 주기 규칙](../decisions/review-rules.md)
+- Issue: [#42](https://github.com/sirloinbh/study-log/issues/42)
+- Branch: `feat/42-review-schedule`
+- Rules: [review interval rules](../decisions/review-rules.md)
 
-## 목적
+## Purpose
 
-학습 기록을 완료하면 복습 1회차가 자동으로 등록되게 한다. 2회차부터는 #43의 완료 처리가 만든다.
+When a study record is completed, register review round 1 automatically. From round 2, the completion handling in #43 creates them.
 
-## 변경
+## Changes
 
-- `database/migrations/012_reviews.sql`: 회차별 복습 표 `reviews`. 기록과 회차 조합이 유일하고, 기록을 지우면 함께 지워진다. `completed_on`이 완료 기록이고, `original_due_date`는 미뤄도 바뀌지 않는 지연 집계 기준이다(#46).
-- `backend/src/reviews.ts`: 간격 1·2·4·7·16일의 예정일 계산과 1회차 동기화.
-- `backend/src/study-logs.ts`: 등록과 수정을 트랜잭션으로 묶었다. 수정은 행을 잠그고 이전 상태와 비교한다.
-- `backend/src/sql.ts`: 트랜잭션 함수 `inTransaction`을 `textbook-contents.ts`에서 옮겨 함께 쓴다. 롤백 실패 시 연결을 폐기하는 동작(#68)은 그대로이다.
+- `database/migrations/012_reviews.sql`: the per-round review table `reviews`. The combination of record and round is unique, and when a record is deleted they are deleted with it. `completed_on` is the completion record, and `original_due_date` is the basis for counting lateness that does not change even when postponed (#46).
+- `backend/src/reviews.ts`: due date calculation for the intervals 1, 2, 4, 7, and 16 days, and round 1 synchronization.
+- `backend/src/study-logs.ts`: wrapped registration and editing in a transaction. An edit locks the row and compares with the previous state.
+- `backend/src/sql.ts`: moved the transaction function `inTransaction` from `textbook-contents.ts` and shared it. The behavior of discarding the connection when a rollback fails (#68) is unchanged.
 
-## 동작
+## Behavior
 
-| 저장 전 → 저장 후        | 결과                                                   |
-| ------------------------ | ------------------------------------------------------ |
-| 없음·미완료 → 완료       | 1회차 생성. 이미 있으면 그대로                         |
-| 완료 → 미완료            | 완료하지 않은 1회차 삭제. 완료한 회차가 있으면 그대로  |
-| 완료 → 완료, 학습일 변경 | 완료하지 않은 1회차의 예정일과 원래 예정일을 다시 계산 |
-| 완료 → 완료, 그 외 수정  | 변화 없음. 기능 도입 전 완료 기록에도 소급하지 않음    |
+| Before saving -> after saving              | Result                                                                              |
+| ------------------------------------------ | ----------------------------------------------------------------------------------- |
+| None or incomplete -> completed            | Create round 1. If it already exists, leave it                                      |
+| Completed -> incomplete                    | Delete the round 1 that is not completed. If a round is completed, leave it         |
+| Completed -> completed, study date changed | Recalculate the due date and original due date of the round 1 that is not completed |
+| Completed -> completed, other edits        | No change. Not applied retroactively to records completed before the feature        |
 
-## 결정한 점
+## Decisions
 
-학습일은 9999-12-31까지 받으므로, 예정일이 그 뒤로 넘어가면 9999-12-31로 둔다. 이 경계를 처리하지 않으면 날짜가 `YYYY-MM-DD` 형식을 벗어나 저장에 실패한다.
+A study date is accepted up to 9999-12-31, so if a due date would go past that, I set it to 9999-12-31. If this boundary is not handled, the date leaves the `YYYY-MM-DD` format and saving fails.
 
-## 테스트
+## Tests
 
-- `backend/test/reviews.test.ts`: 회차 날짜, 늦은 완료, 월·연·윤일 경계, 마지막 날짜. 복습 저장이 실패하면 ROLLBACK하고 연결을 반납하는지 가짜 DB로 확인한다.
-- `backend/test/reviews.integration.test.ts`: 생성, 중복 방지(동시 저장), 행 잠금 대기, 완료 해제, 학습일 변경, 미룬 날짜와 완료한 회차 보존, 소급 없음, 삭제, 없는 참조, 404.
-- `backend/test/study-logs.test.ts`, `backend/test/study-log-reflection.test.ts`: 가짜 DB가 트랜잭션 연결을 쓰도록 고쳤다.
+- `backend/test/reviews.test.ts`: round dates, a late completion, month, year, and leap day boundaries, and the last date. It checks with a fake DB that when saving the review fails, it does ROLLBACK and returns the connection.
+- `backend/test/reviews.integration.test.ts`: creation, preventing duplicates (concurrent saves), waiting on the row lock, un-completing, changing the study date, keeping postponed dates and completed rounds, no retroactive creation, deletion, a missing reference, and 404.
+- `backend/test/study-logs.test.ts`, `backend/test/study-log-reflection.test.ts`: changed the fake DB to use the transaction connection.
 
-## 리뷰
+## Review
 
-1차 리뷰에서 운영 코드의 규칙 위반은 없었고, 테스트 공백 4건과 문서 2건을 이 PR에서 고쳤다.
+In the first review there were no rule violations in the production code, and I fixed 4 test gaps and 2 document points in this PR.
 
-- 롤백 테스트가 복습 저장 전에 실패해 트랜잭션을 검증하지 못했다. 복습 저장을 실패시키는 테스트를 더했다.
-- 메모 수정 시 미룬 날짜 보존, 학습일 변경 시 완료한 1회차 보존, 행 잠금 대기를 검증하지 않았다. 각각 테스트를 더했다.
-- 변경 기록의 테스트 설명을 실제 범위에 맞췄고, 9999-12-31 처리를 규칙 문서에 적었다.
+- The rollback test failed before saving the review, so it could not verify the transaction. I added a test where saving the review fails.
+- It did not verify keeping the postponed date when a note is edited, keeping the completed round 1 when the study date changes, or waiting on the row lock. I added a test for each.
+- I matched the test description in the change record to the real scope, and wrote the 9999-12-31 handling in the rules document.
 
-범위를 넘는 기존 문제는 새 이슈로 분리했다.
+I split existing problems beyond the scope into new issues.
 
-- [#133](https://github.com/sirloinbh/study-log/issues/133): DB 연결이 끊기면 API 프로세스가 죽을 수 있다.
-- [#134](https://github.com/sirloinbh/study-log/issues/134): 배포 스크립트가 없는 `dist/migrate.js`를 실행한다. 그래서 012는 `database/README.md`의 수동 절차로 적용해야 한다.
+- [#133](https://github.com/sirloinbh/study-log/issues/133): if the DB connection drops, the API process can die.
+- [#134](https://github.com/sirloinbh/study-log/issues/134): the deployment script runs a `dist/migrate.js` that does not exist. So 012 must be applied with the manual procedure in `database/README.md`.
 
-2차 리뷰는 보완점이 없었다.
+The second review had nothing to fix.
 
-## 검증
+## Verification
 
-- 마이그레이션 012를 테스트 DB에 두 번 적용했고 두 번 모두 성공했다.
-- `TEST_DATABASE_URL`을 설정하고 `npm run check`의 포맷, 린트, 타입 검사, 테스트를 실행했다. 백엔드 280건, 프런트 52건, 스킬 4건이 모두 통과했다(건너뜀 0).
-- `npm run build`와 `npm run standards:check`가 통과했다.
-- 화면 변경이 없어 브라우저 확인은 하지 않았다.
+- I applied migration 012 to the test DB twice, and it succeeded both times.
+- With `TEST_DATABASE_URL` set, I ran the format, lint, type check, and tests of `npm run check`. Backend 280, frontend 52, and skills 4 all passed (0 skipped).
+- `npm run build` and `npm run standards:check` passed.
+- There was no screen change, so I did not check in a browser.

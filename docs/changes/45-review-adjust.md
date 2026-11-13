@@ -1,66 +1,66 @@
-# #45 복습 조회 범위·수동 조정·미루기
+# #45 Review lookup range, manual adjustment, and postponing
 
-- 이슈: [#45](https://github.com/sirloinbh/study-log/issues/45)
-- 브랜치: `feat/45-review-adjust`
-- 규칙: [복습 주기 규칙](../decisions/review-rules.md) 3장
+- Issue: [#45](https://github.com/sirloinbh/study-log/issues/45)
+- Branch: `feat/45-review-adjust`
+- Rules: chapter 3 of the [review interval rules](../decisions/review-rules.md)
 
-## 목적
+## Purpose
 
-복습 일정을 상황에 맞게 관리한다. 복습 완료를 잘못 눌렀을 때 다음 회차 날짜를 고칠 방법도 이것으로 생긴다.
+Manage the review schedule to fit the situation. This also gives a way to fix the next round's date when you pressed review completion by mistake.
 
-## 변경
+## Changes
 
 - `backend/src/reviews.ts`:
-  - `GET /api/reviews/week`, `GET /api/reviews/all`: 이번 주 토요일까지, 또는 미완료 회차 전체를 준다. 지난 회차도 포함한다.
-  - `POST /api/reviews/:id/snooze`: 예정일과 오늘 중 늦은 날의 다음 날로 옮긴다.
-  - `PUT /api/reviews/:id/due-date`: 예정일을 바꾼다.
-  - 두 변경 모두 그 회차의 예정일만 바꾸고, 원래 예정일은 그대로 둔다. 완료한 회차는 409, 없는 회차는 404로 답한다.
-- `backend/src/dates.ts`: `isCalendarDate`를 `study-logs.ts`에서 옮기고 날짜 더하기를 더했다. 복습 코드가 `study-logs.ts`를 가져오면 순환 참조가 되기 때문이다.
-- `frontend/src/reviews.tsx`, `frontend/src/review.ts`: 범위 버튼(오늘, 이번 주, 전체), 하루 미루기, 날짜 변경.
+  - `GET /api/reviews/week`, `GET /api/reviews/all`: returns up to this week's Saturday, or all incomplete rounds. Past rounds are included.
+  - `POST /api/reviews/:id/snooze`: moves it to the day after the later of the due date and today.
+  - `PUT /api/reviews/:id/due-date`: changes the due date.
+  - Both changes alter only that round's due date and leave the original due date as it is. A completed round answers 409, and a missing round answers 404.
+- `backend/src/dates.ts`: moved `isCalendarDate` from `study-logs.ts` and added date addition. This is because the review code importing `study-logs.ts` would create a circular reference.
+- `frontend/src/reviews.tsx`, `frontend/src/review.ts`: range buttons (today, this week, all), postponing by one day, and changing the date.
 
-## 결정한 점
+## Decisions
 
-- "전체"는 미완료 회차 전체이다. 완료한 회차의 기록은 보여 주지 않는다. 다음 회차는 앞 회차를 완료할 때 만들어지므로, 진행 중인 기록마다 하나씩 나온다.
-- 이번 주의 끝은 토요일이다(주 시작은 일요일, #96).
-- 수동 변경은 지난 날짜도 허용한다. 지난 날짜로 옮기면 지난 복습으로 나타날 뿐 다른 동작에 영향이 없다.
-- 예정일 전의 회차도 "복습 완료"를 누를 수 있다. 다음 회차는 실제 완료일을 기준으로 정해진다.
+- "All" means all incomplete rounds. It does not show the record of completed rounds. The next round is created when the previous round is completed, so one appears per record in progress.
+- The end of this week is Saturday (the week starts on Sunday, #96).
+- A manual change allows past dates too. Moving to a past date only makes it show up as an overdue review and has no effect on other behavior.
+- You can press "review complete" on a round before its due date too. The next round is set from the real completion date.
 
-## 테스트
+## Tests
 
-- `backend/test/reviews.test.ts`: 미루기 날짜, 이번 주의 끝.
-- `backend/test/review-adjust.integration.test.ts`: 범위별 목록, 미루기(지난 회차, 앞날 회차), 미룬 뒤 완료의 다음 회차, 양방향 날짜 변경, 잘못 완료한 뒤 다음 회차 수정, 완료한 회차 거부, 404, 400.
-- `backend/test/review-count.integration.test.ts`: 미루면 배지 수가 줄고, 오늘로 옮기면 다시 는다.
-- `frontend/src/reviews.test.tsx`: 범위 전환, 늦은 응답 무시, 범위별 오류, 미루기, 날짜 변경, 취소, 거부된 날짜, 다른 곳에서 완료된 경우, 재시도, 포커스.
+- `backend/test/reviews.test.ts`: the postponed date, the end of this week.
+- `backend/test/review-adjust.integration.test.ts`: lists by range, postponing (a past round, a future round), the next round of a completion after postponing, changing the date in both directions, fixing the next round after a wrong completion, refusing a completed round, 404, and 400.
+- `backend/test/review-count.integration.test.ts`: postponing reduces the badge count, and moving to today increases it again.
+- `frontend/src/reviews.test.tsx`: switching ranges, ignoring a late response, errors per range, postponing, changing the date, cancel, a rejected date, a case completed elsewhere, retry, and focus.
 
-## 리뷰
+## Review
 
-1차 리뷰에서 백엔드 로직의 결함은 없었고, 다음을 이 PR에서 고쳤다.
+In the first review there were no defects in the backend logic, and I fixed the following in this PR.
 
-- 배지 개수를 정확히 비교하는 검증이 다른 테스트 파일과 병렬로 돌아 간헐적으로 실패할 수 있었다. 잠금을 쓰는 `backend/test/review-count.integration.test.ts`로 옮겼다.
-- 이미 선택된 범위 버튼을 누르면 입력 중인 날짜 폼이 닫혔다. 이제 아무 일도 하지 않고, 목록을 불러오지 못한 상태일 때만 다시 불러온다.
-- 범위 변경과 다른 복습 변경 시 폼 닫기, 처리 중 범위 버튼 잠금의 테스트를 더했다.
-- 복습 화면의 설명 문구를 새 범위에 맞췄다.
+- The check that compares the badge count exactly ran in parallel with other test files, so it could fail intermittently. I moved it to `backend/test/review-count.integration.test.ts`, which uses a lock.
+- Pressing an already selected range button closed the date form being typed. Now it does nothing, and reloads only when the list is in a state where it could not be loaded.
+- I added tests for closing the form on a range change and on another review's change, and for locking the range buttons while processing.
+- I matched the description text on the reviews screen to the new ranges.
 
-2차 리뷰에서 다음을 이 PR에서 고쳤다. 리뷰는 최대 2회이므로 3차 리뷰는 하지 않았다.
+In the second review, the following were fixed in this PR. The review is limited to 2 rounds, so I did not do a third review.
 
-- 목록 재시도 뒤 포커스가 사라지고, 같은 오류가 다시 나면 아무 신호가 없었으며, 앞선 변경의 오류가 남았다. 재시도 시작 때 오류를 지우고, 날짜 폼이 열려 있지 않으면 앞선 오류도 지우며, 포커스를 범위 버튼으로 돌린다.
-- 범위를 오갈 때 진행 중이던 조회가 완료 뒤 목록을 덮어쓸 수 있었다. 가장 최근 조회의 응답만 쓴다.
-- 재시도의 잠금 해제 테스트와 변경 기록의 테스트 위치를 고쳤다.
+- After a list retry, focus was lost, no signal came when the same error appeared again, and the error of an earlier change remained. When a retry starts, I clear the error, I also clear the earlier error if the date form is not open, and I return focus to the range button.
+- When you moved between ranges, a lookup that was in progress could overwrite the list after a completion. Only the response of the most recent lookup is used.
+- I fixed the lock release test of the retry and the test location in the change record.
 
-## 검증
+## Verification
 
-`TEST_DATABASE_URL`을 설정한 `npm run check`가 통과했다. 백엔드 310건, 프런트 100건, 스킬 4건이 통과했다. 건너뜀은 프런트 2건으로, 중앙 표준에서 온 다크 전용 앱 테스트이다. `npm run standards:check`도 통과했다.
+`npm run check` with `TEST_DATABASE_URL` set passed. Backend 310, frontend 100, and skills 4 passed. The skips were 2 frontend tests, the dark-only app tests that came from the central standards. `npm run standards:check` passed too.
 
-## 브라우저 확인
+## Browser check
 
-테스트 DB에 연결한 개발 서버를 headless Chrome으로 PC(1440×900)와 모바일(390×844)에서 확인했다. 25개 항목이 통과했고, 확인 뒤 테스트 데이터를 지웠다.
+With a dev server connected to the test DB, I checked with headless Chrome at PC (1440×900) and mobile (390×844). 25 items passed, and I deleted the test data after checking.
 
-- 오늘, 이번 주, 전체 범위의 목록과 개수가 맞다. 가로 스크롤이 없고 모바일 버튼 높이는 44px이다.
-- 하루 미루면 새 예정일이 안내되고, 오늘 목록과 상단 배지에서 빠지며, 포커스가 제목으로 옮겨 간다.
-- 날짜를 바꾸면 입력 칸에 포커스가 가고, 저장 후 안내가 나오며, 오늘로 옮기면 배지가 돌아온다.
+- The lists and counts for the today, this week, and all ranges are right. There is no horizontal scroll, and the mobile button height is 44px.
+- When you postpone by one day, the new due date is announced, it leaves today's list and the top badge, and focus moves to the title.
+- When you change the date, focus goes to the input, a notice appears after saving, and when you move it to today, the badge comes back.
 
-이번 주의 경계 날짜는 통합 테스트(수요일 기준)로 확인했다. 브라우저 확인과 캡처는 2차 리뷰 보완까지 반영한 최종 코드 기준이다. 범위 버튼 재시도는 테스트로만 확인했다.
+The boundary date of this week was checked with an integration test (based on a Wednesday). The browser check and the captures are based on the final code that includes the second-review fixes. The range button retry was checked only with tests.
 
 ![PC](assets/45-pc-1440x900.png)
 
-![모바일](assets/45-mobile-390x844.png)
+![Mobile](assets/45-mobile-390x844.png)

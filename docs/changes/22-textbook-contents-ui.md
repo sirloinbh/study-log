@@ -1,125 +1,125 @@
-# #22 목차 수동 입력·편집 화면
+# #22 Manual input and edit screen for the table of contents
 
-- 이슈: [#22](https://github.com/sirloinbh/study-log/issues/22) (상위 #5)
-- 브랜치: `feat/22-textbook-contents-ui`
-- 선행: #13 교재 목차 DB·API, #21 교재 화면 (모두 병합 완료)
+- Issue: [#22](https://github.com/sirloinbh/study-log/issues/22) (parent #5)
+- Branch: `feat/22-textbook-contents-ui`
+- Prerequisites: #13 textbook table of contents DB and API, #21 textbook screen (both merged)
 
-## 목적
+## Purpose
 
-목차 자동 생성(#23) 전에도 교재의 장·절을 화면에서 직접 입력하고 고칠 수 있게 한다.
+Even before automatic generation of the table of contents (#23), let you enter and fix the chapters and sections of a textbook directly on the screen.
 
-## 변경
+## Changes
 
-- `frontend/src/TextbookContents.tsx`: 목차 카드. 교재 화면에서 교재를 고르면 목록·상세 아래에 나온다.
-  - 목차를 트리로 보여 준다. 하위 절은 들여쓰고 왼쪽 선으로 묶는다. 목차가 없으면 "아직 목차가 없습니다".
-  - "장 추가": 최상위 장을 맨 뒤에 추가한다.
-  - 항목마다 버튼 다섯 개: 위로, 아래로, 하위 추가, 수정, 삭제.
-    - 위로·아래로는 같은 상위 목차 안에서 이웃과 자리를 바꾸고, 형제 전체 순서를 `PUT /contents/order`로 저장한다. 맨 앞의 위로와 맨 뒤의 아래로는 비활성이다.
-    - 하위 추가는 그 항목 아래 맨 뒤에 추가한다.
-    - 수정은 번호와 제목을 바꾼다.
-    - 삭제는 "삭제 확인"을 한 번 더 눌러야 실행되고, 하위 항목도 함께 지운다.
-  - 편집기는 목차 카드 위쪽에 한 개만 열린다.
-    - 제목: "장 추가", "'1 벡터' 아래에 추가", "목차 수정"
-    - 열릴 때마다 "목차 제목" 칸으로 포커스가 간다(`autoFocus`, 대상이 바뀌면 폼을 새로 그린다).
-  - 서버 오류(학습 기록이 연결된 목차 삭제 409 등)는 서버의 한국어 메시지로 보여 주고 목차를 다시 불러온다.
-    - 404는 편집 중인 그 항목(또는 교재)에 대한 것일 때만 편집기를 닫는다.
-  - 요청 중에는 입력과 버튼을 잠근다.
-  - 목차·편집기·삭제 확인·알림 상태에 교재 ID를 붙여 보관한다. 교재를 바꾸면 이전 교재의 목차나 편집기가 보이지 않는다. 실제 React에서는 `key`로도 새로 그린다.
-- `frontend/src/Textbooks.tsx`: 선택한 교재가 있으면 목차 카드를 붙인다.
-- `frontend/src/style.css`: 목차 트리·행·편집 폼 스타일. 모바일에서는 들여쓰기를 줄인다. 버튼은 줄바꿈한다.
+- `frontend/src/TextbookContents.tsx`: the table of contents card. When you pick a textbook on the textbook screen, it appears under the list and detail.
+  - It shows the table of contents as a tree. Sections are indented and grouped by a line on the left. If there is no table of contents, "아직 목차가 없습니다" ("There is no table of contents yet").
+  - "장 추가" ("Add chapter"): adds a top-level chapter at the end.
+  - Five buttons per item: up, down, add below, edit, and delete.
+    - Up and down swap places with a neighbor within the same parent entry, and save the order of all siblings with `PUT /contents/order`. Up on the first and down on the last are disabled.
+    - Add below adds at the end under that item.
+    - Edit changes the number and the title.
+    - Delete runs only after you press "삭제 확인" ("Confirm delete") once more, and it deletes the items under it too.
+  - Only one editor opens, at the top of the table of contents card.
+    - Titles: "장 추가", "'1 벡터' 아래에 추가" ("Add under '1 Vectors'"), and "목차 수정" ("Edit table of contents")
+    - Each time it opens, focus goes to the "목차 제목" ("Table of contents title") field (`autoFocus`, and if the target changes, the form is redrawn).
+  - Server errors (409 for deleting a table of contents entry that has study logs linked, and so on) are shown with the server's Korean message, and the table of contents is loaded again.
+    - A 404 closes the editor only when it is about the item being edited (or the textbook).
+  - During a request, the inputs and buttons are locked.
+  - The table of contents, editor, delete confirmation, and notice states are kept with the textbook ID attached. If you change the textbook, the table of contents or editor of the previous textbook is not shown. In a real React it is also redrawn with `key`.
+- `frontend/src/Textbooks.tsx`: if a textbook is selected, attach the table of contents card.
+- `frontend/src/style.css`: the styles for the table of contents tree, rows, and the edit form. On mobile the indentation is reduced. The buttons wrap.
 
-## 테스트
+## Tests
 
-- `backend/test/textbook-contents-ui.test.ts`(가짜 목차 API, 요청 기록) 최초 11건(1차 리뷰 후 13건)
-  - 교재 선택 시 트리 표시와 첫 요청 `GET /api/textbooks/1/contents`, 교재 전환
-  - 빈 목차 안내
-  - 장 추가 → 하위 추가: POST 본문(`parentId` null / 상위 ID), 트리 재조회, 편집기 닫힘
-  - 수정: 폼 채움, PUT 본문, 트리 반영
-  - 위로·아래로: 양 끝 비활성, 형제 전체 순서를 보내는 `PUT /order` 본문, 최상위 장 순서 변경
-  - 삭제 확인·취소, 하위 항목 함께 삭제
-  - 409(학습 기록 연결) 메시지 표시, 다른 항목의 편집은 유지
-  - 다른 곳에서 삭제된 항목 수정 저장(404) → 편집기 닫힘, 트리 갱신
-  - 교재를 바꾸면 이전 교재의 편집기가 닫힘
-  - 행 버튼의 `aria-label`
-  - `contentLabel` 단위 검사
-- `backend/test/ui-harness.ts`: `submit`이 범위를 받아 그 안의 폼을 제출한다. 교재 화면에 폼이 두 개라서 필요하다.
-- `backend/test/textbooks-ui.test.ts`: 가짜 API가 목차 요청에 빈 목차를 응답한다.
-- 목차 폼의 제목 라벨은 교재 등록 폼의 "제목"과 구분되게 "목차 제목"으로 정했다.
+- `backend/test/textbook-contents-ui.test.ts` (a fake table of contents API, request records), 11 at first (13 after the first review)
+  - When a textbook is selected, the tree is shown and the first request is `GET /api/textbooks/1/contents`, and switching textbooks
+  - The empty table of contents notice
+  - Add chapter -> add below: the POST body (`parentId` null / the parent ID), reloading the tree, and the editor closing
+  - Edit: filling the form, the PUT body, and reflecting in the tree
+  - Up and down: both ends disabled, the `PUT /order` body that sends the order of all siblings, and reordering top-level chapters
+  - Delete confirmation and cancel, and deleting the items under it together
+  - Showing the 409 (study log linked) message, and the edit of another item is kept
+  - Saving an edit of an item deleted elsewhere (404) -> the editor closes and the tree is updated
+  - If you change the textbook, the editor of the previous textbook closes
+  - The `aria-label` of the row buttons
+  - A unit check of `contentLabel`
+- `backend/test/ui-harness.ts`: `submit` takes a scope and submits the form inside it. It is needed because the textbook screen has two forms.
+- `backend/test/textbooks-ui.test.ts`: the fake API answers the table of contents request with an empty table of contents.
+- I named the title label of the table of contents form "목차 제목" ("Table of contents title") so it is told apart from "제목" ("Title") in the textbook registration form.
 
-## 검증
+## Verification
 
-| 명령                | 환경                              | 결과                                                                                      |
-| ------------------- | --------------------------------- | ----------------------------------------------------------------------------------------- |
-| `npm run check`     | 로컬, `TEST_DATABASE_URL` 미설정  | exit 0. backend tests 78, pass 73, fail 0, **skipped 5**(DB 통합), 스킬 4 pass, 빌드 통과 |
-| Playwright 1440×900 | 메모리 목차 API(3102) + Vite 5202 | 아래 흐름 모두 기대대로. 페이지 오류 0건                                                  |
-| Playwright 390×844  | 같은 환경                         | 가로 스크롤 없음(`scrollWidth` 375, 차이는 세로 스크롤바), 행 넘침 0, 버튼 최소 44px      |
+| Command             | Environment                                           | Result                                                                                                                    |
+| ------------------- | ----------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `npm run check`     | Local, `TEST_DATABASE_URL` not set                    | exit 0. backend tests 78, pass 73, fail 0, **skipped 5** (DB integration), skills 4 pass, build passed                    |
+| Playwright 1440×900 | An in-memory table of contents API (3102) + Vite 5202 | All the flows below as expected. 0 page errors                                                                            |
+| Playwright 390×844  | The same environment                                  | No horizontal scroll (`scrollWidth` 375, the difference is the vertical scrollbar), 0 row overflow, buttons at least 44px |
 
-- 건너뛴 5건은 기존 DB 통합 테스트다(로컬 테스트 DB 없음, CI에서 실행). 이번 변경은 화면뿐이고 API·DB는 바꾸지 않았다.
-- 브라우저 확인은 API 규칙대로 응답하는 메모리 HTTP 서버로 했다. 저장소에는 넣지 않았다. 서버 검증·DB 동작은 #13·#14의 통합 테스트가 맡는다.
-- 확인한 흐름:
-  1. "선형대수와 그 응용" 선택 → 트리 "1 벡터와 선형방정식 › 1.1, 1.2 / 2 행렬"
-  2. 장 추가 "3 행렬식", "2 행렬" 아래에 "2.1 행렬 곱셈" 추가
-  3. "1.1"을 아래로 → 1.2, 1.1 순서
-  4. "1.2" 수정 → "수정했습니다"
-  5. 학습 기록 연결 목차 삭제 → "학습 기록이 연결된 목차는 삭제할 수 없습니다"
-  6. "3 행렬식" 삭제 → "삭제했습니다"
-  7. 첫 확인에서 수정·추가 시 제목 칸으로 포커스가 가지 않았다(편집기가 다음 렌더에 생겨서). `autoFocus`로 고친 뒤 수정, 다른 항목 수정, 장 추가 모두 "목차 제목"에 포커스가 가는 것을 다시 확인했다.
-- 콘솔 오류는 `favicon.ico` 404(기존)와 5번의 의도한 409뿐이다.
-- 스크린샷: [PC 1440×900](assets/22-pc-1440x900.png), [모바일 390×844 목차 카드](assets/22-mobile-390x844.png).
-  - PC 전체 페이지 캡처에서 사이드바가 중간부터 보이는 것은 스크롤된 페이지와 고정 사이드바를 함께 캡처한 결과다(#11 기록과 같음).
+- The 5 skipped are the existing DB integration tests (no local test DB, run in CI). This change is the screen only, and I did not change the API or the DB.
+- I did the browser check with an in-memory HTTP server that answers by the API rules. I did not put it in the repository. Server validation and DB behavior are covered by the integration tests of #13 and #14.
+- Flows checked:
+  1. Pick "선형대수와 그 응용" ("Linear algebra and its applications") -> the tree "1 벡터와 선형방정식 › 1.1, 1.2 / 2 행렬" ("1 Vectors and linear equations › 1.1, 1.2 / 2 Matrices")
+  2. Add the chapter "3 행렬식" ("3 Determinants") and add "2.1 행렬 곱셈" ("2.1 Matrix multiplication") under "2 행렬"
+  3. Move "1.1" down -> the order 1.2, 1.1
+  4. Edit "1.2" -> "수정했습니다" ("Edited")
+  5. Delete a table of contents entry with a study log linked -> "학습 기록이 연결된 목차는 삭제할 수 없습니다" ("A table of contents entry with linked study logs cannot be deleted")
+  6. Delete "3 행렬식" -> "삭제했습니다" ("Deleted")
+  7. In the first check, focus did not go to the title field on edit and add (because the editor appears in the next render). After I fixed it with `autoFocus`, I confirmed again that edit, editing another item, and add chapter all give focus to "목차 제목".
+- The console errors were only the `favicon.ico` 404 (existing) and the intended 409 of step 5.
+- Screenshots: [PC 1440×900](assets/22-pc-1440x900.png), [mobile 390×844 table of contents card](assets/22-mobile-390x844.png).
+  - That the sidebar appears from the middle in the PC full page capture is the result of capturing a scrolled page and the fixed sidebar together (same as the #11 record).
 
-## 자동 코드 리뷰 1차
+## Automated code review, round 1
 
-별도 읽기 전용 리뷰 에이전트가 이슈 #22 완료 기준과 PR 변경을 검토했다.
+A separate read-only review agent reviewed the issue #22 done criteria and the PR changes.
 
-- 문제없다고 확인된 사항:
-  - 교재 ID를 붙인 상태 관리
-  - 404 처리 규칙
-  - 순서 변경(같은 형제 배열과 상위 ID)
-  - 폼 key·`autoFocus`
-  - CSS 회귀 없음
-  - 테스트 수·문서
-- high·medium 지적은 없었다.
-- 지적(low): 변경 직후 재조회가 끝나기 전에 잠금이 풀렸다.
-  - 장 추가 직후 바로 "위로"를 누르면 새 장이 빠진 이전 목록으로 순서 변경을 보내 서버가 거부했다.
-  - 늦게 도착한 재조회가 순서 변경 결과를 덮어쓸 수도 있었다.
-  - 반영:
-    - 재조회를 변경 처리 안으로 옮겨, 재조회가 끝날 때까지 잠금을 유지한다.
-    - 순서 변경은 응답의 새 트리를 그대로 쓴다.
-    - 재조회 effect를 없애 늦은 응답 경합도 없앴다.
-    - 재조회 실패는 기존 목록 옆에 "목차를 불러오지 못했습니다"로 보여 준다.
-  - 테스트: 재조회를 붙잡아 둔 동안 버튼이 잠기는지 확인한다. 수정 전 코드에서 실패하고 수정 후 통과한다.
-  - 테스트: 순서 변경이 거부되면 메시지를 보이고 다시 불러오는지 확인한다.
-- 지적(low): "하위 추가" 버튼의 접근성 이름("… 아래에 추가")에 보이는 문구가 없었다(WCAG 2.5.3).
-  - 반영: "… 하위 추가"로 바꿨다. 테스트 기대값도 바꿨고, 수정 전 코드에서 실패한다.
-- 지적(low): 순서 변경·저장 실패 중 버튼·입력이 비활성화되면서 포커스가 사라진다.
-  - 분리: 같은 원인인 [#65](https://github.com/sirloinbh/study-log/issues/65)에 범위를 추가했다(이슈 코멘트).
-- 지적(low): 첫 조회가 실패하면 다시 시도할 방법이 교재를 다시 고르는 것뿐이다.
-  - 아래 한계에 기록했다.
-- 지적(low): 테스트 제목 "select options"가 실제 검사와 맞지 않았다.
-  - 반영: 제목을 고쳤다.
-- 검증: `npm run check` exit 0. tests 80, pass 75, fail 0, skipped 5(DB 통합).
+- Points confirmed to have no problem:
+  - State management with the textbook ID attached
+  - The 404 handling rule
+  - Reordering (the same sibling array and the parent ID)
+  - The form key and `autoFocus`
+  - No CSS regression
+  - The number of tests and the docs
+- There were no high or medium comments.
+- Comment (low): the lock was released before the reload right after a change finished.
+  - If you pressed "up" right after adding a chapter, the reorder was sent with the old list that lacked the new chapter, and the server rejected it.
+  - A late reload could also overwrite the result of the reorder.
+  - Applied:
+    - I moved the reload inside the change handling, so the lock is kept until the reload finishes.
+    - A reorder uses the new tree in the response as it is.
+    - I removed the reload effect, which also removed the late response race.
+    - A reload failure is shown next to the existing list as "목차를 불러오지 못했습니다" ("Could not load the table of contents").
+  - Test: it checks that the buttons are locked while the reload is held back. It fails on the code before the fix and passes after.
+  - Test: it checks that if a reorder is rejected, the message is shown and it loads again.
+- Comment (low): the accessible name of the "add below" button ("… 아래에 추가", "Add under …") had no visible text (WCAG 2.5.3).
+  - Applied: I changed it to "… 하위 추가" ("… add below"). I changed the test expected value too, and it fails on the code before the fix.
+- Comment (low): while a reorder or save fails, the buttons and inputs are disabled and focus is lost.
+  - Split: I added the scope to [#65](https://github.com/sirloinbh/study-log/issues/65), which has the same cause (an issue comment).
+- Comment (low): if the first lookup fails, the only way to try again is to pick the textbook again.
+  - Recorded in the limits below.
+- Comment (low): the test title "select options" did not match the actual check.
+  - Applied: I fixed the title.
+- Verification: `npm run check` exit 0. tests 80, pass 75, fail 0, skipped 5 (DB integration).
 
-## 자동 코드 리뷰 2차
+## Automated code review, round 2
 
-별도 읽기 전용 리뷰 에이전트가 1차 반영(ae4048d)과 최종 변경을 다시 확인했다. 리뷰는 최대 2회이므로 3차 리뷰는 하지 않는다.
+A separate read-only review agent checked the first-round fix (ae4048d) and the final changes again. The review is limited to 2 rounds, so I do not do a third.
 
-- 확인된 사항:
-  - 재조회 앞뒤로 편집기를 닫거나 유지하는 동작
-  - 재조회가 알림을 지우지 않음
-  - 삭제 실패 시 확인 상태 해제
-  - 제거한 `setReload`의 잔존 참조 없음
-  - 잠금 테스트가 실제 잠금 상태를 관찰함
-- 코드 지적과 분리할 이슈는 없었다.
-- 참고(low):
-  - 순서 변경이 404면 편집 중인 항목과 무관해도 편집기를 닫는다. 순서 변경의 404는 교재나 형제가 사라진 경우뿐이라, 목차를 새로 불러오는 김에 닫는 것으로 유지한다.
-  - 변경은 성공했는데 재조회가 실패하면 이전 목차가 오류와 함께 남는다. 의도한 동작이다.
+- Points confirmed:
+  - Closing or keeping the editor before and after the reload
+  - The reload does not clear the notice
+  - Releasing the confirm state when a delete fails
+  - No leftover reference to the removed `setReload`
+  - The lock test observes the real lock state
+- There were no code comments and no issue to split off.
+- Note (low):
+  - If a reorder is 404, it closes the editor even when unrelated to the item being edited. A 404 on reorder happens only when the textbook or the siblings are gone, so I keep it closing while loading the table of contents anew.
+  - If the change succeeded but the reload fails, the previous table of contents stays with an error. It is the intended behavior.
 
-## 한계·후속
+## Limits and follow-up
 
-- 첫 조회가 실패하면 "장 추가"가 비활성으로 남는다. 교재를 다시 고르면 다시 불러온다. 재시도 버튼은 없다.
-- 테스트용 React 대역은 `key`를 무시하므로, 교재를 바꿀 때 상태를 숨기는 동작은 교재 ID 태그로만 검증된다. 실제 브라우저에서는 `key`로 새로 그린다.
+- If the first lookup fails, "장 추가" stays disabled. If you pick the textbook again, it loads again. There is no retry button.
+- The React stand-in for tests ignores `key`, so the behavior of hiding state when you change the textbook is verified only by the textbook ID tag. In a real browser it is redrawn with `key`.
 
-- 다른 장 아래로 옮기기는 API(#13)에 없어 지원하지 않는다.
-- 모바일에서는 항목마다 버튼 다섯 개가 두 줄로 줄바꿈된다. 목차가 길어지면 메뉴 버튼으로 묶는 방안을 검토할 수 있다.
-- 삭제 확인 버튼 전환 시 포커스 유실은 #65에서 다른 화면과 함께 다룬다.
+- Moving under another chapter is not in the API (#13), so it is not supported.
+- On mobile, the five buttons per item wrap to two lines. If the table of contents gets long, grouping them in a menu button can be considered.
+- Losing focus when the delete confirmation button switches is handled together with other screens in #65.

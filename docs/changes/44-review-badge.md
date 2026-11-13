@@ -1,66 +1,66 @@
-# #44 복습 알림 배지 표시
+# #44 Show the review notification badge
 
-- 이슈: [#44](https://github.com/sirloinbh/study-log/issues/44)
-- 브랜치: `feat/44-review-badge`
-- 규칙: [복습 주기 규칙](../decisions/review-rules.md) 2장
+- Issue: [#44](https://github.com/sirloinbh/study-log/issues/44)
+- Branch: `feat/44-review-badge`
+- Rules: chapter 2 of the [review interval rules](../decisions/review-rules.md)
 
-## 목적
+## Purpose
 
-어느 화면에서든 남은 복습 수를 알 수 있게 한다.
+Let you see the number of remaining reviews on any screen.
 
-## 변경
+## Changes
 
-- `backend/src/reviews.ts`: `GET /api/reviews/today/count`. 예정일이 오늘이거나 지난 미완료 회차의 수를 준다. 앞으로 예정된 다음 회차는 세지 않는다.
-- `frontend/src/review-badge.tsx`: 상단 표시줄의 복습 링크와 개수. 복습이 없으면 보이지 않는다.
-- `frontend/src/app.tsx`: 배지를 `AppShell`의 `actions`에 넣었다.
-- `frontend/src/reviews.tsx`, `frontend/src/StudyLogs.tsx`: 저장, 삭제, 완료 뒤 `onChange`로 알려 배지가 다시 센다.
-- `docs/next-steps/README.md`: 끝난 재부팅과 패키지 설치를 지우고, Docker를 막는 BIOS 설정과 다음 이슈 후보를 현재 상태로 고쳤다.
+- `backend/src/reviews.ts`: `GET /api/reviews/today/count`. It returns the number of incomplete rounds whose due date is today or earlier. Next rounds scheduled for the future are not counted.
+- `frontend/src/review-badge.tsx`: the review link and count in the top bar. It is hidden when there are no reviews.
+- `frontend/src/app.tsx`: put the badge in the `actions` of `AppShell`.
+- `frontend/src/reviews.tsx`, `frontend/src/StudyLogs.tsx`: after save, delete, and complete, notify with `onChange` so the badge counts again.
+- `docs/next-steps/README.md`: removed the finished reboot and package install, and fixed the BIOS setting that blocks Docker and the next issue candidates to the current state.
 
-## 결정한 점
+## Decisions
 
-- 이슈의 "내비게이션 배지"를 메뉴 안이 아니라 상단 표시줄에 두었다. 메뉴 항목은 글자만 받는 중앙 관리 파일이고, 모바일에서는 메뉴가 접혀 있어 "어느 화면에서든"이라는 목적에 맞지 않는다.
-- 페이지 이동, 저장·삭제·완료, 탭으로 돌아올 때 다시 센다. 탭을 밤새 열어 두어도 돌아오면 맞는 수가 나온다. 주기적으로 묻지는 않는다.
-- 개수를 가져오지 못하면 마지막 값을 유지한다. 서버 문제는 각 화면이 알린다.
+- I put the issue's "navigation badge" in the top bar, not inside the menu. A menu item is a centrally managed file that takes only text, and on mobile the menu is collapsed, so it does not fit the purpose of "on any screen".
+- It counts again on page moves, on save, delete, and complete, and when you return to the tab. Even if you leave the tab open overnight, the right number appears when you return. It does not ask periodically.
+- If it cannot fetch the count, it keeps the last value. Each screen reports server problems.
 
-## 테스트
+## Tests
 
-- `backend/test/review-count.integration.test.ts`: 지난 회차와 오늘 회차만 세기, 미래와 미완료 기록 제외, 완료와 삭제 뒤 감소.
-- `frontend/src/review-badge.test.tsx`: 개수와 링크, 0개일 때 숨김, 변경·이동·탭 복귀 시 다시 세기, 실패 시 유지, 늦은 응답 무시.
-- `frontend/src/reviews.test.tsx`: 완료 뒤 변경 알림.
-- `frontend/src/study-logs-change.test.tsx`: 학습 기록의 저장, 저장 실패, 삭제 뒤 변경 알림.
+- `backend/test/review-count.integration.test.ts`: counting only past rounds and today's rounds, excluding the future and incomplete records, and decreasing after completion and deletion.
+- `frontend/src/review-badge.test.tsx`: the count and link, hiding at 0, counting again on change, move, and tab return, keeping on failure, and ignoring a late response.
+- `frontend/src/reviews.test.tsx`: the change notification after completion.
+- `frontend/src/study-logs-change.test.tsx`: the change notification after saving, a save failure, and deleting a study log.
 
-## 리뷰
+## Review
 
-1차 리뷰에서 배지가 다시 세면서 입력 중인 양식이 초기화되는 문제는 없었다. 다음을 이 PR에서 고쳤다.
+In the first review there was no problem where counting again resets a form being typed. I fixed the following in this PR.
 
-- 새 개수 테스트와 통계 테스트가 전체 합계를 비교해 병렬 실행 때 간헐적으로 실패할 수 있었다. 두 테스트를 DB 잠금으로 순서대로 돌린다.
-- `App`을 거쳐 배지까지 이어지는 경로에 테스트가 없었다. 저장과 완료 뒤 배지가 바뀌고 화면이 다시 만들어지지 않는지 `frontend/src/app.test.tsx`에서 확인한다.
-- 실패 경로(삭제 404, 완료 409)의 변경 알림 테스트를 더했다.
-- 끝난 사용자 단계를 `docs/daily/2026-10-31.md`에 남겼다.
+- The new count test and the statistics test compared whole totals, so they could fail intermittently in a parallel run. I run the two tests in order with a DB lock.
+- There was no test for the path that goes through `App` to the badge. `frontend/src/app.test.tsx` checks that the badge changes after save and completion and that the screen is not recreated.
+- I added change notification tests for the failure paths (delete 404, complete 409).
+- I wrote the finished user steps in `docs/daily/2026-10-31.md`.
 
-복습 화면의 목록이 탭 복귀 때 새로 고쳐지지 않는 문제는 [#142](https://github.com/sirloinbh/study-log/issues/142)로 분리했다.
+The problem that the list on the reviews screen is not refreshed on tab return was split into [#142](https://github.com/sirloinbh/study-log/issues/142).
 
-2차 리뷰에서 4건이 나와 이 PR에서 고쳤다. 리뷰는 최대 2회이므로 3차 리뷰는 하지 않았다.
+In the second review, 4 findings came and I fixed them in this PR. The review is limited to 2 rounds, so I did not do a third review.
 
-- 테스트 정리가 실패하면 DB 잠금이 풀리지 않아 `npm test`가 멈출 수 있었다. 정리와 잠금 해제를 한 hook으로 묶어, 정리가 실패해도 잠금을 푼다.
-- 사전 정리가 잠금 전에 돌아, 강제 종료 다음 실행에서 간헐 실패가 남았다. 잠금 뒤로 옮겼고, 개수 테스트는 통계 테스트의 `0001-01-01` 잔여 행도 지운다.
-- 내일 할 일과 후보 표의 이슈를 맞췄다.
-- 일일 기록에 중앙 표준 동기화 PR을 더했다.
+- If test cleanup failed, the DB lock was not released and `npm test` could hang. I tied cleanup and lock release into one hook, so the lock is released even if cleanup fails.
+- The pre-cleanup ran before the lock, so an intermittent failure remained in the run after a forced exit. I moved it after the lock, and the count test also deletes the leftover rows of `0001-01-01` from the statistics test.
+- I matched the issues in tomorrow's to-do and the candidates table.
+- I added the central standards sync PRs to the daily record.
 
-## 검증
+## Verification
 
-`TEST_DATABASE_URL`을 설정한 `npm run check`가 통과했다. 백엔드 297건, 프런트 83건, 스킬 4건이 통과했다. 건너뜀은 프런트 2건으로, 중앙 표준에서 온 다크 전용 앱 테스트이다. `npm run standards:check`도 통과했다.
+`npm run check` with `TEST_DATABASE_URL` set passed. Backend 297, frontend 83, and skills 4 passed. The skips were 2 frontend tests, the dark-only app tests that came from the central standards. `npm run standards:check` passed too.
 
-## 브라우저 확인
+## Browser check
 
-테스트 DB에 연결한 개발 서버를 headless Chrome으로 PC(1440×900)와 모바일(390×844)에서 확인했다. 18개 항목이 통과했고, 확인 뒤 테스트 데이터를 지웠다.
+With a dev server connected to the test DB, I checked with headless Chrome at PC (1440×900) and mobile (390×844). 18 items passed, and I deleted the test data after checking.
 
-- 다른 화면(키워드)에서도 상단 표시줄에 "오늘 복습 2개"가 보인다. 링크 높이는 44px이고 가로 스크롤은 없다.
-- 누르면 복습 화면으로 이동한다.
-- 하나를 완료하면 1개로 줄고, 모두 완료하면 사라진다.
+- On another screen (keywords), "오늘 복습 2개" ("2 reviews today") is also shown in the top bar. The link height is 44px and there is no horizontal scroll.
+- Pressing it moves to the reviews screen.
+- Completing one reduces it to 1, and completing all makes it disappear.
 
-학습 기록 화면에서 저장한 뒤 배지가 갱신되는 것은 브라우저에서 확인하지 않았고, `frontend/src/app.test.tsx`로만 확인했다.
+I did not check in a browser that the badge updates after saving on the study log screen, only with `frontend/src/app.test.tsx`.
 
 ![PC](assets/44-pc-1440x900.png)
 
-![모바일](assets/44-mobile-390x844.png)
+![Mobile](assets/44-mobile-390x844.png)

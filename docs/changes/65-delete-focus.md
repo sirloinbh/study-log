@@ -1,72 +1,72 @@
-# #65 삭제 확인 버튼 전환 시 키보드 포커스 유실
+# #65 Keyboard focus is lost when switching the delete confirmation button
 
-- 이슈: [#65](https://github.com/sirloinbh/study-log/issues/65) (PR #64 리뷰에서 분리)
-- 브랜치: `fix/65-delete-focus`
+- Issue: [#65](https://github.com/sirloinbh/study-log/issues/65) (split from the PR #64 review)
+- Branch: `fix/65-delete-focus`
 
-## 문제
+## Problem
 
-학습 기록 화면과 교재 화면의 삭제는 버튼을 바꿔 끼우는 2단계 확인이다. 각 단계에서 포커스를 가진 버튼이 사라지면서 포커스가 페이지(`<body>`)로 떨어졌다. 그래서 키보드·화면 낭독기 사용자는 단계마다 처음부터 다시 Tab 해야 했다.
+Delete on the study log screen and the textbook screen is a 2-step confirmation that swaps the button. At each step, the button that had focus disappears and focus falls to the page (`<body>`). So keyboard and screen reader users had to Tab again from the start at every step.
 
-## 변경
+## Changes
 
-두 화면에 같은 규칙을 적용했다. 다시 그린 뒤 버튼이 활성화되면 정해 둔 요소에 포커스를 준다.
+I applied the same rule to both screens. After redrawing, once the button is enabled, give focus to a predetermined element.
 
-| 단계                 | 포커스                                              |
-| -------------------- | --------------------------------------------------- |
-| "삭제"를 누름        | 그 항목의 "삭제 확인"                               |
-| "취소"를 누름        | 그 항목의 "삭제"                                    |
-| 삭제 성공            | 목록 제목("최근 기록" / "교재 목록", `tabIndex=-1`) |
-| 이미 지워짐(404)     | 목록 제목                                           |
-| 그 밖의 실패(500 등) | 그 항목의 "삭제"(항목이 남아 있으므로)              |
+| Step                           | Focus                                                     |
+| ------------------------------ | --------------------------------------------------------- |
+| Press "삭제" (Delete)          | That item's "삭제 확인" (Confirm delete)                  |
+| Press "취소" (Cancel)          | That item's "삭제"                                        |
+| Delete succeeds                | The list title ("최근 기록" / "교재 목록", `tabIndex=-1`) |
+| Already deleted (404)          | The list title                                            |
+| Other failures (500 and so on) | That item's "삭제" (because the item remains)             |
 
-- `frontend/src/StudyLogs.tsx`: 버튼에 `study-log-delete-<id>`·`study-log-delete-confirm-<id>`, 제목에 `study-log-list` id를 붙였다.
-- `frontend/src/Textbooks.tsx`: 버튼에 `textbook-delete`·`textbook-delete-confirm`, 제목에 `textbook-list` id를 붙였다.
-- 이슈 범위는 두 화면이다. 같은 2단계 삭제 패턴을 쓰는 연습문제·목차 카드와 키워드 화면(삭제 → 확인, 취소 단계)은 [#86](https://github.com/sirloinbh/study-log/issues/86)으로 분리했다.
+- `frontend/src/StudyLogs.tsx`: attached `study-log-delete-<id>` and `study-log-delete-confirm-<id>` to the buttons and the `study-log-list` id to the title.
+- `frontend/src/Textbooks.tsx`: attached `textbook-delete` and `textbook-delete-confirm` to the buttons and the `textbook-list` id to the title.
+- The issue's scope is the two screens. The exercises and table of contents cards and the keywords screen, which use the same 2-step delete pattern (delete -> confirm, cancel steps), were split into [#86](https://github.com/sirloinbh/study-log/issues/86).
 
-## 테스트
+## Tests
 
-- `backend/test/study-logs-ui.test.ts`, `backend/test/textbooks-ui.test.ts`(각 2건)
-  - 삭제 → 확인 버튼, 취소 → 삭제 버튼, 확인 → 목록 제목(`tabIndex=-1`)
-  - 500 실패 → 삭제 버튼, 404 → 목록 제목
-- 수정 전 코드에서 4건 실패, 수정 후 통과를 확인했다.
+- `backend/test/study-logs-ui.test.ts`, `backend/test/textbooks-ui.test.ts` (2 each)
+  - Delete -> confirm button, cancel -> delete button, confirm -> list title (`tabIndex=-1`)
+  - 500 failure -> delete button, 404 -> list title
+- I confirmed that 4 fail on the code before the fix and pass after the fix.
 
-## 검증
+## Verification
 
-| 명령            | 환경                             | 결과                                                        |
-| --------------- | -------------------------------- | ----------------------------------------------------------- |
-| `npm run check` | 로컬, `TEST_DATABASE_URL` 미설정 | exit 0. backend tests 165, pass 153, fail 0, skipped 12(DB) |
+| Command         | Environment                        | Result                                                       |
+| --------------- | ---------------------------------- | ------------------------------------------------------------ |
+| `npm run check` | Local, `TEST_DATABASE_URL` not set | exit 0. backend tests 165, pass 153, fail 0, skipped 12 (DB) |
 
-- 브라우저(Playwright Chromium, Vite + API + 로컬 테스트 DB)에서 키보드(Enter·Tab)만으로 확인했다.
-  - 모바일 390×844, 학습 기록 화면
-    - "삭제"에서 Enter → 포커스가 "삭제 확인"
-    - Tab → "취소"에서 Enter → 포커스가 "삭제"
-    - Enter → Enter로 실제 삭제 → 포커스가 "최근 기록" 제목, "삭제했습니다", API로 삭제 확인(404)
-  - PC 1440×900, 교재 화면: 같은 흐름이 확인 → 삭제 → 교재 목록 제목으로 이동하고, 가로 스크롤이 없다.
-- 포커스 이동만 바뀌고 화면 모양은 바뀌지 않아 스크린샷은 남기지 않았다.
+- In a browser (Playwright Chromium, Vite + API + a local test DB), I checked with only the keyboard (Enter and Tab).
+  - Mobile 390×844, the study log screen
+    - Enter on "삭제" -> focus is on "삭제 확인"
+    - Tab -> Enter on "취소" -> focus is on "삭제"
+    - Enter -> Enter for a real delete -> focus is on the "최근 기록" title, "삭제했습니다" ("Deleted"), and I confirmed the delete through the API (404)
+  - PC 1440×900, the textbook screen: the same flow moves to the textbook list title after confirm -> delete, and there is no horizontal scroll.
+- Only the focus movement changed and the look of the screen did not, so I did not keep screenshots.
 
-## 자동 코드 리뷰 1차
+## Automated code review, round 1
 
-별도 읽기 전용 리뷰 에이전트가 검토했다. 정확성 문제와 high 지적은 없었다. 분리할 이슈도 없다.
+A separate read-only review agent reviewed it. There were no correctness problems or high comments. There is no issue to split off either.
 
-- 확인된 사항
-  - effect가 `busy`가 풀린 뒤 실행돼 활성화된 버튼에 포커스가 간다.
-  - 목록 제목은 항상 있어 비동기 다시 불러오기와 무관하다.
-  - id가 겹치지 않는다. 기존 포커스 코드(수정·교재 선택)와도 충돌하지 않는다.
-- low(반영): 테스트의 가짜 `getElementById`가 어떤 id든 받아서, 버튼 id에 오타가 있어도 통과했다.
-  - 포커스 대상 id가 렌더된 화면에 정확히 하나 있어야 통과하게 바꿨다.
-  - 확인 버튼 id를 일부러 틀리게 바꾸면 테스트가 "no element"로 실패하는 것을 확인했다.
-- low(유지)
-  - 500 등으로 실패한 뒤 다시 불러온 목록에서 그 항목이 사라졌으면(다른 곳에서 삭제), 포커스할 버튼이 없다. 드문 경우다.
-  - 요청 중에는 포커스가 옮겨지지 않는다는 점은 따로 테스트하지 않았다.
+- Confirmed points
+  - The effect runs after `busy` is released, so focus goes to the enabled button.
+  - The list title is always there, so it does not depend on an asynchronous reload.
+  - The ids do not collide. They do not conflict with the existing focus code (edit and textbook selection) either.
+- low (applied): the fake `getElementById` in the tests accepted any id, so it passed even with a typo in a button id.
+  - I changed it so it passes only if the focus target id is exactly one in the rendered screen.
+  - I confirmed that if I deliberately change the confirm button id wrongly, the test fails with "no element".
+- low (kept)
+  - If the item is gone from the list reloaded after a failure such as 500 (deleted elsewhere), there is no button to focus. It is a rare case.
+  - I did not separately test that focus is not moved during a request.
 
-## 자동 코드 리뷰 2차
+## Automated code review, round 2
 
-별도 읽기 전용 리뷰 에이전트가 1차 반영과 최종 PR 전체를 다시 확인했다. 리뷰는 최대 2회이므로 3차 리뷰는 하지 않는다.
+A separate read-only review agent checked the first-round fixes and the whole final PR again. The review is limited to 2 rounds, so I do not do a third.
 
-- 테스트 하네스는 다시 그린 뒤에 effect를 실행한다. 그래서 강화한 포커스 확인이 현재 화면을 보고, 잘못된 실패가 없다고 확인됐다.
-- 코드 지적과 분리할 이슈는 없었다. 테스트 주석의 필드 이름(`state.ui`)만 바로잡았다.
+- The test harness runs effects after redrawing. So it was confirmed that the strengthened focus check looks at the current screen and that there are no wrong failures.
+- There were no code comments and no issue to split off. I only fixed the field name (`state.ui`) in a test comment.
 
-## 한계·후속
+## Limits and follow-up
 
-- 연습문제·목차·키워드 화면의 같은 문제는 #86에서 고친다.
-- 포커스 링 스타일은 브라우저 기본값을 따른다. 목록 제목이 포커스를 받을 때의 표시는 따로 꾸미지 않았다.
+- The same problem on the exercises, table of contents, and keywords screens is fixed in #86.
+- The focus ring style follows the browser default. I did not style how it looks when the list title gets focus.

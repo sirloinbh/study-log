@@ -1,98 +1,98 @@
-# #47 학습 시간 집계 API (일·주·월·누적·평균)
+# #47 Study time aggregation API (day, week, month, cumulative, average)
 
-- 이슈: [#47](https://github.com/sirloinbh/study-log/issues/47) (상위 #8)
-- 브랜치: `feat/47-study-time-stats`
-- 선행: #10 학습 기록 DB·API (병합 완료)
+- Issue: [#47](https://github.com/sirloinbh/study-log/issues/47) (parent #8)
+- Branch: `feat/47-study-time-stats`
+- Prerequisite: #10 study log DB and API (merged)
 
-## 목적
+## Purpose
 
-학습 기록을 기간별로 집계해 통계 대시보드(#48)·히트맵(#50) 등이 쓸 수 있게 한다.
+Aggregate study records by period so the statistics dashboard (#48) and the heatmap (#50) can use them.
 
-## 결정
+## Decisions
 
-이슈에 "평균의 분모는 착수 시 확정"으로 남아 있던 규칙 등을 아래 기준으로 정했다. [이슈 코멘트](https://github.com/sirloinbh/study-log/issues/47#issuecomment-6357561021)에도 남겼다.
+The issue left "the denominator of the average to be fixed when starting" and other rules, and I set them by the criteria below. I also left them in an [issue comment](https://github.com/sirloinbh/study-log/issues/47#issuecomment-6357561021).
 
-- **집계 대상:** "계획" 상태 기록은 아직 공부하지 않은 것이라 뺀다. 진행 중·완료·중단 기록의 학습 시간을 더한다. 오늘 이후 날짜도 뺀다.
-- **기간(`Asia/Seoul`, 오늘 = `serviceDate()`)**
-  - 이번 주: 월요일 ~ 오늘
-  - 이번 달: 1일 ~ 오늘
-  - 최근 3개월: 3개월 전 같은 날의 다음 날 ~ 오늘. 그 달에 없는 날이면 그 달의 마지막 날로 본다(예: 5월 31일 → 3월 1일부터).
-  - 전체: 첫 기록 날짜 ~ 오늘. 단, 일별·주별·월별 시리즈와 기간 합계는 최근 3653일(약 10년)까지만이다. 전체 누적(`cumulativeMinutes`)은 모든 기록을 센다.
-- **평균:** 기본은 기간의 달력 날짜 수(공부하지 않은 날 포함)로 나눈 하루 평균이다. 공부한 날만으로 나눈 평균도 함께 준다. 둘 다 분 단위로 반올림한다.
+- **What is counted:** records with the status "planned" are not studied yet, so I leave them out. I add up the study time of records in progress, completed, and abandoned. Dates after today are left out too.
+- **Periods (`Asia/Seoul`, today = `serviceDate()`)**
+  - This week: Monday to today
+  - This month: the 1st to today
+  - The last 3 months: the day after the same day 3 months ago to today. If that day does not exist in that month, it counts as the last day of that month (for example, May 31 -> from March 1).
+  - All: the first record date to today. But the daily, weekly, and monthly series and the period total go only up to the last 3653 days (about 10 years). The overall cumulative total (`cumulativeMinutes`) counts all records.
+- **Average:** by default, it is the daily average divided by the number of calendar days in the period (including days not studied). It also gives the average divided by only the days studied. Both are rounded to the minute.
 
-## 변경
+## Changes
 
-- `backend/src/stats.ts`(새 파일), `backend/src/app.ts`
-  - `GET /api/stats/study-time?period=week|month|3months|all`(기본 `week`)
-  - 응답
+- `backend/src/stats.ts` (a new file), `backend/src/app.ts`
+  - `GET /api/stats/study-time?period=week|month|3months|all` (default `week`)
+  - Response
     - `period`, `from`, `to`
-    - `totalMinutes`(기간 합계), `todayMinutes`, `cumulativeMinutes`(기간과 무관한 전체 누적)
+    - `totalMinutes` (the period total), `todayMinutes`, `cumulativeMinutes` (the overall cumulative total regardless of the period)
     - `days`, `studyDays`, `averageMinutesPerDay`, `averageMinutesPerStudyDay`
-    - `daily`(빈 날 0 포함), `weekly`(`weekStart` 월요일 기준), `monthly`(`YYYY-MM`)
-  - 일별 합계는 DB에서 `generate_series`로 기간의 모든 날짜를 만들어 학습 기록을 붙여 구한다. 주별·월별은 그 일별 값을 묶는다. 처음과 마지막 주·월은 기간에 걸친 일부만 들어간다.
-  - 자정을 넘긴 기록은 기존 규칙대로 시작 날짜에 속한다.
-  - 잘못된 기간은 "기간은 이번 주, 이번 달, 최근 3개월, 전체 중에서 고르세요" 400.
-  - 기간 계산 함수(`periodStart`, `weekStart`, `addDays`, `bucket`)는 단위 테스트를 위해 내보낸다.
-- DB 변경은 없다. 일별 합계는 기존 날짜 인덱스를 쓸 수 있지만, 전체 누적·첫 기록 날짜는 오늘까지의 기록을 모두 훑는다(개인 서비스 규모에서는 충분하다).
+    - `daily` (including empty days as 0), `weekly` (`weekStart` on a Monday basis), `monthly` (`YYYY-MM`)
+  - The daily totals are found in the DB by making all dates of the period with `generate_series` and joining the study records. Weekly and monthly group those daily values. The first and last week and month include only the part that falls in the period.
+  - A record that crosses midnight belongs to its start date, as in the existing rule.
+  - A wrong period gives 400 "기간은 이번 주, 이번 달, 최근 3개월, 전체 중에서 고르세요" ("Pick the period from this week, this month, the last 3 months, and all").
+  - I export the period calculation functions (`periodStart`, `weekStart`, `addDays`, `bucket`) for unit tests.
+- There is no DB change. The daily totals can use the existing date index, but the overall cumulative total and the first record date scan all records up to today (enough for a personal service scale).
 
-## 테스트
+## Tests
 
-- `backend/test/stats.test.ts`(DB 없음)
-  - 월요일 주 시작, 연말을 넘는 주
-  - 기간 시작: 이번 주·이번 달·최근 3개월(없는 날·윤년·연초 포함)·전체(첫 기록 / 기록 없음 / 미래 기록)
-  - 날짜 더하기(월말·윤년), 주별·월별 묶기
-  - 잘못된 기간 400
-  - 기록이 없을 때 0과 0으로 나누지 않는 평균
-- `backend/test/stats.integration.test.ts`(실제 DB)
-  - "오늘"을 2096-05-16(수)로 두고 상태·날짜가 다른 기록 8건을 넣는다. 2096년은 다른 테스트 파일이 쓰는 날짜(2097년 이후)보다 앞이라 섞이지 않는다.
-  - 이번 주(월 5/14 ~ 수 5/16) 150분: 일요일 5/13은 지난주
-  - 이번 달 215분, 16일 중 4일 공부, 평균 13분 / 54분, 주별 묶음
-  - 최근 3개월(2/17 ~ 5/16, 90일) 335분, 월별 묶음
-  - 계획 기록과 미래 기록 제외, 자정을 넘긴 기록은 시작 날짜
-  - 전체 누적은 테스트 전 값 + 365분이다. 공유 테스트 DB에 이미 있던 기록은 기준값으로 뺀다.
-  - 기간을 빼면 이번 주, 빈 기간은 400
+- `backend/test/stats.test.ts` (no DB)
+  - The week start on Monday, a week that crosses the year end
+  - The period start: this week, this month, the last 3 months (including a missing day, a leap year, and the start of a year), and all (the first record / no records / a future record)
+  - Date addition (the month end, a leap year), and grouping by week and month
+  - A wrong period 400
+  - 0 and an average that does not divide by zero when there are no records
+- `backend/test/stats.integration.test.ts` (a real DB)
+  - With "today" set to 2096-05-16 (Wed), insert 8 records with different statuses and dates. The year 2096 is before the dates other test files use (2097 and later), so it does not mix.
+  - This week (Mon 5/14 to Wed 5/16) 150 minutes: Sunday 5/13 is last week
+  - This month 215 minutes, 4 of 16 days studied, average 13 minutes / 54 minutes, and the weekly grouping
+  - The last 3 months (2/17 to 5/16, 90 days) 335 minutes, and the monthly grouping
+  - Excluding planned and future records, and a record that crosses midnight goes to its start date
+  - The cumulative total is the value before the test + 365 minutes. Records already in the shared test DB are subtracted as the baseline.
+  - Leaving out the period gives this week, and an empty period is 400
 
-## 검증
+## Verification
 
-| 명령                   | 환경                                                        | 결과                                                        |
-| ---------------------- | ----------------------------------------------------------- | ----------------------------------------------------------- |
-| `npm run check`        | 로컬, `TEST_DATABASE_URL` 미설정                            | exit 0. backend tests 183, pass 170, fail 0, skipped 13(DB) |
-| `npm test` (기본 병렬) | 로컬 Docker `postgres:17-alpine`, 마이그레이션 001~009 적용 | exit 0. tests 183, pass 183, fail 0, skipped 0              |
+| Command                       | Environment                                                      | Result                                                       |
+| ----------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------ |
+| `npm run check`               | Local, `TEST_DATABASE_URL` not set                               | exit 0. backend tests 183, pass 170, fail 0, skipped 13 (DB) |
+| `npm test` (default parallel) | Local Docker `postgres:17-alpine`, migrations 001 to 009 applied | exit 0. tests 183, pass 183, fail 0, skipped 0               |
 
-- 화면 변경이 없어 브라우저 확인은 하지 않았다. 화면은 #48이다.
+- There was no screen change, so I did not check in a browser. The screen is #48.
 
-## 자동 코드 리뷰 1차
+## Automated code review, round 1
 
-별도 읽기 전용 리뷰 에이전트가 검토했다. 지적이 없어 2차 리뷰는 하지 않는다. 분리할 이슈도 없다.
+A separate read-only review agent reviewed it. There were no comments, so I do not do a second review. There is no issue to split off either.
 
-- 확인된 사항
-  - 날짜 계산(UTC 문자열, 월요일, 3개월 전 경계·윤년·연초)이 맞다.
-  - SQL이 맞다(`generate_series`와 날짜 변환, 합계 정수 변환, 매개변수 순서).
-  - 기록이 없거나 첫 기록이 미래일 때도 0으로 나누지 않는다.
-  - 통합 테스트 기대값을 손으로 다시 계산해 맞음을 확인했다. 다른 테스트 파일과 날짜가 겹치지 않는다.
-- 참고(반영): 전체 누적 쿼리는 날짜 인덱스를 쓰지 못하고 전부 훑는다. "기존 날짜 인덱스를 쓴다"던 설명을 바로잡았다.
+- Confirmed points
+  - The date calculation (UTC strings, Monday, the 3-months-ago boundary, a leap year, the start of a year) is right.
+  - The SQL is right (`generate_series` and the date conversion, the integer conversion of the sum, the parameter order).
+  - Even when there are no records or the first record is in the future, it does not divide by zero.
+  - I recalculated the integration test expected values by hand and confirmed they are right. They do not overlap in date with other test files.
+- Note (applied): the overall cumulative query cannot use the date index and scans everything. I corrected the explanation that said "it uses the existing date index".
 
-## 자동 보안 검토
+## Automated security review
 
-커밋 후 자동 보안 검토가 medium 지적을 냈다. 병합 전에 이 PR에서 고쳤다.
+The automated security review after the commit raised a medium comment. I fixed it in this PR before merging.
 
-- 지적: 학습일은 `0001-01-01`처럼 아주 이른 날짜도 받는다. 그런 기록이 하나 있으면 "전체" 요청마다 수십만 일의 일별 시리즈를 만들어 응답한다(저장된 입력으로 자원 사용 증폭).
-- 반영: "전체" 기간의 시작을 최근 `maxSeriesDays` = 3653일(약 10년)로 제한했다. 전체 누적은 그대로 모든 기록을 센다.
-- 테스트
-  - 단위 테스트: 0001년 첫 기록이면 시작이 10년 전(2016-10-23)으로 잘리는지, 범위 안이면 그대로인지
-  - 통합 테스트: 0001-01-01 기록을 넣으면 누적에는 들어가고, 시리즈는 2086-05-17부터 3653일인지
+- Comment: a study date also accepts a very early date such as `0001-01-01`. If one such record exists, every "all" request would build and answer a daily series of hundreds of thousands of days (amplifying resource use through stored input).
+- Applied: I limited the start of the "all" period to the last `maxSeriesDays` = 3653 days (about 10 years). The overall cumulative total still counts all records.
+- Tests
+  - Unit test: if the first record is in year 0001, the start is cut to 10 years ago (2016-10-23), and if it is within range, it stays as it is
+  - Integration test: if you put in a 0001-01-01 record, it goes into the cumulative total, and the series is 3653 days from 2086-05-17
 
-## 자동 코드 리뷰 2차
+## Automated code review, round 2
 
-별도 읽기 전용 리뷰 에이전트가 보안 반영 커밋과 최종 PR 전체를 다시 확인했다. 리뷰는 최대 2회이므로 3차 리뷰는 하지 않는다.
+A separate read-only review agent checked the security fix commit and the whole final PR again. The review is limited to 2 rounds, so I do not do a third.
 
-- 시리즈 상한 계산이 맞다. 2096-05-16 기준 3652일 전이 2086-05-17이고, 양 끝을 포함해 3653일이다(윤일 세 번 포함).
-- 다른 기간은 구조상 짧고(최대 7·31·약 92일), 시작·끝 날짜는 서버가 계산하므로 끝없이 길어지는 경로가 없다.
-- 0001-01-01 테스트 기록은 앞뒤 정리로 지워진다. 다른 테스트에 섞이지 않는다.
-- 지적과 분리할 이슈는 없었다.
+- The series limit calculation is right. On the basis of 2096-05-16, 3652 days before is 2086-05-17, and including both ends it is 3653 days (including three leap days).
+- The other periods are short by structure (at most 7, 31, and about 92 days), and the server calculates the start and end dates, so there is no path that grows without end.
+- The 0001-01-01 test record is deleted by the before and after cleanup. It does not mix into other tests.
+- There were no comments and no issue to split off.
 
-## 한계·후속
+## Limits and follow-up
 
-- 집계는 요청마다 계산한다. 개인 서비스의 기록 수에서는 충분하다. 캐시나 materialized view는 느려질 때 검토한다.
-- 교재별·학습 유형별 필터는 이 이슈 범위가 아니다(#51 등).
-- "전체" 기간의 시리즈는 최근 약 10년까지다(3653일). 그보다 오래된 기록은 전체 누적에만 들어간다.
+- The aggregation is calculated on every request. It is enough for the number of records of a personal service. I will consider a cache or a materialized view when it gets slow.
+- Filters by textbook and by study type are not in this issue's scope (#51 and others).
+- The series of the "all" period goes only up to about the last 10 years (3653 days). Older records go only into the overall cumulative total.

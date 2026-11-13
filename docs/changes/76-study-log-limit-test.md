@@ -1,44 +1,44 @@
-# #76 병렬 테스트에서 학습 기록 limit 통합 테스트가 다른 파일 데이터로 실패
+# #76 The study log limit integration test fails on data from other files in parallel tests
 
-- 이슈: [#76](https://github.com/sirloinbh/study-log/issues/76) (#26 작업 중 발견)
-- 브랜치: `fix/76-study-log-limit-test`
+- Issue: [#76](https://github.com/sirloinbh/study-log/issues/76) (found while working on #26)
+- Branch: `fix/76-study-log-limit-test`
 
-## 문제
+## Problem
 
-`npm test`는 테스트 파일을 병렬로 실행한다. `backend/test/study-logs.integration.test.ts`의 `GET /api/study-logs?limit=1` 검사는 공유 테스트 DB 전체에서 가장 최근 기록을 본다. 그래서 같은 시간에 도는 다른 통합 테스트가 더 늦은 날짜의 기록을 넣으면, 첫 항목이 그 기록이 되어 실패했다.
+`npm test` runs the test files in parallel. The `GET /api/study-logs?limit=1` check in `backend/test/study-logs.integration.test.ts` looks at the most recent record in the whole shared test DB. So when another integration test running at the same time inserted a record with a later date, the first item became that record and the test failed.
 
-- 다른 파일의 날짜: `study-log-textbooks`(2099-02-20), `study-log-reflection`(2099-03-10)
-- 이 파일의 날짜: 2099-01-15
+- Dates in other files: `study-log-textbooks` (2099-02-20), `study-log-reflection` (2099-03-10)
+- Date in this file: 2099-01-15
 
-## 변경
+## Changes
 
-- `backend/test/study-logs.integration.test.ts`: 테스트 날짜를 `9999-12-31`로 바꿨다.
-  - API가 받는 가장 늦은 날짜(연도 4자리)다. 다른 파일이 병렬로 기록을 넣어도 이 파일의 기록이 가장 최근이다.
-  - 다른 데이터와 섞이지 않게 하는 기존 목적(날짜로 정리)도 그대로다.
-- 앱 코드는 바꾸지 않았다.
+- `backend/test/study-logs.integration.test.ts`: changed the test date to `9999-12-31`.
+  - It is the latest date the API accepts (a 4-digit year). Even if other files insert records in parallel, this file's records are the most recent.
+  - The existing purpose of not mixing with other data (cleaning up by date) is kept as well.
+- I did not change the app code.
 
-## 검증
+## Verification
 
-| 명령                                        | 환경                                                         | 결과                                                |
-| ------------------------------------------- | ------------------------------------------------------------ | --------------------------------------------------- |
-| `npx tsx --test test/*.test.ts` (기본 병렬) | 수정 전, 로컬 Docker `postgres:17-alpine`, 마이그레이션 적용 | 3회 모두 `study-logs.integration` 실패(13 ≠ 14)     |
-| 같은 명령 5회 반복                          | 수정 후, 같은 DB                                             | 5회 모두 tests 152, pass 152, fail 0, skipped 0     |
-| `npm run check`                             | 로컬, `TEST_DATABASE_URL` 미설정                             | exit 0. tests 152, pass 142, fail 0, skipped 10(DB) |
+| Command                                            | Environment                                                           | Result                                               |
+| -------------------------------------------------- | --------------------------------------------------------------------- | ---------------------------------------------------- |
+| `npx tsx --test test/*.test.ts` (default parallel) | Before the fix, local Docker `postgres:17-alpine`, migrations applied | All 3 runs failed `study-logs.integration` (13 ≠ 14) |
+| The same command repeated 5 times                  | After the fix, the same DB                                            | All 5 runs: tests 152, pass 152, fail 0, skipped 0   |
+| `npm run check`                                    | Local, `TEST_DATABASE_URL` not set                                    | exit 0. tests 152, pass 142, fail 0, skipped 10 (DB) |
 
-- 이제 로컬 DB 검증을 `--test-concurrency=1` 없이 기본 `npm test`로 할 수 있다.
-- 화면 변경이 없어 브라우저 확인은 하지 않았다.
+- Now local DB verification can be done with the default `npm test` without `--test-concurrency=1`.
+- There was no screen change, so I did not check in a browser.
 
-## 자동 코드 리뷰 1차
+## Automated code review, round 1
 
-별도 읽기 전용 리뷰 에이전트가 검토했다. 지적이 없어 2차 리뷰는 하지 않는다. 분리할 이슈도 없다.
+A separate read-only review agent reviewed it. There were no comments, so I do not do a second review. There is no issue to split off either.
 
-- 확인된 사항
-  - 목록 정렬(날짜·시작 시각·ID 내림차순)에서 `9999-12-31`이 항상 가장 최근이다.
-  - 같은 테스트의 자정을 넘는 기록(23:00~01:00)도 날짜가 바뀌지 않는다.
-  - PostgreSQL `date` 범위와 날짜 문자열 파서에 문제가 없다.
-  - 다른 통합 테스트는 날짜나 교재 조건 없이 학습 기록 목록을 보지 않는다. 그래서 9999년 기록이 다른 테스트에 섞이지 않는다.
-- 참고: `docs/changes/10-study-log-api.md`의 "전용 날짜(2099-01-15)"는 #10 당시의 작업 기록이라 고치지 않는다.
+- Confirmed points
+  - In the list sort order (date, start time, ID descending), `9999-12-31` is always the most recent.
+  - A record that crosses midnight in the same test (23:00 to 01:00) does not change its date either.
+  - There is no problem with the PostgreSQL `date` range or the date string parser.
+  - Other integration tests do not look at the study log list without a date or textbook condition. So records from the year 9999 do not mix into other tests.
+- Note: "the dedicated date (2099-01-15)" in `docs/changes/10-study-log-api.md` is a work record from the time of #10, so I do not fix it.
 
-## 한계·후속
+## Limits and follow-up
 
-- 통합 테스트들은 여전히 같은 DB를 공유한다. 새 테스트가 "전체에서 최근 N개" 같은 검사를 추가하면 같은 문제가 생길 수 있다. 그런 검사는 이 파일처럼 가장 늦은 날짜를 쓰거나 교재 등으로 범위를 좁혀야 한다.
+- The integration tests still share the same DB. If a new test adds a check such as "the latest N across everything", the same problem can occur. Such a check must use the latest date like this file, or narrow the scope by textbook or similar.

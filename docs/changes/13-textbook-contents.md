@@ -1,86 +1,86 @@
-# #13 교재 목차(장·절 계층) DB·API
+# #13 Textbook table of contents (chapter and section hierarchy) DB and API
 
-- 이슈: [#13](https://github.com/sirloinbh/study-log/issues/13) (상위 #5)
-- 브랜치: `feat/13-textbook-contents`
-- 선행: #12 교재 기본 정보 DB·API (병합 완료)
+- Issue: [#13](https://github.com/sirloinbh/study-log/issues/13) (parent #5)
+- Branch: `feat/13-textbook-contents`
+- Prerequisite: #12 textbook basic info DB and API (merged)
 
-## 목적
+## Purpose
 
-교재의 장·절 구조를 저장해 학습 기록(#14)·일정·연습문제가 목차 항목을 참조할 수 있게 한다.
+Store the chapter and section structure of a textbook so that study logs (#14), schedules, and exercises can refer to table of contents entries.
 
-## 변경
+## Changes
 
-- `database/migrations/004_textbook_contents.sql`: `textbook_contents` 테이블.
-  - 열: 교재, 상위 목차(`parent_id`, 없으면 최상위 장), 형제 사이 순서(`position`, 0부터), 번호(20자, 빈 값 허용), 제목(1~200자).
-  - 같은 교재의 목차만 상위로 둘 수 있다. 복합 FK `(textbook_id, parent_id) → (textbook_id, id)`로 DB가 막는다.
-  - 형제 사이 순서는 겹치지 않는다. `UNIQUE NULLS NOT DISTINCT (textbook_id, parent_id, position)`이다. 최상위 장(`parent_id` NULL)끼리도 겹치지 않는다.
-    - 이 제약은 `DEFERRABLE INITIALLY IMMEDIATE`라 문장 끝에 검사한다. 그래서 UPDATE 한 번으로 순서를 당기거나 바꿀 수 있다.
-  - 교재나 상위 목차를 지우면 그 아래 목차도 함께 지워진다(CASCADE).
-  - 계층 깊이는 제한하지 않는다(장·절·소절).
-  - 상위 목차는 항상 먼저 존재해야 하고 상위 변경 API가 없으므로 순환이 생기지 않는다.
-- `backend/src/textbook-contents.ts`, `backend/src/app.ts`: `/api/textbooks/:textbookId/contents` API.
+- `database/migrations/004_textbook_contents.sql`: the `textbook_contents` table.
+  - Columns: the textbook, the parent entry (`parent_id`, a top-level chapter if none), the order among siblings (`position`, from 0), the number (20 characters, empty allowed), and the title (1 to 200 characters).
+  - Only an entry of the same textbook can be the parent. The DB blocks it with the composite FK `(textbook_id, parent_id) -> (textbook_id, id)`.
+  - The order among siblings does not overlap. It is `UNIQUE NULLS NOT DISTINCT (textbook_id, parent_id, position)`. Top-level chapters (`parent_id` NULL) do not overlap each other either.
+    - This constraint is `DEFERRABLE INITIALLY IMMEDIATE`, so it is checked at the end of the statement. So one UPDATE can pull up or swap the order.
+  - If you delete a textbook or a parent entry, the entries under it are deleted too (CASCADE).
+  - The hierarchy depth is not limited (chapter, section, subsection).
+  - A parent entry must exist first and there is no API to change the parent, so no cycle can form.
+- `backend/src/textbook-contents.ts`, `backend/src/app.ts`: the `/api/textbooks/:textbookId/contents` API.
 
-  | 요청          | 동작                                                                                                                          |
-  | ------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-  | `GET /`       | 목차 트리 `{ contents: [{ id, parentId, number, title, children: [...] }] }`. 형제는 순서대로                                 |
-  | `POST /`      | `{ parentId?, number?, title }`. 같은 상위 목차의 맨 뒤에 추가. 201 `{ content }`. 다른 교재의 상위 목차는 400                |
-  | `PUT /:id`    | `{ number?, title }` 수정. 200 `{ content }`                                                                                  |
-  | `DELETE /:id` | 하위 목차와 함께 삭제하고 남은 형제의 순서를 당긴다. 204                                                                      |
-  | `PUT /order`  | `{ parentId?, ids }`. 같은 상위 목차의 모든 항목을 한 번씩 보낸 순서로 저장. 일부만 보내거나 다른 항목이 섞이면 400. 200 트리 |
-  - 쓰기(추가·삭제·순서 변경)는 트랜잭션 안에서 교재 행을 `FOR UPDATE`로 잠근다. 같은 교재의 동시 요청이 순서 값을 엇갈리게 쓰지 않는다. 4xx 응답이면 롤백한다.
-  - 없는 교재는 "교재를 찾을 수 없습니다", 없는 목차(다른 교재의 목차 포함)는 "목차를 찾을 수 없습니다"로 404를 응답한다.
-  - 경로 ID와 본문 ID는 교재 API와 같은 규칙(15자리 이하 양의 정수)으로 검증한다. 검증 메시지는 한국어다.
+  | Request       | Behavior                                                                                                                                                   |
+  | ------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `GET /`       | The table of contents tree `{ contents: [{ id, parentId, number, title, children: [...] }] }`. Siblings in order                                           |
+  | `POST /`      | `{ parentId?, number?, title }`. Adds at the end of the same parent entry. 201 `{ content }`. A parent entry of another textbook gives 400                 |
+  | `PUT /:id`    | Edit `{ number?, title }`. 200 `{ content }`                                                                                                               |
+  | `DELETE /:id` | Deletes it with the entries under it and pulls up the order of the remaining siblings. 204                                                                 |
+  | `PUT /order`  | `{ parentId?, ids }`. Saves all items of the same parent entry in the order sent, once each. 400 if you send only some or mix in other items. 200 the tree |
+  - Writes (add, delete, reorder) lock the textbook row with `FOR UPDATE` inside a transaction. Concurrent requests for the same textbook do not write the order values out of step. On a 4xx response, it rolls back.
+  - A missing textbook answers 404 "교재를 찾을 수 없습니다" ("Textbook not found"), and a missing entry (including an entry of another textbook) answers 404 "목차를 찾을 수 없습니다" ("Table of contents entry not found").
+  - The path ID and body ID are validated with the same rule as the textbook API (a positive integer of 15 digits or fewer). The validation messages are in Korean.
 
-## 테스트
+## Tests
 
-- `backend/test/textbook-contents.test.ts`(DB 없음):
-  - 잘못된 본문 14가지가 DB에 닿기 전에 한국어 400으로 거부되는지 확인한다(제목·번호·상위 목차 ID·JSON 객체 아님·순서 목록 비었음·중복·음수).
-  - 경로의 교재·목차 ID 검증을 확인한다.
-  - 없는 교재는 404이고, 쓰기 트랜잭션 3건이 모두 롤백·연결 반환되는지 확인한다.
-- `backend/test/textbook-contents.integration.test.ts`(실제 DB, `TEST_DATABASE_URL` 필요):
-  - 장·절·소절 트리 조회와 제목 공백 제거
-  - 같은 장에 동시 추가 4건 → 순서 0~3이 겹치지 않음
-  - 순서 변경(역순), 일부 누락·다른 장 항목 혼입 거부, 최상위 장 순서 변경
-  - 수정
-  - 다른 교재의 상위 목차·목차 ID 접근 차단
-  - 삭제 시 하위 목차 함께 삭제, 남은 형제 순서 당김, 다른 장 순서 유지
-  - DB 제약 직접 확인: 다른 교재 상위 목차 INSERT는 23503, 겹치는 순서 INSERT는 23505
-  - 교재 삭제 시 목차 삭제
+- `backend/test/textbook-contents.test.ts` (no DB):
+  - Checks that 14 kinds of wrong bodies are rejected with a Korean 400 before reaching the DB (title, number, parent entry ID, not a JSON object, an empty order list, duplicates, negatives).
+  - Checks the validation of the textbook and entry IDs in the path.
+  - A missing textbook is 404, and all 3 write transactions roll back and return the connection.
+- `backend/test/textbook-contents.integration.test.ts` (a real DB, needs `TEST_DATABASE_URL`):
+  - Lookup of the chapter, section, and subsection tree, and trimming spaces from titles
+  - 4 concurrent adds to the same chapter -> orders 0 to 3 do not overlap
+  - Reordering (reverse), rejecting a missing item or an item from another chapter mixed in, and reordering top-level chapters
+  - Edit
+  - Blocking access to a parent entry and entry IDs of another textbook
+  - On delete, the entries under it are deleted too, the order of the remaining siblings is pulled up, and the order of other chapters is kept
+  - Direct check of DB constraints: an INSERT with a parent entry of another textbook is 23503, and an INSERT with an overlapping order is 23505
+  - Deleting a textbook deletes its table of contents
 
-## 검증
+## Verification
 
-| 명령                | 환경 | 결과                  |
-| ------------------- | ---- | --------------------- |
-| `npm run format`    | 로컬 | 적용                  |
-| `npm run lint`      | 로컬 | exit 0                |
-| `npm run typecheck` | 로컬 | exit 0                |
-| `npm test`          | -    | **로컬 미실행**(아래) |
+| Command             | Environment | Result                      |
+| ------------------- | ----------- | --------------------------- |
+| `npm run format`    | Local       | Applied                     |
+| `npm run lint`      | Local       | exit 0                      |
+| `npm run typecheck` | Local       | exit 0                      |
+| `npm test`          | n/a         | **Not run locally** (below) |
 
-- 사용자 요청("테스트 없이 바로 다음 이슈카드로")에 따라 로컬에서 테스트를 실행하지 않았다. 테스트 코드는 작성했고 CI(PostgreSQL 17 서비스, 모든 마이그레이션 적용)에서 실행된다. 결과는 PR 검사에서 확인한다.
-- 이 PC에는 테스트 DB 연결 정보가 없어 마이그레이션과 DB 통합 테스트를 로컬에서 실행할 수 없다(#21 기록 참고).
+- Following the user's request ("go straight to the next issue card without tests"), I did not run the tests locally. I wrote the test code, and it runs in CI (a PostgreSQL 17 service, all migrations applied). The result is checked in the PR checks.
+- This PC has no test DB connection info, so I cannot run the migrations and the DB integration tests locally (see the #21 record).
 
-### CI 결과
+### CI result
 
-- PR #66 첫 커밋(110063e)의 GitHub Actions `verify`에서 `npm run check`가 통과했다.
-  - 환경: PostgreSQL 17 서비스, 마이그레이션 001~004 적용
+- In GitHub Actions `verify` for the first commit (110063e) of PR #66, `npm run check` passed.
+  - Environment: a PostgreSQL 17 service, migrations 001 to 004 applied
   - backend tests 59, pass 59, fail 0, **skipped 0**
-  - 목차 DB 통합 테스트가 실제 DB에서 실행돼 통과했다. 스킬 4 pass, `docker-build` 통과.
-- 새 마이그레이션 004가 실제 PostgreSQL에 적용된 것은 이 CI가 처음이다. 로컬 적용과 재실행 확인은 하지 않았다.
+  - The table of contents DB integration tests ran on a real DB and passed. Skills 4 pass, and `docker-build` passed.
+- This CI is the first time the new migration 004 was applied to a real PostgreSQL. I did not do a local apply or a re-run check.
 
-## 자동 코드 리뷰 1차
+## Automated code review, round 1
 
-별도 읽기 전용 리뷰 에이전트가 이슈 #13 완료 기준과 PR 변경(마이그레이션, 라우터, 앱 연결, 문서)을 검토했다.
+A separate read-only review agent reviewed the issue #13 done criteria and the PR changes (the migration, the router, the app connection, and the docs).
 
-- 복합 FK, 문장 끝 검사 고유 제약, 삭제 후 순서 당김, 순서 변경 UPDATE, 맨 뒤 추가, 잠금 순서(교재 행 → 목차 행), 트랜잭션·연결 반환, 마이그레이션 재실행 안전성, 경로 순서(`/order` → `/:id`)는 문제없다고 확인됐다.
-- high·medium 지적은 없었다. 이 PR에서 고칠 지적이 없으므로 정책에 따라 2차 리뷰 없이 CI 확인과 병합으로 넘어간다.
-- low 지적은 다음과 같이 처리했다.
-  - `ROLLBACK`이 실패해도 연결을 그대로 풀에 돌려준다. 백엔드 전체 점검이 필요해 [#68](https://github.com/sirloinbh/study-log/issues/68)로 분리했다.
-  - ID 검증은 15자리까지 허용하는데 응답은 `id::int`로 바꾼다. 21억을 넘는 ID에서 500이 나며, 교재·학습 기록 API도 같다. [#67](https://github.com/sirloinbh/study-log/issues/67)로 분리했다.
-  - `parent_id` 단독 인덱스는 다른 인덱스와 겹쳐 불필요할 수 있다. 해는 없어 유지한다.
-  - 조회의 교재 존재 확인과 트리 조회가 별개 쿼리라, 그 사이에 교재가 삭제되면 빈 트리 200이 응답된다. 영향이 없어 유지한다.
+- It was confirmed there is no problem with the composite FK, the unique constraint checked at the end of the statement, pulling up the order after a delete, the UPDATE that reorders, adding at the end, the lock order (textbook row -> entry rows), transactions and returning connections, the migration being safe to re-run, and the route order (`/order` -> `/:id`).
+- There were no high or medium comments. There is nothing to fix in this PR, so by the policy I go to the CI check and the merge without a second review.
+- I handled the low comments as follows.
+  - Even if `ROLLBACK` fails, the connection is returned to the pool as it is. It needs a check of the whole backend, so I split it into [#68](https://github.com/sirloinbh/study-log/issues/68).
+  - The ID validation allows up to 15 digits, but the response converts with `id::int`. A 500 occurs for an ID over 2.1 billion, and the textbook and study log APIs are the same. I split it into [#67](https://github.com/sirloinbh/study-log/issues/67).
+  - The `parent_id` index alone may be unnecessary because it overlaps with other indexes. It does no harm, so I keep it.
+  - The textbook existence check in the lookup and the tree lookup are separate queries, so if the textbook is deleted in between, an empty tree 200 is answered. It has no effect, so I keep it.
 
-## 한계·후속
+## Limits and follow-up
 
-- 상위 목차 변경(다른 장으로 옮기기)은 범위 밖이다. 필요하면 순환 검사를 포함해 별도 이슈로 다룬다.
-- 목차 화면은 #22(수동 입력·편집), 목차 텍스트 파싱은 #23에서 다룬다.
-- 학습 기록·연습문제가 목차를 참조하면(#14, #24) 참조된 목차의 삭제 정책을 그때 정한다.
+- Changing the parent entry (moving to another chapter) is out of scope. If needed, handle it in a separate issue, including a cycle check.
+- The table of contents screen is in #22 (manual input and editing), and parsing table of contents text is in #23.
+- When study logs and exercises refer to the table of contents (#14, #24), the delete policy for referenced entries is decided then.

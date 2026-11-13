@@ -1,27 +1,27 @@
-# #129 다음 작업 문서를 현재 상태로 갱신
+# #129 Refresh the next-steps document to the current state
 
-- 이슈: [#129](https://github.com/sirloinbh/study-log/issues/129)
-- 브랜치: `docs/129-next-steps-refresh`
+- Issue: [#129](https://github.com/sirloinbh/study-log/issues/129)
+- Branch: `docs/129-next-steps-refresh`
 
-## 목적
+## Purpose
 
-사용자가 공공데이터포털 API 키 발급을 "나중에 직접 할 일"에 넣어 달라고 요청했다(2026-10-31). `docs/next-steps/README.md`는 이미 닫힌 이슈와 예전 포트를 적고 있어 함께 고쳤다.
+The user asked to put getting the Public Data Portal API key into "what the user does by hand later" (2026-10-31). `docs/next-steps/README.md` still listed issues that were already closed and old ports, so those were fixed too.
 
-## 변경
+## Changes
 
-- 직접 할 일에 재부팅, 패키지 설치, API 키 발급을 넣었다. WSL·Docker는 설치 완료로 바꿨다.
-- 앱 DB 포트를 15402, 웹 포트를 8102로 고쳤다.
-- 다음 이슈 후보를 #42, #43, #33, #34, #28로 바꿨다.
+- Added the reboot, the package install, and the API key to the by-hand list. Changed WSL and Docker to installed.
+- Fixed the app DB port to 15402 and the web port to 8102.
+- Changed the next issue candidates to #42, #43, #33, #34, and #28.
 
-## 리뷰
+## Review
 
-1차 리뷰에서 두 가지가 나와 고쳤다.
+The first review found two things, and they were fixed.
 
-- 패키지 설치와 Docker 이미지 빌드에 `NODE_AUTH_TOKEN`이 필요한데 빠져 있었다. 이 PC의 환경변수에 토큰이 없음을 확인해 적었다.
-- 테스트 DB에 마이그레이션 008~011이 빠져 있어 통합 테스트가 실패할 상태였다. 네 파일을 적용하고 테이블 4개가 있는 것을 확인했다.
+- Package installs and Docker image builds need `NODE_AUTH_TOKEN`, but it was missing. I checked that this PC has no token in its environment variables and wrote that down.
+- Migrations 008 to 011 were missing from the test DB, so the integration tests would fail. I applied the four files and confirmed that the 4 tables exist.
 
-## 검증
+## Verification
 
-문서만 바꿔 앱 테스트를 추가하지 않았다. 프로젝트 설정 없이 로컬 Prettier로 정렬했다. 로컬에 공유 패키지가 없어 `npm run format:check`는 CI 결과로 확인한다.
+Only docs changed, so no app tests were added. Aligned with the local Prettier without project settings. The shared packages are not installed locally, so `npm run format:check` is confirmed with the CI result.
 
-이 PR은 #129를 닫지 않는다. #129는 사용자가 키를 발급하면 닫는다.
+This PR does not close #129. #129 is closed when the user gets the key.

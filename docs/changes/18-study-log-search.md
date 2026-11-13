@@ -1,79 +1,79 @@
-# #18 학습 일지 검색 (키워드·기간·교재)
+# #18 Study log search (keyword, period, textbook)
 
-- 이슈: [#18](https://github.com/sirloinbh/study-log/issues/18) (상위 #9)
-- 브랜치: `feat/18-study-log-search`
-- 선행: #10 학습 기록 DB·API (병합 완료)
+- Issue: [#18](https://github.com/sirloinbh/study-log/issues/18) (parent #9)
+- Branch: `feat/18-study-log-search`
+- Prerequisite: #10 study log DB and API (merged)
 
-## 목적
+## Purpose
 
-지난 학습 기록을 검색어·기간·교재 조건으로 찾는다.
+Find past study records by search term, period, and textbook conditions.
 
-## 결정
+## Decisions
 
-정해지지 않은 규칙은 아래 기준으로 정했다. [이슈 코멘트](https://github.com/sirloinbh/study-log/issues/18#issuecomment-6358798339)에도 남겼다.
+I set the undecided rules by the criteria below. I also left them in an [issue comment](https://github.com/sirloinbh/study-log/issues/18#issuecomment-6358798339).
 
-- **검색 대상:** 메모와 "어려웠던 부분". 대소문자를 구분하지 않는 부분 일치이고, `%`·`_`는 문자 그대로 찾는다(키워드 검색 #39와 같음).
-- **조합:** 검색어·기간·교재는 모두 AND다. 비운 조건은 적용하지 않는다.
-- **결과:** 최근 날짜·시각 순, 최대 100개. 기존 목록 API에 조건을 더한 것이라 응답 형식이 같다.
-- **위치:** 학습 기록 화면의 검색 카드. 결과는 읽기 전용이다.
+- **What is searched:** the note and "difficult parts" ("어려웠던 부분"). It is a case-insensitive partial match, and `%` and `_` are searched as literal characters (same as the keyword search #39).
+- **Combination:** the search term, period, and textbook are all AND. A condition left empty is not applied.
+- **Result:** most recent date and time first, at most 100. It adds conditions to the existing list API, so the response format is the same.
+- **Location:** the search card on the study log screen. The results are read-only.
 
-## 변경
+## Changes
 
-- `backend/src/study-logs.ts`: `GET /api/study-logs`에 `q`(50자 이하), `from`, `to` 조건을 더했다. 기존 `date`·`textbookId`·`limit`과 함께 쓸 수 있다.
-  - 시작일이 종료일보다 늦으면 "시작일은 종료일보다 늦을 수 없습니다" 400.
-- `backend/src/sql.ts`(새 파일): LIKE 이스케이프 함수 `likePattern`을 키워드 API에서 옮겨 두 API가 같이 쓴다.
-  - 처음에는 학습 기록 모듈이 키워드 모듈에서 가져오게 했다. 그런데 키워드 모듈은 이미 학습 기록 모듈의 날짜 함수를 쓰고 있어 순환 import가 됐다. 로딩 순서에 따라 초기화 전 참조 오류가 날 수 있어 공용 모듈로 뺐다.
-- `frontend/src/StudyLogSearch.tsx`(새 파일), `frontend/src/study-logs.ts`(`studyLogSearchPath`), `frontend/src/StudyLogs.tsx`
-  - 학습 기록 화면의 최근 기록과 달력 사이에 "학습 기록 검색" 카드를 둔다.
-  - 입력: 검색어, 시작일·종료일(`min`·`max`로 엇갈린 기간을 막음), 교재(전체/교재 목록 — 화면이 이미 불러온 목록을 쓴다)
-  - 결과: 개수(100개면 "최근 100개까지 보여 줍니다"), 날짜·시간·학습 시간·상태·교재·어려웠던 부분·메모
-  - 같은 화면에서 저장·삭제하면 보이는 검색 결과를 다시 검색한다. 검색이 실패하면 옛 결과를 지운다.
-  - 같은 틱 중복 검색은 `useBusy`(#75)로 막는다.
+- `backend/src/study-logs.ts`: added the `q` (50 characters or fewer), `from`, and `to` conditions to `GET /api/study-logs`. They can be used with the existing `date`, `textbookId`, and `limit`.
+  - If the start date is later than the end date, 400 "시작일은 종료일보다 늦을 수 없습니다" ("The start date cannot be later than the end date").
+- `backend/src/sql.ts` (a new file): moved the LIKE escape function `likePattern` from the keyword API so the two APIs share it.
+  - At first I made the study log module import it from the keyword module. But the keyword module already used the date function of the study log module, so it became a circular import. Depending on the load order, a reference-before-initialization error could occur, so I moved it to a shared module.
+- `frontend/src/StudyLogSearch.tsx` (a new file), `frontend/src/study-logs.ts` (`studyLogSearchPath`), `frontend/src/StudyLogs.tsx`
+  - Put a "학습 기록 검색" ("Study log search") card between the recent records and the calendar on the study log screen.
+  - Input: the search term, the start and end dates (`min` and `max` block a crossed period), and the textbook (all or the textbook list, using the list the screen already loaded)
+  - Result: the count (if 100, "최근 100개까지 보여 줍니다", "Showing up to the latest 100"), date, time, study time, status, textbook, difficult parts, and note
+  - If you save or delete on the same screen, the visible search result is searched again. If the search fails, the old result is cleared.
+  - A duplicate search in the same tick is blocked with `useBusy` (#75).
 
-## 테스트
+## Tests
 
 - `backend/test/study-logs.test.ts`
-  - 검색어 50자 초과, 시작일 > 종료일, 잘못된 날짜 → 400
-  - 조건 조합의 쿼리 매개변수와 `%`·`_` 이스케이프
-- `backend/test/study-log-search.integration.test.ts`(실제 DB, 새 파일, 2101년 데이터)
-  - 메모·어려웠던 부분 검색, 대소문자 무시
-  - `50%`·`%` 문자 그대로 검색
-  - 검색어 + 교재, 교재만, 기간만, 검색어 + 좁은 기간, 결과 없음
-  - 모든 검색을 2101년으로 한정해 다른 파일의 기록과 섞이지 않는다. 2101년은 통계 테스트(2096-05-16까지 누적)와 다른 파일의 날짜와 겹치지 않는다.
-- `backend/test/study-log-search-ui.test.ts`(새 파일, 5건)
-  - 채운 조건만 담은 요청 경로와 결과 표시, 교재 조건
-  - 결과 없음, 실패 시 오류 표시와 옛 결과 제거
-  - 저장 후 다시 검색, 경로 생성 함수
-- `backend/test/study-logs-ui.test.ts`: 입력 폼을 검증하는 두 테스트(요청 중 잠금, 교재 선택지)의 범위를 첫 번째 폼으로 좁혔다. 검색 카드에도 입력란과 "교재" 선택이 생겼기 때문이다.
+  - A search term over 50 characters, start date > end date, and a wrong date -> 400
+  - The query parameters of the combined conditions and the escape of `%` and `_`
+- `backend/test/study-log-search.integration.test.ts` (a real DB, a new file, year 2101 data)
+  - Searching notes and difficult parts, ignoring case
+  - Searching `50%` and `%` as literal characters
+  - Search term + textbook, textbook only, period only, search term + narrow period, and no result
+  - Every search is limited to the year 2101 so it does not mix with records from other files. The year 2101 does not overlap with the statistics tests (cumulative up to 2096-05-16) or with the dates of other files.
+- `backend/test/study-log-search-ui.test.ts` (a new file, 5 tests)
+  - The request path with only the filled conditions and the result display, and the textbook condition
+  - No result, the error display and removing the old result on failure
+  - Searching again after save, and the path building function
+- `backend/test/study-logs-ui.test.ts`: I narrowed the scope of the two tests that verify the input form (locking during a request and the textbook choices) to the first form. This is because the search card also has an input field and a "교재" ("Textbook") select.
 
-## 검증
+## Verification
 
-| 명령                   | 환경                                                        | 결과                                                        |
-| ---------------------- | ----------------------------------------------------------- | ----------------------------------------------------------- |
-| `npm run check`        | 로컬, `TEST_DATABASE_URL` 미설정                            | exit 0. backend tests 210, pass 195, fail 0, skipped 15(DB) |
-| `npm test` (기본 병렬) | 로컬 Docker `postgres:17-alpine`, 마이그레이션 001~009 적용 | exit 0. tests 210, pass 210, fail 0, skipped 0              |
+| Command                       | Environment                                                      | Result                                                       |
+| ----------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------ |
+| `npm run check`               | Local, `TEST_DATABASE_URL` not set                               | exit 0. backend tests 210, pass 195, fail 0, skipped 15 (DB) |
+| `npm test` (default parallel) | Local Docker `postgres:17-alpine`, migrations 001 to 009 applied | exit 0. tests 210, pass 210, fail 0, skipped 0               |
 
-- 브라우저: Playwright(Chromium)로 Vite 개발 서버와 이 브랜치 API(로컬 Docker 테스트 DB)를 띄워 확인했다.
-  - 모바일 390×844: 검색어 "#48" + 시작일 2026-10-10 → "4개를 찾았습니다"(10/23·22·20·14). 10/2 기록은 기간 밖이라 빠졌다. 가로 스크롤 없음.
-  - PC 1440×900: 같은 결과, 시작일·종료일·교재가 한 줄
-  - 스크린샷: [모바일 390×844 (검색 카드)](assets/18-mobile-390x844.png), [PC 1440×900](assets/18-pc-1440x900.png)
+- Browser: I checked by starting the Vite dev server and this branch's API (a local Docker test DB) with Playwright (Chromium).
+  - Mobile 390×844: the search term "#48" + start date 2026-10-10 -> "4개를 찾았습니다" ("Found 4") (10/23, 22, 20, 14). The 10/2 record is out of the period so it dropped out. No horizontal scroll.
+  - PC 1440×900: the same result, with start date, end date, and textbook in one row
+  - Screenshots: [mobile 390×844 (search card)](assets/18-mobile-390x844.png), [PC 1440×900](assets/18-pc-1440x900.png)
 
-## 자동 코드 리뷰 1차
+## Automated code review, round 1
 
-별도 읽기 전용 리뷰 에이전트가 검토했다. 기준 이상의 지적이 없어 2차 리뷰는 하지 않는다. 분리할 이슈도 없다.
+A separate read-only review agent reviewed it. There were no comments at or above the bar, so I do not do a second review. There is no issue to split off either.
 
-- 확인된 사항
-  - SQL 매개변수 번호와 이스케이프가 맞다.
-  - `date` 조건과의 조합도 맞다(AND).
-  - 다른 코드가 `listQuery`의 형태(`.shape`)에 기대지 않는다.
-  - 다시 검색하는 effect는 처음 열 때 검색하지 않고, 최신 결과 경로를 쓴다.
-  - 결과 개수·오류의 상태 영역이 적절하다.
-- 참고(유지)
-  - 잘못된 시작일·종료일의 오류 문구가 "학습일은 YYYY-MM-DD 형식으로…"다. 화면은 날짜 입력이라 사용자가 보기 어렵다.
-  - 사용자가 검색을 누르는 순간과 다른 곳의 저장이 겹치면 두 검색 응답 순서가 바뀔 수 있다. 드문 경우다.
-  - 결과가 정확히 100개여도 "최근 100개까지 보여 줍니다"라고 보여 준다.
+- Confirmed points
+  - The SQL parameter numbers and the escape are right.
+  - The combination with the `date` condition is right too (AND).
+  - No other code depends on the shape of `listQuery` (`.shape`).
+  - The effect that searches again does not search when first opened, and uses the latest result path.
+  - The status area for the result count and errors is appropriate.
+- Note (kept)
+  - The error message for a wrong start or end date is "학습일은 YYYY-MM-DD 형식으로…" ("The study date must be in YYYY-MM-DD format…"). The screen is a date input, so it is hard for the user to see.
+  - If the moment the user presses search overlaps with a save elsewhere, the order of the two search responses can swap. It is a rare case.
+  - Even if the result is exactly 100, it shows "최근 100개까지 보여 줍니다".
 
-## 한계·후속
+## Limits and follow-up
 
-- 교재 제목·목차 제목으로는 검색하지 않는다. 교재 조건으로 고른다.
-- 결과는 최대 100개다. 더 보기는 없다.
+- It does not search by textbook title or table of contents title. You pick it with the textbook condition.
+- The result is at most 100. There is no "show more".

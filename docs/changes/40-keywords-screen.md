@@ -1,96 +1,96 @@
-# #40 오늘의 키워드 입력·날짜별 조회·검색 화면
+# #40 Today's keyword input, lookup by date, and search screen
 
-- 이슈: [#40](https://github.com/sirloinbh/study-log/issues/40) (상위 #6)
-- 브랜치: `feat/40-keywords-screen`
-- 선행: #39 오늘의 키워드 DB·API (병합 완료)
+- Issue: [#40](https://github.com/sirloinbh/study-log/issues/40) (parent #6)
+- Branch: `feat/40-keywords-screen`
+- Prerequisite: #39 today's keyword DB and API (merged)
 
-## 목적
+## Purpose
 
-공부하다 만난 키워드를 빠르게 남기고, 날짜별로 보거나 검색해 다시 찾는다.
+Quickly leave the keywords you meet while studying, and find them again by viewing by date or searching.
 
-## 변경
+## Changes
 
-- `frontend/src/main.tsx`: 메뉴에 "키워드" 페이지를 추가했다(학습 기록 · 교재 · 키워드 · 설정).
-- `frontend/src/Keywords.tsx`(새 파일), `frontend/src/keyword.ts`(새 파일)
-  - **오늘의 키워드**: 날짜(기본 오늘), 키워드, 메모(선택)를 입력하고 Enter나 "추가"로 저장한다.
-    - 저장하면 키워드·메모 입력란을 비우고 키워드 입력란에 다시 포커스를 준다. 연속 입력용이다.
-    - 날짜는 그대로 유지된다. 오늘이 아닌 날짜를 고르면 "오늘로" 버튼이 나온다.
-  - **날짜별 목록**: 고른 날짜의 키워드를 추가한 순서로 보여 준다.
-    - 수정은 그 자리에서 한다. 날짜·키워드·메모를 바꿀 수 있다. 다른 날짜로 옮기면 "수정해서 YYYY-MM-DD로 옮겼습니다"라고 알린다.
-    - 삭제는 확인을 한 번 더 받는다.
-    - 다른 곳에서 지워진 키워드를 저장하면 서버 메시지를 보여 주고 편집을 닫는다.
-  - **키워드 검색**: 검색어(키워드·메모 부분 일치)와 선택 기간으로 찾는다. 모두 비우면 최근 키워드를 보여 준다.
-    - 결과 개수와 키워드·날짜·메모를 보여 준다.
-    - 결과의 날짜 버튼을 누르면 그날의 목록으로 간다.
-    - 추가·수정·삭제 후에는 보이는 검색 결과도 다시 불러온다.
-  - 변경 요청 중에는 입력과 버튼을 잠근다.
-  - 날짜 목록은 날짜로 태그해, 늦게 온 다른 날짜의 응답이 섞이지 않게 했다.
-  - 중복 키워드(409) 등 서버 메시지를 그대로 보여 주고 입력은 유지한다.
+- `frontend/src/main.tsx`: added a "키워드" ("Keywords") page to the menu (study logs, textbooks, keywords, settings).
+- `frontend/src/Keywords.tsx` (a new file), `frontend/src/keyword.ts` (a new file)
+  - **Today's keywords**: enter the date (default today), the keyword, and an optional note, and save with Enter or "추가" ("Add").
+    - When saved, it clears the keyword and note inputs and gives focus back to the keyword input. It is for continuous entry.
+    - The date stays as it is. If you pick a date other than today, a "오늘로" ("To today") button appears.
+  - **List by date**: shows the chosen date's keywords in the order they were added.
+    - You edit in place. You can change the date, keyword, and note. If you move it to another date, it announces "수정해서 YYYY-MM-DD로 옮겼습니다" ("Edited and moved to YYYY-MM-DD").
+    - Delete asks for one more confirmation.
+    - If you save a keyword deleted elsewhere, it shows the server message and closes editing.
+  - **Keyword search**: find with a search term (partial match of keyword and note) and an optional period. If you clear everything, it shows the recent keywords.
+    - It shows the result count and the keyword, date, and note.
+    - Pressing the date button in a result goes to that day's list.
+    - After add, edit, and delete, it also loads the visible search result again.
+  - During a change request, the inputs and buttons are locked.
+  - The date list is tagged with its date, so a late response for another date does not mix in.
+  - Server messages such as a duplicate keyword (409) are shown as they are and the input is kept.
 - `frontend/src/style.css`
-  - 키워드 화면 배치.
-  - 메뉴 버튼 글자가 줄바꿈되지 않게 했다(`white-space: nowrap`).
-  - 모바일에서는 메뉴 버튼 좌우 여백을 9px로 줄였다. 메뉴가 4개가 되면서 390px 너비에서 "학습 기록"·"키워드"가 두 줄로 꺾이고 메뉴가 36px 넘쳤기 때문이다.
+  - The keyword screen layout.
+  - Menu button text does not wrap (`white-space: nowrap`).
+  - On mobile, I reduced the left and right margin of the menu buttons to 9px. With 4 menu items, "학습 기록" ("Study logs") and "키워드" wrapped to two lines at 390px width and the menu overflowed by 36px.
 
-## 테스트
+## Tests
 
-- `backend/test/keywords-ui.test.ts`(새 파일, 1차 리뷰 반영 후 18건)
-  - 오늘 날짜로 열림, 빈 날짜 안내
-  - 빠른 입력: POST 본문(날짜 포함), 입력란 비움, 메시지, 포커스
-  - 다른 날짜 선택 시 그 날짜로 조회·추가, "오늘로"
-  - 중복 409 메시지와 입력 유지
-  - 수정(PUT 본문), 다른 날짜로 옮길 때 메시지와 목록에서 빠짐
-  - 삭제 확인·취소, 다른 곳에서 지워진 키워드 수정
-  - 검색 요청 경로, 결과 개수·순서, 날짜 버튼으로 이동, 결과 없음
-  - 변경 후 검색 결과 갱신, 요청 중 잠금, 불러오기·검색 실패 메시지
-  - 버튼 이름(aria-label)
-  - `searchPath`가 빈 조건을 빼는지
-- `keyword.ts`의 `searchPath`는 `URLSearchParams` 대신 `encodeURIComponent`로 만든다. 화면 테스트 VM에 `URLSearchParams`가 없어서다. 결과 경로는 같다.
+- `backend/test/keywords-ui.test.ts` (a new file, 18 tests after the first-review fixes)
+  - Opens with today's date, the empty date notice
+  - Quick entry: the POST body (including the date), clearing the inputs, the message, and focus
+  - Picking another date looks up and adds to that date, and "오늘로"
+  - The duplicate 409 message and keeping the input
+  - Edit (the PUT body), the message when moving to another date, and leaving the list
+  - Delete confirmation and cancel, and editing a keyword deleted elsewhere
+  - The search request path, the result count and order, moving with the date button, and no result
+  - Updating the search result after a change, locking during a request, and the load and search failure messages
+  - Button names (aria-label)
+  - Whether `searchPath` leaves out empty conditions
+- `searchPath` in `keyword.ts` is built with `encodeURIComponent` instead of `URLSearchParams`. This is because the screen test VM has no `URLSearchParams`. The resulting path is the same.
 
-## 검증
+## Verification
 
-| 명령            | 환경                             | 결과                                                                           |
-| --------------- | -------------------------------- | ------------------------------------------------------------------------------ |
-| `npm run check` | 로컬, `TEST_DATABASE_URL` 미설정 | exit 0. backend tests 152, pass 142, fail 0, skipped 10(DB) (1차 리뷰 반영 후) |
+| Command         | Environment                        | Result                                                                                  |
+| --------------- | ---------------------------------- | --------------------------------------------------------------------------------------- |
+| `npm run check` | Local, `TEST_DATABASE_URL` not set | exit 0. backend tests 152, pass 142, fail 0, skipped 10 (DB) (after first-review fixes) |
 
-- 건너뛴 10건은 DB 통합 테스트다. 이 PR은 API·DB를 바꾸지 않았다. CI(PostgreSQL 17)에서 실행된다.
-- 브라우저: Playwright(Chromium)로 Vite 개발 서버(5202)와 API(3102, 로컬 Docker 테스트 DB)를 띄워 확인했다.
-  - 모바일 390×844
-    - Enter로 빠른 추가 → 입력란 비움, 키워드 입력란 포커스, 목록 추가
-    - 검색 "고유" → 3개(메모 일치 포함, 최근 날짜 우선)
-    - 수정으로 다른 날짜로 옮기기 → 메시지, 오늘 목록에서 빠짐, API로 옮긴 날짜 확인, 검색 결과 갱신
-    - 메뉴 4개가 넘치지 않음(메뉴 너비 343px = 내용 너비), 페이지 가로 스크롤 없음
-  - PC 1440×900: 입력 카드(날짜 1칸 + 키워드 3칸), 날짜별 목록, 가로 스크롤 없음
-  - 스크린샷: [모바일 390×844 (전체 페이지)](assets/40-mobile-390x844.png), [PC 1440×900](assets/40-pc-1440x900.png)
+- The 10 skipped are DB integration tests. This PR did not change the API or the DB. They run in CI (PostgreSQL 17).
+- Browser: I checked by starting the Vite dev server (5202) and the API (3102, a local Docker test DB) with Playwright (Chromium).
+  - Mobile 390×844
+    - Quick add with Enter -> the inputs are cleared, the keyword input has focus, and it is added to the list
+    - Search "고유" -> 3 (including a note match, the most recent date first)
+    - Moving to another date by edit -> the message, it leaves today's list, I confirmed the moved date through the API, and the search result updated
+    - The 4 menu items do not overflow (menu width 343px = content width), and no horizontal page scroll
+  - PC 1440×900: the input card (1 date cell + 3 keyword cells), the list by date, and no horizontal scroll
+  - Screenshots: [mobile 390×844 (whole page)](assets/40-mobile-390x844.png), [PC 1440×900](assets/40-pc-1440x900.png)
 
-## 자동 코드 리뷰 1차
+## Automated code review, round 1
 
-별도 읽기 전용 리뷰 에이전트가 이슈 #40 완료 기준과 PR 변경을 검토했다. high 지적은 없었다. 분리할 이슈도 없다.
+A separate read-only review agent reviewed the issue #40 done criteria and the PR changes. There were no high comments. There is no issue to split off either.
 
-- medium(반영): 날짜 입력란을 지우면 날짜가 빈 값이 되어 목록이 "불러오는 중…"에서 멈추고, 제목이 " 의 키워드"가 됐다.
-  - 빈 날짜는 무시해서 마지막으로 고른 날짜를 유지한다.
-- low(반영): 검색이 실패한 뒤 다른 변경을 하면, 이전 검색이 다시 실행되어 새 검색어 아래에 옛 결과가 나왔다.
-  - 검색이 실패하면 결과를 비우고 다시 실행하지 않는다.
-- low(반영): 시작일이 종료일보다 늦은 검색은 서버 400으로만 막혔다.
-  - 날짜 입력에 `min`·`max`를 걸어 브라우저가 먼저 막는다.
-- low(반영): 수정 저장·취소·삭제 뒤에는 누른 버튼이 사라져 키보드 포커스를 잃었다.
-  - 그날 목록의 제목(`tabIndex=-1`)으로 포커스를 옮긴다.
-- 회귀 테스트 4건을 추가했다. 수정 전 코드에서 4건 실패, 수정 후 18건 통과를 확인했다.
-- 브라우저(390×844)에서도 확인했다. 날짜를 지워도 이전 날짜가 유지되고, 삭제 후 포커스가 목록 제목으로 간다.
-- low(유지)
-  - 수정·삭제 알림은 입력 카드의 상태 영역에 나온다. 항상 있는 `role=status` 영역이라 화면 낭독기는 읽는다.
-  - 키워드 제목이 `log-date` 클래스를 같이 쓴다. 스타일 공유 목적이다.
+- medium (applied): if you cleared the date input, the date became empty, the list stalled at "불러오는 중…" ("Loading…"), and the title became " 의 키워드" (" 's keywords").
+  - An empty date is ignored, so the last chosen date is kept.
+- low (applied): if you made another change after a search failed, the earlier search ran again, and the old result appeared under the new search term.
+  - If a search fails, it clears the result and does not run again.
+- low (applied): a search with the start date later than the end date was blocked only by the server 400.
+  - I put `min` and `max` on the date inputs so the browser blocks it first.
+- low (applied): after saving, cancelling, or deleting an edit, the button that was pressed disappeared and keyboard focus was lost.
+  - Focus moves to the title of that day's list (`tabIndex=-1`).
+- I added 4 regression tests. I confirmed 4 fail on the code before the fix and 18 pass after the fix.
+- I also checked in a browser (390×844). Even if you clear the date, the previous date is kept, and after a delete, focus goes to the list title.
+- low (kept)
+  - The edit and delete notices appear in the status area of the input card. It is a `role=status` area that is always there, so a screen reader reads it.
+  - The keyword title shares the `log-date` class. It is for sharing styles.
 
-## 자동 코드 리뷰 2차
+## Automated code review, round 2
 
-별도 읽기 전용 리뷰 에이전트가 1차 반영과 최종 화면 코드를 다시 확인했다. 리뷰는 최대 2회이므로 3차 리뷰는 하지 않는다.
+A separate read-only review agent checked the first-round fixes and the final screen code again. The review is limited to 2 rounds, so I do not do a third.
 
-- 1차 반영 네 가지가 맞고, 새 문제가 없다고 확인됐다. 수정 전 반드시 고칠 지적은 없었다. 분리할 이슈도 없다.
-- 참고 지적(반영, 2차 보완): 저장이 404로 실패해 편집이 닫히거나, 삭제가 실패해 확인 버튼이 사라질 때도 포커스를 잃었다.
-  - 두 경우 모두 그날 목록 제목으로 포커스를 옮긴다.
-  - 기존 테스트("다른 곳에서 지워진 키워드 수정")에 포커스 확인을 추가했다.
+- It was confirmed that the four first-round fixes are right and that there are no new problems. There were no comments that had to be fixed before. There is no issue to split off either.
+- Reference comment (applied, second fix): focus was also lost when a save failed with 404 and editing closed, or when a delete failed and the confirm button disappeared.
+  - In both cases, focus moves to the title of that day's list.
+  - I added a focus check to the existing test ("editing a keyword deleted elsewhere").
 
-## 한계·후속
+## Limits and follow-up
 
-- 검색 결과에서 바로 수정·삭제하지 않는다. 날짜 버튼으로 그날 목록에 가서 한다.
-- 검색 결과는 최대 50개(API 기본값)다. 더 보기는 없다.
-- 키워드를 학습 기록·교재와 연결하지 않는다.
+- You do not edit or delete directly from a search result. You go to that day's list with the date button and do it there.
+- The search result is at most 50 (the API default). There is no "show more".
+- Keywords are not linked to study logs or textbooks.

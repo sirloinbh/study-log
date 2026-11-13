@@ -1,28 +1,28 @@
-# #117 프런트 파일 이름을 소문자-하이픈으로 바꾸기
+# #117 Rename the frontend files to lowercase with hyphens
 
-- 이슈: [#117](https://github.com/sirloinbh/study-log/issues/117)
-- 브랜치: `chore/117-frontend-file-names`
+- Issue: [#117](https://github.com/sirloinbh/study-log/issues/117)
+- Branch: `chore/117-frontend-file-names`
 
-## 목적
+## Purpose
 
-다른 앱과 중앙 규칙처럼 `frontend/src`의 파일 이름을 소문자와 하이픈으로 맞춘다. 동작은 바뀌지 않는다.
+Match the file names in `frontend/src` to lowercase with hyphens, like the other apps and the central rule. Behavior does not change.
 
-## 변경
+## Changes
 
-- 화면 파일 16개의 이름을 바꿨다. 이슈 등록 때는 15개였고, #52에서 추가한 `ReviewRateChart.tsx`를 함께 바꿨다. 컴포넌트 이름은 그대로이다.
-- 화면 `StudyLogs.tsx`가 `study-logs.tsx`가 되면서 로직 파일 `study-logs.ts`와 import 경로가 겹치므로, 로직 파일을 `study-logs-data.ts`로 바꿨다. 이름이 겹치는 파일은 이것뿐이다. `exercise.ts`와 `exercises.tsx`처럼 단수와 복수로 다른 파일은 그대로 둔다.
-- `frontend/src`와 `backend/test`의 import를 고쳤다. 지난 변경 기록(`docs/changes`, `docs/daily`)의 옛 이름은 당시 기록이므로 고치지 않았다.
+- Renamed 16 screen files. There were 15 when the issue was registered, and `ReviewRateChart.tsx`, added in #52, was renamed with them. The component names are unchanged.
+- The screen `StudyLogs.tsx` became `study-logs.tsx`, which collides with the import path of the logic file `study-logs.ts`, so I renamed the logic file to `study-logs-data.ts`. This is the only pair of files whose names collide. Files that differ by singular and plural, such as `exercise.ts` and `exercises.tsx`, stay as they are.
+- Fixed the imports in `frontend/src` and `backend/test`. The old names in past change records (`docs/changes`, `docs/daily`) are records of the time, so I did not fix them.
 
-- `frontend/src/stats-review.test.tsx`: 코드를 바꾼 직후 첫 전체 검사에서 제한 시간 5초를 넘겨 실패하는 일이 여러 번 있었다(다시 돌리면 통과). `reviewCard`가 호출마다 하던 역할 조회를 없애고, 카드 제목은 한 테스트에서만 확인하게 했다. 이 파일의 테스트별 제한 시간도 20초로 늘렸다. 역할 조회의 비용을 원인으로 추정했을 뿐 측정하지는 않았다. `findBy`와 `waitFor`의 기본 대기 1초는 그대로라, 더 느린 환경에서는 다시 실패할 수 있다.
+- `frontend/src/stats-review.test.tsx`: right after a code change, the first full check often failed by going over the 5 second limit (it passed on a re-run). I removed the role lookup that `reviewCard` did on every call, and made the card title checked in only one test. I also raised the per-test limit of this file to 20 seconds. I only presumed the cost of the role lookup was the cause and did not measure it. The default 1 second wait of `findBy` and `waitFor` is unchanged, so it can fail again in a slower environment.
 
-## 리뷰
+## Review
 
-1차 리뷰에서 앱 코드와 import의 결함은 없었다. 테스트가 카드 제목을 더 확인하지 않는 점과, 이 기록이 역할 조회 변경을 부정확하게 설명한 점을 고쳤다. 2차 리뷰에서 결함은 없었다.
+The first review found no defects in the app code and the imports. I fixed that the test did not check the card title further and that this record described the role lookup change inaccurately. The second review found no defects.
 
-## 검증
+## Verification
 
-`TEST_DATABASE_URL`을 설정한 `npm run check`가 두 번 연속 통과했다. 백엔드 338건, 프런트 123건, 스킬 4건이 통과했다. 건너뜀은 프런트 2건으로, 중앙 표준에서 온 다크 전용 앱 테스트이다. `npm run standards:check`의 파일 이름 경고가 없어졌다.
+`npm run check` with `TEST_DATABASE_URL` set passed twice in a row. Backend 338, frontend 123, and skills 4 passed. The skips were 2 frontend tests, the dark-only app tests that came from the central standards. The file name warning of `npm run standards:check` is gone.
 
-headless Chrome으로 PC 1440×900과 모바일 390×844에서 통계와 학습 기록 화면 35개 항목을 확인했다. 다른 화면은 자동 테스트와 빌드로만 확인했다.
+With headless Chrome I checked 35 items on the statistics and study log screens at PC 1440×900 and mobile 390×844. The other screens were checked only with automated tests and the build.
 
-파일 이름의 대소문자는 Windows에서 구분되지 않으므로, 대소문자를 구분하는 Linux의 CI가 import를 실제로 확인한다.
+File name case is not distinguished on Windows, so CI on Linux, which distinguishes case, actually checks the imports.

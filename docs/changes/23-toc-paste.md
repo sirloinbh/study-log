@@ -1,216 +1,216 @@
-# #23 목차 자동 생성 (붙여넣은 목차 텍스트 파싱)
+# #23 Automatic table of contents generation (parsing pasted table of contents text)
 
-- 이슈: [#23](https://github.com/sirloinbh/study-log/issues/23) (상위 #5)
-- 브랜치: `feat/23-toc-paste`
-- 선행: #13 교재 목차(장·절 계층) DB·API (병합 완료)
+- Issue: [#23](https://github.com/sirloinbh/study-log/issues/23) (parent #5)
+- Branch: `feat/23-toc-paste`
+- Prerequisite: #13 textbook table of contents (chapter and section hierarchy) DB and API (merged)
 
-## 목적
+## Purpose
 
-목차를 한 항목씩 입력하지 않고, 책의 목차 텍스트를 붙여넣어 한 번에 등록한다.
+Instead of entering the table of contents one item at a time, paste the table of contents text of the book and register it all at once.
 
-## 결정
+## Decisions
 
-- 사용자 결정: 입력 방식은 텍스트 붙여넣기와 PDF 목차 추출이다.
-  - 이번 PR은 텍스트 붙여넣기만 다룬다.
-  - PDF 추출에는 PDF 라이브러리 설치가 필요하다. 설치할 패키지와 버전을 사용자에게 다시 확인한 뒤 별도로 진행한다.
-- 정해지지 않았던 파싱 규칙은 아래로 정했다.
-  - **한 줄이 한 항목**이다. 빈 줄, 쪽 번호만 있는 줄, 첫 항목보다 앞의 "목차/차례/Contents" 줄은 건너뛴다.
-  - **쪽 번호 제거:** 점선(`....`, `···`), 탭, 두 칸 이상 띄운 뒤의 숫자만 쪽 번호로 본다. "연습 3"처럼 한 칸 띄운 숫자는 제목의 일부로 남긴다.
-  - **번호와 단계:** 바깥 단계부터 차례로 다음과 같다.
-    - 부: Part I, 제1부, 제1편
-    - 장: Chapter 1, Ch. 1, Appendix A, 제1장, 1장, 부록 A
-    - 절: 제1절, 1절
-    - 소수점 번호: 1, 1.2, 1-2-3, A.1. 점이나 하이픈으로 나뉜 조각이 하나 늘 때마다 한 단계 깊어진다. 그래서 "1.1"은 "1" 아래에도, "Chapter 1" 아래에도 들어간다.
-    - "A Tour of C++", "3D 그래픽", "2024년" 같은 줄은 번호로 보지 않는다.
-  - **번호 없는 줄**
-    - 바로 위 줄보다 더 들여 썼으면 그 아래로 들어간다. 탭은 4칸으로 세고, 전각 공백도 들여쓰기로 본다.
-    - 그렇지 않으면 들여쓰기가 같거나 얕은 가장 가까운 줄과 같은 단계에 놓인다.
-    - 위에 따를 줄이 없으면(머리말 등) 가장 바깥 번호와 같은 단계에 놓인다. 그래서 뒤의 장들이 머리말 아래로 들어가지 않는다.
-  - **번호만 있는 줄**("Part II")은 번호를 제목으로 쓴다. 20자를 넘는 번호는 제목에 그대로 남긴다.
-  - **수정 방식:** 미리보기는 글을 고칠 때마다 다시 그려진다. 단계가 틀리면 번호나 들여쓰기를 고친다. 저장한 뒤에는 기존 목차처럼 항목마다 수정·이동·삭제할 수 있다.
-  - **저장 위치:** 기존 목차가 있으면 그 뒤에 추가한다. 기존 목차는 바꾸지 않는다.
-  - **한도:** 한 번에 500개, 10단계, 글 50000자까지. 제목 200자, 번호 20자 한도는 기존과 같다.
+- User decision: the input methods are pasting text and extracting the table of contents from a PDF.
+  - This PR covers only pasting text.
+  - PDF extraction needs installing a PDF library. I go ahead separately after confirming again with the user which package and version to install.
+- I set the parsing rules that were not decided as follows.
+  - **One line is one item.** It skips blank lines, lines with only a page number, and a "목차/차례/Contents" ("Table of contents") line before the first item.
+  - **Removing page numbers:** only a number after dotted leaders (`....`, `···`), a tab, or two or more spaces is treated as a page number. A number after one space, like "연습 3" ("Exercise 3"), stays as part of the title.
+  - **Numbers and levels:** from the outer level in order, they are as follows.
+    - Part: Part I, 제1부, 제1편
+    - Chapter: Chapter 1, Ch. 1, Appendix A, 제1장, 1장, 부록 A
+    - Section: 제1절, 1절
+    - Decimal numbers: 1, 1.2, 1-2-3, A.1. Each time the number of pieces split by dots or hyphens grows by one, it goes one level deeper. So "1.1" goes both under "1" and under "Chapter 1".
+    - Lines such as "A Tour of C++", "3D 그래픽" ("3D graphics"), and "2024년" ("year 2024") are not seen as numbers.
+  - **A line with no number**
+    - If it is indented more than the line just above, it goes under that line. A tab counts as 4 spaces, and a full-width space is also seen as indentation.
+    - Otherwise it is placed at the same level as the nearest line with the same or shallower indentation.
+    - If there is no line above to follow (a preface and so on), it is placed at the same level as the outermost numbers. So later chapters do not go under the preface.
+  - **A line with only a number** ("Part II") uses the number as the title. A number over 20 characters stays in the title as it is.
+  - **How to fix:** the preview is redrawn each time you edit the text. If a level is wrong, fix the number or the indentation. After saving, you can edit, move, and delete each item like the existing table of contents.
+  - **Where it is saved:** if there is an existing table of contents, it is added after it. The existing table of contents is not changed.
+  - **Limits:** 500 items at a time, 10 levels, and up to 50000 characters of text. The limits of 200 characters for a title and 20 characters for a number are the same as before.
 
-## 변경
+## Changes
 
-- `frontend/src/toc.ts`(새 파일): 위 규칙의 파서다.
-  - `parseToc`: 각 항목의 단계·번호·제목·원래 줄 번호를 돌려준다.
-  - `tocProblems`: 저장을 막는 문제를 줄 번호와 함께 돌려준다.
-  - `tocTree`: 미리보기용 트리를 만든다.
+- `frontend/src/toc.ts` (a new file): the parser of the rules above.
+  - `parseToc`: returns the level, number, title, and original line number of each item.
+  - `tocProblems`: returns the problems that block saving, with line numbers.
+  - `tocTree`: builds the tree for the preview.
 - `backend/src/textbook-contents.ts`: `POST /api/textbooks/:id/contents/bulk` `{ entries: [{ level, number, title }] }`
-  - 항목은 읽는 순서대로 평평하게 받는다. 깊은 입력을 재귀 없이 검증하기 위해서다.
-  - 다음 경우는 400: 첫 항목이 맨 위 단계가 아님, 위 항목보다 두 단계 이상 깊음, 500개 초과, 10단계 초과
-  - 기존 쓰기와 같은 트랜잭션(교재 행 잠금)에서 모두 넣는다. 실패하면 하나도 남지 않는다.
-  - 응답은 새 목차 트리(201)다.
+  - Items are received flat in reading order. This is to validate deep input without recursion.
+  - These cases are 400: the first item is not at the top level, it is two or more levels deeper than the item above, over 500, and over 10 levels
+  - It inserts them all in the same transaction (the textbook row lock) as the existing writes. If it fails, none are left.
+  - The response is the new table of contents tree (201).
 - `frontend/src/TextbookContents.tsx`, `frontend/src/style.css`
-  - 목차 카드에 "목차 붙여넣기" 버튼을 추가했다.
-  - 붙여넣기 창의 구성
-    - 목차 텍스트 입력과 규칙 안내(`aria-describedby`)
-    - 실시간 미리보기 트리: 항목 수, 기존 목차가 있으면 "기존 목차 뒤에 추가" 표시. 길면 미리보기 안에서 스크롤된다.
-    - 문제 목록(`role="alert"`)
-    - "N개 저장" 버튼과 취소 버튼
-  - 문제가 있거나 항목이 없으면 저장 버튼이 잠긴다. 장 추가·수정 편집기를 열면 붙여넣기 창은 닫힌다.
-  - 저장하면 응답의 트리로 바로 바꾼다. 서버가 거절하면 메시지를 보여 주고 글은 그대로 둔다.
+  - Added a "목차 붙여넣기" ("Paste table of contents") button to the table of contents card.
+  - The makeup of the paste window
+    - The table of contents text input and the rules guide (`aria-describedby`)
+    - A live preview tree: the item count, and "기존 목차 뒤에 추가" ("Add after the existing table of contents") if one exists. If it is long, it scrolls inside the preview.
+    - The problem list (`role="alert"`)
+    - A "N개 저장" ("Save N") button and a cancel button
+  - If there are problems or no items, the save button is locked. If you open the add chapter or edit editor, the paste window closes.
+  - When you save, it changes right away to the tree in the response. If the server rejects, it shows the message and leaves the text as it is.
 
-## 테스트
+## Tests
 
-- `backend/test/toc.test.ts`(새 파일): 파서 단위 테스트
-  - 소수점·하이픈·글자 번호와 쪽 번호(점선·탭·넓은 간격) 제거
-  - 부/장/절, 영문/한글 번호, 번호만 있는 줄
-  - 들여쓰기(공백·탭·전각 공백), 번호와 섞인 경우, 머리말
-  - 목차 제목 줄·빈 줄·쪽 번호 줄 건너뛰기, 번호처럼 보이는 제목, 한 칸 띄운 숫자, 너무 긴 번호
-  - 문제(200자, 10단계, 500개)와 미리보기 트리
+- `backend/test/toc.test.ts` (a new file): parser unit tests
+  - Decimal, hyphen, and letter numbers, and removing page numbers (dotted leaders, a tab, a wide gap)
+  - Part/chapter/section, English and Korean numbers, and lines with only a number
+  - Indentation (spaces, tabs, full-width spaces), mixed with numbers, and a preface
+  - Skipping the table of contents title line, blank lines, and page number lines, titles that look like numbers, a number after one space, and a too long number
+  - Problems (200 characters, 10 levels, 500 items) and the preview tree
 - `backend/test/textbook-contents.test.ts`
-  - 일괄 등록의 검증 400(목록 없음, 빈 목록, 단계 누락·소수·초과, 첫 단계, 단계 건너뜀, 빈 제목, 501개): DB를 건드리기 전에 막는다.
-  - 없는 교재는 404와 롤백
-- `backend/test/textbook-contents-bulk.integration.test.ts`(새 파일, 실제 DB)
-  - 기존 장 뒤에 3단계 목차를 추가한다. 각 부모 안의 위치가 0, 1, 2로 매겨지는지 확인한다.
-  - 두 번째 붙여넣기는 첫 번째 뒤에 들어간다.
-  - 잘못된 묶음은 아무것도 남기지 않는다.
+  - Validation 400 for bulk registration (no list, an empty list, a level missing, a decimal, or over, the first level, skipping a level, an empty title, and 501): it blocks before touching the DB.
+  - 404 and rollback for a missing textbook
+- `backend/test/textbook-contents-bulk.integration.test.ts` (a new file, a real DB)
+  - It adds a 3-level table of contents after an existing chapter. It checks that the positions inside each parent are numbered 0, 1, 2.
+  - The second paste goes after the first.
+  - A wrong batch leaves nothing.
 - `backend/test/textbook-contents-ui.test.ts`
-  - 미리보기 트리, 항목 수와 "기존 목차 뒤에 추가", 글을 고치면 미리보기도 바뀜, 일괄 요청 본문, 저장 후 트리·안내
-  - 문제가 있으면 저장 잠김, 취소, 장 추가로 닫힘, 서버 거절 메시지와 글 유지
+  - The preview tree, the item count and "기존 목차 뒤에 추가", the preview changing when you edit the text, the bulk request body, and the tree and notice after saving
+  - Save locked when there are problems, cancel, closing by add chapter, and the server rejection message and keeping the text
 
-## 검증
+## Verification
 
-| 명령                   | 환경                                                        | 결과                                                        |
-| ---------------------- | ----------------------------------------------------------- | ----------------------------------------------------------- |
-| `npm run check`        | 로컬, `TEST_DATABASE_URL` 미설정                            | exit 0. backend tests 243, pass 225, fail 0, skipped 18(DB) |
-| `npm test` (기본 병렬) | 로컬 Docker `postgres:17-alpine`, 마이그레이션 001~010 적용 | exit 0. tests 243, pass 243, fail 0, skipped 0              |
+| Command                       | Environment                                                      | Result                                                       |
+| ----------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------ |
+| `npm run check`               | Local, `TEST_DATABASE_URL` not set                               | exit 0. backend tests 243, pass 225, fail 0, skipped 18 (DB) |
+| `npm test` (default parallel) | Local Docker `postgres:17-alpine`, migrations 001 to 010 applied | exit 0. tests 243, pass 243, fail 0, skipped 0               |
 
-- 브라우저: Playwright(Chromium)로 Vite 개발 서버와 이 브랜치 API(로컬 Docker 테스트 DB)를 띄워 확인했다.
-  - 확인용 교재를 만들고 "0 머리말"을 넣은 뒤 진행했고, 확인 후 교재는 삭제했다.
-  - 모바일 390×844
-    - 붙여넣은 글: "목차", Chapter 1/2, 점선·탭·넓은 간격 쪽 번호, 들여 쓴 "연습문제", "부록 A"
-    - 미리보기는 8개였고, "연습문제"가 1.2 아래에 들어갔다. 가로 스크롤은 없었다.
-    - "8개 저장" 후 "목차 8개를 추가했습니다"가 보였다. 트리는 "0 머리말" 뒤에 같은 구조로 저장됐고 API 응답도 같았다.
+- Browser: I checked by starting the Vite dev server and this branch's API (a local Docker test DB) with Playwright (Chromium).
+  - I made a textbook for the check, put in "0 머리말" ("0 Preface"), and went ahead, and deleted the textbook after checking.
+  - Mobile 390×844
+    - The pasted text: "목차", Chapter 1/2, page numbers with dotted leaders, a tab, and a wide gap, an indented "연습문제" ("Exercises"), and "부록 A" ("Appendix A")
+    - The preview had 8 items, and "연습문제" went under 1.2. There was no horizontal scroll.
+    - After "8개 저장", "목차 8개를 추가했습니다" ("Added 8 table of contents entries") appeared. The tree was saved with the same structure after "0 머리말", and the API response was the same.
   - PC 1440×900
-    - 제3장 아래에 제1절·제2절, 그 아래 3.2.1이 들어갔다.
-    - 201자 제목 줄은 "6번째 줄: 제목이 200자를 넘습니다"로 표시되고 저장 버튼이 잠겼다.
-  - 스크린샷: [모바일 390×844 (미리보기)](assets/23-mobile-390x844.png), [PC 1440×900 (문제 표시)](assets/23-pc-1440x900.png)
+    - Section 1 and section 2 went under chapter 3, and 3.2.1 under that.
+    - The 201-character title line was shown as "6번째 줄: 제목이 200자를 넘습니다" ("Line 6: the title is over 200 characters") and the save button was locked.
+  - Screenshots: [mobile 390×844 (preview)](assets/23-mobile-390x844.png), [PC 1440×900 (problem display)](assets/23-pc-1440x900.png)
 
-## 한계·후속
+## Limits and follow-up
 
-- PDF 목차 추출은 PDF 라이브러리 설치에 대한 사용자 재확인을 기다린다(이슈 #23의 결정 코멘트).
-- 로마 숫자 장 번호("I. 서론")와 괄호 번호("(1)", "①")는 번호로 보지 않는다. 그런 줄은 들여쓰기를 따른다.
-- 미리보기에서 항목을 직접 끌어 옮기지는 못한다. 글을 고치거나, 저장한 뒤 기존 위로/아래로·수정을 쓴다.
-- 50000자를 넘는 글을 붙여넣으면 입력란이 넘는 부분을 알림 없이 자른다(브라우저의 `maxLength` 동작). 500개 한도보다 훨씬 긴 분량이라 그대로 둔다.
+- PDF table of contents extraction waits for the user's reconfirmation about installing a PDF library (the decision comment of issue #23).
+- Roman numeral chapter numbers ("I. 서론", "I. Introduction") and parenthesized numbers ("(1)", "①") are not seen as numbers. Such lines follow the indentation.
+- You cannot drag items to move them directly in the preview. Fix the text, or after saving, use the existing up/down and edit.
+- If you paste text over 50000 characters, the input field cuts the part that goes over without a notice (the browser's `maxLength` behavior). It is far longer than the 500 item limit, so I leave it.
 
-## 리뷰
+## Review
 
-- 1차 자동 리뷰(읽기 전용, 별도 에이전트): 보완점 없음
-  - 확인한 항목
-    - 서버: 위치 카운터, 부모 매핑, 트랜잭션, superRefine 경계
-    - 요청 크기: JSON 256kb 안에 최대 입력이 들어감
-    - 파서: 단계 건너뜀 없음, 백트래킹 없음, 번호 오인 없음
-    - 화면: 교재 전환 시 상태 분리, 중복 제출 방지, 접근성
-  - 보고 기준 미만 참고 사항
-    - 공백만 수만 개인 한 줄은 쪽 번호 정규식이 느려질 수 있다. 현실적인 입력이 아니어서 그대로 둔다.
-    - 위의 50000자 자르기
-    - 문서의 "첫 줄" 표현: 코드와 맞게 "첫 항목보다 앞"으로 고쳤다.
-  - 보완점이 없어 2차 리뷰는 하지 않았다.
+- First automated review (read-only, a separate agent): nothing to fix
+  - Checked
+    - Server: the position counter, the parent mapping, the transaction, and the superRefine boundary
+    - Request size: the maximum input fits within the JSON 256kb
+    - Parser: no skipping a level, no backtracking, and no misreading of numbers
+    - Screen: state separation when switching textbooks, preventing duplicate submits, and accessibility
+  - Notes below the reporting bar
+    - A single line of tens of thousands of spaces could slow down the page number regular expression. It is not realistic input, so I leave it.
+    - The 50000 character cut above
+    - The wording "first line" in the document: I fixed it to "before the first item" to match the code.
+  - There was nothing to fix, so I did not do a second review.
 
-## PDF 목차 추출 (브랜치 `feat/23-toc-pdf`)
+## PDF table of contents extraction (branch `feat/23-toc-pdf`)
 
-### 결정
+### Decisions
 
-- 사용자가 `pdfjs-dist` 설치를 허락했다([결정 코멘트](https://github.com/sirloinbh/study-log/issues/23#issuecomment-6360592804)).
-- PDF는 서버로 올리지 않고 브라우저에서만 읽는다. 읽은 글은 기존 붙여넣기 칸에 들어가며, 같은 미리보기로 고친 뒤 저장한다.
-- 책갈피(아웃라인)가 있으면 책갈피를 단계별 들여쓰기로 가져온다. 없으면 앞 20쪽의 글을 줄 단위로 가져오고, 목차가 아닌 줄은 사용자가 지운다.
-- 50MB를 넘는 PDF는 읽지 않는다. 스캔본처럼 글자가 없는 PDF는 그렇다고 알린다(OCR은 #29).
+- The user allowed installing `pdfjs-dist` ([decision comment](https://github.com/sirloinbh/study-log/issues/23#issuecomment-6360592804)).
+- The PDF is not uploaded to the server and is read only in the browser. The text read goes into the existing paste field, and you fix it with the same preview and then save.
+- If there are bookmarks (the outline), it brings the bookmarks in with indentation by level. If not, it brings the text of the first 20 pages by line, and the user deletes lines that are not the table of contents.
+- A PDF over 50MB is not read. A PDF with no text, such as a scan, is reported as such (OCR is #29).
 
-### 설치 전 확인(글로벌 공급망 규칙)
+### Checks before installing (the global supply chain rule)
 
 - `pdfjs-dist@6.4.299`
-  - 2026-10-03 게시, 게시자는 GitHub Actions(SLSA provenance 있음)
-  - 관리자는 Mozilla pdf.js 팀, 저장소는 `github.com/mozilla/pdf.js`
-  - install script 없음
-  - 버전을 정확히 고정하고 `--ignore-scripts`로 설치했다.
-- 선택 의존성 `@napi-rs/canvas`(Node에서만 쓰는 네이티브 모듈)
-  - 범위 `^1.0.10`의 최신 1.0.13은 2026-10-21 게시라 14일이 지나지 않았다.
-  - 그래서 `overrides`로 1.0.10(2026-10-01 게시)에 고정했다. 워크스페이스 설치에는 npm이 루트 `package.json`의 것만 적용한다. `frontend/package.json`의 것은 하위 저장소 단독 설치(`frontend/package-lock.json`, Docker 빌드)용이다.
-  - 플랫폼별 바이너리 11개도 1.0.10이고 모두 GitHub Actions 게시다. install script는 없다.
-  - 로더 `js-binding.js`의 `child_process`는 Linux에서 musl을 판별하는 `ldd --version` 호출뿐이다. 브라우저 번들에는 들어가지 않는다.
-- 잠금 파일
-  - 루트: 13개 추가, 기존 항목 변경 없음, 모두 `registry.npmjs.org`
-  - `frontend/package-lock.json`: 임시 폴더에서 `--package-lock-only --ignore-scripts`로 다시 만들었다. 추가된 13개 항목이 루트와 버전·integrity가 같고, 삭제된 줄이 없다.
-- 보안: 텍스트만 읽고 그리지 않는다. PDF.js 6에는 CVE-2024-4367의 원인이던 `eval` 경로가 없다. 워커를 포함해 빌드 결과에 `eval`·`new Function`이 없음을 확인했다.
+  - Published 2026-10-03, the publisher is GitHub Actions (with SLSA provenance)
+  - The maintainers are the Mozilla pdf.js team, and the repository is `github.com/mozilla/pdf.js`
+  - No install script
+  - I pinned the version exactly and installed with `--ignore-scripts`.
+- The optional dependency `@napi-rs/canvas` (a native module used only in Node)
+  - The latest 1.0.13 in the range `^1.0.10` was published on 2026-10-21, so it is not 14 days old.
+  - So I pinned it to 1.0.10 (published 2026-10-01) with `overrides`. For a workspace install, npm applies only the one in the root `package.json`. The one in `frontend/package.json` is for a standalone install of the sub-repository (`frontend/package-lock.json`, the Docker build).
+  - The 11 platform binaries are also 1.0.10 and all are published by GitHub Actions. There is no install script.
+  - The `child_process` in the loader `js-binding.js` is only the `ldd --version` call that tells musl on Linux. It does not go into the browser bundle.
+- Lockfiles
+  - Root: 13 added, no existing entry changed, all from `registry.npmjs.org`
+  - `frontend/package-lock.json`: I rebuilt it in a temporary folder with `--package-lock-only --ignore-scripts`. The 13 added entries have the same versions and integrity as the root, and no line was removed.
+- Security: it only reads text and does not draw. PDF.js 6 has no `eval` path, which was the cause of CVE-2024-4367. I confirmed there is no `eval` or `new Function` in the build output, including the worker.
 
-### 변경
+### Changes
 
-- `frontend/src/pdf-toc.ts`(새 파일)
-  - `outlineText`: 책갈피를 2칸씩 들여 쓴 줄로 바꾼다.
-  - `pageText`: 쪽의 글 조각을 줄로 다시 묶는다. 글자 크기 절반보다 가까운 기준선은 같은 줄로 본다. 넓은 간격은 두 칸으로 바꿔 쪽 번호가 빠지게 하고, 왼쪽 여백은 들여쓰기로 옮긴다.
-- `frontend/src/pdf-import.ts`(새 파일): `readPdfToc`
-  - PDF.js와 워커를 처음 쓸 때 동적으로 불러온다.
-  - 책갈피가 있으면 책갈피를, 없으면 앞 20쪽의 글을 읽는다.
-  - 끝나면 문서를 닫는다.
+- `frontend/src/pdf-toc.ts` (a new file)
+  - `outlineText`: turns the bookmarks into lines indented by 2 spaces.
+  - `pageText`: regroups the text pieces of a page into lines. A baseline closer than half the font size is seen as the same line. A wide gap becomes two spaces so the page number is dropped, and the left margin is turned into indentation.
+- `frontend/src/pdf-import.ts` (a new file): `readPdfToc`
+  - It loads PDF.js and the worker dynamically on first use.
+  - If there are bookmarks it reads the bookmarks, and if not it reads the text of the first 20 pages.
+  - It closes the document when done.
 - `frontend/src/TextbookContents.tsx`
-  - 붙여넣기 창에 "PDF에서 가져오기" 파일 선택을 넣었다.
-  - 읽는 동안 "PDF를 읽는 중…"이 보이고 입력과 저장이 잠긴다.
-  - 결과 안내: 책갈피 N줄, 또는 앞 N쪽. 실패, 글 없음, 50MB 초과도 알린다.
-  - 같은 파일을 다시 고를 수 있게 선택값을 비운다.
-- `frontend/src/vite-env.d.ts`(새 파일): 워커 주소를 가져오는 `?url` import용 Vite 타입
-- `backend/test/ui-harness.ts`: 테스트가 패키지 대역(PDF.js)을 이름으로 넘길 수 있게 `mount(fetch, globals, modules)`로 바꿨다.
-- 번들
-  - 메인 JS는 gzip 126.14 kB → 129.58 kB다(붙여넣기·파서 코드 포함).
-  - PDF.js(gzip 144.80 kB)와 워커(1.26 MB)는 PDF를 고를 때만 받는 별도 파일이다.
+  - I put a "PDF에서 가져오기" ("Import from PDF") file picker in the paste window.
+  - While reading, "PDF를 읽는 중…" ("Reading the PDF…") is shown and the input and save are locked.
+  - The result notice: N bookmark lines, or the first N pages. Failure, no text, and over 50MB are also reported.
+  - It clears the picked value so you can pick the same file again.
+- `frontend/src/vite-env.d.ts` (a new file): the Vite types for the `?url` import that gets the worker address
+- `backend/test/ui-harness.ts`: I changed it to `mount(fetch, globals, modules)` so tests can pass package stand-ins (PDF.js) by name.
+- Bundle
+  - The main JS goes from 126.14 kB to 129.58 kB gzip (including the paste and parser code).
+  - PDF.js (144.80 kB gzip) and the worker (1.26 MB) are separate files fetched only when you pick a PDF.
 
-### 테스트
+### Tests
 
-- `backend/test/pdf-toc.test.ts`(새 파일)
-  - 책갈피를 들여 쓴 줄로 바꾸고, 공백을 정리하고, 빈 제목을 버린다. 파서가 이를 단계대로 묶는다.
-  - 순서가 뒤섞인 글 조각을 위에서 아래 줄로 다시 묶는다. 쪽 번호 간격, 들여쓰기, 빈 조각, 빈 쪽을 처리한다.
-- `backend/test/textbook-contents-ui.test.ts`(PDF.js 대역)
-  - 책갈피 PDF: 칸 내용 바꿈, 워커 주소, 문서 닫힘, 미리보기, 안내
-  - 책갈피 없는 PDF: 쪽 글과 "앞 2쪽" 안내
-  - 읽기 실패(문서 닫힘, 글 유지), 글 없음, 50MB 초과(읽지 않음)
+- `backend/test/pdf-toc.test.ts` (a new file)
+  - It turns bookmarks into indented lines, tidies spaces, and drops empty titles. The parser groups them by level.
+  - It regroups scrambled text pieces into lines from top to bottom. It handles the page number gap, indentation, empty pieces, and empty pages.
+- `backend/test/textbook-contents-ui.test.ts` (a PDF.js stand-in)
+  - A PDF with bookmarks: replacing the field content, the worker address, the document closing, the preview, and the notice
+  - A PDF with no bookmarks: the page text and the "first 2 pages" notice
+  - A read failure (the document closes, text is kept), no text, and over 50MB (not read)
 
-### 검증
+### Verification
 
-| 명령                   | 환경                                                        | 결과                                                        |
-| ---------------------- | ----------------------------------------------------------- | ----------------------------------------------------------- |
-| `npm run check`        | 로컬, `TEST_DATABASE_URL` 미설정                            | exit 0. backend tests 248, pass 230, fail 0, skipped 18(DB) |
-| `npm test` (기본 병렬) | 로컬 Docker `postgres:17-alpine`, 마이그레이션 001~010 적용 | exit 0. tests 248, pass 248, fail 0, skipped 0              |
+| Command                       | Environment                                                      | Result                                                       |
+| ----------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------ |
+| `npm run check`               | Local, `TEST_DATABASE_URL` not set                               | exit 0. backend tests 248, pass 230, fail 0, skipped 18 (DB) |
+| `npm test` (default parallel) | Local Docker `postgres:17-alpine`, migrations 001 to 010 applied | exit 0. tests 248, pass 248, fail 0, skipped 0               |
 
-- 브라우저: 실제 PDF.js로 확인했다. 확인용 교재를 만들어 쓰고 끝난 뒤 삭제했다.
-  - 확인용 PDF 2개는 패키지 없이 Python으로 직접 썼다.
-    - 한글 책갈피 4개(UTF-16) PDF
-    - 책갈피 없이 "Contents" 쪽(Helvetica, 오른쪽 끝 쪽 번호, 들여 쓴 절)이 있는 PDF
-  - 모바일 390×844, 책갈피 PDF
-    - "1 벡터 / 1.1 벡터의 덧셈 / 1.2 내적 / 2 행렬"이 들여쓰기와 함께 칸에 들어갔다.
-    - 미리보기 4개, "PDF 책갈피에서 목차 4줄을 가져왔습니다"가 보였다. 가로 스크롤은 없었다.
-  - PC 1440×900, 책갈피 없는 PDF
-    - "책갈피 목차가 없어 앞 1쪽의 글을 가져왔습니다"가 보였다.
-    - "Contents" 줄과 쪽 번호가 빠지고, Chapter 1[1.1, 1.2], Chapter 2[Exercises]로 미리보기됐다.
-    - 저장하면 "목차 5개를 추가했습니다"가 보였고, API 트리도 같았다.
-  - 스크린샷: [모바일 390×844 (책갈피)](assets/23-pdf-mobile-390x844.png), [PC 1440×900 (책갈피 없음)](assets/23-pdf-pc-1440x900.png)
+- Browser: I checked with the real PDF.js. I made a textbook for the check and used it, and deleted it afterward.
+  - I wrote the 2 PDFs for the check directly with Python, with no package.
+    - A PDF with 4 Korean bookmarks (UTF-16)
+    - A PDF with no bookmarks that has a "Contents" page (Helvetica, page numbers at the right end, indented sections)
+  - Mobile 390×844, the PDF with bookmarks
+    - "1 벡터 / 1.1 벡터의 덧셈 / 1.2 내적 / 2 행렬" ("1 Vectors / 1.1 Vector addition / 1.2 Inner product / 2 Matrices") went into the field with indentation.
+    - The preview had 4 items, and "PDF 책갈피에서 목차 4줄을 가져왔습니다" ("Imported 4 table of contents lines from the PDF bookmarks") was shown. There was no horizontal scroll.
+  - PC 1440×900, the PDF with no bookmarks
+    - "책갈피 목차가 없어 앞 1쪽의 글을 가져왔습니다" ("There was no bookmark table of contents, so I imported the text of the first page") was shown.
+    - The "Contents" line and page numbers dropped out, and it was previewed as Chapter 1 [1.1, 1.2], Chapter 2 [Exercises].
+    - When I saved, "목차 5개를 추가했습니다" ("Added 5 table of contents entries") was shown, and the API tree was the same.
+  - Screenshots: [mobile 390×844 (bookmarks)](assets/23-pdf-mobile-390x844.png), [PC 1440×900 (no bookmarks)](assets/23-pdf-pc-1440x900.png)
 
-### 한계
+### Limits
 
-- 확인한 PDF는 손으로 만든 작은 파일이다. 실제 교재 PDF는 글 조각 배치가 다양해서, 책갈피가 없으면 줄 묶음이나 들여쓰기가 어긋날 수 있다. 그때는 칸에서 글을 고친다.
-- 두 단으로 된 목차 쪽은 두 단의 줄이 섞일 수 있다.
+- The PDFs I checked are small files made by hand. Real textbook PDFs have varied text piece layouts, so without bookmarks the line grouping or indentation can be off. Then fix the text in the field.
+- On a table of contents page in two columns, the lines of the two columns can mix.
 
-### 리뷰
+### Review
 
-- 1차 자동 리뷰(읽기 전용, 별도 에이전트)
-  - 지적: PDF를 읽는 동안 `busy`가 아니어서 취소·장 추가·수정 버튼이 열려 있었다.
-    - 읽는 중에 취소하면, 늦게 끝난 읽기가 닫은 붙여넣기 창을 다시 열었다.
-    - 읽는 중에 장 추가를 열면, 끝난 뒤 두 폼이 함께 열렸다.
-    - 다른 교재로 바꾸면 새 교재의 입력이 잠겼다.
-  - 반영(커밋 "fix: drop a PDF read once the paste box closes")
-    - 읽기에 번호(`readSeq`)를 붙였다. 붙여넣기 열기·취소·장 추가·수정을 하면 번호가 바뀌고, 늦게 끝난 결과는 버린다.
-    - 읽는 중 상태는 교재 ID와 묶어, 다른 교재의 입력을 잠그지 않는다.
-    - "PDF를 읽는 중…"은 늘 있는 상태 영역(`role="status"`)으로 알린다. 취소하면 함께 지운다.
-    - 화면 테스트: PDF.js 대역의 열기를 붙잡아 두고 확인했다.
-      - 읽는 중 안내와 입력 잠금
-      - 취소 뒤 늦은 결과가 창을 다시 열지 않음
-      - 장 추가 뒤 편집기만 남음
-      - 문서는 그래도 닫힘
-  - 문제없음으로 확인된 항목: `pageText` 계산(0 나눗셈 없음), 책갈피 null·순환, 문서 닫기, 프로덕션 워커 주소
-  - 참고: 프론트엔드 `overrides` 설명을 위처럼 바로잡았다.
-- 반영 후 `npm run check`: exit 0. tests 249, pass 231, fail 0, skipped 18(DB)
-- 2차 자동 리뷰: 보완점 없음
-  - 확인한 항목: 읽는 중 상태 고착 없음, 늦은 결과의 알림 없음, 교재 전환 후 복귀, 화면 중 ref 사용(lint), 문서 닫기
-  - 참고: 읽는 중에 위로/아래로·삭제를 하면 "읽는 중…" 문구가 다른 안내로 바뀐다. 입력은 계속 잠겨 있어 기능에는 영향이 없다.
-  - 리뷰는 최대 2회이므로 여기서 마친다.
+- First automated review (read-only, a separate agent)
+  - Comment: while reading the PDF, `busy` was not set, so the cancel, add chapter, and edit buttons were open.
+    - If you cancelled while reading, a read that ended late reopened the paste window you had closed.
+    - If you opened add chapter while reading, two forms opened together after it ended.
+    - If you changed to another textbook, the input of the new textbook was locked.
+  - Applied (commit "fix: drop a PDF read once the paste box closes")
+    - I gave each read a number (`readSeq`). When you open the paste, cancel, add a chapter, or edit, the number changes, and the result that ends late is discarded.
+    - The reading state is tied to the textbook ID, so it does not lock the input of another textbook.
+    - "PDF를 읽는 중…" is announced in the always-present status area (`role="status"`). When you cancel, it is cleared together.
+    - Screen test: I checked by holding back the open of the PDF.js stand-in.
+      - The reading notice and the input lock
+      - After cancel, the late result does not reopen the window
+      - After add chapter, only the editor remains
+      - The document is still closed
+  - Items confirmed to have no problem: the `pageText` calculation (no division by zero), bookmarks null and cycles, closing the document, and the production worker address
+  - Note: I corrected the explanation of the frontend `overrides` as above.
+- After the fix, `npm run check`: exit 0. tests 249, pass 231, fail 0, skipped 18 (DB)
+- Second automated review: nothing to fix
+  - Checked: no stuck reading state, no notice for a late result, returning after switching textbooks, ref use during rendering (lint), and closing the document
+  - Note: if you do up/down or delete while reading, the "Reading…" text changes to another notice. The input stays locked, so there is no effect on function.
+  - The review is limited to 2 rounds, so I finish here.

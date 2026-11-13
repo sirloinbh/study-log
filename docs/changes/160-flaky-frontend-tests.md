@@ -1,51 +1,51 @@
-# #160 프런트 테스트의 간헐적 시간 초과 원인 찾기
+# #160 Find the cause of the intermittent timeouts in the frontend tests
 
-- 이슈: [#160](https://github.com/sirloinbh/study-log/issues/160)
-- 브랜치: `chore/160-flaky-frontend-tests`
+- Issue: [#160](https://github.com/sirloinbh/study-log/issues/160)
+- Branch: `chore/160-flaky-frontend-tests`
 
-## 목적
+## Purpose
 
-`frontend/src/stats-review.test.tsx`와 `frontend/src/app.test.tsx`가 전체 검사에서 가끔 실패하고 다시 돌리면 통과했다(#34, #36, #117, #175, #179 기록). 원인을 재고, 원인에 맞게 고친다.
+`frontend/src/stats-review.test.tsx` and `frontend/src/app.test.tsx` sometimes failed in the full check and passed when run again (see the #34, #36, #117, #175, and #179 records). Measure the cause, and fix it to fit the cause.
 
-## 원인 측정
+## Measuring the cause
 
-- 이 PC(논리 코어 8개)에서 두 파일만 실행하면 오래 걸리는 테스트도 짧다. `picking a period asks for its reviews too` 0.66초, `saving a log and completing a review update the badge, and the pages stay mounted` 1.5초, `each page has its own address and is marked in the main menu` 1.5초.
-- 프런트 테스트 전체(32개 파일)를 한 번 돌리면 같은 테스트가 3.5초, 3.7초, 3.4초가 된다. vitest가 jsdom 워커를 여러 개 동시에 돌리기 때문이다.
-- 다른 작업이 PC를 함께 쓰는 상황을 만들려고 전체 실행 3개를 동시에 돌렸다. **3회 모두 `app.test.tsx`의 `saving a log ...`가 `Unable to find role="link" and name "오늘 복습 2개"`로 실패했다**(#175에서 본 실패와 같다). 기록 저장 뒤 배지가 다시 세어지기까지 단계마다 1초를 넘겼는데, 이 파일은 `findBy`의 기본 대기 1초를 그대로 쓰고 있었다. 같은 실행에서 `each page ...`는 7.9~9.5초 걸려 테스트 제한 15초에 가까웠다.
-- `stats-review.test.tsx`의 `picking a period ...`를 단계별로 쟀다. 혼자 실행하면 단계마다 0.01~0.12초였다. 전체 실행 2개와 함께 돌리면 같은 단계가 0.1초에서 3.6초까지 들쭉날쭉했다(`findByText('75%')` 0.1초와 3.6초, `getByRole('group')` 0.09초와 1.2초). 특정 조회나 차트 로딩이 느린 것이 아니라, CPU가 모자라 아무 단계나 멈추는 것이다. `recharts`는 이 파일에서 이미 모의로 바꿔 두었다(#52).
-- 결론: 테스트 코드나 화면의 결함이 아니다. PC가 바쁘면 테스트가 크게 느려진다(`picking a period ...` 기준 혼자 0.66초, 전체 실행 한 번에서 3.5초로 약 5배, 전체 실행 3개 동시에서 최대 17.9초로 약 27배). `app.test.tsx`는 기본 대기 1초를 그대로 써서 그 대기를 넘겨 실패했고, 기본 제한 15초에도 가까웠다. 다른 화면 테스트 5개 파일은 파일마다 대기 10초, 제한 20초로 늘려 두어 덜 실패했다.
-- `stats-review.test.tsx`는 이미 대기 10초, 제한 20초였다. #34의 실패는 `findBy` 대기가 아니라 테스트 제한 20초를 넘긴 것으로 기록되어 있다. #179 기록에는 "시간 초과"만 있으나, 대기 실패라면 `Unable to find...`로 나오므로 같은 경우로 보인다. 이 PR은 이 파일의 설정을 실제로 바꾸지 않고 대기 설정을 `setup.ts`로 옮기기만 한다. 남은 위험은 아주 바쁠 때 제한 20초를 넘기는 것이다(아래 "제한·후속 작업").
+- On this PC (8 logical cores), when I run only the two files, even the tests that take long are short. `picking a period asks for its reviews too` 0.66 seconds, `saving a log and completing a review update the badge, and the pages stay mounted` 1.5 seconds, `each page has its own address and is marked in the main menu` 1.5 seconds.
+- When I run the whole frontend test suite (32 files) once, the same tests become 3.5, 3.7, and 3.4 seconds. This is because vitest runs several jsdom workers at the same time.
+- To create a situation where other work shares the PC, I ran 3 full runs at the same time. **All 3 times, `saving a log ...` in `app.test.tsx` failed with `Unable to find role="link" and name "오늘 복습 2개"`** (the same failure seen in #175). After saving a record, each step took over 1 second until the badge was counted again, and this file was using the default `findBy` wait of 1 second as it is. In the same run, `each page ...` took 7.9 to 9.5 seconds, close to the test limit of 15 seconds.
+- I timed `picking a period ...` in `stats-review.test.tsx` step by step. Run alone, each step was 0.01 to 0.12 seconds. When run together with 2 full runs, the same step varied from 0.1 to 3.6 seconds (`findByText('75%')` 0.1 and 3.6 seconds, `getByRole('group')` 0.09 and 1.2 seconds). It is not that a specific lookup or chart loading is slow; the CPU is short, so any step stalls. `recharts` was already replaced with a mock in this file (#52).
+- Conclusion: it is not a defect in the test code or the screen. When the PC is busy, the tests get much slower (based on `picking a period ...`, 0.66 seconds alone, 3.5 seconds in one full run, about 5 times, and up to 17.9 seconds with 3 full runs at once, about 27 times). `app.test.tsx` used the default wait of 1 second as it is, so it failed by going over that wait, and it was also close to the default limit of 15 seconds. The other 5 screen test files had raised the wait to 10 seconds and the limit to 20 seconds per file, so they failed less.
+- `stats-review.test.tsx` already had a wait of 10 seconds and a limit of 20 seconds. The failure in #34 is recorded as going over the test limit of 20 seconds, not the `findBy` wait. The #179 record has only "timeout", but if it were a wait failure it would show as `Unable to find...`, so it looks like the same case. This PR does not actually change this file's settings and only moves the wait setting to `setup.ts`. The remaining risk is going over the limit of 20 seconds when it is very busy (see "Limits and follow-up" below).
 
-## 변경
+## Changes
 
-- `frontend/src/test/setup.ts`: `configure({ asyncUtilTimeout: 10_000 })`로 모든 테스트의 `findBy`·`waitFor` 대기를 10초로 늘렸다. 기다리던 요소가 나오면 바로 넘어가므로 통과하는 테스트는 느려지지 않는다. 실패하는 테스트만 더 늦게 실패하고, 테스트 제한 시간은 그대로 적용된다. 일부러 대기가 끝나기를 기다리는 테스트(`rejects`로 `findBy` 실패를 확인하는 등)는 없다.
-- 파일마다 두었던 같은 설정을 지웠다: `schedules.test.tsx`, `screens.test.tsx`, `stats-review.test.tsx`, `stats-textbook-filter.test.tsx`, `textbook-stats.test.tsx`. 테스트 제한 20초는 그대로 둔다. `screens.test.tsx`의 주석은 대기 설정이 `setup.ts`로 옮겨졌다고 고쳤다.
-- `frontend/src/app.test.tsx`: 앱 전체를 그리고 한 테스트에서 일곱 화면을 여는 파일이라 다른 화면 테스트처럼 제한을 20초로 늘렸다. `frontend/vitest.config.ts`(제한 15초)는 중앙 관리 파일이라 고치지 않았다.
-- `docs/next-steps/README.md`: 끝난 #160을 후보에서 지웠다.
+- `frontend/src/test/setup.ts`: with `configure({ asyncUtilTimeout: 10_000 })`, I raised the `findBy` and `waitFor` wait of all tests to 10 seconds. Once the element being waited for appears, it moves on right away, so passing tests do not get slower. Only failing tests fail later, and the test time limit still applies. There are no tests that deliberately wait for the wait to end (such as checking a `findBy` failure with `rejects`).
+- I deleted the same setting that had been put in each file: `schedules.test.tsx`, `screens.test.tsx`, `stats-review.test.tsx`, `stats-textbook-filter.test.tsx`, and `textbook-stats.test.tsx`. I leave the test limit of 20 seconds as it is. I fixed the comment in `screens.test.tsx` to say the wait setting moved to `setup.ts`.
+- `frontend/src/app.test.tsx`: it is a file that draws the whole app and opens seven screens in one test, so I raised the limit to 20 seconds like the other screen tests. I did not fix `frontend/vitest.config.ts` (limit 15 seconds) because it is a centrally managed file.
+- `docs/next-steps/README.md`: removed the finished #160 from the candidates.
 
-## 검증
+## Verification
 
-- 고치기 전: 전체 실행 3개 동시 → 3회 모두 실패 1건(`app.test.tsx`의 `saving a log ...`, 위 원인 측정).
-- 고친 뒤, vitest 캐시(`frontend/node_modules/.vite`)를 지우고 같은 조건(전체 실행 3개 동시) → 3회 모두 통과(파일 32개, 통과 214, 건너뜀 2, 실패 0). 오래 걸린 테스트: `saving a log ...` 8.4~11.7초, `each page ...` 10.4~11.1초, `picking a period ...` 0.8~17.9초.
-- 고친 뒤, 전체 실행 2개와 단계별 측정 파일을 동시에 실행 → 전체 실행 2회 모두 통과(통과 214, 건너뜀 2).
-- `npm run check`(캐시를 지운 뒤, 문서를 쓰기 전): 통과(exit 0). 백엔드 323개 중 통과 290, 실패 0, 건너뜀 33. 프런트 파일 32개, 통과 214, 건너뜀 2(중앙 표준의 다크 전용 앱 테스트). 스킬 테스트 4개 통과. 문서를 쓴 뒤 `npm run format:check` 통과.
-- 백엔드에서 건너뛴 33개는 DB 통합 테스트다. `TEST_DATABASE_URL`이 없어 실행하지 못했다(#177, #178). 이번 변경은 프런트 테스트 설정만 바꾼다.
+- Before the fix: 3 full runs at the same time -> all 3 times, 1 failure (`saving a log ...` in `app.test.tsx`, the cause measurement above).
+- After the fix, clearing the vitest cache (`frontend/node_modules/.vite`) and the same condition (3 full runs at the same time) -> all 3 times passed (32 files, 214 passed, 2 skipped, 0 failed). The tests that took long: `saving a log ...` 8.4 to 11.7 seconds, `each page ...` 10.4 to 11.1 seconds, `picking a period ...` 0.8 to 17.9 seconds.
+- After the fix, running 2 full runs and the step-by-step timing file at the same time -> both full runs passed (214 passed, 2 skipped).
+- `npm run check` (after clearing the cache, before writing the docs): passed (exit 0). Of 323 backend tests, 290 passed, 0 failed, 33 skipped. Frontend 32 files, 214 passed, 2 skipped (the dark-only app tests from the central standards). 4 skill tests passed. After writing the docs, `npm run format:check` passed.
+- The 33 skipped in the backend are DB integration tests. I could not run them because there is no `TEST_DATABASE_URL` (#177, #178). This change only changes the frontend test settings.
 
-## 제한·후속 작업
+## Limits and follow-up
 
-- 전체 실행 3개를 동시에 돌린 극단적인 부하에서 `picking a period ...`가 17.9초까지 걸렸다(제한 20초). 그보다 더 바쁘면 여전히 실패할 수 있다. 부하 자체를 줄이려면 vitest 워커 수를 줄여야 하는데, 이는 중앙 관리 파일 `frontend/vitest.config.ts`의 일이다(`maxWorkers`나 `pool` 조정). 지금은 일반 전체 검사에서 이 테스트가 4초 안팎이라 여유가 커서 중앙 리포 이슈는 만들지 않았다. 여러 작업을 동시에 돌릴 때 다시 실패하면 `sirloinbh/project-standards`에 이슈를 연다.
-- 측정에 쓴 임시 테스트 파일(`frontend/src/zz-timing.test.tsx`)은 지웠다.
+- Under the extreme load of 3 full runs at once, `picking a period ...` took up to 17.9 seconds (limit 20 seconds). If it is busier than that, it can still fail. To reduce the load itself, the number of vitest workers must be reduced, but that is the job of the centrally managed file `frontend/vitest.config.ts` (adjusting `maxWorkers` or `pool`). In a normal full check this test takes about 4 seconds, so there is plenty of room, and I did not create a central repository issue. If it fails again when running several jobs at once, open an issue in `sirloinbh/project-standards`.
+- I deleted the temporary test file used for the measurement (`frontend/src/zz-timing.test.tsx`).
 
-## 리뷰
+## Review
 
-1차 리뷰에서 반드시 고칠 결함은 없었다. `setup.ts`의 설정이 모든 테스트 파일에 적용되는지(`setupFiles`, `@testing-library/dom` 한 벌), 1초 대기에 기대는 테스트가 없는지(가짜 타이머 없음, 사라지기를 기다리는 `waitFor`는 조건이 맞으면 바로 끝남), 지운 설정 뒤에 남은 import, 중앙 관리 파일 변경 여부를 확인했다. 다음 문서 지적을 이 PR에서 고쳤다.
+The first review found no defects that had to be fixed. I checked whether the setting in `setup.ts` applies to all test files (`setupFiles`, a single copy of `@testing-library/dom`), whether any test depends on the 1 second wait (there are no fake timers, and a `waitFor` waiting for something to disappear ends right away when the condition is met), the imports left after deleting the settings, and whether any centrally managed file changed. I fixed the following document comments in this PR.
 
-- `stats-review.test.tsx`는 이미 대기 10초였으므로 이 PR이 그 파일에서 바꾸는 것이 없다는 점을 분명히 적었다.
-- 근거 없이 적은 "5~25배"를 실제로 잰 시간의 비로 바꿨다.
-- 워커 수 조정에 대한 후속 이슈는 위 이유로 만들지 않고 이 기록에 남겼다.
+- I stated clearly that `stats-review.test.tsx` already had a wait of 10 seconds, so this PR changes nothing in that file.
+- I replaced the unsupported "5 to 25 times" with the ratio of the times actually measured.
+- I did not create a follow-up issue for adjusting the worker count, for the reason above, and left it in this record.
 
-2차 리뷰에서 1차 지적 세 가지가 반영된 것과 코드 변경에 결함이 없는 것을 확인했다. 다음 문서 지적을 고쳤다. 리뷰는 최대 2회라 더 리뷰하지 않는다.
+In the second review I confirmed that the three first-round comments were applied and that there are no defects in the code change. I fixed the following document comments. The review is limited to 2 rounds, so no further review.
 
-- 임시 측정 파일을 지웠다는 항목이 "리뷰" 절 아래로 밀려나 있어 "제한·후속 작업"으로 되돌렸다.
-- `app.test.tsx`가 넘긴 것은 대기 1초뿐이고 제한 15초는 넘기지 않았으므로 결론 문장을 그에 맞게 고쳤다.
-- #179 기록에는 "시간 초과"만 있어, 제한 20초를 넘겼다고 확인된 것은 #34뿐이라고 고쳤다.
+- The item saying the temporary measurement file was deleted had been pushed below the "Review" section, so I moved it back to "Limits and follow-up".
+- What `app.test.tsx` went over was only the 1 second wait, not the limit of 15 seconds, so I fixed the conclusion sentence to match.
+- The #179 record has only "timeout", so I corrected that only #34 is confirmed to have gone over the 20 second limit.

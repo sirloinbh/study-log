@@ -1,102 +1,102 @@
-# #24 연습문제 DB·API (목차 연결, 텍스트 입력)
+# #24 Exercise DB and API (linked to the table of contents, text input)
 
-- 이슈: [#24](https://github.com/sirloinbh/study-log/issues/24) (상위 #5)
-- 브랜치: `feat/24-exercises-api`
-- 선행: #13 교재 목차 DB·API (병합 완료)
+- Issue: [#24](https://github.com/sirloinbh/study-log/issues/24) (parent #5)
+- Branch: `feat/24-exercises-api`
+- Prerequisite: #13 textbook table of contents DB and API (merged)
 
-## 목적
+## Purpose
 
-교재의 장·절별 연습문제를 저장한다. 파일 입력(#28~#30) 전에 텍스트 입력부터 지원한다. 문제 화면(#25), 정답(#26), 중요 문제 필터(#27)의 기반이다.
+Store the exercises for each chapter and section of a textbook. It supports text input first, before file input (#28 to #30). It is the base for the exercise screen (#25), answers (#26), and the important problem filter (#27).
 
-## 변경
+## Changes
 
-- `database/migrations/007_exercises.sql`: `exercises` 테이블.
-  - 열: 교재, 목차 항목(장 또는 절), 문제 번호(20자, 빈 값 허용), 본문(공백만은 불가, 20000자 이하), 중요 여부(기본 false).
-  - 복합 FK `(textbook_id, content_id) → textbook_contents (textbook_id, id)`: 다른 교재의 목차에는 넣을 수 없다.
-  - `ON DELETE CASCADE`: 목차 항목을 지우면 그 항목(과 하위 절)의 연습문제도 지워진다. 교재를 지우면 목차를 거쳐 함께 지워진다(#12 마이그레이션 주석의 기존 방침).
-  - 목차별 조회용 인덱스 `(textbook_id, content_id, id)`.
+- `database/migrations/007_exercises.sql`: the `exercises` table.
+  - Columns: the textbook, the table of contents entry (chapter or section), the problem number (20 characters, empty allowed), the body (not only spaces, 20000 characters or fewer), and the important flag (default false).
+  - Composite FK `(textbook_id, content_id) -> textbook_contents (textbook_id, id)`: it cannot be put on the table of contents of another textbook.
+  - `ON DELETE CASCADE`: if you delete a table of contents entry, the exercises of that entry (and its sections) are deleted too. If you delete a textbook, they are deleted through the table of contents (the existing policy in the #12 migration comment).
+  - An index for lookup by table of contents `(textbook_id, content_id, id)`.
 - `backend/src/exercises.ts`, `backend/src/app.ts`
 
-  | 요청                                                           | 동작                                                            |
-  | -------------------------------------------------------------- | --------------------------------------------------------------- |
-  | `GET /api/textbooks/:textbookId/contents/:contentId/exercises` | 그 목차 항목의 연습문제를 추가한 순서로. `{ exercises: [...] }` |
-  | `POST` 같은 경로                                               | `{ number?, body, important? }` 추가. 201 `{ exercise }`        |
-  | `GET /api/exercises/:id`                                       | 한 문제                                                         |
-  | `PUT /api/exercises/:id`                                       | 번호·본문·중요 여부를 교체한다. 목차 항목은 바꾸지 않는다. 200  |
-  | `DELETE /api/exercises/:id`                                    | 204                                                             |
-  - 응답 필드: `id`, `textbookId`, `contentId`, `number`, `body`, `important`.
-  - 본문은 입력한 줄바꿈·들여쓰기를 그대로 저장한다(trim하지 않음). 번호는 앞뒤 공백을 지운다.
-  - 없는 목차나 다른 교재의 목차는 "목차를 찾을 수 없습니다"로 404를 응답한다. 추가는 FK 위반(23503)으로 판정한다.
-  - 없는 문제는 "연습문제를 찾을 수 없습니다"로 404를 응답한다.
-  - 검증 메시지:
-    - "문제 본문을 입력하세요"
-    - "문제 본문은 20000자 이하로 입력하세요"
-    - "문제 번호 길이는 20자 이하여야 합니다"
-    - "중요 표시 형식이 올바르지 않습니다"
-    - "연습문제 내용을 JSON 객체로 보내세요"
-    - 경로 ID 오류
+  | Request                                                        | Behavior                                                                                           |
+  | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+  | `GET /api/textbooks/:textbookId/contents/:contentId/exercises` | The exercises of that table of contents entry in the order they were added. `{ exercises: [...] }` |
+  | `POST` the same path                                           | Add `{ number?, body, important? }`. 201 `{ exercise }`                                            |
+  | `GET /api/exercises/:id`                                       | One problem                                                                                        |
+  | `PUT /api/exercises/:id`                                       | Replaces the number, body, and important flag. It does not change the table of contents entry. 200 |
+  | `DELETE /api/exercises/:id`                                    | 204                                                                                                |
+  - Response fields: `id`, `textbookId`, `contentId`, `number`, `body`, `important`.
+  - The body is saved with the line breaks and indentation as entered (not trimmed). The number has leading and trailing spaces removed.
+  - A missing table of contents entry or one of another textbook answers 404 "목차를 찾을 수 없습니다" ("Table of contents entry not found"). On add, it is judged by an FK violation (23503).
+  - A missing problem answers 404 "연습문제를 찾을 수 없습니다" ("Exercise not found").
+  - Validation messages:
+    - "문제 본문을 입력하세요" ("Enter the problem body")
+    - "문제 본문은 20000자 이하로 입력하세요" ("Enter the problem body in 20000 characters or fewer")
+    - "문제 번호 길이는 20자 이하여야 합니다" ("The problem number must be 20 characters or fewer")
+    - "중요 표시 형식이 올바르지 않습니다" ("The important mark format is not valid")
+    - "연습문제 내용을 JSON 객체로 보내세요" ("Send the exercise content as a JSON object")
+    - Path ID errors
 
-- 중요 여부는 저장·수정만 지원한다. 토글 API와 중요 문제 필터는 #27 범위다.
+- The important flag supports only save and edit. The toggle API and the important problem filter are in the scope of #27.
 
-## 테스트
+## Tests
 
-- `backend/test/exercises.test.ts`(DB 없음)
-  - 잘못된 본문·번호·중요 여부·JSON 아닌 본문 → 한국어 400. POST와 PUT 모두 확인한다.
-  - 교재·목차·연습문제 경로 ID 검증
-  - 없는 목차·문제 404, 추가 시 FK 위반 → 404
-  - 본문 줄바꿈 보존과 번호 trim이 쿼리에 그대로 전달되는지
-- `backend/test/exercises.integration.test.ts`(실제 DB)
-  - 빈 목록, 추가(본문 그대로 저장), 목차별 조회 순서, 다른 교재 목차 접근 404
-  - 수정·조회·삭제
-  - 장 삭제 시 하위 절의 문제까지 함께 삭제, 교재 삭제 시 함께 삭제
-  - DB 제약 직접 확인: 다른 교재 목차 23503, 공백 본문·줄바꿈·탭만 있는 본문·21자 번호 23514
+- `backend/test/exercises.test.ts` (no DB)
+  - A wrong body, number, important flag, or a non-JSON body -> a Korean 400. Both POST and PUT are checked.
+  - Validation of the textbook, table of contents, and exercise path IDs
+  - 404 for a missing table of contents entry or problem, and an FK violation on add -> 404
+  - Whether keeping body line breaks and the number trim are passed to the query as they are
+- `backend/test/exercises.integration.test.ts` (a real DB)
+  - An empty list, add (the body saved as it is), the lookup order by table of contents, and 404 for access to a table of contents of another textbook
+  - Edit, lookup, and delete
+  - When a chapter is deleted, the problems of its sections are deleted too, and when a textbook is deleted, they are deleted too
+  - Direct check of DB constraints: a table of contents of another textbook 23503, and a body of only spaces, a body of only line breaks and tabs, and a 21-character number 23514
 
-## 검증
+## Verification
 
-| 명령            | 환경                             | 결과                                                                                      |
-| --------------- | -------------------------------- | ----------------------------------------------------------------------------------------- |
-| `npm run check` | 로컬, `TEST_DATABASE_URL` 미설정 | exit 0. backend tests 91, pass 84, fail 0, **skipped 7**(DB 통합), 스킬 4 pass, 빌드 통과 |
+| Command         | Environment                        | Result                                                                                                 |
+| --------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `npm run check` | Local, `TEST_DATABASE_URL` not set | exit 0. backend tests 91, pass 84, fail 0, **skipped 7** (DB integration), skills 4 pass, build passed |
 
-- 건너뛴 7건은 DB 통합 테스트다(로컬 테스트 DB 없음). 새 통합 테스트를 포함해 CI(PostgreSQL 17)에서 실행된다.
-- 화면 변경이 없어 브라우저 확인은 하지 않았다. 이슈 완료 기준에도 없다.
+- The 7 skipped are DB integration tests (no local test DB). They run in CI (PostgreSQL 17), including the new integration tests.
+- There was no screen change, so I did not check in a browser. It is not in the issue's done criteria either.
 
-## 자동 코드 리뷰 1차
+## Automated code review, round 1
 
-별도 읽기 전용 리뷰 에이전트가 이슈 #24 완료 기준과 PR 변경을 검토했다.
+A separate read-only review agent reviewed the issue #24 done criteria and the PR changes.
 
-- 문제없다고 확인된 사항:
-  - 복합 FK 대상(004의 고유 키)
-  - 목차 삭제 트랜잭션 안의 연쇄 삭제와 학습 기록 RESTRICT(409)의 공존
-  - 동시 추가·삭제 시 고아 행 없음
-  - 마이그레이션 재실행 안전성과 인덱스 용도
-  - 마운트 순서·경로 충돌 없음
-  - 추가 시 23503 → 404 매핑(이 테이블의 FK는 하나뿐)
-  - Zod가 DB보다 엄격함
-  - API 계약 일관성
-- high·medium 지적은 없었다. 분리할 이슈도 없다.
-- 지적(low): DB CHECK `length(btrim(body)) >= 1`은 띄어쓰기만 지워, 줄바꿈·탭만 있는 본문은 DB를 통과했다. API(Zod `trim`)는 거부한다.
-  - 반영: CHECK를 `body ~ '\S'`로 바꿔 API와 같게 했다. 줄바꿈·탭만 있는 본문 INSERT가 23514인지 DB 통합 테스트에 추가했다.
-  - 007은 아직 병합 전이라 같은 파일을 고쳤다.
-- 참고(유지):
-  - 통합 테스트가 한 개의 큰 테스트다. 다른 통합 테스트와 같은 방식이다.
-  - 목록 조회의 목차 확인과 목록 쿼리 사이에 목차가 삭제되면 404 대신 빈 200이 된다. 목차 API와 같은 무해한 경합이다.
+- Points confirmed to have no problem:
+  - The composite FK target (the unique key in 004)
+  - The cascading delete inside the table of contents delete transaction coexisting with the study log RESTRICT (409)
+  - No orphan rows with concurrent adds and deletes
+  - The migration being safe to re-run, and the purpose of the index
+  - No mount order or path conflicts
+  - The 23503 -> 404 mapping on add (this table has only one FK)
+  - Zod being stricter than the DB
+  - Consistency of the API contract
+- There were no high or medium comments. There is no issue to split off either.
+- Comment (low): the DB CHECK `length(btrim(body)) >= 1` removes only spaces, so a body of only line breaks and tabs passed the DB. The API (Zod `trim`) rejects it.
+  - Applied: I changed the CHECK to `body ~ '\S'` to match the API. I added to the DB integration test that an INSERT of a body of only line breaks and tabs is 23514.
+  - 007 was not merged yet, so I fixed the same file.
+- Note (kept):
+  - The integration test is one big test. It is the same way as the other integration tests.
+  - If the table of contents is deleted between the table of contents check and the list query of a list lookup, it becomes an empty 200 instead of 404. It is a harmless race, the same as the table of contents API.
 
-## 자동 코드 리뷰 2차
+## Automated code review, round 2
 
-별도 읽기 전용 리뷰 에이전트가 1차 반영(c27e259)과 최종 파일을 다시 확인했다. 리뷰는 최대 2회이므로 3차 리뷰는 하지 않는다.
+A separate read-only review agent checked the first-round fix (c27e259) and the final files again. The review is limited to 2 rounds, so I do not do a third.
 
-- `'\S'`는 `standard_conforming_strings`(PostgreSQL 17 기본값)에서 그대로 정규식에 전달된다. 띄어쓰기·탭·줄바꿈 등 ASCII 공백에 대해 Zod `trim`과 같게 판정한다고 확인됐다.
-- 새 테스트 케이스의 형태와 23514 출처(FK가 아니라 CHECK)가 맞다.
-- 코드 지적과 분리할 이슈는 없었다.
-- 참고: 드문 유니코드 공백에서는 두 판정이 다르다. 아래 한계에 기록했다.
+- `'\S'` is passed to the regular expression as it is with `standard_conforming_strings` (the PostgreSQL 17 default). It was confirmed that for ASCII whitespace such as spaces, tabs, and line breaks it decides the same as Zod `trim`.
+- The shape of the new test case and the source of 23514 (a CHECK, not an FK) are right.
+- There were no code comments and no issue to split off.
+- Note: for rare Unicode whitespace, the two decisions differ. I recorded it in the limits below.
 
-## 한계·후속
+## Limits and follow-up
 
-- 드문 유니코드 공백에서는 API(Zod `trim`)와 DB(`~ '\S'`, 로캘에 따라 다름)의 공백 판정이 다르다.
-  - NBSP만 있는 본문: API가 400으로 먼저 거부한다. 안전한 방향이다.
-  - U+0085(NEL)만 있는 본문: API는 받고 DB CHECK가 거부할 수 있어 500이 된다.
-  - 실제 교재 입력에서 생길 가능성이 거의 없어 이 PR에서는 고치지 않는다.
+- For rare Unicode whitespace, the whitespace decision differs between the API (Zod `trim`) and the DB (`~ '\S'`, which depends on the locale).
+  - A body of only NBSP: the API rejects it first with 400. It is the safe direction.
+  - A body of only U+0085 (NEL): the API accepts it and the DB CHECK can reject it, giving a 500.
+  - It is very unlikely to happen in real textbook input, so I do not fix it in this PR.
 
-- 본문에 NUL 문자가 있으면 500이 나는 기존 문제(#58)는 이 API에도 해당한다. #58에서 공통으로 고친다.
-- 다른 목차 항목으로 문제를 옮기는 기능은 없다.
-- 목차 항목 안의 순서는 추가한 순서(ID)다. 문제 번호 순 정렬이 필요하면 화면(#25)에서 다시 판단한다.
+- The existing problem that a NUL character in the body gives a 500 (#58) applies to this API too. It is fixed commonly in #58.
+- There is no feature to move a problem to another table of contents entry.
+- The order within a table of contents entry is the order of adding (ID). If sorting by problem number is needed, I will judge again on the screen (#25).

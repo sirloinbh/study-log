@@ -1,66 +1,66 @@
-# #74 다른 곳에서 지워진 단원에 연습문제를 추가하면 화면이 갱신되지 않음
+# #74 Adding an exercise to a chapter deleted elsewhere does not update the screen
 
-- 이슈: [#74](https://github.com/sirloinbh/study-log/issues/74) (#73 리뷰에서 분리)
-- 브랜치: `fix/74-deleted-chapter-exercise`
+- Issue: [#74](https://github.com/sirloinbh/study-log/issues/74) (split from the #73 review)
+- Branch: `fix/74-deleted-chapter-exercise`
 
-## 문제
+## Problem
 
-연습문제 카드에서 고른 단원이 다른 곳(다른 탭 등)에서 지워지면 빠져나올 방법이 없었다.
+If the chapter picked on the exercises card was deleted elsewhere (another tab and so on), there was no way out.
 
-- 문제 추가가 404 "목차를 찾을 수 없습니다"로 실패하고, 이어지는 목록 새로고침도 404라 "연습문제를 불러오지 못했습니다"가 함께 보였다.
-- 목차 트리를 다시 불러오지 않아, 지워진 단원이 "단원" 선택에 계속 남았다.
+- Adding an exercise failed with 404 "목차를 찾을 수 없습니다" ("Table of contents entry not found"), and the list refresh that followed was also 404, so "연습문제를 불러오지 못했습니다" ("Could not load the exercises") was shown together.
+- The table of contents tree was not reloaded, so the deleted chapter stayed in the "단원" ("Chapter") select.
 
-## 변경
+## Changes
 
 - `frontend/src/Exercises.tsx`
-  - 서버가 단원에 대해 404 "목차를 찾을 수 없습니다"를 주면 `onContentMissing`으로 알린다.
-    - 문제 추가·수정·삭제·정답 저장 등 변경 실패와 목록 조회 실패 모두 해당한다.
-    - 문제 하나가 없는 404("연습문제를 찾을 수 없습니다")는 해당하지 않는다.
-  - 다시 불러온 트리에 그 단원이 없으면 첫 단원으로 돌아간다. 이것은 기존 동작이다.
-  - 상태 영역에 "선택한 단원이 다른 곳에서 삭제되었습니다. 첫 단원을 보여 줍니다"를 보여 준다. 남은 단원이 없으면 앞 문장만 보여 준다.
-  - 다른 단원을 고르면 안내가 사라진다.
-- `frontend/src/TextbookContents.tsx`: `reloadKey`가 바뀌면 트리를 다시 불러온다. 새 트리가 올 때까지는 보이던 트리를 유지한다.
-- `frontend/src/Textbooks.tsx`: 연습문제 카드의 알림을 받아 목차 카드의 `reloadKey`를 올린다. 연습문제 카드는 같은 트리를 받으므로 단원 선택도 함께 갱신된다.
+  - If the server gives 404 "목차를 찾을 수 없습니다" for a chapter, it reports with `onContentMissing`.
+    - It applies to both a failed change such as adding, editing, or deleting an exercise or saving an answer, and a failed list lookup.
+    - A 404 for a single missing exercise ("연습문제를 찾을 수 없습니다", "Exercise not found") does not apply.
+  - If the chapter is not in the reloaded tree, it goes back to the first chapter. This is the existing behavior.
+  - It shows "선택한 단원이 다른 곳에서 삭제되었습니다. 첫 단원을 보여 줍니다" ("The selected chapter was deleted elsewhere. Showing the first chapter") in the status area. If no chapter is left, it shows only the first sentence.
+  - If you pick another chapter, the notice disappears.
+- `frontend/src/TextbookContents.tsx`: reloads the tree when `reloadKey` changes. Until the new tree arrives, it keeps the tree that was showing.
+- `frontend/src/Textbooks.tsx`: receives the notification from the exercises card and raises the `reloadKey` of the table of contents card. The exercises card receives the same tree, so the chapter selection is updated too.
 
-## 테스트
+## Tests
 
-- `backend/test/exercises-ui.test.ts`(3건 추가)
-  - 지워진 단원에 추가하면 트리를 한 번 다시 불러오고, 그 단원과 하위 절이 선택에서 빠지고, 첫 단원과 안내가 보이는지. 오류 상자는 남지 않고, 단원을 고르면 안내가 사라지는지.
-  - 옛 트리에 남은 지워진 단원을 고르면(목록 조회 404) 트리를 다시 불러오는지
-  - 문제 하나가 없는 404는 트리를 다시 불러오지 않는지
-- 가짜 API
-  - 트리에 없는 단원에 대해 404 "목차를 찾을 수 없습니다"를 준다.
-  - 트리를 요청마다 복사해 준다. 그전에는 테스트가 단원을 지우면 화면이 들고 있는 "옛 트리"까지 함께 바뀌어, 다른 곳에서 지워진 상황을 흉내 낼 수 없었다.
-- 수정 전 코드에서 앞의 두 테스트가 실패하고, 수정 후 통과하는 것을 확인했다.
+- `backend/test/exercises-ui.test.ts` (3 added)
+  - Whether adding to a deleted chapter reloads the tree once, that chapter and its sections leave the selection, and the first chapter and the notice are shown. Whether the error box does not remain, and the notice disappears when you pick a chapter.
+  - Whether picking the deleted chapter left in the old tree (a 404 on the list lookup) reloads the tree
+  - Whether a 404 for a single missing exercise does not reload the tree
+- Fake API
+  - It gives 404 "목차를 찾을 수 없습니다" for a chapter not in the tree.
+  - It gives a copy of the tree on every request. Before that, when a test deleted a chapter, the "old tree" held by the screen changed with it, so it could not imitate a chapter deleted elsewhere.
+- I confirmed that the first two tests fail on the code before the fix and pass after the fix.
 
-## 검증
+## Verification
 
-| 명령            | 환경                             | 결과                                                        |
-| --------------- | -------------------------------- | ----------------------------------------------------------- |
-| `npm run check` | 로컬, `TEST_DATABASE_URL` 미설정 | exit 0. backend tests 168, pass 156, fail 0, skipped 12(DB) |
+| Command         | Environment                        | Result                                                       |
+| --------------- | ---------------------------------- | ------------------------------------------------------------ |
+| `npm run check` | Local, `TEST_DATABASE_URL` not set | exit 0. backend tests 168, pass 156, fail 0, skipped 12 (DB) |
 
-- 브라우저: Playwright(Chromium)로 Vite 개발 서버와 API(로컬 Docker 테스트 DB)를 띄워 확인했다.
-  - 모바일 390×844
-    - 교재에 단원 "9 지울 단원"을 API로 추가하고, 연습문제 카드에서 그 단원을 골라 문제 입력란을 열었다.
-    - API로 단원을 지운 뒤 "추가" → 목차 카드·단원 선택에서 그 단원이 사라짐, "2 행렬"로 돌아감, 안내 표시, 오류 상자 없음, 가로 스크롤 없음
-  - PC 1440×900: 같은 상태에서 안내 표시, 가로 스크롤 없음
-  - 콘솔에는 네트워크 404 두 건(추가 요청과 이어진 목록 요청)이 남는다. 예상한 응답이다.
-  - 스크린샷: [모바일 390×844](assets/74-mobile-390x844.png), [PC 1440×900](assets/74-pc-1440x900.png). 연습문제 카드만 캡처했다.
+- Browser: I checked by starting the Vite dev server and the API (a local Docker test DB) with Playwright (Chromium).
+  - Mobile 390×844
+    - I added the chapter "9 지울 단원" ("9 Chapter to delete") to the textbook through the API, picked that chapter on the exercises card, and opened the exercise input.
+    - After deleting the chapter through the API, "추가" ("Add") -> that chapter disappeared from the table of contents card and the chapter select, it went back to "2 행렬" ("2 Matrices"), the notice was shown, there was no error box, and no horizontal scroll
+  - PC 1440×900: in the same state, the notice was shown and there was no horizontal scroll
+  - Two network 404s remain in the console (the add request and the list request that followed). They are the expected responses.
+  - Screenshots: [mobile 390×844](assets/74-mobile-390x844.png), [PC 1440×900](assets/74-pc-1440x900.png). I captured only the exercises card.
 
-## 자동 코드 리뷰 1차
+## Automated code review, round 1
 
-별도 읽기 전용 리뷰 에이전트가 검토했다. 지적이 없어 2차 리뷰는 하지 않는다. 분리할 이슈도 없다.
+A separate read-only review agent reviewed it. There were no comments, so I do not do a second review. There is no issue to split off either.
 
-- 확인된 사항
-  - 실패 한 번에 신호는 한 번이다. 변경 후 새로고침(`refresh`)은 신호를 보내지 않는다.
-  - 반복 루프가 없다. 다시 불러온 트리에 단원이 남아 있으면 `contentId`가 그대로라 다시 요청하지 않는다.
-  - effect의 eslint 예외는 상태 setter만 쓰므로 안전하다.
-  - 교재를 바꾸면 카드가 새로 만들어져 `lost`가 초기화된다.
-  - 안내와 오류 표시가 겹치지 않는다.
-  - 404 메시지가 백엔드와 같다.
-- 참고(유지): 목차 카드가 자기 변경을 처리하는 도중에 외부 요청으로 다시 불러오면, 늦게 도착한 옛 트리가 새 트리를 덮을 수 있다. 시간 창이 좁고 다음 불러오기에서 바로잡힌다. 요청 순서 관리는 #75에서 함께 본다.
+- Confirmed points
+  - One failure gives one signal. The refresh after a change (`refresh`) does not send a signal.
+  - There is no repeat loop. If the chapter is still in the reloaded tree, `contentId` is unchanged so it does not request again.
+  - The eslint exception in the effect uses only state setters, so it is safe.
+  - If you change the textbook, the card is recreated and `lost` is reset.
+  - The notice and the error display do not overlap.
+  - The 404 message is the same as the backend's.
+- Note (kept): if the table of contents card is reloaded by an external request while it is handling its own change, an old tree that arrives late can overwrite the new tree. The time window is narrow, and it is corrected at the next load. Request order management is looked at together in #75.
 
-## 한계·후속
+## Limits and follow-up
 
-- 지워진 단원에 쓰던 문제 입력은 사라진다. 그 단원에 묶인 입력이라 다른 단원으로 옮기지 않는다.
-- 중요 문제 카드의 범위 선택은 이 신호를 쓰지 않는다. 목차가 다시 불러와지면 지워진 단원은 범위에서 빠지고 "교재 전체"로 돌아간다.
+- The exercise input being written for the deleted chapter disappears. It is input tied to that chapter, so it is not moved to another chapter.
+- The range selection of the important exercises card does not use this signal. When the table of contents is reloaded, a deleted chapter drops out of the range and it goes back to "교재 전체" ("Whole textbook").

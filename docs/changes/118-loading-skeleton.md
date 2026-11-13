@@ -1,38 +1,38 @@
-# #118 불러오는 중 표시를 공통 Skeleton·Spinner로 바꾸기
+# #118 Change the loading display to the shared Skeleton and Spinner
 
-- 이슈: [#118](https://github.com/sirloinbh/study-log/issues/118)
-- 브랜치: `chore/118-loading-skeleton`
+- Issue: [#118](https://github.com/sirloinbh/study-log/issues/118)
+- Branch: `chore/118-loading-skeleton`
 
-## 목적
+## Purpose
 
-기능 화면이 불러오는 동안 글자 대신 공통 컴포넌트를 보여 준다. 규칙은 중앙 `sirloinbh/project-standards`의 `docs/ui-components.md` "불러오는 중 화면"이다.
+While feature screens load, show a shared component instead of text. The rule is "Loading screen" in `docs/ui-components.md` of the central `sirloinbh/project-standards`.
 
-## 변경
+## Changes
 
-- `frontend/src/loading.tsx`: `Loading`과 `ButtonSpinner`를 추가했다.
-- 글자만 있던 21곳을 `Loading`으로 바꿨다. 목록은 `SkeletonList`, 글과 그래프는 `SkeletonText`, 통계 카드는 `SkeletonCard` 4개이다.
-- `frontend/src/busy.ts`: 어떤 요청을 기다리는지 `action`으로 알려 준다. 화면은 요청 직전에 `nameNext`로 이름을 붙인다.
-- 저장, 추가, 검색, 삭제 확인 버튼 18개에 `ButtonSpinner`를 달았다. 눌린 버튼에만 돈다.
-- `backend/test/ui-harness.ts`: 공통 컴포넌트를 차트 부품처럼 이름 붙은 요소로 바꿔 불러온다.
+- `frontend/src/loading.tsx`: added `Loading` and `ButtonSpinner`.
+- Replaced 21 places that had only text with `Loading`. Lists use `SkeletonList`, text and charts use `SkeletonText`, and statistics cards use 4 `SkeletonCard`.
+- `frontend/src/busy.ts`: tells which request is being waited for with `action`. A screen names it with `nameNext` right before the request.
+- Put `ButtonSpinner` on 18 buttons for save, add, search, and delete confirmation. It spins only on the pressed button.
+- `backend/test/ui-harness.ts`: loads the shared components as named elements, like the chart parts.
 
-## 구현 판단
+## Implementation judgment
 
-- 낭독용 문장은 `aria-busy` 영역 밖에 둔다. 바쁜 영역 안의 알림은 낭독되지 않을 수 있다.
-- 복습 완료와 미루기, 중요 표시, 목차 순서 바꾸기, 번역 버튼에는 스피너를 달지 않았다. 규칙의 "저장·삭제"가 아닌 즉시 처리 동작이고 비활성화는 그대로이다. 번역은 "번역하는 중…" 안내가 이미 있다.
-- `서버 확인 중…`, `PDF를 읽는 중…`, `번역하는 중…`은 무엇을 하는지 알려 주는 안내 문장이라 그대로 둔다.
-- 화면 메시지용 `[role='status']` 규칙(`style.css`)이 스피너에도 위 여백 16px을 주어 아이콘이 어긋나고 버튼이 커졌다. 브라우저 측정으로 찾아 스피너의 위 여백을 없앴다.
+- Keep the sentence for reading aloud outside the `aria-busy` area. A notice inside a busy area may not be read aloud.
+- I did not put a spinner on completing and postponing a review, the important mark, reordering the table of contents, or the translate button. They are immediate actions that are not "save or delete" in the rule, and they stay disabled as before. Translation already has the "translating…" notice.
+- `서버 확인 중…` ("Checking the server…"), `PDF를 읽는 중…` ("Reading the PDF…"), and `번역하는 중…` ("Translating…") are notice sentences that tell what is going on, so I left them as they are.
+- The `[role='status']` rule for screen messages (`style.css`) also gave the spinner a 16px top margin, which misaligned the icon and made the button bigger. I found it by measuring in the browser and removed the spinner's top margin.
 
-## 검증
+## Verification
 
-`TEST_DATABASE_URL`을 설정한 `npm run check`가 통과했다. 백엔드 338건, 프런트 129건, 스킬 4건이 통과했다. 건너뜀은 프런트 2건으로, 중앙 표준에서 온 다크 전용 앱 테스트이다.
+`npm run check` with `TEST_DATABASE_URL` set passed. Backend 338, frontend 129, and skills 4 passed. The skips were 2 frontend tests, the dark-only app tests that came from the central standards.
 
-headless Chrome에서 API 응답을 붙잡아 PC 1440×900과 모바일 375×812의 학습 기록, 통계 화면을 확인했다. 스켈레톤과 이름, 낭독 문장, 눌린 버튼에만 도는 스피너, 아이콘과 글자의 중심 일치, 가로 스크롤 없음, 응답 후 사라짐을 포함한 32개 항목이다. 다른 화면은 브라우저로 보지 않았다. 버튼 스피너의 자동 테스트도 학습 기록 화면의 저장과 삭제뿐이고, 전체 18개 중 다른 화면의 16개는 코드 리뷰로 이름의 짝만 확인했다.
+With headless Chrome, I held back the API responses and checked the study log and statistics screens at PC 1440×900 and mobile 375×812. That is 32 items, including the skeleton and its name, the sentence for reading aloud, the spinner that spins only on the pressed button, the icon and text centers matching, no horizontal scroll, and disappearing after the response. I did not look at the other screens in a browser. The automated tests for the button spinner also cover only save and delete on the study log screen, and for the other 16 of the 18 buttons I only checked the name pairing by code review.
 
-## 리뷰
+## Review
 
-1차 리뷰에서 기능 결함은 없었다. 위 검증 문단이 스피너의 테스트 범위를 넓게 적은 점만 고쳤다. 2차 리뷰에서 결함은 없었다.
+The first review found no functional defects. I only fixed that the verification paragraph above described the test scope of the spinner too broadly. The second review found no defects.
 
-## 테스트
+## Tests
 
-- `frontend/src/loading.test.tsx`: 영역의 `aria-busy`와 이름, 낭독 문장의 위치, 종류별 모양, 저장과 삭제 때 눌린 버튼에만 도는 스피너와 완료 후 사라짐.
-- `frontend/src/reviews.test.tsx`: 바뀐 문구를 반영했다.
+- `frontend/src/loading.test.tsx`: `aria-busy` and the name of the area, the position of the sentence for reading aloud, the shape per kind, and the spinner that spins only on the pressed button on save and delete and disappears after completion.
+- `frontend/src/reviews.test.tsx`: reflected the changed wording.
