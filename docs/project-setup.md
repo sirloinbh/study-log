@@ -42,7 +42,7 @@ Copy them as they are into the new project's `AGENTS.md` too.
 
 ## 2. Language and document rules
 
-- Write user conversation, screen text, and documents (README, docs, issues, PRs) in **Korean**. Code identifiers, commit title prefixes (`feat:` and so on), and code comments default to English.
+- User conversation, screen text, and documents (README, docs, issues, PRs) are written in **English** (the user set this on 2026-11-12; the earlier version of this document said Korean). Code identifiers, commit title prefixes (`feat:` and so on), and code comments are English. Screen text and validation messages that the user sees are covered by `sirloinbh/project-standards#457`.
 - Specify server validation error messages in Korean too if the user sees them. Give the message as in `.min(1, '…')` so the default English Zod message ("Array must contain…") is not shown on screen as it is.
 - Dates are `YYYY-MM-DD`, and the service time zone is `<timezone>`. Compute the server's "today" in the service time zone, not the server's time zone.
 - Document locations:
@@ -751,7 +751,7 @@ provider "aws" { region = var.region }
 | Several PRs keep conflicting in the same large file (`main.tsx`, `app.ts`) | Screens and routes are gathered in one file                        | Split into per-feature modules, and in later PRs merge `main` and confirm both features with tests         |
 | A double-click on a toggle button reverts the state                        | The two clicks are handled in different renders                    | Ignore an opposite action within a short time + a regression test                                          |
 | Data saved on another screen does not show when you return                 | The screen does not reload on entry                                | Re-fetch on screen switch                                                                                  |
-| Server validation errors show in the original English                      | The default Zod message                                            | Give Korean messages to validation the user can see                                                        |
+| Server validation errors show in the original English                      | The default Zod message                                            | Give explicit messages for validation the user can see                                                     |
 | After a backup "replace all", a retry answers a deleted id as "saved"      | The idempotency retry key is still there                           | On a replace restore, reset the retry keys in the same transaction                                         |
 | A DB test looked like it "passed" but did not actually run                 | Skipped when `TEST_DATABASE_URL` is not set                        | Check the skip count and report what was not run separately                                                |
 
