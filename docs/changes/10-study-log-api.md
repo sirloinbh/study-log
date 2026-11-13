@@ -1,67 +1,67 @@
-# #10 학습 기록 DB·API (시간 자동 계산)
+# #10 Study log DB and API (automatic time calculation)
 
-- 이슈: [#10](https://github.com/sirloinbh/study-log/issues/10) (상위 #9)
-- 브랜치: `feat/10-study-log-api`
-- 마이그레이션 번호: `002` 예약·사용
+- Issue: [#10](https://github.com/sirloinbh/study-log/issues/10) (parent #9)
+- Branch: `feat/10-study-log-api`
+- Migration number: `002` reserved and used
 
-## 목적
+## Purpose
 
-공부한 내용과 시간을 저장하는 핵심 데이터 구조를 만든다. 통계·복습·일정 기능이 이 기록을 기준으로 한다.
+Build the core data structure that stores what you studied and for how long. The statistics, review, and schedule features are based on this record.
 
-## 결정 (사용자 확인, [이슈 코멘트](https://github.com/sirloinbh/study-log/issues/10#issuecomment-6315555771))
+## Decisions (confirmed with the user, [issue comment](https://github.com/sirloinbh/study-log/issues/10#issuecomment-6315555771))
 
-- 자정을 넘긴 기록(23:00~01:00)은 시작한 날짜의 학습으로 보고 전체 시간(120분)을 그 날짜에 귀속한다.
-- 입력은 학습일 + 시작·종료 시각(HH:MM). 종료가 시작보다 이르면 다음 날로 계산하고, 같으면 거부한다.
+- A record that crosses midnight (23:00 to 01:00) is treated as study of the date it started, and the whole time (120 minutes) is attributed to that date.
+- The input is the study date + start and end times (HH:MM). If the end is earlier than the start, it is calculated as the next day, and if they are the same, it is rejected.
 
-## 변경
+## Changes
 
-- `database/migrations/002_study_logs.sql`: `study_logs`(학습일, 시작·종료 시각, 학습 시간(분) 1~1439, 메모, 상태 `planned`/`in_progress`/`done`/`stopped`). `IF NOT EXISTS`로 재실행 안전. 상태 값은 영문 코드라 한글 리터럴이 없다.
-- `backend/src/study-logs.ts`: `studyMinutes()` 계산과 라우터.
-  - `GET /api/study-logs?date=YYYY-MM-DD` — 그날 기록을 시작 시각 순으로. `date`가 없으면 최근 기록(`limit` 기본 20, 최대 100).
-  - `GET /api/study-logs/:id`, `POST /api/study-logs`(201), `PUT /api/study-logs/:id`(전체 수정), `DELETE /api/study-logs/:id`(204). 없는 ID는 404 `학습 기록을 찾을 수 없습니다`.
-  - Zod 검증 메시지는 모두 한국어(형식·존재하지 않는 날짜·HH:MM·시작=종료·상태·메모 10000자).
-- `backend/src/app.ts`: `/api/study-logs` 라우터 등록.
-- `backend/test/helpers.ts`: `call(path, { method, body })`로 GET 외 요청과 204 응답을 지원(기존 호출 방식 유지).
+- `database/migrations/002_study_logs.sql`: `study_logs` (study date, start and end times, study time in minutes 1 to 1439, note, status `planned`/`in_progress`/`done`/`stopped`). It is safe to re-run with `IF NOT EXISTS`. The status values are English codes, so there are no Korean literals.
+- `backend/src/study-logs.ts`: the `studyMinutes()` calculation and the router.
+  - `GET /api/study-logs?date=YYYY-MM-DD`: that day's records in start time order. Without `date`, the recent records (`limit` default 20, at most 100).
+  - `GET /api/study-logs/:id`, `POST /api/study-logs` (201), `PUT /api/study-logs/:id` (a full edit), `DELETE /api/study-logs/:id` (204). A missing ID gives 404 `학습 기록을 찾을 수 없습니다` ("Study log not found").
+  - All Zod validation messages are in Korean (format, a date that does not exist, HH:MM, start = end, status, note 10000 characters).
+- `backend/src/app.ts`: registered the `/api/study-logs` router.
+- `backend/test/helpers.ts`: with `call(path, { method, body })`, it supports requests other than GET and a 204 response (the existing way of calling is kept).
 
-## 테스트
+## Tests
 
-- `backend/test/study-logs.test.ts`(단위·가짜 풀): 시간 계산, 자정 넘김 120분·1분, 잘못된 입력 8종이 DB 조회 전에 한국어 400, 잘못된 조회 조건·ID, 없는 기록의 조회·수정·삭제 404.
-- `backend/test/study-logs.integration.test.ts`(실제 DB): 생성(자정 넘김 120분, 기본 상태·메모), 날짜별 시간순 조회, 최근 목록, 수정 후 시간 재계산, 삭제 후 404. 전용 날짜(2099-01-15) 행만 정리한다.
+- `backend/test/study-logs.test.ts` (unit, fake pool): the time calculation, a midnight crossing of 120 minutes and 1 minute, 8 kinds of wrong input rejected with a Korean 400 before the DB lookup, wrong lookup conditions and IDs, and 404 for lookup, edit, and delete of a missing record.
+- `backend/test/study-logs.integration.test.ts` (a real DB): creation (a midnight crossing of 120 minutes, the default status and note), lookup by date in time order, the recent list, recalculating time after an edit, and 404 after a delete. It cleans up only the rows of the dedicated date (2099-01-15).
 
-## 검증
+## Verification
 
-| 명령                                              | 환경                             | 결과                                                                                                  |
-| ------------------------------------------------- | -------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| `npm run check`                                   | 로컬, `TEST_DATABASE_URL` 미설정 | exit 0. backend tests 14, pass 12, fail 0, skipped 2(DB 통합 2건), 스킬 4 pass, 빌드 통과             |
-| GitHub Actions `verify` (PR #55, run 39600302004) | Postgres 17 + 마이그레이션 적용  | pass — backend tests 14, pass 14, skipped 0 (DB 통합 2건 실제 실행), 스킬 4 pass. `docker-build` pass |
+| Command                                           | Environment                        | Result                                                                                                                   |
+| ------------------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `npm run check`                                   | Local, `TEST_DATABASE_URL` not set | exit 0. backend tests 14, pass 12, fail 0, skipped 2 (2 DB integration), skills 4 pass, build passed                     |
+| GitHub Actions `verify` (PR #55, run 39600302004) | Postgres 17 + migrations applied   | pass: backend tests 14, pass 14, skipped 0 (the 2 DB integration tests actually ran), skills 4 pass. `docker-build` pass |
 
-## 한계·후속
+## Limits and follow-up
 
-- 로컬에 Docker·PostgreSQL이 없어 DB 통합 테스트와 마이그레이션 적용은 CI에서만 확인했다.
-- 테스트 helper가 fetch 금지 포트를 받으면 간헐적으로 실패하는 문제를 #12 작업 중 발견해 #56으로 등록했다.
-- 화면은 #11, 교재·챕터 연결은 #14, 자가 평가 필드는 #15에서 추가한다.
+- There is no Docker or PostgreSQL locally, so the DB integration tests and applying the migration were checked only in CI.
+- The problem that the test helper fails intermittently when it gets a port that fetch forbids was found while working on #12, and I registered it as #56.
+- The screen is added in #11, the textbook and chapter link in #14, and the self-assessment fields in #15.
 
-## 자동 코드 리뷰 1차 (PR #55)
+## Automated code review, round 1 (PR #55)
 
-이 브랜치에 `origin/main`(#54, #2, #4)을 병합한 뒤 별도 읽기 전용 리뷰 에이전트가 PR 전체 diff를 검토했다. 시간 계산·자정 넘김·SQL 파라미터화·마이그레이션 SQL에는 결함이 없다. 아래 지적은 모두 이 PR에서 반영했고 분리한 이슈는 없다.
+After merging `origin/main` (#54, #2, #4) into this branch, a separate read-only review agent reviewed the whole PR diff. There were no defects in the time calculation, midnight crossing, SQL parameterization, or the migration SQL. I applied all the comments below in this PR, and no issue was split off.
 
-- 지적(medium): 본문이 없거나 배열인 POST·PUT 요청이 Zod 기본 영어 메시지("Required", "Expected object, received array")로 400 응답했다.
-  - 반영: `studyLogInput` 객체 스키마에 한국어 `required_error`·`invalid_type_error`("학습 기록 내용을 JSON 객체로 보내세요")를 지정했다.
-- 지적(low): ID 검증이 `z.coerce.number()`라 `1e3`·`0x10`·20자리 숫자를 받았다. 20자리 숫자는 Postgres bigint 범위 오류로 500이 됐다.
-  - 반영: 앞자리 0 없는 1~15자리 양의 정수만 받도록 바꿨다.
-- 지적(low): 깨진 JSON이나 256kb를 넘는 본문이 500 "서버 오류"로 응답했다.
-  - 반영: `app.ts` 오류 처리에서 `entity.parse.failed`는 400 "요청 본문의 JSON 형식이 올바르지 않습니다", `entity.too.large`는 413 "요청 본문이 너무 큽니다"로 응답한다.
-- 지적(low): "재실행해도 안전한 마이그레이션" 완료 기준을 실제로 검증하지 않았다.
-  - 반영: CI가 `database/migrations/*.sql`을 두 번 연속 적용한다.
-- 테스트(`backend/test/study-logs.test.ts`): 객체가 아닌 본문·깨진 JSON·JSON 문자열·초과 크기 본문 테스트와, 비정상 ID 7종 × 조회·수정·삭제 테스트를 추가했다. `backend/test/helpers.ts`에 원문 본문 전송용 `rawBody`를 추가했다.
-  - 수정 전 소스로 실행하면 새 테스트 2건이 실패하고, 수정 후에는 통과한다.
-- 보완 후 검증: 로컬 `npm run check` exit 0. backend tests 16, pass 14, fail 0, skipped 2(DB 통합 2건, `TEST_DATABASE_URL` 미설정). 스킬 4 pass, 빌드 통과. DB 통합 테스트와 마이그레이션 2회 적용은 CI에서 확인한다.
+- Comment (medium): a POST or PUT request with no body or an array body answered 400 with Zod's default English messages ("Required", "Expected object, received array").
+  - Applied: I gave the `studyLogInput` object schema Korean `required_error` and `invalid_type_error` ("학습 기록 내용을 JSON 객체로 보내세요", "Send the study log content as a JSON object").
+- Comment (low): the ID validation was `z.coerce.number()`, so it accepted `1e3`, `0x10`, and 20-digit numbers. A 20-digit number became a 500 from the Postgres bigint range error.
+  - Applied: it now accepts only positive integers of 1 to 15 digits with no leading zero.
+- Comment (low): broken JSON or a body over 256kb was answered with a 500 "server error".
+  - Applied: in the `app.ts` error handling, `entity.parse.failed` answers 400 "요청 본문의 JSON 형식이 올바르지 않습니다" ("The JSON format of the request body is not valid"), and `entity.too.large` answers 413 "요청 본문이 너무 큽니다" ("The request body is too large").
+- Comment (low): the "migration safe to re-run" done criterion was not actually verified.
+  - Applied: CI applies `database/migrations/*.sql` twice in a row.
+- Tests (`backend/test/study-logs.test.ts`): I added tests for a body that is not an object, broken JSON, a JSON string, and an oversize body, and tests for 7 kinds of abnormal IDs × lookup, edit, and delete. I added `rawBody` to `backend/test/helpers.ts` for sending a raw body.
+  - When run with the source before the fix, 2 new tests fail, and after the fix they pass.
+- Verification after the fix: local `npm run check` exit 0. backend tests 16, pass 14, fail 0, skipped 2 (2 DB integration, `TEST_DATABASE_URL` not set). Skills 4 pass, build passed. The DB integration tests and applying the migration twice are checked in CI.
 
-## 자동 코드 리뷰 2차 (PR #55)
+## Automated code review, round 2 (PR #55)
 
-- 1차 반영 확인: 본문 스키마 메시지, ID 정규식, 400·413 처리, CI 마이그레이션 2회 적용이 의도대로 동작한다. #57과의 충돌은 `helpers.ts` 텍스트 충돌뿐이다.
-- 지적(low): 다른 body-parser 4xx 오류가 여전히 500으로 응답했다. 예: `charset=latin1` → `charset.unsupported`, 지원하지 않는 `Content-Encoding` → `encoding.unsupported`, 중단된 요청.
-  - 반영: `app.ts` 오류 처리에서 `status`가 400~499인 오류는 그 상태 코드와 "요청을 처리할 수 없습니다"로 응답한다.
-  - 테스트: `study-logs.test.ts`에 `charset=latin1` 요청이 415로 응답하는 검사를 추가했다. `helpers.ts`에 `contentType` 옵션을 추가했다.
-- 리뷰는 최대 2회이므로 3차 리뷰는 하지 않는다. 최종 head의 CI로 병합 여부를 판단한다.
-- 보완 후 검증: 로컬 `npm run check` exit 0. backend tests 16, pass 14, fail 0, skipped 2(DB 통합 2건, `TEST_DATABASE_URL` 미설정). 스킬 4 pass, 빌드 통과. DB 통합 테스트와 마이그레이션 2회 적용은 CI에서 확인한다.
+- Checked the first-round fixes: the body schema messages, the ID regular expression, the 400 and 413 handling, and applying the migration twice in CI work as intended. The conflict with #57 is only a text conflict in `helpers.ts`.
+- Comment (low): other body-parser 4xx errors were still answered with 500. Examples: `charset=latin1` -> `charset.unsupported`, an unsupported `Content-Encoding` -> `encoding.unsupported`, and an aborted request.
+  - Applied: in the `app.ts` error handling, an error whose `status` is 400 to 499 is answered with that status code and "요청을 처리할 수 없습니다" ("The request cannot be handled").
+  - Tests: I added to `study-logs.test.ts` a check that a `charset=latin1` request is answered with 415. I added a `contentType` option to `helpers.ts`.
+- The review is limited to 2 rounds, so I do not do a third. The merge is decided by the CI of the final head.
+- Verification after the fix: local `npm run check` exit 0. backend tests 16, pass 14, fail 0, skipped 2 (2 DB integration, `TEST_DATABASE_URL` not set). Skills 4 pass, build passed. The DB integration tests and applying the migration twice are checked in CI.

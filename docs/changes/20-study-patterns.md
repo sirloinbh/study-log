@@ -1,72 +1,72 @@
-# #20 학습 패턴 분석 (생산적인 시간대·요일)
+# #20 Study pattern analysis (productive hours and weekdays)
 
-- 이슈: [#20](https://github.com/sirloinbh/study-log/issues/20) (상위 #9)
-- 브랜치: `feat/20-study-patterns`
-- 선행: #10 학습 기록 DB·API, #19 회고 화면 (병합 완료)
+- Issue: [#20](https://github.com/sirloinbh/study-log/issues/20) (parent #9)
+- Branch: `feat/20-study-patterns`
+- Prerequisites: #10 study log DB and API, #19 retrospective screen (merged)
 
-## 목적
+## Purpose
 
-언제 공부가 잘 되는지 데이터로 보여 준다. 회고를 쓸 때 그 기간의 패턴을 함께 본다.
+Show with data when studying goes well. When you write a retrospective, you also see the pattern of that period.
 
-## 결정
+## Decisions
 
-정해지지 않은 규칙은 아래 기준으로 정했다. [이슈 코멘트](https://github.com/sirloinbh/study-log/issues/20#issuecomment-6359438004)에도 남겼다.
+I set the undecided rules by the criteria below. I also left them in an [issue comment](https://github.com/sirloinbh/study-log/issues/20#issuecomment-6359438004).
 
-- **집계 대상:** "계획" 기록을 뺀 진행 중·완료·중단 기록(통계와 같음)
-- **시간대별:** 각 기록의 학습 시간을 실제로 공부한 시각에 분 단위로 나눠 0~23시에 더한다. 예: 20:30~22:00 → 20시 30분, 21시 60분. 자정을 넘긴 기록은 넘긴 뒤의 분을 0시부터 더한다.
-- **요일별:** 기록의 학습일(시작 날짜) 요일. 일요일부터 센다(#96).
-- **가장 생산적인 시간대·요일:** 학습 시간이 가장 많은 1시간 구간과 요일. 같으면 이른 쪽을 고르고, 기록이 없으면 보여 주지 않는다.
-- **위치:** 회고 화면에서 지금 보는 주·달의 패턴
+- **What is counted:** records in progress, completed, and abandoned, without "planned" records (same as the statistics)
+- **By hour:** split each record's study time by minute across the times you actually studied, and add it to hours 0 to 23. Example: 20:30 to 22:00 -> 30 minutes in hour 20 and 60 minutes in hour 21. For a record that crosses midnight, the minutes after midnight are added from hour 0.
+- **By weekday:** the weekday of the record's study date (start date). Counted from Sunday (#96).
+- **Most productive hour and weekday:** the 1-hour slot and the weekday with the most study time. If tied, pick the earlier one, and if there are no records, show nothing.
+- **Location:** the pattern of the week or month you are viewing on the retrospective screen
 
-## 변경
+## Changes
 
 - `backend/src/stats.ts`
-  - `studyPattern(sessions)`: 위 규칙으로 시간대·요일 합계와 가장 많은 시간대·요일을 계산한다(단위 테스트용으로 내보낸다).
-  - `GET /api/stats/patterns?from=&to=`: 기본은 최근 3개월(#47의 "최근 3개월"과 같은 시작일)부터 오늘까지다. 응답은 `{ from, to, totalMinutes, byHour[24], byWeekday[7], topHour, topWeekday }`.
-  - 시작일 > 종료일, 잘못된 날짜는 400. 10년을 넘는 기간도 400 "기간은 10년 이내로 지정하세요"(#47 시리즈 상한과 같은 기준).
-- `frontend/src/StudyPattern.tsx`(새 파일), `frontend/src/study-stats.ts`, `frontend/src/Retrospectives.tsx`, `frontend/src/style.css`
-  - 회고 작성 카드 아래 "학습 패턴"
-    - 요약 문장: "가장 많이 공부한 시간대는 9시~10시(6시간 50분), 요일은 수요일(3시간 30분)입니다."
-    - 요일별 막대 7개(일~토, 가장 많은 요일 기준 폭)
-    - 시간대별 막대 24개(가장 많은 시간대는 진한 색, 각 막대 툴팁에 값)
-  - 차트 라이브러리 없이 CSS 폭·높이로 그린다(차트 라이브러리 결정 #49와 무관).
-  - 기간을 옮기면 그 기간의 패턴을 불러오고, 회고 저장·삭제 후에도 다시 불러온다. 응답은 기간별로 보관한다.
-  - 기록이 없으면 "이 기간에는 학습 기록이 없어 패턴을 볼 수 없습니다", 실패하면 오류를 보여 준다.
+  - `studyPattern(sessions)`: calculates the totals by hour and weekday and the hour and weekday with the most time with the rules above (exported for unit tests).
+  - `GET /api/stats/patterns?from=&to=`: by default it runs from the last 3 months (the same start date as "the last 3 months" in #47) to today. The response is `{ from, to, totalMinutes, byHour[24], byWeekday[7], topHour, topWeekday }`.
+  - A start date > end date or a wrong date gives 400. A period over 10 years also gives 400 "기간은 10년 이내로 지정하세요" ("Set the period within 10 years") (the same limit as the #47 series).
+- `frontend/src/StudyPattern.tsx` (a new file), `frontend/src/study-stats.ts`, `frontend/src/Retrospectives.tsx`, `frontend/src/style.css`
+  - "학습 패턴" ("Study pattern") under the retrospective writing card
+    - Summary sentence: "가장 많이 공부한 시간대는 9시~10시(6시간 50분), 요일은 수요일(3시간 30분)입니다." ("The hour you studied the most is 9 to 10 (6 hours 50 minutes), and the weekday is Wednesday (3 hours 30 minutes).")
+    - 7 weekday bars (Sun to Sat, width relative to the weekday with the most)
+    - 24 hour bars (the hour with the most is a dark color, and each bar's tooltip has the value)
+  - It is drawn with CSS widths and heights without a chart library (unrelated to the chart library decision #49).
+  - When you move the period, it loads the pattern for that period, and it loads again after saving or deleting a retrospective. Responses are kept per period.
+  - If there are no records it shows "이 기간에는 학습 기록이 없어 패턴을 볼 수 없습니다" ("There are no study records in this period, so no pattern can be seen"), and if it fails it shows an error.
 
-## 테스트
+## Tests
 
 - `backend/test/stats.test.ts`
-  - 시간대 분배(20:30~22:00, 자정을 넘긴 23:30+90분, 한 시간 안), 요일(자정 넘김도 시작 날짜), 합계 보존, 동점 시 이른 시간
-  - 기록 없음, 날짜 검증 400, 기본 기간(최근 3개월)
-- `backend/test/patterns.integration.test.ts`(실제 DB, 새 파일, 2103년): 일요일 기록, 자정을 넘긴 수요일 기록, 같은 시간대 합산, 계획 기록 제외, 범위 밖 제외, 가장 많은 시간대·요일, 빈 기간
+  - Hour allocation (20:30 to 22:00, 23:30+90 minutes crossing midnight, within one hour), weekday (a midnight crossing is also the start date), the total is preserved, and the earlier hour on a tie
+  - No records, date validation 400, and the default period (the last 3 months)
+- `backend/test/patterns.integration.test.ts` (a real DB, a new file, year 2103): a Sunday record, a Wednesday record that crosses midnight, adding up the same hour, excluding planned records, excluding out of range, the hour and weekday with the most, and an empty period
 - `backend/test/retrospectives-ui.test.ts`
-  - 요약 문장, 요일 막대 폭, 시간대 막대 24개와 강조·툴팁, 기간 이동 시 다시 요청
-  - 기록 없음·실패 표시, 시간대 이름·막대 폭 함수
+  - The summary sentence, the weekday bar widths, 24 hour bars with the highlight and tooltips, and requesting again when the period moves
+  - Showing no records and failure, and the hour name and bar width functions
 
-## 검증
+## Verification
 
-| 명령                   | 환경                                                        | 결과                                                        |
-| ---------------------- | ----------------------------------------------------------- | ----------------------------------------------------------- |
-| `npm run check`        | 로컬, `TEST_DATABASE_URL` 미설정                            | exit 0. backend tests 231, pass 214, fail 0, skipped 17(DB) |
-| `npm test` (기본 병렬) | 로컬 Docker `postgres:17-alpine`, 마이그레이션 001~010 적용 | exit 0. tests 231, pass 231, fail 0, skipped 0              |
+| Command                       | Environment                                                      | Result                                                       |
+| ----------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------ |
+| `npm run check`               | Local, `TEST_DATABASE_URL` not set                               | exit 0. backend tests 231, pass 214, fail 0, skipped 17 (DB) |
+| `npm test` (default parallel) | Local Docker `postgres:17-alpine`, migrations 001 to 010 applied | exit 0. tests 231, pass 231, fail 0, skipped 0               |
 
-- 브라우저: Playwright(Chromium)로 Vite 개발 서버와 이 브랜치 API(로컬 Docker 테스트 DB)를 띄워 확인했다.
-  - API: 2026년 10월 패턴 합계 985분이 통계 API의 이번 달 합계(985분)와 같다.
-  - 모바일 390×844, 월간 회고
+- Browser: I checked by starting the Vite dev server and this branch's API (a local Docker test DB) with Playwright (Chromium).
+  - API: the October 2026 pattern total of 985 minutes is the same as this month's total (985 minutes) in the statistics API.
+  - Mobile 390×844, monthly retrospective
     - "가장 많이 공부한 시간대는 9시~10시(6시간 50분), 요일은 수요일(3시간 30분)입니다."
-    - 요일 막대 7개, 시간대 막대
-    - 영역 넘침·가로 스크롤 없음
-  - PC 1440×900: 같은 내용, 가로 스크롤 없음
-  - 스크린샷: [모바일 390×844 (학습 패턴)](assets/20-mobile-390x844.png), [PC 1440×900](assets/20-pc-1440x900.png)
+    - 7 weekday bars, the hour bars
+    - No overflow of the area and no horizontal scroll
+  - PC 1440×900: the same content, no horizontal scroll
+  - Screenshots: [mobile 390×844 (study pattern)](assets/20-mobile-390x844.png), [PC 1440×900](assets/20-pc-1440x900.png)
 
-## 한계·후속
+## Limits and follow-up
 
-- 시간대 막대 각각의 값은 마우스 툴팁으로만 보인다. 화면 낭독기에는 요약 문장과 요일 막대의 값을 읽어 준다.
-- 통계 화면에는 패턴을 따로 두지 않았다. 필요하면 같은 API로 붙일 수 있다.
+- The value of each hour bar is seen only in a mouse tooltip. For screen readers, the summary sentence and the values of the weekday bars are read.
+- I did not put the pattern on the statistics screen separately. If needed, it can be attached with the same API.
 
-## 리뷰
+## Review
 
-- 1차 자동 리뷰(읽기 전용, 별도 에이전트): 보완점 없음
-  - 확인한 항목: 시간 분배·자정 넘김, UTC 기준 요일, 기간 검증, 기간별 캐시와 늦은 응답 버림, 접근성
-  - 참고(보고 기준 미만): 패턴 API는 기간 안의 미래 날짜도 센다. 회고 화면의 기간 요약(#19)과 같은 기준이고, "계획"이 아닌 미래 기록은 드물어 그대로 둔다.
-  - 보완점이 없어 2차 리뷰는 하지 않았다.
+- First automated review (read-only, a separate agent): nothing to fix
+  - Checked: time allocation and midnight crossing, weekday in UTC, period validation, the cache per period and discarding late responses, accessibility
+  - Note (below the reporting bar): the pattern API also counts future dates inside the period. It is the same criterion as the period summary of the retrospective screen (#19), and non-"planned" future records are rare, so I left it.
+  - There was nothing to fix, so I did not do a second review.

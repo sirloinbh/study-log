@@ -1,58 +1,58 @@
-# #51 교재별 진행률과 일정 달성률·준수율
+# #51 Per-textbook progress and schedule achievement and adherence rates
 
-- 이슈: [#51](https://github.com/sirloinbh/study-log/issues/51)
-- 브랜치: `feat/51-textbook-stats`
-- 규칙: [학습 일정 규칙](../decisions/schedule-rules.md) 7장
+- Issue: [#51](https://github.com/sirloinbh/study-log/issues/51)
+- Branch: `feat/51-textbook-stats`
+- Rules: chapter 7 of the [study schedule rules](../decisions/schedule-rules.md)
 
-## 목적
+## Purpose
 
-교재와 일정 기준의 진행 상황을 통계로 보여 준다.
+Show progress by textbook and by schedule as statistics.
 
-## 변경
+## Changes
 
-- `database/migrations/018_schedule_item_original_date.sql`: `schedule_items.original_date`. 이미 있는 항목은 현재 날짜로 채운다.
-- `backend/src/stats.ts`: `GET /api/stats/textbooks?textbookId=`. 교재별 완료 장과 전체 장, 일정 달성률과 준수율.
-- `backend/src/schedules.ts`: 항목을 만들 때 원래 날짜를 저장한다.
-- `frontend/src/textbook-stats.tsx`: 통계 화면의 "교재와 일정" 카드와 교재 필터.
+- `database/migrations/018_schedule_item_original_date.sql`: `schedule_items.original_date`. Existing items are filled with the current date.
+- `backend/src/stats.ts`: `GET /api/stats/textbooks?textbookId=`. Completed chapters and total chapters per textbook, and the schedule achievement and adherence rates.
+- `backend/src/schedules.ts`: saves the original date when an item is created.
+- `frontend/src/textbook-stats.tsx`: the "Textbooks and schedules" card and the textbook filter on the statistics screen.
 
-## 구현 판단
+## Implementation judgment
 
-이슈가 정의하지 않은 기준은 규칙 7장에 적었다.
+The criteria the issue did not define are written in chapter 7 of the rules.
 
-- 완료 장은 그 장이나 아래 절에 완료한 학습 기록이 하나라도 있는 장이다. 일정의 완료 체크와 학습 기록은 연결되어 있지 않아, 교재의 진도는 학습 기록으로 센다.
-- 달성률은 목표 시간 기준, 준수율은 항목 수 기준이다. 준수는 날짜를 지켰는지의 문제여서 시간으로 가중하지 않는다.
-- 자동 밀기가 현재 날짜를 바꾸므로, 준수율을 세려면 원래 날짜가 필요해 컬럼을 더했다.
-- 오늘 항목을 아직 안 끝낸 것은 늦은 것이 아니어서 세지 않는다. 늦음으로 치지 않는 것은 복습 통계와 같고, 분모에서도 빼는 것은 다르다. 오늘 시작한 일정의 달성률이 바로 낮게 나오지 않게 하기 위해서이다.
+- A completed chapter is one that has at least one completed study record in the chapter or in a section under it. The completion check of a schedule and the study records are not linked, so a textbook's progress is counted from study records.
+- The achievement rate is based on target time, and the adherence rate is based on the number of items. Adherence is about whether the date was kept, so it is not weighted by time.
+- Automatic pushing changes the current date, so I added a column because the original date is needed to count the adherence rate.
+- Today's item that is not finished yet is not late, so it is not counted. Not counting it as late is the same as the review statistics, and removing it from the denominator too is different. This is so the achievement rate of a schedule that started today does not come out low right away.
 
-## 리뷰
+## Review
 
-1차 리뷰에서 차단급 결함은 없었다. 다음을 고쳤다.
+The first review found no blocking defects. I fixed the following.
 
-- 긴 교재 제목에서 필터가 카드 밖으로 넘쳐 화면에 가로 스크롤이 생길 수 있었다.
-- 미래 날짜의 완료 기록을 장 완료로 셌다. 다른 통계처럼 오늘 이전 기록만 센다.
-- 첫 요청이 실패하면 카드를 복구할 방법이 없었다. "다시 불러오기"를 더했다.
-- 테스트를 더했다. 통계 화면에 카드가 있는지, 중단한 기록, 완료 취소, 잘못된 쿼리이다.
-- "복습 통계와 같은 방식"이라는 설명을 바로잡았다.
+- With a long textbook title, the filter could overflow the card and create a horizontal scroll on the screen.
+- A completion record with a future date was counted as a completed chapter. Like the other statistics, only records before today are counted.
+- If the first request failed, there was no way to recover the card. I added "다시 불러오기" ("Reload").
+- I added tests: whether the card is on the statistics screen, an abandoned record, cancelling a completion, and a bad query.
+- I corrected the explanation "the same way as the review statistics".
 
-규칙의 결과로 알아 둘 점이 있다. 사용자가 바꾸기로 하면 규칙 7장을 고친다.
+There are points to know about as results of the rules. If the user decides to change them, fix chapter 7 of the rules.
 
-- 자동 밀기는 미완료 항목 전체를 옮기므로, 첫날만 놓치고 이후 화면대로 매일 끝내도 모든 항목이 원래 날짜보다 하루 늦어 준수율이 0%까지 떨어질 수 있다. 달성률은 100%이다.
-- 절 하나만 끝내도 그 장은 완료이고, 일정의 완료 체크만 하고 학습 기록이 없으면 0장이다.
-- 앞당겨 끝낸 항목은 원래 날짜가 올 때까지 달성률에 들어가지 않는다. 일정 화면의 진행률(#38)과 다를 수 있다.
+- Automatic pushing moves all incomplete items, so even if you miss only the first day and then finish every day as the screen shows, every item is one day later than its original date, and the adherence rate can drop to 0%. The achievement rate is 100%.
+- Finishing even one section makes its chapter complete, and if you only tick the schedule's completion and have no study record, it is 0 chapters.
+- An item finished early is not included in the achievement rate until its original date comes. It can differ from the progress on the schedule screen (#38).
 
-## 확인하지 못한 것
+## Not confirmed
 
-API 키가 없어(#129) 실제 공휴일 API로 일정을 만들어 보지 못했다. 브라우저 확인은 테스트 DB에 2026년 공휴일을 임시로 넣어 진행했고, 끝난 뒤 지웠다.
+There was no API key (#129), so I could not create a schedule with the real holiday API. The browser check was done by temporarily putting the 2026 holidays into the test DB, and I deleted them afterward.
 
-이 기능을 넣기 전에 만든 일정이 있으면 원래 날짜는 마이그레이션 때의 날짜가 된다. 아직 배포 전이라 실제로 영향을 받는 일정은 없다.
+If a schedule was created before this feature was added, its original date becomes the date at the time of the migration. It is not deployed yet, so no real schedule is affected.
 
-## 검증
+## Verification
 
-`TEST_DATABASE_URL`을 설정한 `npm run check`가 통과했다. 백엔드 422건, 프런트 201건, 스킬 4건이 통과했다. 건너뜀은 프런트 2건으로, 중앙 표준에서 온 다크 전용 앱 테스트이다. 테스트 DB에 마이그레이션 018을 적용했다.
+`npm run check` with `TEST_DATABASE_URL` set passed. Backend 422, frontend 201, and skills 4 passed. The skips were 2 frontend tests, the dark-only app tests that came from the central standards. I applied migration 018 to the test DB.
 
-headless Chrome으로 PC 1440×900과 모바일 390×844에서 확인했다. 16개 항목이 통과했고 스크린샷을 직접 봤다. 완료한 장 막대, 목차 없는 교재, 달성률과 준수율, 교재 필터, 200자 교재 제목에서도 가로 스크롤 없음을 봤다.
+I checked with headless Chrome at PC 1440×900 and mobile 390×844. 16 items passed and I looked at the screenshots myself. I looked at the completed chapters bar, a textbook with no table of contents, the achievement and adherence rates, the textbook filter, and no horizontal scroll even with a 200-character textbook title.
 
-## 테스트
+## Tests
 
-- `backend/test/textbook-stats.integration.test.ts`: 장과 절의 완료 판정, 중복 기록, 완료가 아닌 기록, 집계 대상이 없을 때, 자동 밀기와 수동 이동에도 원래 날짜로 세는 것, 늦게 끝낸 항목, 교재 필터, 잘못된 교재.
-- `frontend/src/textbook-stats.test.tsx`: 경로와 내림, 막대와 수치, 필터, 비율이 없을 때, 실패, 늦게 온 응답.
+- `backend/test/textbook-stats.integration.test.ts`: the completion check of chapters and sections, duplicate records, records that are not completed, when there are no counted items, counting by the original date even with automatic pushing and manual moves, an item finished late, the textbook filter, and a wrong textbook.
+- `frontend/src/textbook-stats.test.tsx`: the path and rounding down, the bar and figures, the filter, when there is no rate, failure, and a late response.

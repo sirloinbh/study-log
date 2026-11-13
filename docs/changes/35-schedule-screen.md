@@ -1,60 +1,60 @@
-# #35 일정 생성 화면과 리스트 뷰
+# #35 Schedule creation screen and list view
 
-- 이슈: [#35](https://github.com/sirloinbh/study-log/issues/35)
-- 브랜치: `feat/35-schedule-screen`
-- 규칙: [학습 일정 규칙](../decisions/schedule-rules.md) 1, 6장
+- Issue: [#35](https://github.com/sirloinbh/study-log/issues/35)
+- Branch: `feat/35-schedule-screen`
+- Rules: chapters 1 and 6 of the [study schedule rules](../decisions/schedule-rules.md)
 
-## 목적
+## Purpose
 
-기간과 하루 분량으로 일정을 만들고, 날짜별 목표 시간을 확인한다.
+Create a schedule from a period and a daily amount, and check the target time for each date.
 
-## 변경
+## Changes
 
-- `frontend/src/schedules.tsx`: 일정 만들기 폼, 내 일정 목록, 날짜별 목록.
-- `frontend/src/schedule.ts`: API 응답 타입, 시간을 분으로 바꾸기, 날짜 표시.
-- `frontend/src/app.tsx`: `/schedules` 경로와 메뉴 항목 "일정".
-- `frontend/src/style.css`: 날짜별 목록과 일정 화면의 공통 간격.
+- `frontend/src/schedules.tsx`: the schedule creation form, the list of my schedules, and the list by date.
+- `frontend/src/schedule.ts`: API response types, converting time to minutes, and date display.
+- `frontend/src/app.tsx`: the `/schedules` route and the menu item "일정" ("Schedule").
+- `frontend/src/style.css`: the list by date and the shared spacing of the schedule screen.
 
-## 구현 판단
+## Implementation judgment
 
-- 폼에 평일 2시간, 주말·공휴일 5시간을 미리 채운다(규칙 1장). 시작일은 오늘, 종료일은 30일째로 채운다.
-- 시간은 0.5 단위로 입력하고 서버에는 분으로 보낸다.
-- 삭제를 넣었다. 이슈 범위에는 없지만, 규칙 6장에서 기간이나 분량을 바꾸는 유일한 방법이 지우고 새로 만드는 것이기 때문이다.
-- 이름 수정 화면은 넣지 않았다. 이슈 범위에 없고, API(`PUT /api/schedules/:id`)만 있다.
-- 캘린더 뷰는 넣지 않았다. 이슈는 리스트 뷰를 요구하고 캘린더는 공용화 검토로만 적었다. 학습 기록 캘린더(`calendar.tsx`)는 기록 조회와 묶여 있어, 공용화는 별도 작업이 필요하다.
-- 날짜별 목록에는 공휴일 여부를 표시하지 않는다. 항목에 날짜 종류를 저장하지 않기 때문이다(#34). 분량으로만 구별된다.
+- The form is pre-filled with 2 hours for weekdays and 5 hours for weekends and holidays (rule chapter 1). The start date is filled with today, and the end date with day 30.
+- Time is entered in steps of 0.5 and sent to the server in minutes.
+- I added delete. It is not in the issue's scope, but in rule chapter 6 the only way to change the period or the amount is to delete and create anew.
+- I did not add a name edit screen. It is not in the issue's scope, and only the API (`PUT /api/schedules/:id`) exists.
+- I did not add a calendar view. The issue asks for a list view, and mentions the calendar only as a review for sharing. The study log calendar (`calendar.tsx`) is tied to record lookup, so sharing needs separate work.
+- The list by date does not mark whether a day is a holiday. This is because the item does not store the kind of day (#34). It is told apart only by the amount.
 
-## 확인하지 못한 것
+## Not confirmed
 
-API 키가 없어(#129) 실제 공휴일 API로 일정을 만들어 보지 못했다. 브라우저 확인은 테스트 DB에 2026년 공휴일(12월 25일)을 임시로 넣어 진행했고, 끝난 뒤 지웠다. 키가 없는 동안 실제 앱에서는 일정을 만들 수 없고 화면에 이유가 표시된다.
+There was no API key (#129), so I could not create a schedule with the real holiday API. The browser check was done by temporarily putting the 2026 holiday (December 25) into the test DB, and I deleted it afterward. While there is no key, a schedule cannot be created in the real app and the screen shows the reason.
 
-## 리뷰
+## Review
 
-1차 리뷰에서 막아야 할 결함은 없었고, 다음을 고쳤다.
+In the first review there were no defects that had to be blocked, and I fixed the following.
 
-- 삭제 실패 메시지가 폼 카드에만 나와, 목록까지 스크롤한 모바일 화면에서는 보이지 않았다. 메시지를 목록 카드로 옮겼다.
-- 날짜별 조회가 한 번 실패하면 같은 일정을 눌러도 다시 읽지 않았다. 일정을 누르면 다시 읽는다.
-- 삭제 후 목록을 다시 읽지 못하면 지운 일정이 남아 보였다. 삭제에 성공하면 바로 뺀다.
-- 공백 없는 긴 이름이 제목에서 가로로 넘칠 수 있었다.
-- 입력을 고쳐도 지난 오류 문구가 남았고, 일정을 만든 뒤에도 다른 일정의 삭제 확인이 남았다.
-- 일정이 해를 넘기면 날짜별 목록에서 같은 월일이 구별되지 않았다. 시작일과 다른 해의 날짜에는 연도를 붙인다.
-- 삭제 흐름의 초점, 404, 동시 제출 테스트를 더했다.
+- The delete failure message appeared only on the form card, so it was not visible on a mobile screen scrolled to the list. I moved the message to the list card.
+- After one failed lookup by date, pressing the same schedule did not read again. Now pressing a schedule reads again.
+- If the list could not be read again after a delete, the deleted schedule still looked there. Now it is removed right away when the delete succeeds.
+- A long name with no spaces could overflow the title horizontally.
+- The old error text remained even after fixing the input, and after creating a schedule the delete confirmation of another schedule remained.
+- When a schedule crosses a year, the same month and day could not be told apart in the list by date. I add the year to dates in a year different from the start date.
+- I added tests for the focus of the delete flow, 404, and concurrent submits.
 
-2차 리뷰에서도 막아야 할 결함은 없었고, 3건을 고쳤다. 리뷰는 2회까지라 이후 리뷰는 하지 않았다.
+The second review also found no defects that had to be blocked, and I fixed 3. The review is limited to 2 rounds, so I did no further review.
 
-- 생성이나 삭제 뒤의 재조회가 실패하면 이미 읽은 날짜별 목록이 오류로 바뀌고 초점이 사라졌다. 날짜별 목록은 바뀌지 않으므로 읽은 내용을 유지한다.
-- 삭제 메시지가 목록 아래에 있어 긴 목록에서는 화면 밖에 나왔다. 카드 제목 바로 아래로 옮겼다.
-- 재시도가 또 실패해도 화면이 그대로였다. 시도하는 동안 오류를 지워, 다시 실패하면 새로 표시되고 읽힌다.
+- If the re-lookup after create or delete failed, the already read list by date turned into an error and focus was lost. The list by date does not change, so I keep what was read.
+- The delete message was below the list, so with a long list it appeared off screen. I moved it right under the card title.
+- When a retry failed again, the screen stayed the same. I now clear the error while trying, so if it fails again it is shown anew and read.
 
-어떤 일정을 먼저 열지(지금은 시작일이 가장 늦은 일정)는 고치지 않았다. 일정 화면을 더 쓰는 #37, #38에서 정한다.
+I did not fix which schedule is opened first (right now the schedule with the latest start date). It will be decided in #37 and #38, which use the schedule screen more.
 
-## 검증
+## Verification
 
-`TEST_DATABASE_URL`을 설정한 `npm run check`가 통과했다. 백엔드 377건, 프런트 171건, 스킬 4건이 통과했다. 건너뜀은 프런트 2건으로, 중앙 표준에서 온 다크 전용 앱 테스트이다.
+`npm run check` with `TEST_DATABASE_URL` set passed. Backend 377, frontend 171, and skills 4 passed. The skips were 2 frontend tests, the dark-only app tests that came from the central standards.
 
-headless Chrome으로 PC 1440×900과 모바일 390×844에서 확인했다. 38개 항목이 통과했고 스크린샷을 직접 봤다. 공휴일인 금요일 5시간, 평범한 금요일 2시간, 토요일 5시간, 오늘 표시, 키가 없을 때의 거부 메시지와 입력 유지, 삭제 확인과 초점, 공백 없는 200자 이름에서도 가로 스크롤 없음을 봤다. 리뷰 반영 후의 최종 코드로 다시 확인한 결과이다.
+I checked with headless Chrome at PC 1440×900 and mobile 390×844. 38 items passed and I looked at the screenshots myself. I looked at 5 hours on a Friday that is a holiday, 2 hours on an ordinary Friday, 5 hours on Saturday, the today mark, the rejection message and kept input when there is no key, the delete confirmation and focus, and no horizontal scroll even with a 200-character name with no spaces. This is the result of checking again with the final code after the review fixes.
 
-## 테스트
+## Tests
 
-- `frontend/src/schedules.test.tsx`: 시간 변환과 경계, 기본 종료일, 날짜 표시, 폼의 기본값, 생성 요청과 날짜별 표시, 범위를 벗어난 분량, 서버 거부 시 메시지와 입력 유지, 일정 선택, 오늘 표시, 삭제 확인과 취소, 삭제 실패, 불러오기 실패, 늦게 온 응답 무시.
-- `frontend/src/app.test.tsx`: 메뉴와 주소에 일정 추가.
+- `frontend/src/schedules.test.tsx`: time conversion and boundaries, the default end date, date display, the defaults of the form, the create request and display by date, an amount out of range, the message and kept input when the server rejects, selecting a schedule, the today mark, delete confirmation and cancel, delete failure, load failure, and ignoring a late response.
+- `frontend/src/app.test.tsx`: added the schedule to the menu and the address.

@@ -1,93 +1,93 @@
-# #39 오늘의 키워드 DB·API
+# #39 Today's keyword DB and API
 
-- 이슈: [#39](https://github.com/sirloinbh/study-log/issues/39) (상위 #6)
-- 브랜치: `feat/39-keywords-api`
-- 선행: 없음
+- Issue: [#39](https://github.com/sirloinbh/study-log/issues/39) (parent #6)
+- Branch: `feat/39-keywords-api`
+- Prerequisite: none
 
-## 목적
+## Purpose
 
-학습 중 중요한 키워드를 날짜별로 저장하고, 날짜별로 보거나 검색한다. 화면은 #40 범위다.
+Store important keywords from studying by date, and view them by date or search them. The screen is in the scope of #40.
 
-## 결정
+## Decisions
 
-이슈에 정해지지 않은 규칙은 아래 기준으로 구현했다. [이슈 코멘트](https://github.com/sirloinbh/study-log/issues/39#issuecomment-6355484438)에도 남겼다.
+I implemented the rules the issue did not set by the criteria below. I also left them in an [issue comment](https://github.com/sirloinbh/study-log/issues/39#issuecomment-6355484438).
 
-- 같은 날짜에 같은 키워드는 하나만 둔다. 대소문자만 다른 것도 같은 키워드로 본다.
-- 검색은 키워드와 메모에 대한 부분 일치이고 대소문자를 구분하지 않는다. 기간을 함께 지정할 수 있다.
-- 날짜를 비우면 `serviceDate()` 기준 오늘로 저장한다.
-- 길이: 키워드 50자(한 줄), 메모 2000자.
+- Keep only one of the same keyword on the same date. Ones that differ only by case count as the same keyword.
+- Search is a partial match on the keyword and note, and is case-insensitive. You can also specify a period.
+- If you leave the date empty, it is saved as today based on `serviceDate()`.
+- Length: keyword 50 characters (one line), note 2000 characters.
 
-## 변경
+## Changes
 
-- `database/migrations/009_keywords.sql`: `keywords` 테이블.
-  - 열: 날짜(`keyword_date`), 키워드, 메모(기본 빈 값).
-  - CHECK: 키워드는 앞뒤 공백 없이 1~50자, 메모 2000자 이하.
-  - 고유 인덱스 `(keyword_date, lower(keyword))`: 같은 날짜의 같은 키워드(대소문자 무시)를 막는다. 날짜별 조회에도 쓴다.
-- `backend/src/keywords.ts`, `backend/src/app.ts`, `backend/src/study-logs.ts`(`isCalendarDate` 내보내기)
+- `database/migrations/009_keywords.sql`: the `keywords` table.
+  - Columns: the date (`keyword_date`), the keyword, and the note (default empty).
+  - CHECK: the keyword is 1 to 50 characters with no leading or trailing spaces, and the note is 2000 characters or fewer.
+  - A unique index `(keyword_date, lower(keyword))`: it blocks the same keyword (ignoring case) on the same date. It is also used for lookup by date.
+- `backend/src/keywords.ts`, `backend/src/app.ts`, `backend/src/study-logs.ts` (export `isCalendarDate`)
 
-  | 요청                                    | 동작                                                                  |
-  | --------------------------------------- | --------------------------------------------------------------------- |
-  | `GET /api/keywords?date=YYYY-MM-DD`     | 그날의 키워드를 추가한 순서로                                         |
-  | `GET /api/keywords?q=&from=&to=&limit=` | 최근 날짜부터. `q`는 키워드·메모 부분 일치. `limit` 기본 50, 최대 200 |
-  | `GET /api/keywords/:id`                 | 하나                                                                  |
-  | `POST /api/keywords`                    | `{ date?, keyword, memo? }`. 201 `{ keyword }`                        |
-  | `PUT /api/keywords/:id`                 | 날짜·키워드·메모 교체. 날짜를 비우면 오늘. 200                        |
-  | `DELETE /api/keywords/:id`              | 204                                                                   |
-  - 응답 필드: `id`, `date`, `keyword`, `memo`.
-  - `date`를 주면 그날만 조회하고 `q`·`from`·`to`·`limit`는 적용하지 않는다.
-  - 검색어의 `%`·`_`·`\`는 와일드카드가 아니라 그 문자 그대로 찾는다.
-  - 중복: "이 날짜에 이미 있는 키워드입니다" 409(추가·수정 모두). 없는 키워드: "키워드를 찾을 수 없습니다" 404.
-  - 검증 메시지: 키워드 입력·형식·50자·한 줄, 메모 2000자, 날짜 형식·존재하지 않는 날짜, 검색어 50자, 시작일 > 종료일, 조회 개수, JSON 객체, ID.
+  | Request                                 | Behavior                                                                                            |
+  | --------------------------------------- | --------------------------------------------------------------------------------------------------- |
+  | `GET /api/keywords?date=YYYY-MM-DD`     | That day's keywords in the order they were added                                                    |
+  | `GET /api/keywords?q=&from=&to=&limit=` | Most recent date first. `q` is a partial match on keyword and note. `limit` default 50, at most 200 |
+  | `GET /api/keywords/:id`                 | One                                                                                                 |
+  | `POST /api/keywords`                    | `{ date?, keyword, memo? }`. 201 `{ keyword }`                                                      |
+  | `PUT /api/keywords/:id`                 | Replace the date, keyword, and note. If you empty the date, it is today. 200                        |
+  | `DELETE /api/keywords/:id`              | 204                                                                                                 |
+  - Response fields: `id`, `date`, `keyword`, `memo`.
+  - If you give `date`, it looks up only that day and does not apply `q`, `from`, `to`, and `limit`.
+  - `%`, `_`, and `\` in the search term are searched as those characters, not wildcards.
+  - Duplicate: "이 날짜에 이미 있는 키워드입니다" ("This keyword already exists on this date") 409 (both add and edit). A missing keyword: "키워드를 찾을 수 없습니다" ("Keyword not found") 404.
+  - Validation messages: keyword input, format, 50 characters, one line, note 2000 characters, date format and a date that does not exist, search term 50 characters, start date > end date, the lookup count, JSON object, and ID.
 
-## 테스트
+## Tests
 
-- `backend/test/keywords.test.ts`(DB 없음)
-  - 잘못된 본문 → 한국어 400. POST·PUT 모두 확인
-  - 목록 조건·ID 검증
-  - 없는 키워드 404, 중복 409(추가·수정)
-  - 날짜를 비우면 주입한 오늘(`2026-10-23`)로 저장, 키워드 trim
-  - 검색어의 `%`·`_`·`\` 이스케이프
-- `backend/test/keywords.integration.test.ts`(실제 DB)
-  - 오늘 기본값, 날짜별 조회 순서
-  - 같은 날짜 중복(대소문자 포함) 409, 다른 날짜는 허용
-  - 키워드·메모 검색, 대소문자 무시, `50%`·`%` 문자 그대로 검색, 기간 필터, 최근 날짜 우선
-  - 수정, 수정으로 생기는 중복 409, 삭제 후 404
-  - DB CHECK: 빈 값·앞 공백·51자 키워드 23514
+- `backend/test/keywords.test.ts` (no DB)
+  - A wrong body -> a Korean 400. Both POST and PUT are checked
+  - Validation of list conditions and ID
+  - 404 for a missing keyword, and 409 for a duplicate (add and edit)
+  - If the date is empty, it is saved as the injected today (`2026-10-23`), and the keyword trim
+  - Escaping `%`, `_`, and `\` in the search term
+- `backend/test/keywords.integration.test.ts` (a real DB)
+  - The default of today, and the lookup order by date
+  - A duplicate on the same date (including case) is 409, and a different date is allowed
+  - Searching keyword and note, ignoring case, searching `50%` and `%` as literal characters, the period filter, and most recent date first
+  - Edit, a duplicate caused by an edit is 409, and 404 after a delete
+  - DB CHECK: an empty keyword, a leading space, and a 51-character keyword give 23514
 
-## 검증
+## Verification
 
-| 명령                                                       | 환경                                                        | 결과                                                                                              |
-| ---------------------------------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `npm run check`                                            | 로컬, `TEST_DATABASE_URL` 미설정                            | exit 0. backend tests 134, pass 124, fail 0, skipped 10(DB) (1차 리뷰 반영 후 다시 실행해도 같음) |
-| `tsx --test --test-concurrency=1 test/*.test.ts` (backend) | 로컬 Docker `postgres:17-alpine`, 마이그레이션 001~009 적용 | tests 134, pass 134, fail 0, skipped 0                                                            |
+| Command                                                    | Environment                                                      | Result                                                                                                              |
+| ---------------------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `npm run check`                                            | Local, `TEST_DATABASE_URL` not set                               | exit 0. backend tests 134, pass 124, fail 0, skipped 10 (DB) (the same when run again after the first-review fixes) |
+| `tsx --test --test-concurrency=1 test/*.test.ts` (backend) | Local Docker `postgres:17-alpine`, migrations 001 to 009 applied | tests 134, pass 134, fail 0, skipped 0                                                                              |
 
-- 009를 같은 DB에 두 번 적용해 재실행 안전성을 확인했다.
-- 직렬로 실행한 이유는 #76(무관한 병렬 실행 경합)이다.
-- 화면 변경이 없어 브라우저 확인은 하지 않았다. 이슈 완료 기준에도 없다.
+- I applied 009 twice to the same DB and confirmed it is safe to re-run.
+- The reason I ran it serially is #76 (an unrelated parallel run race).
+- There was no screen change, so I did not check in a browser. It is not in the issue's done criteria either.
 
-## 자동 코드 리뷰 1차
+## Automated code review, round 1
 
-별도 읽기 전용 리뷰 에이전트가 이슈 #39 완료 기준과 PR 변경을 검토했다. high·medium 지적은 없었다. 분리할 이슈도 없다.
+A separate read-only review agent reviewed the issue #39 done criteria and the PR changes. There were no high or medium comments. There is no issue to split off either.
 
-- 문제없다고 확인된 사항: 동적 WHERE의 매개변수 바인딩, LIKE 이스케이프, 고유 인덱스와 23505 → 409 매핑, Zod trim과 DB CHECK의 일관성, 날짜·시간대 처리, 마이그레이션 재실행, docs 일치.
-- low(반영): `0000-01-01`은 JS 날짜로는 유효하지만 PostgreSQL에는 0년이 없어 DB 오류 500이 됐다. 학습 기록에도 같은 문제가 있었다.
-  - 공용 `isCalendarDate`가 0001-01-01 이전을 거부하게 했다. 학습 기록에도 함께 적용된다.
-  - 키워드 본문·조회와 학습 기록 테스트에 케이스를 추가했다. 수정 전 3건 실패, 수정 후 통과를 확인했다.
-- low(반영): `date`를 주면 다른 조건을 무시한다는 점을 docs에 적고, 통합 테스트로 고정했다.
-- low(유지)
-  - 날짜를 비운 수정은 오늘로 옮긴다. 추가와 같은 규칙이고 docs에 있다.
-  - 한 줄 규칙은 CR·LF만 본다. 유니코드 줄 구분자(U+2028/2029)는 실제 입력에서 거의 생기지 않는다.
+- Points confirmed to have no problem: the parameter binding of the dynamic WHERE, the LIKE escape, the unique index and the 23505 -> 409 mapping, consistency between Zod trim and the DB CHECK, date and time zone handling, re-running the migration, and the docs matching.
+- low (applied): `0000-01-01` is valid as a JS date, but PostgreSQL has no year 0, so it became a DB error 500. Study logs had the same problem.
+  - I made the shared `isCalendarDate` reject dates before 0001-01-01. It applies to study logs too.
+  - I added cases to the keyword body and lookup tests and to the study log tests. I confirmed 3 fail before the fix and pass after the fix.
+- low (applied): I wrote in the docs that if you give `date`, the other conditions are ignored, and fixed it with an integration test.
+- low (kept)
+  - An edit with an empty date moves it to today. It is the same rule as add and is in the docs.
+  - The one-line rule looks only at CR and LF. The Unicode line separators (U+2028/2029) hardly ever occur in real input.
 
-## 자동 코드 리뷰 2차
+## Automated code review, round 2
 
-별도 읽기 전용 리뷰 에이전트가 1차 반영과 최종 PR 전체를 다시 확인했다. 리뷰는 최대 2회이므로 3차 리뷰는 하지 않는다.
+A separate read-only review agent checked the first-round fixes and the whole final PR again. The review is limited to 2 rounds, so I do not do a third.
 
-- 연도 0000 거부는 정규식 검사 뒤의 문자열 비교라 숫자 순서와 같다. 호출하는 두 곳 모두 정규식을 먼저 거친다. 학습 기록에서 새로 거부되는 값은 원래 500이던 0000년뿐이라 회귀가 없다.
-- 코드 지적과 분리할 이슈는 없었다.
-- 참고: 키워드·메모·검색어의 NUL 문자는 500이 된다. 기존 #58(전 API 공통)에서 함께 고친다.
+- Rejecting the year 0000 is a string comparison after the regular expression check, so it is the same as numeric order. Both places that call it go through the regular expression first. The only value newly rejected in study logs is the year 0000, which was a 500 before, so there is no regression.
+- There were no code comments and no issue to split off.
+- Note: a NUL character in a keyword, note, or search term becomes a 500. It is fixed together in the existing #58 (common to all APIs).
 
-## 한계·후속
+## Limits and follow-up
 
-- 화면(빠른 입력·날짜별 목록·검색)은 #40.
-- 키워드를 교재·학습 기록과 연결하지 않는다.
-- 문자열의 NUL 문자 500(#58)은 이 API에도 해당한다.
+- The screen (quick input, list by date, search) is #40.
+- Keywords are not linked to textbooks or study logs.
+- The 500 for a NUL character in a string (#58) applies to this API too.

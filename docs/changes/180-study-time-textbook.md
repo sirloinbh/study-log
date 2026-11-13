@@ -1,58 +1,58 @@
-# #180 학습 시간 통계를 교재로 좁혀 보기
+# #180 Narrow the study time statistics to a textbook
 
-- 이슈: [#180](https://github.com/sirloinbh/study-log/issues/180)
-- 브랜치: `feat/180-study-time-textbook`
+- Issue: [#180](https://github.com/sirloinbh/study-log/issues/180)
+- Branch: `feat/180-study-time-textbook`
 
-## 목적
+## Purpose
 
-교재 필터가 "교재와 일정" 카드에만 있었다. 학습 시간 지표와 그래프는 기간과 학습 유형으로만 걸렀다. 2026-11-03에 사용자가 학습 시간도 교재로 좁혀 보기로 정했다(#8의 남은 일).
+The textbook filter existed only on the "Textbooks and schedules" card. The study time metrics and charts were filtered only by period and study type. On 2026-11-03, the user decided to narrow study time by textbook too (the remaining work of #8).
 
-## 변경
+## Changes
 
-- `backend/src/stats.ts`: `/api/stats/study-time`에 `textbookId`를 더했다.
-  - 주면 누적·기간 합계, 오늘, 평균, 일·주·월 묶음을 모두 그 교재의 학습 기록으로만 센다. "전체" 기간의 시작일도 그 교재의 첫 기록이다.
-  - 학습 유형과 함께 쓸 수 있다.
-  - 없는 교재는 404 "교재를 찾을 수 없습니다"를 돌려준다. 기록이 없는 교재는 0으로 답한다. ID 형식이 틀리면 400 "교재 ID가 올바르지 않습니다"이다. 형식 검사는 `/api/stats/textbooks`의 것을 함께 쓴다.
-  - 응답에 `textbookId`(없으면 `null`)를 더했다.
-- `frontend/src/study-stats.ts`: `studyTimePath`가 교재 ID를 받는다.
+- `backend/src/stats.ts`: added `textbookId` to `/api/stats/study-time`.
+  - When given, the cumulative and period totals, today, the average, and the day, week, and month groupings are all counted only from that textbook's study records. The start date of the "all" period is also that textbook's first record.
+  - It can be used together with the study type.
+  - A missing textbook returns 404 "교재를 찾을 수 없습니다" ("Textbook not found"). A textbook with no records answers 0. A wrong ID format gives 400 "교재 ID가 올바르지 않습니다" ("The textbook ID is not valid"). The format check is shared with `/api/stats/textbooks`.
+  - Added `textbookId` (`null` if none) to the response.
+- `frontend/src/study-stats.ts`: `studyTimePath` takes a textbook ID.
 - `frontend/src/stats.tsx`:
-  - 학습 유형 버튼 아래에 "교재" 선택 상자를 두었다. 교재를 고르면 지표 카드와 학습 시간 그래프가 그 교재 기준으로 바뀌고, "총 학습 시간" 카드에 교재 이름이 붙는다.
-  - 접근 이름은 "학습 시간 교재"이다. 아래 "교재와 일정" 카드의 "교재" 선택 상자와 구별하기 위해서이다.
-  - 교재 목록을 불러오지 못하면 "전체"만 남기고 "교재 목록을 불러오지 못해 교재로 좁혀 볼 수 없습니다"라고 알린다.
-  - 복습 완료율과 히트맵은 전처럼 거르지 않는다.
-- `docs/next-steps/README.md`: 끝난 #179, #180을 후보에서 지웠다.
+  - Put a "교재" ("Textbook") select box under the study type buttons. When you pick a textbook, the metric cards and the study time chart change to that textbook, and the textbook name is added to the "총 학습 시간" ("Total study time") card.
+  - The accessible name is "학습 시간 교재" ("Study time textbook"). This is to tell it apart from the "교재" select box of the "교재와 일정" ("Textbooks and schedules") card below.
+  - If the textbook list cannot be loaded, only "전체" ("All") remains, and it announces "교재 목록을 불러오지 못해 교재로 좁혀 볼 수 없습니다" ("Could not load the textbook list, so you cannot narrow by textbook").
+  - The review completion rate and the heatmap are not filtered, as before.
+- `docs/next-steps/README.md`: removed the finished #179 and #180 from the candidates.
 
-## 테스트
+## Tests
 
-- `backend/test/stats.integration.test.ts`의 `study time can be narrowed to one textbook`: 2095년 날짜와 이 테스트만의 교재 세 권으로 다음을 확인한다.
-  - 교재별 합계, 오늘, 누적, 공부한 날 수가 맞다. 학습 유형과 함께 걸러진다.
-  - "전체" 기간이 그 교재의 첫 기록에서 시작한다. 기록 없는 교재는 0이고 오늘 하루만 센다.
-  - 교재가 없으면 모든 기록을 세고 `textbookId`가 `null`이다.
-  - 없는 교재는 404, `0`, `abc`, `1.5`, 빈 값은 400이다.
-- `backend/test/stats.test.ts`: 교재를 주지 않으면 쿼리에 `null`이 넘어가는 것으로 기대값을 고쳤다.
-- `frontend/src/stats-textbook-filter.test.tsx`(새 파일) 다섯 개:
-  - 교재를 고르면 요청에 교재가 들어가고 그 교재의 시간과 이름이 보인다. 학습 유형·기간과 함께 바뀌고, "전체"로 돌아온다.
-  - 기록 없는 교재는 0분이다.
-  - 선택 상자의 이름이 "교재와 일정" 카드의 것과 겹치지 않는다.
-  - 교재 목록을 못 읽으면 이유를 알리고 "전체"만 남는다.
-  - 다른 곳에서 지운 교재는 오류를 보여 주고, "전체"로 돌아가면 사라진다.
+- `study time can be narrowed to one textbook` in `backend/test/stats.integration.test.ts`: with dates in 2095 and three textbooks only this test uses, it checks the following.
+  - The per-textbook total, today, cumulative, and number of days studied are right. It is filtered together with the study type.
+  - The "all" period starts at that textbook's first record. A textbook with no records is 0 and counts only today.
+  - If there is no textbook, all records are counted and `textbookId` is `null`.
+  - A missing textbook is 404, and `0`, `abc`, `1.5`, and an empty value are 400.
+- `backend/test/stats.test.ts`: fixed the expected value so `null` is passed to the query when no textbook is given.
+- `frontend/src/stats-textbook-filter.test.tsx` (a new file), five tests:
+  - Picking a textbook puts the textbook in the request and shows that textbook's time and name. It changes together with the study type and period, and goes back with "전체".
+  - A textbook with no records is 0 minutes.
+  - The select box name does not collide with that of the "교재와 일정" card.
+  - If the textbook list cannot be read, it announces the reason and only "전체" remains.
+  - A textbook deleted elsewhere shows an error, and it goes away when you go back to "전체".
 
-## 검증
+## Verification
 
-- headless Chrome(DevTools 프로토콜)으로 PC 1440×900과 모바일 390×844에서 20개 항목을 확인했다. 테스트 DB에 교재 두 권과 오늘 기록 세 개(교재별 90분, 45분, 교재 없는 20분)를 넣고 `npm run dev`로 띄웠다.
-  - 전체 2시간 35분, 선형대수 1시간 30분, 미적분 45분으로 바뀌고 "전체"로 돌아오는 것을 확인했다.
-  - 그래프가 그려지고 요약 문장도 교재 기준(1시간 30분)인 것을 확인했다.
-  - 가로 스크롤이 없고, 선택 상자가 내용 폭 안에 있으며 높이가 36px이다.
-  - 첫 실행의 "그래프가 계속 보임" 항목은 확인 스크립트의 선택자가 틀려 실패했다. 스크린샷으로 그래프 카드가 있는 것을 보고, 막대가 그려지는지 기다리도록 고쳐 다시 실행했다.
-  - 확인한 뒤 넣은 행을 지웠다. `textbooks`, `study_logs`, `schedules`는 모두 0행이다.
-- `TEST_DATABASE_URL`을 설정한 `npm run check`: 통과(exit 0).
-  - 백엔드 425개 통과(건너뜀 0).
-  - 프런트 214개 통과, 건너뜀 2개(중앙 표준의 다크 전용 앱 테스트).
-  - 스킬 4개 통과.
-- `npm run standards:check` 통과.
+- With headless Chrome (the DevTools protocol), I checked 20 items at PC 1440×900 and mobile 390×844. I put two textbooks and three records for today into the test DB (90 minutes and 45 minutes per textbook, and 20 minutes with no textbook) and started it with `npm run dev`.
+  - I confirmed it changes to 2 hours 35 minutes for all, 1 hour 30 minutes for linear algebra, and 45 minutes for calculus, and goes back to "전체".
+  - I confirmed the chart is drawn and the summary sentence is also based on the textbook (1 hour 30 minutes).
+  - There is no horizontal scroll, and the select box is within the content width with a height of 36px.
+  - In the first run, the item "the chart stays visible" failed because a selector in the check script was wrong. I saw in a screenshot that the chart card was there, fixed it to wait until the bars are drawn, and ran again.
+  - After checking, I deleted the rows I had put in. `textbooks`, `study_logs`, and `schedules` are all 0 rows.
+- `npm run check` with `TEST_DATABASE_URL` set: passed (exit 0).
+  - Backend 425 passed (0 skipped).
+  - Frontend 214 passed, 2 skipped (the dark-only app tests from the central standards).
+  - Skills 4 passed.
+- `npm run standards:check` passed.
 
-## 리뷰
+## Review
 
-1차 리뷰에서 코드와 테스트의 결함은 없었다. SQL 인자, 히트맵 호출부, 교재 기준의 "전체" 시작일과 누적, 요청 경로별 캐시, 기존 목 서버의 처리를 확인했다. `docs/next-steps/README.md`가 아직 병합하지 않은 #180을 "병합했다"고 적은 것만 고쳤다.
+The first review found no defects in the code or the tests. I checked the SQL arguments, the heatmap call site, the "all" start date and the cumulative figure by textbook, the cache per request path, and how the existing mock server handles it. I only fixed that `docs/next-steps/README.md` wrote that the not yet merged #180 was "merged".
 
-2차 리뷰에서 1차 지적이 고쳐진 것과 새 문장이 사실에 맞는 것을 확인했고, 남은 결함은 없었다. 이 기록의 검증 항목에 빠져 있던 `npm run check`와 `standards:check` 결과도 함께 적었다.
+In the second review I confirmed that the first-round comment was fixed and that the new sentence matches the facts, and no defects remained. I also wrote the `npm run check` and `standards:check` results that were missing from this record's verification section.

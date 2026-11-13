@@ -1,51 +1,51 @@
-# #179 일정 이름을 화면에서 고칠 수 있게 하기
+# #179 Let the schedule name be edited on the screen
 
-- 이슈: [#179](https://github.com/sirloinbh/study-log/issues/179)
-- 브랜치: `feat/179-schedule-rename`
+- Issue: [#179](https://github.com/sirloinbh/study-log/issues/179)
+- Branch: `feat/179-schedule-rename`
 
-## 목적
+## Purpose
 
-일정은 만든 뒤 이름만 고칠 수 있지만(`docs/decisions/schedule-rules.md` 6장), API(`PUT /api/schedules/:id`)만 있고 화면이 없었다. 2026-11-03에 사용자가 화면을 만들기로 정했다.
+After a schedule is created, only the name can be edited (chapter 6 of `docs/decisions/schedule-rules.md`), but only the API (`PUT /api/schedules/:id`) existed and there was no screen. On 2026-11-03, the user decided to build the screen.
 
-## 변경
+## Changes
 
 - `frontend/src/schedules.tsx`:
-  - "날짜별 일정" 카드의 제목 옆에 "이름 수정" 버튼을 두었다. 누르면 제목 자리에 "새 일정 이름" 입력칸과 "이름 저장", "취소"(접근 이름 "이름 수정 취소") 버튼이 나온다. 만들기 폼의 "일정 이름", 날짜 옮기기의 "취소"와 이름이 겹치지 않게 했다.
-  - 저장하면 서버가 돌려준 일정으로 제목과 목록의 이름을 바로 바꾸고 "일정 이름을 바꿨습니다"를 알린 뒤 제목으로 포커스를 옮긴다. 목록을 다시 읽지 못해도 목록의 이름은 바뀐다. 취소하면 아무것도 보내지 않고 "이름 수정" 버튼으로 돌아간다.
-  - 서버와 같이 앞뒤 공백을 빼고 검사한다. 공백뿐인 이름은 "일정 이름을 입력하세요", 200자를 넘는 이름은 "일정 이름 길이는 200자 이하여야 합니다"로 보내기 전에 막는다. 입력칸에 글자 수 제한(`maxLength`)을 두지 않아, 긴 이름을 말없이 자르지 않는다.
-  - 이 안내와 서버의 거부는 폼 안, 입력칸 바로 아래에 보여 주고 입력칸에 `aria-invalid`, `aria-describedby`로 연결한다. 날짜 옮기기의 안내와 따로 두어, 날짜를 옮겨도 이름 안내가 지워지지 않는다. 입력칸과 값은 그대로 둔다.
-  - 다른 곳에서 지운 일정(404)은 목록 카드에 알리고 폼을 닫는다.
-  - 다른 일정을 고르거나, 새 일정을 만들거나, 일정을 지우면 열려 있던 이름 수정을 닫는다.
-- `frontend/src/style.css`: 이름 수정 폼의 배치를 더했다. 좁은 화면에서는 버튼이 입력칸 아래로 내려간다.
+  - Put an "이름 수정" ("Edit name") button next to the title of the "날짜별 일정" ("Schedule by date") card. Pressing it shows the "새 일정 이름" ("New schedule name") input in place of the title and the "이름 저장" ("Save name") and "취소" ("Cancel", accessible name "이름 수정 취소") buttons. The names do not collide with "일정 이름" ("Schedule name") of the create form or "취소" of moving dates.
+  - When you save, it changes the title and the name in the list right away with the schedule the server returned, announces "일정 이름을 바꿨습니다" ("The schedule name was changed"), and moves focus to the title. Even if the list cannot be read again, the name in the list changes. If you cancel, it sends nothing and goes back to the "이름 수정" button.
+  - It trims leading and trailing spaces and validates, like the server. A name of only spaces is blocked before sending with "일정 이름을 입력하세요" ("Enter a schedule name"), and a name over 200 characters with "일정 이름 길이는 200자 이하여야 합니다" ("The schedule name must be 200 characters or fewer"). The input has no character limit (`maxLength`), so a long name is not silently cut.
+  - This notice and the server's rejection are shown inside the form, right under the input, and linked to the input with `aria-invalid` and `aria-describedby`. They are kept separate from the notice of moving dates, so moving dates does not erase the name notice. The input and the value are left as they are.
+  - A schedule deleted elsewhere (404) is reported on the list card and the form is closed.
+  - If you pick another schedule, create a new schedule, or delete a schedule, the open name edit is closed.
+- `frontend/src/style.css`: added the layout of the name edit form. On a narrow screen the buttons go below the input.
 
-백엔드와 DB는 바꾸지 않았다. 이름의 길이와 공백 처리는 서버가 이미 검사한다.
+I did not change the backend or the DB. The server already validates the name's length and whitespace handling.
 
-## 테스트
+## Tests
 
-`frontend/src/schedules.test.tsx`에 `renaming a schedule (#179)` 여덟 개를 더했다.
+I added eight `renaming a schedule (#179)` tests to `frontend/src/schedules.test.tsx`.
 
-- 새 이름을 저장하면 요청이 하나 가고, 제목과 목록이 바뀌며 제목에 포커스가 간다.
-- 저장 뒤 목록을 다시 읽지 못해도 목록에 새 이름이 보인다.
-- 취소하면 요청이 없고 버튼으로 포커스가 돌아간다.
-- 공백뿐인 이름과 201자 이름은 요청 없이 막는다. 안내는 입력칸의 설명으로 연결되고, 다시 입력하면 사라진다. 201자를 넣어도 잘리지 않고, 앞뒤 공백을 빼면 200자인 이름은 저장된다.
-- 400 거부는 폼 안에 안내를 보여 주고 입력칸과 값을 남긴다.
-- 404는 목록 카드에 알리고 "내 일정" 제목으로 포커스를 옮긴다.
-- 다른 일정을 고르면 이름 수정이 닫히고, 돌아와도 닫혀 있다.
-- 이름 수정과 날짜 옮기기를 함께 열면 "취소" 버튼이 하나뿐이다. 날짜 옮기기를 열어도 이름 안내가 남는다.
+- Saving a new name sends one request, the title and the list change, and focus goes to the title.
+- Even if the list cannot be read again after saving, the new name shows in the list.
+- If you cancel, there is no request and focus goes back to the button.
+- A name of only spaces and a 201-character name are blocked without a request. The notice is linked as the description of the input and disappears when you type again. Even if you enter 201 characters it is not cut, and a name that is 200 characters after trimming spaces is saved.
+- A 400 rejection shows a notice inside the form and keeps the input and the value.
+- A 404 is reported on the list card and focus moves to the "내 일정" ("My schedules") title.
+- If you pick another schedule, the name edit closes, and it is still closed when you come back.
+- If you open name edit and moving dates together, there is only one "취소" button. Even if you open moving dates, the name notice stays.
 
-## 검증
+## Verification
 
-- headless Chrome(DevTools 프로토콜)으로 PC 1440×900과 모바일 390×844에서 24개 항목을 확인했다(리뷰 반영 후 다시 실행). 빈 이름 안내가 입력칸 아래·카드 안에 있고 입력칸에 연결되는 것도 포함한다. 테스트 DB에 일정 하나를 넣고 `npm run dev`로 띄웠다.
-  - 버튼, 입력칸 포커스와 현재 이름, 저장 안내, 제목과 목록의 변경, 제목 포커스를 봤다.
-  - 새로고침 후에도 이름이 유지되는 것을 봤다.
-  - 가로 스크롤이 없고, 폼과 버튼이 카드 안에 있으며, 버튼 높이가 44px인 것을 확인했다.
-  - 모바일에서는 띄어쓰기가 있는 긴 이름(70자가량)이 제목과 목록에서 줄바꿈되는 것을 스크린샷으로 확인했다.
-  - 확인한 뒤 넣은 일정을 지웠다. `schedules`, `holidays`, `holiday_years`는 모두 0행이다.
-- `TEST_DATABASE_URL`을 설정한 `npm run check`: 통과(exit 0).
-  - 백엔드 424개 통과(건너뜀 0).
-  - 프런트 206개 통과, 건너뜀 2개(중앙 표준의 다크 전용 앱 테스트).
-  - 스킬 4개 통과.
-  - 그 전 실행에서는 이 변경과 관계없는 `frontend/src/stats-review.test.tsx`의 `picking a period asks for its reviews too`가 시간 초과로 실패했다(#160과 같은 테스트). 그 파일만 실행하면 8개 모두 통과했고, 전체 검사를 다시 실행하면 통과했다.
-- `npm run standards:check` 통과.
+- With headless Chrome (the DevTools protocol), I checked 24 items at PC 1440×900 and mobile 390×844 (run again after the review fixes). It includes the empty name notice being under the input and inside the card, and being linked to the input. I put one schedule into the test DB and started it with `npm run dev`.
+  - I looked at the button, the input focus and the current name, the save notice, the change of the title and the list, and the title focus.
+  - I saw that the name is kept after a refresh.
+  - I confirmed there is no horizontal scroll, the form and buttons are inside the card, and the button height is 44px.
+  - On mobile, I confirmed with a screenshot that a long name with spaces (about 70 characters) wraps in the title and the list.
+  - After checking, I deleted the schedule I had put in. `schedules`, `holidays`, and `holiday_years` are all 0 rows.
+- `npm run check` with `TEST_DATABASE_URL` set: passed (exit 0).
+  - Backend 424 passed (0 skipped).
+  - Frontend 206 passed, 2 skipped (the dark-only app tests from the central standards).
+  - Skills 4 passed.
+  - In the run before that, `picking a period asks for its reviews too` in `frontend/src/stats-review.test.tsx`, which is unrelated to this change, failed with a timeout (the same test as #160). Running only that file passed all 8, and running the full check again passed.
+- `npm run standards:check` passed.
 
-2차 리뷰에서 네 지적이 반영된 것과 화면 검사가 서버 검사(앞뒤 공백을 뺀 1~200자)와 같은 것을 확인했고, 남은 결함은 없었다. 공백뿐인 이름을 연달아 보내면 같은 안내가 다시 읽히지 않는다는 점이 나왔지만, 만들기 폼과 같은 기존 방식이라 고치지 않았다.
+In the second review I confirmed that the four comments were applied and that the screen validation matches the server validation (1 to 200 characters after trimming spaces), and no defects remained. A point came up that sending a name of only spaces repeatedly does not read the same notice again, but it is the existing way, the same as the create form, so I did not fix it.

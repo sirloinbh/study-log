@@ -1,64 +1,64 @@
-# #43 오늘의 복습 목록과 완료 체크
+# #43 Today's review list and the completion check
 
-- 이슈: [#43](https://github.com/sirloinbh/study-log/issues/43)
-- 브랜치: `feat/43-today-reviews`
-- 규칙: [복습 주기 규칙](../decisions/review-rules.md)
+- Issue: [#43](https://github.com/sirloinbh/study-log/issues/43)
+- Branch: `feat/43-today-reviews`
+- Rules: [review interval rules](../decisions/review-rules.md)
 
-## 목적
+## Purpose
 
-오늘 복습할 내용을 보여 주고, 완료할 때까지 목록에 남긴다. 완료하면 다음 회차를 만든다.
+Show what to review today, and keep it in the list until it is completed. When it is completed, create the next round.
 
-## 변경
+## Changes
 
 - `backend/src/reviews.ts`:
-  - `GET /api/reviews/today`: 예정일이 오늘이거나 지난 미완료 회차를 오래된 순으로 준다. 오늘 날짜(`serviceDate()`)도 함께 준다.
-  - `POST /api/reviews/:id/complete`: 회차를 완료하고 다음 회차를 만든다. 예정일은 완료일에 간격 2·4·7·16일을 더한 날이다. 5회차면 다음 회차가 없다.
-- `frontend/src/reviews.tsx`, `frontend/src/review.ts`: 복습 화면. 회차, 지난 일수, 학습일과 예정일을 보여 준다.
-- `frontend/src/app.tsx`: 주 메뉴에 "복습"(`/reviews`)을 추가했다.
+  - `GET /api/reviews/today`: returns the incomplete rounds whose due date is today or earlier, oldest first. It also returns today's date (`serviceDate()`).
+  - `POST /api/reviews/:id/complete`: completes the round and creates the next round. The due date is the completion date plus the interval of 2, 4, 7, or 16 days. For round 5, there is no next round.
+- `frontend/src/reviews.tsx`, `frontend/src/review.ts`: the reviews screen. It shows the round, the days overdue, and the study date and due date.
+- `frontend/src/app.tsx`: added "복습" ("Reviews", `/reviews`) to the main menu.
 
-## 결정한 점
+## Decisions
 
-- 이미 완료한 회차를 다시 완료하면 409, 없으면 404로 답한다. 규칙상 완료는 되돌리지 않으므로 재완료로 날짜가 바뀌면 안 된다.
-- 완료는 확인 단계 없이 한 번에 처리한다. 자주 쓰는 동작이고, 잘못 눌렀으면 다음 회차 날짜를 #45의 수동 조정으로 고친다. #45 전까지는 고칠 방법이 없다. 5회차는 다음 회차가 없어 #45 뒤에도 고칠 수 없다.
-- 교재가 없는 기록의 제목은 "날짜 학습"이다. 메모는 Markdown이라 제목으로 자르지 않고, 학습 기록 화면과 같은 방식으로 제목 아래에 보여 준다.
-- 완료 처리는 학습 기록 행을 먼저 잠근다. 학습 기록 저장과 잠금 순서를 맞춰 서로 기다리다 멈추지 않게 한다.
-- 예정일 전의 회차는 목록에 나오지 않는다. API로 직접 완료하면 처리된다. 조회 범위는 #45에서 다룬다.
+- Completing a round that is already completed answers 409, and a missing one answers 404. By the rules, completion is not undone, so completing again must not change dates.
+- Completion is handled at once with no confirmation step. It is a frequent action, and if you pressed it by mistake, you fix the next round's date with the manual adjustment in #45. Until #45, there is no way to fix it. For round 5 there is no next round, so it cannot be fixed even after #45.
+- The title of a record with no textbook is "날짜 학습" ("Study on a date"). The note is Markdown, so it is not cut into a title, and it is shown under the title the same way as on the study log screen.
+- The completion handling locks the study log row first. It matches the lock order with saving a study log so they do not wait on each other and stall.
+- Rounds before their due date do not appear in the list. Completing directly through the API works. The lookup range is handled in #45.
 
-## 테스트
+## Tests
 
-- `backend/test/today-reviews.integration.test.ts`: 목록 범위와 순서, 미완료 유지, 5회차까지의 날짜, 늦은 완료, 중복 완료, 기록 저장 시 2회차 보존, 잠금 대기 중 완료 해제와 삭제, 404, 400.
-- `frontend/src/reviews.test.tsx`: 지난 일수, 제목 규칙, Markdown 메모, 빈 목록, 완료, 마지막 회차, 실패 시 포커스, 404·409, 다시 불러오기 실패, 같은 문구 반복, 빠른 두 번 클릭, 불러오기 실패.
-- `frontend/src/app.test.tsx`: 메뉴와 주소에 복습을 더했다.
+- `backend/test/today-reviews.integration.test.ts`: the list range and order, keeping incomplete ones, the dates up to round 5, a late completion, a duplicate completion, keeping round 2 when a record is saved, un-completing and deleting during a lock wait, 404, and 400.
+- `frontend/src/reviews.test.tsx`: days overdue, the title rule, a Markdown note, an empty list, completion, the last round, focus on failure, 404 and 409, a failed reload, repeating the same message, a rapid double click, and a load failure.
+- `frontend/src/app.test.tsx`: added reviews to the menu and the address.
 
-## 리뷰
+## Review
 
-1차 리뷰에서 잠금과 다음 회차 로직의 결함은 없었고, 다음을 이 PR에서 고쳤다.
+In the first review there were no defects in the lock and next-round logic, and I fixed the following in this PR.
 
-- 긴 제목이 카드 밖으로 넘칠 수 있어 `.log-date`에 줄바꿈을 더했다.
-- 메모가 Markdown 원문으로 보이고, 교재 없는 기록은 메모 둘째 줄부터 보이지 않았다. `Memo`로 보여 주고 제목은 날짜로 바꿨다. 제목을 자르지 않으므로 이모지가 깨지는 문제도 사라졌다.
-- 같은 완료 문구가 반복되면 스크린 리더가 읽지 않아, 요청 시작 때 문구를 지운다.
-- 실패 뒤 버튼이 사라지면 포커스가 제목으로 간다.
-- 잠금 대기, 2회차 보존, 프런트 실패 경로의 테스트를 더했다.
-- 5회차 완료는 #45 뒤에도 고칠 수 없다는 점을 적었다.
+- A long title could overflow the card, so I added line wrapping to `.log-date`.
+- The note showed as raw Markdown, and for a record with no textbook, the note was not visible from its second line. I show it as `Memo` and changed the title to the date. The title is not cut, so the problem of breaking emoji is gone too.
+- If the same completion message repeats, the screen reader does not read it, so I clear the message when a request starts.
+- If the button disappears after a failure, focus goes to the title.
+- I added tests for the lock wait, keeping round 2, and the frontend failure paths.
+- I wrote that a round 5 completion cannot be fixed even after #45.
 
-2차 리뷰는 보완점이 없었다. 리뷰에서 긴 제목 확인이 한글이라 줄바꿈 수정의 효과를 보여 주지 못한다는 언급이 있어, 영문 제목으로 다시 확인했다.
+The second review had nothing to fix. In the review, it was mentioned that checking the long title in Korean could not show the effect of the line wrapping fix, so I checked again with an English title.
 
-CodeQL이 `GET /api/reviews/today`에 속도 제한이 없다고 경고했다(`js/missing-rate-limiting`). 사용자가 오탐 처리 대신 Express 제한을 추가하기로 정해 [#137](https://github.com/sirloinbh/study-log/issues/137)로 처리하고 이 브랜치에 합쳤다.
+CodeQL warned that `GET /api/reviews/today` has no rate limit (`js/missing-rate-limiting`). The user decided to add an Express limit instead of dismissing it as a false positive, so I handled it in [#137](https://github.com/sirloinbh/study-log/issues/137) and merged it into this branch.
 
-## 검증
+## Verification
 
-`TEST_DATABASE_URL`을 설정한 `npm run check`가 통과했다. `origin/main`을 합친 뒤 백엔드 296건, 프런트 66건, 스킬 4건이 통과했다. 건너뜀은 프런트 2건으로, 중앙 표준에서 온 다크 전용 앱 테스트이다. `npm run standards:check`도 통과했다.
+`npm run check` with `TEST_DATABASE_URL` set passed. After merging `origin/main`, backend 296, frontend 66, and skills 4 passed. The skips were 2 frontend tests, the dark-only app tests that came from the central standards. `npm run standards:check` passed too.
 
-## 브라우저 확인
+## Browser check
 
-테스트 DB에 연결한 개발 서버를 headless Chrome으로 PC(1440×900)와 모바일(390×844)에서 확인했다. 확인 뒤 테스트 데이터를 지웠다.
+With a dev server connected to the test DB, I checked with headless Chrome at PC (1440×900) and mobile (390×844). I deleted the test data after checking.
 
-- 지난 회차에 "3일 지남"이 표시되고 목록에 남는다.
-- 완료하면 목록에서 빠지고, 오늘 + 2일의 다음 복습 날짜가 안내되며, 포커스가 제목으로 옮겨 간다.
-- 모두 완료하면 "오늘 복습할 내용이 없습니다"가 나온다.
-- 가로 스크롤이 없고, 모바일 버튼 높이는 44px이다. 공백 없는 120자 영문 교재 제목도 카드 안에 머문다.
-- 메모의 Markdown이 굵은 글씨로 표시된다.
+- "3일 지남" ("3 days overdue") is shown on a past round, and it stays in the list.
+- When completed, it leaves the list, the next review date of today + 2 days is announced, and focus moves to the title.
+- When all are completed, "오늘 복습할 내용이 없습니다" ("There is nothing to review today") appears.
+- There is no horizontal scroll, and the mobile button height is 44px. A 120-character English textbook title with no spaces also stays inside the card.
+- The Markdown in the note is shown in bold.
 
 ![PC](assets/43-pc-1440x900.png)
 
-![모바일](assets/43-mobile-390x844.png)
+![Mobile](assets/43-mobile-390x844.png)

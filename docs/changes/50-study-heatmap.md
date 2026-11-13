@@ -1,85 +1,85 @@
-# #50 학습 히트맵 (GitHub 기여도 스타일)
+# #50 Study heatmap (GitHub contribution style)
 
-- 이슈: [#50](https://github.com/sirloinbh/study-log/issues/50) (상위 #8)
-- 브랜치: `feat/50-study-heatmap`
-- 선행: #47 학습 시간 집계 API, #48 통계 대시보드 (병합 완료)
+- Issue: [#50](https://github.com/sirloinbh/study-log/issues/50) (parent #8)
+- Branch: `feat/50-study-heatmap`
+- Prerequisites: #47 study time aggregation API, #48 statistics dashboard (merged)
 
-## 목적
+## Purpose
 
-최근 1년의 날짜별 학습량을 한눈에 본다.
+See the amount of study per date over the last year at a glance.
 
-## 결정
+## Decisions
 
-정해지지 않은 규칙은 아래 기준으로 정했다. [이슈 코멘트](https://github.com/sirloinbh/study-log/issues/50#issuecomment-6357805533)에도 남겼다.
+I set the undecided rules by the criteria below. I also left them in an [issue comment](https://github.com/sirloinbh/study-log/issues/50#issuecomment-6357805533).
 
-- **범위:** 오늘이 든 주를 포함해 최근 53주(월요일 시작)다. 첫 칸은 52주 전 월요일이다. 집계 대상은 #47과 같다(`Asia/Seoul`, "계획" 기록과 미래 날짜 제외).
-- **강도 구간(고정 기준):** 0분 / 30분 미만 / 30분~1시간 / 1~2시간 / 2시간 이상, 5단계.
-  - 가장 많이 공부한 날에 맞춘 상대 기준은 쓰지 않았다. 같은 색이 언제나 같은 학습량을 뜻하도록 하기 위해서다.
-- **위치:** 통계 화면의 지표 카드 아래 "최근 1년" 카드.
+- **Range:** the last 53 weeks including the week that has today (the week starts on Monday). The first cell is the Monday 52 weeks ago. What is counted is the same as #47 (`Asia/Seoul`, excluding "planned" records and future dates).
+- **Intensity levels (fixed criteria):** 0 minutes / under 30 minutes / 30 minutes to 1 hour / 1 to 2 hours / 2 hours or more, 5 levels.
+  - I did not use a relative criterion fitted to the day with the most study. This is so the same color always means the same amount of study.
+- **Location:** the "최근 1년" ("Last year") card under the metric cards on the statistics screen.
 
-## 변경
+## Changes
 
 - `backend/src/stats.ts`
-  - `GET /api/stats/heatmap` → `{ from, to, daily }`. `daily`는 시작 월요일부터 오늘까지의 모든 날짜다(빈 날 0).
-  - #47의 일별 쿼리를 `dailyMinutes`로 빼서 두 API가 같이 쓴다. 집계 규칙이 어긋나지 않는다.
-  - `heatmapWeeks`(53), `heatmapStart(today)`
-- `frontend/src/Heatmap.tsx`(새 파일), `frontend/src/study-stats.ts`, `frontend/src/Stats.tsx`
-  - 주마다 한 열(월요일이 위)이다. 이번 주의 남은 날은 빈칸이다.
-  - 그 주에 1일이 있으면 열 위에 "N월"을 표시한다. 왼쪽에 요일(월·수·금)을 표시한다.
-  - 각 칸에 마우스를 올리면 "YYYY-MM-DD: N시간 M분"이 나온다(`title`).
-  - 화면 낭독기에는 히트맵 전체를 그림 하나(`role="img"`)로 알린다: "기간, N일 공부, 총 시간". 칸 하나하나는 읽지 않는다.
-  - 카드 위에 "N일 공부 · 총 시간", 아래에 강도 범례를 둔다.
-  - 함수: `heatLevel`(구간), `heatWeeks`(주 단위 묶기), `monthLabel`
+  - `GET /api/stats/heatmap` -> `{ from, to, daily }`. `daily` is every date from the start Monday to today (0 on empty days).
+  - I moved the daily query of #47 into `dailyMinutes` so the two APIs share it. The counting rules do not drift apart.
+  - `heatmapWeeks` (53), `heatmapStart(today)`
+- `frontend/src/Heatmap.tsx` (a new file), `frontend/src/study-stats.ts`, `frontend/src/Stats.tsx`
+  - One column per week (Monday on top). The remaining days of this week are blank cells.
+  - If that week has the 1st, "N월" ("Month N") is shown above the column. The weekdays (Mon, Wed, Fri) are shown on the left.
+  - When you hover over each cell, "YYYY-MM-DD: N hours M minutes" appears (`title`).
+  - For screen readers, the whole heatmap is announced as one picture (`role="img"`): "period, N days studied, total time". Each cell is not read.
+  - Above the card there is "N days studied · total time", and below it the intensity legend.
+  - Functions: `heatLevel` (the levels), `heatWeeks` (grouping by week), `monthLabel`
 - `frontend/src/style.css`
-  - 11px 칸. PC에서는 53주가 한 화면에 들어간다.
-  - 모바일에서는 카드 안에서 가로로 스크롤하고, 처음에는 최근 주(오른쪽 끝)가 보인다. 요일 열은 왼쪽에 고정된다(`position: sticky`).
-  - 히트맵 카드에 `min-width: 0`을 줬다. 없으면 통계 화면의 격자 항목이 히트맵 폭(757px)만큼 늘어나 모바일에서 페이지 전체가 가로로 스크롤됐다.
+  - 11px cells. On PC, 53 weeks fit on one screen.
+  - On mobile, it scrolls horizontally inside the card, and at first the recent weeks (the right end) are visible. The weekday column is fixed on the left (`position: sticky`).
+  - I gave the heatmap card `min-width: 0`. Without it, the grid item of the statistics screen grew to the heatmap width (757px), and the whole page scrolled horizontally on mobile.
 
-## 테스트
+## Tests
 
-- `backend/test/stats.test.ts`: 히트맵 시작일. 금요일 기준으로 52주 전 월요일이고, 월요일이어도 53열이다.
-- `backend/test/stats.integration.test.ts`(실제 DB): "오늘" 2096-05-16(수)에서 다음을 확인한다.
-  - 범위 2095-05-16 ~ 오늘, 52주 + 3일
-  - 오늘·3월·1월 값
-  - 미래 기록 없음
+- `backend/test/stats.test.ts`: the heatmap start date. It is the Monday 52 weeks ago on a Friday basis, and it is 53 columns even on a Monday.
+- `backend/test/stats.integration.test.ts` (a real DB): with "today" 2096-05-16 (Wed), it checks the following.
+  - The range 2095-05-16 to today, 52 weeks + 3 days
+  - The values of today, March, and January
+  - No future records
 - `backend/test/stats-ui.test.ts`
-  - 2주 데이터로 열 2개, 칸마다 구간 단계(경계값 10·30·59·60·119·120분), 이번 주 남은 날 빈칸
-  - 툴팁, 화면 낭독기용 요약, 상단 요약, 범례
-  - 히트맵 불러오기 실패 시 오류를 보여 주고, 지표 카드는 그대로 남는지
-  - 구간 경계 단위 테스트(0·1·29·30·59·60·119·120·600분), 주 묶기, 월 표시
+  - 2 columns with 2 weeks of data, the level of each cell (boundary values 10, 30, 59, 60, 119, and 120 minutes), and blank cells for the remaining days of this week
+  - The tooltip, the summary for screen readers, the top summary, and the legend
+  - If loading the heatmap fails, it shows an error and the metric cards stay as they are
+  - Unit tests for the level boundaries (0, 1, 29, 30, 59, 60, 119, 120, 600 minutes), grouping by week, and the month label
 
-## 검증
+## Verification
 
-| 명령                   | 환경                                                        | 결과                                                        |
-| ---------------------- | ----------------------------------------------------------- | ----------------------------------------------------------- |
-| `npm run check`        | 로컬, `TEST_DATABASE_URL` 미설정                            | exit 0. backend tests 191, pass 178, fail 0, skipped 13(DB) |
-| `npm test` (기본 병렬) | 로컬 Docker `postgres:17-alpine`, 마이그레이션 001~009 적용 | exit 0. tests 191, pass 191, fail 0, skipped 0              |
+| Command                       | Environment                                                      | Result                                                       |
+| ----------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------ |
+| `npm run check`               | Local, `TEST_DATABASE_URL` not set                               | exit 0. backend tests 191, pass 178, fail 0, skipped 13 (DB) |
+| `npm test` (default parallel) | Local Docker `postgres:17-alpine`, migrations 001 to 009 applied | exit 0. tests 191, pass 191, fail 0, skipped 0               |
 
-- 브라우저: Playwright(Chromium)로 Vite 개발 서버와 이 브랜치 API(로컬 Docker 테스트 DB)를 띄워 확인했다. 지난 1년에 걸쳐 완료 기록 161건을 고르게 넣었다.
-  - API: 2025-10-20 ~ 2026-10-23, 369일, 165일 공부
-  - 모바일 390×844
-    - 53열, 처음에 오른쪽 끝(최근 주)이 보임
-    - 요일 열 고정
-    - 페이지 가로 스크롤 없음. 처음 구현에서는 카드가 늘어나 페이지가 스크롤됐고, 위의 `min-width: 0`으로 고쳤다.
-  - PC 1440×900: 53주가 스크롤 없이 한 화면에 들어간다.
-  - 스크린샷: [모바일 390×844 (히트맵 카드)](assets/50-mobile-390x844.png), [PC 1440×900](assets/50-pc-1440x900.png)
+- Browser: I checked by starting the Vite dev server and this branch's API (a local Docker test DB) with Playwright (Chromium). I put in 161 completed records spread evenly across the past year.
+  - API: 2025-10-20 to 2026-10-23, 369 days, 165 days studied
+  - Mobile 390×844
+    - 53 columns, and at first the right end (the recent weeks) is visible
+    - The weekday column is fixed
+    - No horizontal page scroll. In the first implementation the card grew and the page scrolled, and I fixed it with the `min-width: 0` above.
+  - PC 1440×900: 53 weeks fit on one screen with no scroll.
+  - Screenshots: [mobile 390×844 (heatmap card)](assets/50-mobile-390x844.png), [PC 1440×900](assets/50-pc-1440x900.png)
 
-## 자동 코드 리뷰 1차
+## Automated code review, round 1
 
-별도 읽기 전용 리뷰 에이전트가 검토했다. 지적이 없어 2차 리뷰는 하지 않는다. 분리할 이슈도 없다.
+A separate read-only review agent reviewed it. There were no comments, so I do not do a second review. There is no issue to split off either.
 
-- 확인된 사항
-  - 시작일이 항상 월요일이라 주 묶기가 맞다. 빈 시리즈가 생기지 않는다.
-  - React key가 겹치지 않는다.
-  - 일별 쿼리를 뺀 뒤에도 #47 API 동작이 같다.
-  - 스크롤 effect가 안전하다. 접근성 처리(그림 하나 + 숨긴 칸, 범례)가 적절하다.
-  - 고정 요일 열의 배경이 불투명하다.
-- 참고(유지)
-  - 스크롤 대상을 id로 찾는다. 히트맵은 한 화면에 하나뿐이라 겹치지 않는다.
-  - 범례 목록은 `list-style: none`이라 Safari 화면 낭독기에서 목록으로 읽히지 않을 수 있다.
-  - 월 표시가 이웃 주끼리 겹칠 수 있다는 지적은 실제로 생기지 않는다. 매달 1일은 4주 이상 떨어져 있어 이웃한 두 주에 함께 올 수 없다.
+- Confirmed points
+  - The start date is always a Monday, so grouping by week is right. No empty series appear.
+  - React keys do not collide.
+  - Even after extracting the daily query, the #47 API behaves the same.
+  - The scroll effect is safe. The accessibility handling (one picture + hidden cells, the legend) is appropriate.
+  - The background of the fixed weekday column is opaque.
+- Note (kept)
+  - The scroll target is found by id. There is only one heatmap on a screen, so they do not collide.
+  - The legend list is `list-style: none`, so it may not be read as a list by a Safari screen reader.
+  - The point that month labels could overlap between neighboring weeks does not actually happen. The 1st of each month is at least 4 weeks apart, so it cannot fall in two neighboring weeks at once.
 
-## 한계·후속
+## Limits and follow-up
 
-- 칸별 값은 마우스 툴팁으로만 볼 수 있다. 터치 기기에서 칸을 눌러 값을 보는 기능은 없다.
-- 모바일에서 요일 열 뒤로 지나가는 월 이름은 일부만 보일 수 있다.
+- The value of each cell can be seen only in a mouse tooltip. There is no feature to tap a cell on a touch device to see its value.
+- On mobile, the month names that pass behind the weekday column may be only partly visible.

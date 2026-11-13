@@ -1,45 +1,45 @@
-# #142 복습 화면 목록을 탭으로 돌아올 때 다시 불러오기
+# #142 Reload the reviews screen list when you return to the tab
 
-- 이슈: [#142](https://github.com/sirloinbh/study-log/issues/142)
-- 브랜치: `feat/142-reviews-refresh-on-focus`
+- Issue: [#142](https://github.com/sirloinbh/study-log/issues/142)
+- Branch: `feat/142-reviews-refresh-on-focus`
 
-## 목적
+## Purpose
 
-상단 배지(#44)는 탭으로 돌아올 때 다시 세지만 복습 목록은 그대로여서, 복습 화면을 오래 열어 두면 둘의 수가 어긋났다.
+The badge at the top (#44) is counted again when you return to the tab, but the review list stayed as it was, so if you left the reviews screen open for a long time the two counts drifted apart.
 
-## 변경
+## Changes
 
-- `frontend/src/reviews.tsx`: 탭으로 돌아오면 보고 있는 범위의 목록을 다시 불러온다.
+- `frontend/src/reviews.tsx`: when you return to the tab, reload the list of the range you are viewing.
 
-## 결정한 점
+## Decisions
 
-- 변경을 처리하는 중에 돌아오면 요청을 더하지 않는다. 처리가 끝나면 그 자체의 새로고침이 최신 목록을 가져온다.
-- 입력 중인 날짜 폼은 그 복습이 목록에 남아 있으면 그대로 둔다. 목록에서 빠지면 폼을 닫고 이유를 안내한다. 입력값은 버린다. 남겨 두면 복습이 돌아올 때 지난 날짜로 다시 나타나기 때문이다.
-- 포커스가 있던 복습이 목록에서 빠지면 포커스를 제목으로 옮긴다. 그 외에는 포커스를 건드리지 않는다.
-- 불러오기가 실패하면 기존처럼 목록을 남기고 오류를 보여 준다. 다음 복귀에서 성공하면 오류가 사라진다.
+- If you return while a change is being processed, do not add a request. When the processing ends, its own refresh fetches the latest list.
+- Leave the date form you are typing in as it is if that review is still in the list. If it drops out of the list, close the form and explain why. Discard the typed value, because if it were kept, the review would come back later with a past date.
+- If the review that had focus drops out of the list, move focus to the title. Otherwise do not touch focus.
+- If loading fails, keep the list as before and show the error. If the next return succeeds, the error goes away.
 
-## 테스트
+## Tests
 
-`frontend/src/reviews.test.tsx`: 범위별 다시 불러오기, 입력 중인 날짜 유지, 빠진 복습의 폼 닫기와 안내, 오류 교체, 포커스 이동, 실패 후 복구, 처리 중 요청 없음, 화면을 떠나면 처리기 제거.
+`frontend/src/reviews.test.tsx`: reload per range, keeping a date being typed, closing the form and the notice for a review that dropped out, replacing the error, moving focus, recovery after a failure, no request while processing, removing the handler when you leave the screen.
 
-## 리뷰
+## Review
 
-1차 리뷰에서 탭 복귀로 항목이 빠질 때 폼과 포커스가 정리되지 않는다는 지적이 나왔다. 포커스가 `body`로 떨어지고, 닫히지 않은 폼이 나중에 지난 날짜로 되살아나며, 날짜 오류가 남았다. 위 결정대로 고치고 테스트를 더했다.
+The first review pointed out that when an item drops out on a tab return, the form and focus are not cleaned up. Focus would fall to `body`, the form that was not closed would come back later with a past date, and the date error remained. I fixed it as in the decisions above and added tests.
 
-2차 리뷰에서 다음을 이 PR에서 고쳤다. 리뷰는 최대 2회이므로 3차 리뷰는 하지 않았다.
+In the second review, the following were fixed in this PR. The review is limited to 2 rounds, so I did not do a third review.
 
-- 폼이 닫힐 때 포커스가 다른 컨트롤에 있어도 제목으로 옮겼다. 포커스 이동을 탭 복귀 처리 한 곳으로 모았다.
-- 응답을 기다리는 사이 사용자가 옮긴 포커스를 빼앗았다. 응답 시점에 여전히 그 복습에 있거나 포커스를 잃은 경우에만 옮긴다.
-- 폼이 닫히는 안내가 다른 복습의 실패 알림을 덮었다. 알림에 어느 복습의 것인지 기록해, 닫힌 폼의 복습에 대한 알림만 바꾼다.
+- When the form closed, focus was moved to the title even if it was on another control. I gathered the focus move into one place, the tab return handling.
+- It took away focus that the user had moved while waiting for the response. It now moves only if focus is still on that review at response time or was lost.
+- The notice that the form was closed covered the failure notice of another review. The notice now records which review it belongs to, and only the notice for the review of the closed form is replaced.
 
-## 검증
+## Verification
 
-`TEST_DATABASE_URL`을 설정한 `npm run check`가 통과했다. 백엔드 325건, 프런트 112건, 스킬 4건이 통과했다. 건너뜀은 프런트 2건으로, 중앙 표준에서 온 다크 전용 앱 테스트이다.
+`npm run check` with `TEST_DATABASE_URL` set passed. Backend 325, frontend 112, and skills 4 passed. The skips were 2 frontend tests, the dark-only app tests that came from the central standards.
 
-## 브라우저 확인
+## Browser check
 
-테스트 DB에 연결한 개발 서버를 headless Chrome으로 PC(1440×900)와 모바일(390×844)에서 확인했다. 최종 코드에서 8개 항목이 통과했고, 확인 뒤 테스트 데이터를 지웠다. 폼 닫기와 포커스 이동은 브라우저에서 확인하지 않았고 테스트로만 확인했다.
+With a dev server connected to the test DB, I checked with headless Chrome at PC (1440×900) and mobile (390×844). 8 items passed on the final code, and I deleted the test data after checking. Closing the form and moving focus were not checked in a browser, only with tests.
 
-- API로 기록을 더하거나 지운 뒤 탭 복귀를 알리면 목록이 따라오고, 상단 배지와 같은 수가 된다.
-- 탭 복귀는 `window`에 `focus` 이벤트를 보내 대신했다. 실제로 탭을 전환하지는 않았다.
-- 화면 모양은 바뀌지 않아 캡처는 남기지 않았다.
+- After adding or deleting records through the API and signaling a tab return, the list follows and the count matches the badge at the top.
+- I signaled the tab return by sending a `focus` event to `window`. I did not actually switch tabs.
+- The look of the screen did not change, so I did not keep a capture.

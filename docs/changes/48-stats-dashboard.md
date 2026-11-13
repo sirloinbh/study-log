@@ -1,80 +1,80 @@
-# #48 통계 대시보드 메인과 주요 지표 카드
+# #48 Statistics dashboard main and key metric cards
 
-- 이슈: [#48](https://github.com/sirloinbh/study-log/issues/48) (상위 #8)
-- 브랜치: `feat/48-stats-dashboard`
-- 선행: #47 학습 시간 집계 API (병합 완료)
+- Issue: [#48](https://github.com/sirloinbh/study-log/issues/48) (parent #8)
+- Branch: `feat/48-stats-dashboard`
+- Prerequisite: #47 study time aggregation API (merged)
 
-## 목적
+## Purpose
 
-총 학습 시간, 오늘, 고른 기간의 합계와 평균을 한눈에 본다. 그래프는 차트 라이브러리를 정해야 하는 #49 범위라 이 화면에 넣지 않았다.
+See at a glance the total study time, today, and the total and average for the chosen period. Charts are in the scope of #49, where the chart library must be decided, so I did not put them on this screen.
 
-## 변경
+## Changes
 
-- `frontend/src/main.tsx`: 메뉴에 "통계" 페이지를 추가했다(학습 기록 · 교재 · 키워드 · 통계 · 설정).
-- `frontend/src/Stats.tsx`, `frontend/src/study-stats.ts`(새 파일)
-  - **기간 필터:** 이번 주(기본) · 이번 달 · 최근 3개월 · 전체 버튼(`aria-pressed`)
-  - **지표 카드 4개**
-    - 총 학습 시간: 전체 누적
-    - 오늘
-    - 고른 기간 합계: 카드 제목이 기간 이름("이번 주" 등)이 된다. 기간 날짜와 "N일 중 M일 공부"를 함께 보여 준다.
-    - 하루 평균: 고른 기간의 달력 날짜 기준이다. 공부한 날 기준 평균을 함께 보여 준다.
-  - 값은 `GET /api/stats/study-time?period=`(#47)에서 받아 "N시간 M분"으로 보여 준다. 표시 함수는 학습 기록 화면의 `formatMinutes`를 그대로 쓴다.
-  - 응답은 기간별로 따로 보관한다. 늦게 도착한 다른 기간의 응답이 지금 기간 값을 덮거나 지우지 않는다. 이미 본 기간으로 돌아가면 보관한 값이 바로 보이고, 새 값이 오면 바뀐다.
-  - 불러오기에 실패하면 빈 카드 대신 오류를 보여 준다.
-  - 타입 파일 이름은 `stats.ts`가 아니라 `study-stats.ts`다. Windows는 대소문자를 구분하지 않아 `Stats.tsx`와 충돌하기 때문이다(`exercise.ts`/`Exercises.tsx`처럼 이름을 다르게 둔다).
+- `frontend/src/main.tsx`: added a "통계" ("Statistics") page to the menu (study logs, textbooks, keywords, statistics, settings).
+- `frontend/src/Stats.tsx`, `frontend/src/study-stats.ts` (a new file)
+  - **Period filter:** buttons for this week (default), this month, the last 3 months, and all time (`aria-pressed`)
+  - **4 metric cards**
+    - Total study time: the whole cumulative figure
+    - Today
+    - Total for the chosen period: the card title becomes the period name ("이번 주" and so on, "This week"). It also shows the period dates and "N days studied out of M".
+    - Daily average: based on the calendar days of the chosen period. It also shows the average based on days studied.
+  - The values come from `GET /api/stats/study-time?period=` (#47) and are shown as "N hours M minutes". The display function uses `formatMinutes` of the study log screen as it is.
+  - Responses are kept separately per period. A response for another period that arrives late does not overwrite or clear the current period's value. If you go back to a period you already saw, the kept value shows right away, and it changes when a new value arrives.
+  - If loading fails, it shows an error instead of an empty card.
+  - The type file name is `study-stats.ts`, not `stats.ts`. Windows does not distinguish case, so it would collide with `Stats.tsx` (keep the names different, like `exercise.ts` and `Exercises.tsx`).
 - `frontend/src/style.css`
-  - 기간 필터와 지표 카드 배치. 카드는 최소 150px로 자동 배치되어 PC에서는 한 줄 4칸, 모바일에서는 2칸이다.
-  - 날짜는 중간에서 줄바꿈되지 않게 했다.
-  - **모바일 메뉴:** 메뉴가 5개가 되면서 390px에서 72px 넘쳤다. 모바일에서만 메뉴를 아이콘 위·글자 아래(12px)로 바꾸고, 다섯 칸을 같은 폭(64px)으로 나눴다. #40에서 4개용으로 줄였던 좌우 여백 규칙은 이것으로 대체했다.
+  - The layout of the period filter and the metric cards. The cards are laid out automatically with a minimum of 150px, so it is 4 per row on PC and 2 on mobile.
+  - Dates do not wrap in the middle.
+  - **Mobile menu:** with 5 menu items, it overflowed by 72px at 390px. On mobile only, I changed the menu to an icon on top and text below (12px), and divided the five cells into the same width (64px). This replaces the left and right margin rule that was reduced for 4 items in #40.
 
-## 테스트
+## Tests
 
-- `backend/test/stats-ui.test.ts`(새 파일, 4건)
-  - 이번 주로 열리고, 카드 4개의 제목·값·보조 문구가 맞는지
-  - 기간을 바꾸면 그 기간으로 요청하고 눌림 상태·카드 제목·값이 바뀌는지(이번 달·최근 3개월·전체)
-  - 늦게 도착한 이전 기간 응답이 새 기간 값을 덮지 않는지
-    - 이 테스트를 쓰다가, 처음 구현(응답 하나만 보관)에서는 늦은 응답이 새 기간 값을 지워 "불러오는 중"에 멈추는 것을 발견했다.
-    - 실제 React는 effect 정리로 막지만, 그것에만 기대지 않도록 기간별 보관으로 바꿨다.
-  - 실패 시 오류 표시, 빈 카드·"불러오는 중" 없음, 다른 기간으로 돌아가면 다시 표시
+- `backend/test/stats-ui.test.ts` (a new file, 4 tests)
+  - It opens on this week, and the titles, values, and secondary text of the 4 cards are right
+  - If you change the period, it requests that period, and the pressed state, card titles, and values change (this month, the last 3 months, all time)
+  - A previous period's response that arrives late does not overwrite the new period's value
+    - While writing this test, I found that the first implementation (keeping only one response) made a late response clear the new period's value and stall at "loading".
+    - A real React prevents it with effect cleanup, but I changed to keeping per period so as not to rely on that alone.
+  - The error display on failure, no empty card or "loading", and showing it again when you go back to another period
 
-## 검증
+## Verification
 
-| 명령            | 환경                             | 결과                                                        |
-| --------------- | -------------------------------- | ----------------------------------------------------------- |
-| `npm run check` | 로컬, `TEST_DATABASE_URL` 미설정 | exit 0. backend tests 187, pass 174, fail 0, skipped 13(DB) |
+| Command         | Environment                        | Result                                                       |
+| --------------- | ---------------------------------- | ------------------------------------------------------------ |
+| `npm run check` | Local, `TEST_DATABASE_URL` not set | exit 0. backend tests 187, pass 174, fail 0, skipped 13 (DB) |
 
-- 브라우저: Playwright(Chromium)로 Vite 개발 서버와 #47 API(로컬 Docker 테스트 DB)를 띄워 확인했다. 오늘(2026-10-23) 기준으로 완료·중단 기록 6건을 넣었다.
-  - 이번 주(10/19 ~ 10/23): 합계 4시간 45분(90+135+60분), 하루 평균 57분(285/5), 공부한 날 기준 1시간 35분(285/3). 손으로 계산한 값과 같다.
-  - 이번 달: 합계 8시간 5분, 평균 21분(485/23), 공부한 날 기준 1시간 37분
-  - 모바일 390×844
-    - 메뉴 5개가 넘치지 않는다(메뉴 너비 343px = 내용 너비, 각 64px, 글자 잘림 없음).
-    - 카드 2칸, 카드 넘침 없음, 가로 스크롤 없음
-  - PC 1440×900: 카드 한 줄 4칸
-  - 스크린샷: [모바일 390×844 (이번 달)](assets/48-mobile-390x844.png), [PC 1440×900 (이번 달)](assets/48-pc-1440x900.png)
+- Browser: I checked by starting the Vite dev server and the #47 API (a local Docker test DB) with Playwright (Chromium). Based on today (2026-10-23), I put in 6 completed and abandoned records.
+  - This week (10/19 to 10/23): total 4 hours 45 minutes (90+135+60 minutes), daily average 57 minutes (285/5), and 1 hour 35 minutes based on days studied (285/3). It is the same as the value I calculated by hand.
+  - This month: total 8 hours 5 minutes, average 21 minutes (485/23), and 1 hour 37 minutes based on days studied
+  - Mobile 390×844
+    - The 5 menu items do not overflow (menu width 343px = content width, 64px each, no clipped text).
+    - 2 cards per row, no card overflow, and no horizontal scroll
+  - PC 1440×900: 4 cards in a row
+  - Screenshots: [mobile 390×844 (this month)](assets/48-mobile-390x844.png), [PC 1440×900 (this month)](assets/48-pc-1440x900.png)
 
-## 자동 코드 리뷰 1차
+## Automated code review, round 1
 
-별도 읽기 전용 리뷰 에이전트가 검토했다. 막는 지적은 없었다. 분리할 이슈도 없다.
+A separate read-only review agent reviewed it. There were no blocking comments. There is no issue to split off either.
 
-- 확인된 사항
-  - 기간 카드 제목이 고른 기간을 따른다. 기본이 이번 주라 이슈의 "이번 주" 카드에 해당한다.
-  - effect와 기간별 보관, 오류 표시 범위가 맞다.
-  - 모바일 메뉴 변경은 760px 이하에만 적용되어 PC에 영향이 없다.
-  - 제목 구조와 기간 버튼의 접근성이 적절하다.
-- 반영
-  - "불러오는 중…"에 `role="status"`를 붙여, 카드로 바뀌는 과정을 화면 낭독기가 알 수 있게 했다.
-  - 카드 묶음 이름이 "이번 주 학습 시간"처럼 기간을 따라가서, 전체 누적 카드까지 기간 값처럼 들렸다. 이름을 "학습 시간 지표"로 고정했다.
-  - 두 가지 모두 UI 테스트에 확인을 추가했다.
-- 유지: 이미 본 기간으로 돌아가면 새 값을 받는 동안 보관한 값을 그대로 보여 준다. 새로 받는 중이라는 표시는 없다. 새 값이 오면 바로 바뀐다.
+- Confirmed points
+  - The period card title follows the chosen period. The default is this week, so it matches the issue's "this week" card.
+  - The effect, the keeping per period, and the scope of the error display are right.
+  - The mobile menu change applies only at 760px or less, so it does not affect PC.
+  - The heading structure and the accessibility of the period buttons are appropriate.
+- Applied
+  - I put `role="status"` on "불러오는 중…" ("Loading…") so a screen reader can know the change into cards.
+  - The name of the card group followed the period, like "이번 주 학습 시간" ("This week's study time"), so even the total cumulative card sounded like a period value. I fixed the name to "학습 시간 지표" ("Study time metrics").
+  - I added checks for both in the UI test.
+- Kept: if you go back to a period you already saw, the kept value is shown as it is while the new value is received. There is no indication that it is being received again. It changes right away when the new value arrives.
 
-## 자동 코드 리뷰 2차
+## Automated code review, round 2
 
-별도 읽기 전용 리뷰 에이전트가 1차 반영과 최종 PR 전체를 다시 확인했다. 리뷰는 최대 2회이므로 3차 리뷰는 하지 않는다.
+A separate read-only review agent checked the first-round fixes and the whole final PR again. The review is limited to 2 rounds, so I do not do a third.
 
-- 화면 상단의 서버 상태 줄과 새 "불러오는 중" 상태 영역이 함께 있어도 충돌이 없다. 테스트가 통계 화면의 상태 영역을 정확히 고른다.
-- 지적과 분리할 이슈는 없었다.
+- Even with the server status line at the top of the screen and the new "loading" status area together, there is no conflict. The test picks exactly the status area of the statistics screen.
+- There were no comments and no issue to split off.
 
-## 한계·후속
+## Limits and follow-up
 
-- 일별·주별·월별 그래프는 #49(차트 라이브러리 결정)에서 붙인다. API는 이미 일별·주별·월별 값을 준다.
-- 교재별·학습 유형별 필터는 이 이슈 범위가 아니다.
+- The daily, weekly, and monthly charts are attached in #49 (the chart library decision). The API already gives daily, weekly, and monthly values.
+- Filters by textbook and by study type are not in this issue's scope.

@@ -1,53 +1,53 @@
-# #133 DB 연결이 끊겨도 API 프로세스가 죽지 않게 하기
+# #133 Keep the API process from dying when the DB connection drops
 
-- 이슈: [#133](https://github.com/sirloinbh/study-log/issues/133)
-- 브랜치: `fix/133-db-connection-errors`
+- Issue: [#133](https://github.com/sirloinbh/study-log/issues/133)
+- Branch: `fix/133-db-connection-errors`
 
-## 재현
+## Reproduction
 
-고치기 전에 테스트 DB에서 `pg_terminate_backend`로 연결을 끊어 확인했다. 유휴 연결과 트랜잭션 중 연결 모두 `Unhandled 'error' event`로 프로세스가 종료 코드 1로 끝났다.
+Before the fix, I cut the connection with `pg_terminate_backend` on the test DB. For both an idle connection and a connection in a transaction, the process ended with exit code 1 because of `Unhandled 'error' event`.
 
-## 원인
+## Cause
 
-`pg`는 끊긴 연결을 `error` 이벤트로 알리고, 받는 쪽이 없으면 Node가 프로세스를 끝낸다. `backend/src`에는 처리기가 없었다.
+`pg` reports a dropped connection with an `error` event, and if nobody receives it, Node ends the process. There was no handler in `backend/src`.
 
-## 변경
+## Changes
 
-- `backend/src/sql.ts`: `createPool`을 추가했다. 풀이 만드는 모든 연결과 풀 자체에 처리기를 단다.
-- `backend/src/server.ts`: `createPool`을 쓴다.
+- `backend/src/sql.ts`: added `createPool`. It attaches a handler to every connection the pool creates and to the pool itself.
+- `backend/src/server.ts`: uses `createPool`.
 
-## 동작
+## Behavior
 
-- 유휴 연결이나 트랜잭션의 쿼리 사이에 끊기면 `db_connection_error`와 오류 메시지만 로그에 남긴다. 쿼리 실행 중에 끊기면 그 쿼리의 오류로 전달되어 `request_error`로 남는다.
-- 그 연결로 진행 중이던 요청은 기존처럼 한국어 500으로 끝나고, 트랜잭션은 반영되지 않는다. 예외로, DB가 `COMMIT`을 처리한 뒤 응답을 보내기 전에 끊기면 500이어도 저장되어 있을 수 있다.
-- 풀이 끊긴 연결을 버리고 다음 요청은 새 연결로 처리한다.
+- If the connection drops while idle or between the queries of a transaction, only `db_connection_error` and the error message are logged. If it drops while a query is running, it is delivered as that query's error and logged as `request_error`.
+- A request in progress on that connection still ends with a Korean 500 as before, and the transaction is not applied. As an exception, if the connection drops after the DB processed the `COMMIT` and before the response was sent, the data may be saved even though the answer is 500.
+- The pool discards the dropped connection, and the next request is handled with a new connection.
 
-## 제외한 범위
+## Out of scope
 
-- 네트워크가 끊겨 DB 쪽 종료 신호가 전혀 오지 않는 경우는 다루지 않는다. 진행 중 요청이 응답 없이 멈출 수 있다. 시간 제한(`query_timeout` 등)이 필요한데, API와 DB가 같은 compose 네트워크에 있어 드문 경우이고 긴 쿼리의 기준도 정해야 한다.
-- 종료 신호(SIGTERM)가 두 번 오면 `pool.end()`가 두 번 불려 종료 코드가 1이 되는 문제는 이번 변경 전부터 있었고, 연결 끊김과 무관해 고치지 않았다.
+- A case where the network drops and no shutdown signal at all comes from the DB side is not covered. A request in progress can hang with no response. A time limit (such as `query_timeout`) would be needed, but the API and DB are on the same compose network, so it is rare, and the limit for long queries would also have to be decided.
+- The problem that if the termination signal (SIGTERM) comes twice, `pool.end()` is called twice and the exit code becomes 1 existed before this change and is unrelated to dropped connections, so I did not fix it.
 
-## 테스트
+## Tests
 
-`backend/test/db-connection.integration.test.ts`: 실제 연결을 끊어 확인한다.
+`backend/test/db-connection.integration.test.ts`: it cuts real connections to check.
 
-- 유휴 연결: 로그 1건(필드는 `event`와 `message`뿐이고 연결 문자열 없음), 다음 쿼리 정상.
-- 트랜잭션의 쿼리 사이: 거부되고 다음 쿼리 정상.
-- 요청 처리 중: 한국어 500, 저장되지 않음, 다음 요청 정상.
+- Idle connection: 1 log entry (the fields are only `event` and `message`, with no connection string), and the next query is normal.
+- Between the queries of a transaction: rejected, and the next query is normal.
+- During request handling: a Korean 500, nothing saved, and the next request is normal.
 
-## 리뷰
+## Review
 
-1차 리뷰에서 핵심 수정의 결함은 없었다. 다음을 이 PR에서 고쳤다.
+The first review found no defects in the core fix. The following were fixed in this PR.
 
-- 고정 200ms 대기가 부하 때 실패할 수 있어, 풀이 연결을 버릴 때까지 기다린다.
-- 테스트 실패 때 서버 로그가 가려져, 앞 단계 실패 메시지에 로그를 넣었다.
-- 로그 검증을 필드 2개와 연결 문자열 부재로 강화했다.
-- 문서의 `COMMIT` 예외와 제외 범위를 적었다.
+- A fixed 200ms wait could fail under load, so it waits until the pool discards the connection.
+- When a test failed, the server log was hidden, so I put the log in the failure message of the earlier step.
+- Strengthened the log check to 2 fields and no connection string.
+- Wrote down the `COMMIT` exception and the out-of-scope items in the document.
 
-2차 리뷰에서 로그 설명이 실제보다 넓다는 지적이 나와 고쳤다. 리뷰는 최대 2회이므로 3차 리뷰는 하지 않았다.
+In the second review, it was pointed out that the log description was broader than what really happens, and I fixed it. The review is limited to 2 rounds, so I did not do a third review.
 
-## 검증
+## Verification
 
-`TEST_DATABASE_URL`을 설정한 `npm run check`가 통과했다. 백엔드 314건, 프런트 100건, 스킬 4건이 통과했다. 건너뜀은 프런트 2건으로, 중앙 표준에서 온 다크 전용 앱 테스트이다. 화면 변경이 없어 브라우저 확인은 하지 않았다.
+`npm run check` with `TEST_DATABASE_URL` set passed. Backend 314, frontend 100, and skills 4 passed. The skips were 2 frontend tests, the dark-only app tests that came from the central standards. There was no screen change, so I did not check in a browser.
 
-실행 중인 서버에서 DB 서비스 자체를 재시작해 보지는 않았다. 개별 연결을 끊는 방식으로 같은 이벤트를 확인했다.
+I did not restart the DB service itself under a running server. I confirmed the same event by cutting individual connections.

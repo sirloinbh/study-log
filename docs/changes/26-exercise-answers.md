@@ -1,112 +1,112 @@
-# #26 연습문제 정답 입력·조회 (수동)
+# #26 Enter and view exercise answers (manual)
 
-- 이슈: [#26](https://github.com/sirloinbh/study-log/issues/26) (상위 #5)
-- 브랜치: `feat/26-exercise-answers`
-- 선행: #24 연습문제 DB·API, #25 연습문제 화면 (병합 완료)
+- Issue: [#26](https://github.com/sirloinbh/study-log/issues/26) (parent #5)
+- Branch: `feat/26-exercise-answers`
+- Prerequisites: #24 exercise DB and API, #25 exercise screen (merged)
 
-## 목적
+## Purpose
 
-문제별 정답을 직접 입력해 저장하고, 문제 화면에서 펼쳐 확인한다.
+Enter and save the answer for each problem by hand, and expand it on the exercise screen to check.
 
-## 결정
+## Decisions
 
-- 문제 하나에 정답은 하나다(1:1). 이슈에 개수가 정해져 있지 않아 가장 단순한 형태로 정했다. 풀이가 여러 개 필요하면 본문에 함께 적는다. 여러 개가 필요해지면 별도 이슈에서 테이블을 바꾼다.
-- 화면에서는 한 번에 한 문제의 정답만 펼친다. 다른 문제의 정답을 열면 앞의 것은 닫힌다.
+- There is one answer per problem (1:1). The issue did not set a number, so I chose the simplest form. If several solutions are needed, write them together in the body. If several become needed, change the table in a separate issue.
+- On the screen, only one problem's answer is expanded at a time. If you open another problem's answer, the earlier one closes.
 
-## 변경
+## Changes
 
-- `database/migrations/008_exercise_answers.sql`: `exercise_answers` 테이블.
-  - `exercise_id`가 기본 키다. 그래서 문제당 정답은 하나만 저장된다.
-  - FK `→ exercises (id) ON DELETE CASCADE`: 문제를 지우면 정답도 지워진다. 목차·교재 삭제도 문제를 거쳐 함께 지워진다.
-  - 본문 CHECK는 문제 본문과 같다(`body ~ '\S'`, 20000자 이하).
+- `database/migrations/008_exercise_answers.sql`: the `exercise_answers` table.
+  - `exercise_id` is the primary key. So only one answer is stored per problem.
+  - FK `-> exercises (id) ON DELETE CASCADE`: if you delete a problem, its answer is deleted too. Deleting a table of contents entry or a textbook also deletes them through the problem.
+  - The body CHECK is the same as the problem body (`body ~ '\S'`, 20000 characters or fewer).
 - `backend/src/exercises.ts`
 
-  | 요청                               | 동작                                                                         |
-  | ---------------------------------- | ---------------------------------------------------------------------------- |
-  | `GET /api/exercises/:id/answer`    | `{ answer: { exerciseId, body } }`. 정답이 없으면 `{ answer: null }`         |
-  | `PUT /api/exercises/:id/answer`    | `{ body }`로 저장하고, 이미 있으면 교체한다(`ON CONFLICT`). 200 `{ answer }` |
-  | `DELETE /api/exercises/:id/answer` | 204. 정답이 없으면 "정답을 찾을 수 없습니다" 404                             |
-  - 없는 문제는 세 요청 모두 "연습문제를 찾을 수 없습니다"로 404를 응답한다. PUT은 FK 위반(23503)으로 판정한다.
-  - 본문은 문제 본문처럼 줄바꿈·들여쓰기를 그대로 저장한다.
-  - 검증 메시지: "정답을 입력하세요", "정답 형식이 올바르지 않습니다", "정답은 20000자 이하로 입력하세요", "정답 내용을 JSON 객체로 보내세요", 경로 ID 오류.
+  | Request                            | Behavior                                                                              |
+  | ---------------------------------- | ------------------------------------------------------------------------------------- |
+  | `GET /api/exercises/:id/answer`    | `{ answer: { exerciseId, body } }`. If there is no answer, `{ answer: null }`         |
+  | `PUT /api/exercises/:id/answer`    | Saves with `{ body }`, and replaces it if it exists (`ON CONFLICT`). 200 `{ answer }` |
+  | `DELETE /api/exercises/:id/answer` | 204. If there is no answer, "정답을 찾을 수 없습니다" ("Answer not found") 404        |
+  - For a missing problem, all three requests answer 404 "연습문제를 찾을 수 없습니다" ("Exercise not found"). PUT is judged by an FK violation (23503).
+  - The body is saved with line breaks and indentation as they are, like the problem body.
+  - Validation messages: "정답을 입력하세요" ("Enter the answer"), "정답 형식이 올바르지 않습니다" ("The answer format is not valid"), "정답은 20000자 이하로 입력하세요" ("Enter the answer in 20000 characters or fewer"), "정답 내용을 JSON 객체로 보내세요" ("Send the answer content as a JSON object"), and path ID errors.
 
 - `frontend/src/Exercises.tsx`, `frontend/src/exercise.ts`, `frontend/src/style.css`
-  - 문제마다 "정답 보기/닫기" 버튼(`aria-expanded`, 문제 이름이 들어간 `aria-label`).
-  - 펼치면 정답을 불러와 보여 준다. 없으면 "입력한 정답이 없습니다"와 "정답 입력" 버튼을 보여 준다.
-  - "정답 입력/수정"은 문제 아래에 입력란을 연다. 저장하면 PUT으로 저장한다. 비워 두고 저장하면 저장된 정답을 DELETE로 지운다.
-  - 저장 중에는 #25와 같은 `busy` 잠금을 쓴다. 저장 후 목록을 다시 불러온다. 문제가 다른 곳에서 지워졌으면 서버 메시지를 보여 주고 목록에서 빠진다.
-  - 단원을 바꾸면 정답 패널을 닫는다. 다시 열면 정답을 새로 불러온다(1차 리뷰 반영).
+  - A "정답 보기/닫기" ("Show answer / Close") button for each problem (`aria-expanded`, an `aria-label` that has the problem name).
+  - When expanded, it loads and shows the answer. If there is none, it shows "입력한 정답이 없습니다" ("There is no answer entered") and a "정답 입력" ("Enter answer") button.
+  - "정답 입력/수정" opens an input field under the problem. When you save, it saves with PUT. If you save it empty, it deletes the stored answer with DELETE.
+  - While saving, it uses the same `busy` lock as #25. After saving, it loads the list again. If the problem was deleted elsewhere, it shows the server message and the problem leaves the list.
+  - If you change the chapter, the answer panel closes. If you open it again, it loads the answer anew (first-review fix).
 
-## 테스트
+## Tests
 
-- `backend/test/exercises.test.ts`(DB 없음)
-  - 잘못된 정답 본문·JSON 아닌 본문 → 한국어 400, 경로 ID 검증
-  - 없는 문제 404(GET·DELETE, PUT의 FK 위반), 정답만 없을 때 DELETE 404 메시지
-  - 정답 없음 → `null`, 저장 시 줄바꿈 보존
-- `backend/test/exercises.integration.test.ts`(실제 DB)
-  - 빈 정답, 저장·조회, 다시 저장하면 교체(행 1개), 다른 문제는 영향 없음
-  - 삭제와 재삭제 404, 없는 문제 404
-  - DB 제약: 공백만 있는 정답 23514, 같은 문제의 두 번째 정답 23505
-  - 문제 삭제 시 정답도 삭제
-- `backend/test/exercises-ui.test.ts`(화면)
-  - 정답 입력·저장(PUT 본문, 줄바꿈 표시), 수정·취소, 비워 저장하면 DELETE
-  - 한 번에 하나만 펼침, `aria-expanded`, 단원 전환 시 숨김·복귀
-  - 불러오기 실패 메시지, 저장 중 문제가 지워진 경우
-  - 문제 버튼 이름 목록에 "정답 보기" 추가
+- `backend/test/exercises.test.ts` (no DB)
+  - A wrong answer body or a non-JSON body -> a Korean 400, and path ID validation
+  - 404 for a missing problem (GET, DELETE, and an FK violation on PUT), and the DELETE 404 message when only the answer is missing
+  - No answer -> `null`, and keeping line breaks on save
+- `backend/test/exercises.integration.test.ts` (a real DB)
+  - An empty answer, save and lookup, saving again replaces it (1 row), and other problems are not affected
+  - Delete and 404 on a second delete, and 404 for a missing problem
+  - DB constraints: an answer of only spaces 23514, and a second answer for the same problem 23505
+  - When a problem is deleted, the answer is deleted too
+- `backend/test/exercises-ui.test.ts` (screen)
+  - Entering and saving an answer (the PUT body, showing line breaks), edit and cancel, and DELETE when saved empty
+  - Only one is expanded at a time, `aria-expanded`, and hiding and returning when you switch chapters
+  - The load failure message, and the case where the problem was deleted while saving
+  - Added "정답 보기" to the problem button name list
 
-## 검증
+## Verification
 
-| 명령                                                       | 환경                                                            | 결과                                                       |
-| ---------------------------------------------------------- | --------------------------------------------------------------- | ---------------------------------------------------------- |
-| `npm run check`                                            | 로컬, `TEST_DATABASE_URL` 미설정                                | exit 0. backend tests 119, pass 111, fail 0, skipped 8(DB) |
-| `tsx --test --test-concurrency=1 test/*.test.ts` (backend) | 로컬 Docker `postgres:17-alpine`, 마이그레이션 001~008 2회 적용 | tests 119, pass 119, fail 0, skipped 0                     |
-| `npm run test -w backend` (기본 병렬)                      | 위와 같은 DB                                                    | pass 117, **fail 1**: `study-logs.integration` (아래 참고) |
+| Command                                                    | Environment                                                            | Result                                                      |
+| ---------------------------------------------------------- | ---------------------------------------------------------------------- | ----------------------------------------------------------- |
+| `npm run check`                                            | Local, `TEST_DATABASE_URL` not set                                     | exit 0. backend tests 119, pass 111, fail 0, skipped 8 (DB) |
+| `tsx --test --test-concurrency=1 test/*.test.ts` (backend) | Local Docker `postgres:17-alpine`, migrations 001 to 008 applied twice | tests 119, pass 119, fail 0, skipped 0                      |
+| `npm run test -w backend` (default parallel)               | The same DB as above                                                   | pass 117, **fail 1**: `study-logs.integration` (see below)  |
 
-- 병렬 실행의 실패 1건은 이 변경과 무관하다. `main`에서도 같은 DB로 똑같이 실패한다.
-  - 원인: `study-logs.integration`의 `?limit=1` 검사가 공유 테스트 DB 전체의 최신 기록을 본다.
-  - 같은 시간에 병렬로 도는 다른 통합 테스트 파일이 더 늦은 날짜(2099-02-20, 2099-03-10)의 기록을 넣으면 결과가 바뀐다.
-  - [#76](https://github.com/sirloinbh/study-log/issues/76)으로 분리했다.
-- 마이그레이션 001~008을 같은 DB에 두 번 적용해 재실행 안전성을 확인했다.
-- 브라우저: Playwright(Chromium)로 Vite 개발 서버(5202)와 API(3102, 위 테스트 DB)를 띄워 확인했다.
-  - 모바일 390×844
-    - 정답 펼치기와 줄바꿈 표시
-    - 다른 문제를 펼치면 앞의 정답이 닫힘
-    - 정답 입력란에 포커스
-    - 입력·저장 후 "정답을 저장했습니다" 표시, API로 저장값 확인
-    - 가로 스크롤 없음
-  - PC 1440×900: 정답 패널 표시
-  - 스크린샷: [모바일 390×844 (입력 중)](assets/26-mobile-390x844.png), [PC 1440×900](assets/26-pc-1440x900.png). 연습문제 카드만 캡처했다.
+- The 1 failure in the parallel run is unrelated to this change. It fails the same way on `main` with the same DB.
+  - Cause: the `?limit=1` check in `study-logs.integration` looks at the latest record in the whole shared test DB.
+  - If another integration test file running in parallel at the same time inserts a record with a later date (2099-02-20, 2099-03-10), the result changes.
+  - I split it into [#76](https://github.com/sirloinbh/study-log/issues/76).
+- I applied migrations 001 to 008 twice to the same DB and confirmed they are safe to re-run.
+- Browser: I checked by starting the Vite dev server (5202) and the API (3102, the test DB above) with Playwright (Chromium).
+  - Mobile 390×844
+    - Expanding an answer and showing line breaks
+    - If you expand another problem, the earlier answer closes
+    - Focus on the answer input
+    - After entering and saving, "정답을 저장했습니다" ("Saved the answer") is shown, and I confirmed the saved value through the API
+    - No horizontal scroll
+  - PC 1440×900: the answer panel is shown
+  - Screenshots: [mobile 390×844 (typing)](assets/26-mobile-390x844.png), [PC 1440×900](assets/26-pc-1440x900.png). I captured only the exercises card.
 
-## 자동 코드 리뷰 1차
+## Automated code review, round 1
 
-별도 읽기 전용 리뷰 에이전트가 이슈 #26 완료 기준과 변경 파일을 검토했다. high 지적은 없었다. 분리할 이슈도 없다.
+A separate read-only review agent reviewed the issue #26 done criteria and the changed files. There were no high comments. There is no issue to split off either.
 
-- medium: 다른 곳에서 이미 지운 정답을 비워 저장하면 DELETE가 "정답을 찾을 수 없습니다" 404가 된다. 입력란과 옛 정답이 그대로 남아 다시 저장해도 같은 오류가 반복됐다.
-  - 반영: 비워 저장할 때의 이 404는 지운 것으로 처리한다. 문제 자체가 없는 404는 그대로 오류로 보여 준다.
-  - 회귀 테스트: `clearing an answer already deleted elsewhere counts as cleared`.
-- medium: 단원을 바꿨다가 돌아오면 정답 패널이 예전에 불러온 값으로 다시 보였다. 불러오기 effect는 문제 ID에만 걸려 있어 다시 실행되지 않았다. 그래서 다른 곳에서 바뀐 정답이 반영되지 않았고, 비워 저장할 때도 옛 값으로 판단했다.
-  - 반영: 단원을 고르면 패널을 닫는다.
-  - 회귀 테스트: `one answer is open at a time and picking a chapter closes it`.
-- 두 회귀 테스트는 수정 전 코드에서 실패하고 수정 후 통과하는 것을 확인했다.
-- low(유지)
-  - 정답 DELETE 404의 원인 판별(정답 없음 / 문제 없음)이 두 쿼리라 그 사이 경합이 있다. 메시지 구분용이라 영향이 없다.
-  - 저장된 정답이 없는데 빈 값으로 저장하면 메시지 없이 입력란만 닫힌다. 바뀐 것이 없어 그대로 둔다.
-- 교재를 바꿀 때는 `Textbooks.tsx`가 연습문제 카드를 `key={selected.id}`로 다시 만들어서 같은 문제가 없다.
+- medium: if you save empty an answer that was already deleted elsewhere, DELETE gets 404 "정답을 찾을 수 없습니다". The input field and the old answer stayed, and saving again repeated the same error.
+  - Applied: this 404 on saving empty is handled as deleted. A 404 where the problem itself is missing is still shown as an error.
+  - Regression test: `clearing an answer already deleted elsewhere counts as cleared`.
+- medium: if you changed the chapter and came back, the answer panel showed the value loaded earlier again. The load effect depended only on the problem ID, so it did not run again. So an answer changed elsewhere was not reflected, and even when saving empty, it judged by the old value.
+  - Applied: picking a chapter closes the panel.
+  - Regression test: `one answer is open at a time and picking a chapter closes it`.
+- I confirmed that the two regression tests fail on the code before the fix and pass after the fix.
+- low (kept)
+  - Telling the cause of the answer DELETE 404 (no answer / no problem) takes two queries, so there is a race in between. It is for telling the message apart, so there is no effect.
+  - If there is no stored answer and you save with an empty value, only the input field closes with no message. Nothing changed, so I leave it.
+- When you change the textbook, `Textbooks.tsx` recreates the exercises card with `key={selected.id}`, so the same problem does not occur.
 
-## 자동 코드 리뷰 2차
+## Automated code review, round 2
 
-별도 읽기 전용 리뷰 에이전트가 1차 반영(7027a21)과 최종 PR 전체를 다시 확인했다. 리뷰는 최대 2회이므로 3차 리뷰는 하지 않는다.
+A separate read-only review agent checked the first-round fix (7027a21) and the whole final PR again. The review is limited to 2 rounds, so I do not do a third.
 
-- 두 수정이 맞고 빠진 경우가 없다고 확인됐다.
-  - 비워 저장할 때는 "정답을 찾을 수 없습니다"만 지운 것으로 처리한다. 문제 없음 404는 그대로 오류다.
-  - 단원을 바꾼 뒤 다시 열면 불러오기 effect가 다시 실행된다.
-- 코드 지적과 분리할 이슈는 없었다.
-- 참고
-  - 메시지 문자열 비교는 서버 문구에 의존한다. 지금은 두 쪽이 같은 문자열이다.
-  - 드문 유니코드 공백(U+0085 등)에서 API와 DB의 공백 판정이 다를 수 있다. #24 기록과 같은 한계다.
+- It was confirmed that the two fixes are right and no case is missing.
+  - When saving empty, only "정답을 찾을 수 없습니다" is handled as deleted. A problem-missing 404 is still an error.
+  - If you open it again after changing the chapter, the load effect runs again.
+- There were no code comments and no issue to split off.
+- Note
+  - Comparing the message string depends on the server wording. For now both sides are the same string.
+  - For rare Unicode whitespace (U+0085 and so on), the whitespace decision of the API and DB can differ. It is the same limit as the #24 record.
 
-## 한계·후속
+## Limits and follow-up
 
-- `study-logs.integration`의 병렬 실행 경합은 [#76](https://github.com/sirloinbh/study-log/issues/76)으로 분리했다.
-- 정답에도 #58(NUL 문자 500)이 해당한다. #58에서 공통으로 고친다.
-- 목록에서 정답이 있는 문제를 미리 표시하지 않는다. 펼쳐야 알 수 있다.
+- The race in the parallel run of `study-logs.integration` was split into [#76](https://github.com/sirloinbh/study-log/issues/76).
+- #58 (a 500 for a NUL character) applies to answers too. It is fixed commonly in #58.
+- The list does not show in advance which problems have an answer. You can know only by expanding.

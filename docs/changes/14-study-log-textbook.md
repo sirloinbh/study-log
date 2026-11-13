@@ -1,120 +1,120 @@
-# #14 학습 기록에 교재·챕터 연결
+# #14 Link a textbook and chapter to a study log
 
-- 이슈: [#14](https://github.com/sirloinbh/study-log/issues/14) (상위 #9)
-- 브랜치: `feat/14-study-log-textbook`
-- 선행: #10 학습 기록 DB·API, #13 교재 목차 DB·API (모두 병합 완료)
+- Issue: [#14](https://github.com/sirloinbh/study-log/issues/14) (parent #9)
+- Branch: `feat/14-study-log-textbook`
+- Prerequisites: #10 study log DB and API, #13 textbook table of contents DB and API (both merged)
 
-## 목적
+## Purpose
 
-어떤 교재의 어느 장·절을 공부했는지 학습 기록에 남긴다. 교재별 진행률·복습의 근거로 쓴다.
+Leave in the study log which chapter and section of which textbook you studied. It is used as the basis for per-textbook progress and reviews.
 
-## 결정
+## Decisions
 
-이슈 코멘트에 기록했다: [#14 결정](https://github.com/sirloinbh/study-log/issues/14#issuecomment-6334667747).
+I recorded them in an issue comment: [#14 decisions](https://github.com/sirloinbh/study-log/issues/14#issuecomment-6334667747).
 
-- 학습 기록이 연결된 교재는 삭제를 막는다(#12의 기존 결정).
-- 학습 기록이 연결된 목차도 삭제를 막는다. 하위 절에 연결된 기록이 있어도 상위 장 삭제가 막힌다.
-  - 대안인 "기록의 목차 연결만 비움"은 과거 기록의 장 정보가 사라져 채택하지 않았다.
-- 거부 응답은 409와 한국어 메시지다.
+- Block deleting a textbook that has study logs linked (the existing decision of #12).
+- Also block deleting a table of contents entry that has study logs linked. Even if a record is linked to a lower section, deleting the parent chapter is blocked.
+  - The alternative, "only clear the record's table of contents link", was not adopted because the chapter information of past records would be lost.
+- The refusal response is 409 and a Korean message.
 
-## 변경
+## Changes
 
 - `database/migrations/005_study_log_textbooks.sql`
-  - `study_logs`에 `textbook_id`, `content_id`(둘 다 선택)를 추가했다.
-  - 교재 FK는 `ON DELETE RESTRICT`다.
-  - 목차 FK는 복합 FK `(textbook_id, content_id) → textbook_contents (textbook_id, id)`, `RESTRICT`다. 다른 교재의 목차는 DB가 거부한다.
-  - CHECK로 목차만 있고 교재가 없는 기록을 막는다.
-  - 교재 필터와 RESTRICT 검사용 부분 인덱스 2개를 추가했다.
-  - 제약은 `pg_constraint` 확인 후 추가하므로 재실행해도 안전하다.
+  - Added `textbook_id` and `content_id` (both optional) to `study_logs`.
+  - The textbook FK is `ON DELETE RESTRICT`.
+  - The table of contents FK is the composite FK `(textbook_id, content_id) -> textbook_contents (textbook_id, id)`, `RESTRICT`. The DB rejects a table of contents of another textbook.
+  - A CHECK blocks a record that has a table of contents entry but no textbook.
+  - I added 2 partial indexes for the textbook filter and the RESTRICT check.
+  - The constraints are added after checking `pg_constraint`, so it is safe to re-run.
 - `backend/src/study-logs.ts`
-  - 입력에 `textbookId`, `contentId`(양의 정수 또는 null, 기본 null)를 추가했다. 교재 없이 목차만 보내면 "목차를 고르려면 교재를 먼저 선택하세요".
-  - 없는 교재는 "교재를 찾을 수 없습니다", 없거나 다른 교재의 목차는 "목차를 찾을 수 없습니다"로 400을 응답한다. FK 위반(23503)을 제약 이름으로 구분한다.
-  - 응답에 `textbookId`, `textbookTitle`, `contentId`, `contentNumber`, `contentTitle`을 추가했다. 연결이 없으면 모두 null이다. 저장 응답도 CTE로 같은 이름을 붙여 돌려준다.
-  - `GET /api/study-logs?textbookId=N`: 교재별 필터. `date`와 함께 쓸 수 있다.
-- `backend/src/textbooks.ts`, `backend/src/textbook-contents.ts`: 연결된 학습 기록이 있으면 삭제가 409로 거부된다.
-  - 교재: "학습 기록이 연결된 교재는 삭제할 수 없습니다"
-  - 목차: "학습 기록이 연결된 목차는 삭제할 수 없습니다"
-  - 목차 삭제는 트랜잭션을 롤백해 순서 당김도 일어나지 않는다.
-- 화면(`frontend/src/StudyLogs.tsx`, `study-logs.ts`, `textbook.ts`, `style.css`)
-  - 입력 폼에 교재 → 장/절 선택을 추가했다.
-  - 장/절은 선택한 교재의 목차를 불러와 계층 순서로 들여쓰기해 보여 준다.
-  - 교재를 고르기 전에는 장/절을 고를 수 없다. 교재를 바꾸면 장/절 선택을 비운다. 이전 교재의 목차가 잠깐이라도 보이지 않게, 불러온 목차는 그 교재 ID와 함께 보관한다.
-  - 수정 시 기록의 교재·장/절을 채운다. 새 기록을 저장하면 연결을 비운다.
-  - 최근 기록에 "교재 · 1.2 내적"을 표시한다.
-  - 교재 필터 화면은 이슈 범위(필터 API)에 없어 만들지 않았다.
+  - Added `textbookId` and `contentId` (a positive integer or null, default null) to the input. If you send only a table of contents entry without a textbook, "목차를 고르려면 교재를 먼저 선택하세요" ("Select a textbook first to pick a table of contents entry").
+  - A missing textbook answers 400 "교재를 찾을 수 없습니다" ("Textbook not found"), and a missing table of contents entry or one of another textbook answers 400 "목차를 찾을 수 없습니다" ("Table of contents entry not found"). An FK violation (23503) is told apart by the constraint name.
+  - Added `textbookId`, `textbookTitle`, `contentId`, `contentNumber`, and `contentTitle` to the response. If there is no link, all are null. The save response also gives the same names with a CTE.
+  - `GET /api/study-logs?textbookId=N`: the per-textbook filter. It can be used with `date`.
+- `backend/src/textbooks.ts`, `backend/src/textbook-contents.ts`: if there are linked study logs, the delete is refused with 409.
+  - Textbook: "학습 기록이 연결된 교재는 삭제할 수 없습니다" ("A textbook with linked study logs cannot be deleted")
+  - Table of contents: "학습 기록이 연결된 목차는 삭제할 수 없습니다" ("A table of contents entry with linked study logs cannot be deleted")
+  - The table of contents delete rolls back the transaction, so the order pull-up does not happen either.
+- Screen (`frontend/src/StudyLogs.tsx`, `study-logs.ts`, `textbook.ts`, `style.css`)
+  - Added the textbook -> chapter/section select to the input form.
+  - The chapter/section loads the chosen textbook's table of contents and shows it indented in hierarchy order.
+  - Before you pick a textbook, you cannot pick a chapter/section. If you change the textbook, the chapter/section selection is cleared. So that the table of contents of the previous textbook is never visible even briefly, the loaded table of contents is kept together with its textbook ID.
+  - When editing, the record's textbook and chapter/section are filled in. When a new record is saved, the link is cleared.
+  - The recent records show "교재 · 1.2 내적" ("Textbook · 1.2 Inner product").
+  - I did not build a textbook filter screen because it is not in the issue's scope (the filter API).
 
-## 테스트
+## Tests
 
-- `backend/test/study-log-textbooks.test.ts`(DB 없음)
-  - 연결 입력 검증(교재 없는 목차, 문자열·0·소수 ID)과 필터 쿼리 검증
-  - FK 위반을 제약별 한국어 400으로 응답
-  - 연결된 교재·목차 삭제 409
-- `backend/test/study-log-textbooks.integration.test.ts`(실제 DB)
-  - 연결 저장과 이름 응답
-  - 없는 교재·다른 교재 목차 거부
-  - 교재 필터(단독, 날짜와 함께, 기록 없는 교재는 빈 목록)
-  - 없는 교재·다른 교재 목차로 수정하면 400이고 기록은 바뀌지 않음(1차 리뷰 반영)
-  - 연결된 교재·절·상위 장 삭제 409와 변경 없음
-  - 연결을 바꾼 뒤 삭제 성공
-  - DB CHECK(23514) 확인
+- `backend/test/study-log-textbooks.test.ts` (no DB)
+  - Validation of the link input (a table of contents entry without a textbook, a string, 0, or a decimal ID) and of the filter query
+  - Answering an FK violation with a Korean 400 per constraint
+  - 409 for deleting a linked textbook or table of contents entry
+- `backend/test/study-log-textbooks.integration.test.ts` (a real DB)
+  - Saving a link and the name response
+  - Rejecting a missing textbook or a table of contents entry of another textbook
+  - The textbook filter (alone, with a date, and a textbook with no records gives an empty list)
+  - Editing with a missing textbook or a table of contents entry of another textbook is 400 and the record does not change (first-review fix)
+  - 409 and no change for deleting a linked textbook, section, and parent chapter
+  - Delete succeeds after changing the link
+  - Checking the DB CHECK (23514)
 - `backend/test/study-logs-ui.test.ts`
-  - 가짜 API가 교재·목차를 응답한다.
-  - 기존 요청 본문 비교에 새 필드를 반영했고, 잠금 칸은 5 → 7개다.
-  - 새 테스트 4건: 연결 저장·표시, 교재 변경 시 장/절 초기화, 연결된 기록 수정, 표시 함수
-- `backend/test/study-logs.integration.test.ts`: 응답 비교에 null 연결 필드를 추가했다.
-- `backend/test/app-ui.test.ts`, `textbooks-ui.test.ts`: 학습 기록 화면이 시작할 때 교재를 불러오는 요청에 맞췄다. 교재 화면 테스트는 교재 화면 요청만 센다.
+  - The fake API answers the textbooks and table of contents.
+  - I reflected the new fields in the existing request body comparison, and the lock cells went from 5 to 7.
+  - 4 new tests: saving and showing a link, resetting the chapter/section when the textbook changes, editing a linked record, and the display function
+- `backend/test/study-logs.integration.test.ts`: added the null link fields to the response comparison.
+- `backend/test/app-ui.test.ts`, `textbooks-ui.test.ts`: matched the request that the study log screen loads textbooks when it starts. The textbook screen test counts only the textbook screen's requests.
 
-## 검증
+## Verification
 
-| 명령                | 환경                                        | 결과                                                                                                                                                         |
-| ------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `npm run check`     | 로컬, `TEST_DATABASE_URL` 미설정            | exit 0. backend tests 67, pass 62, fail 0, **skipped 5**(DB 통합), 스킬 4 pass, 빌드 통과                                                                    |
-| Playwright 1440×900 | 실제 Express 앱 + 메모리 가짜 풀, Vite 5202 | 교재 선택 전 장/절 비활성, 장/절 계층 들여쓰기, 저장 후 목록 "선형대수와 그 응용 · 1.2 길이와 내적", 폼 연결 초기화, 교재 변경 시 목록 교체. 페이지 오류 0건 |
-| Playwright 390×844  | 같은 환경                                   | 교재·장/절 한 줄씩(294px), 가로 스크롤 없음(`scrollWidth` 375, 차이는 세로 스크롤바)                                                                         |
+| Command             | Environment                                            | Result                                                                                                                                                                                                                                                                                                                      |
+| ------------------- | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run check`     | Local, `TEST_DATABASE_URL` not set                     | exit 0. backend tests 67, pass 62, fail 0, **skipped 5** (DB integration), skills 4 pass, build passed                                                                                                                                                                                                                      |
+| Playwright 1440×900 | A real Express app + an in-memory fake pool, Vite 5202 | The chapter/section disabled before picking a textbook, the chapter/section indented in hierarchy, after saving the list "선형대수와 그 응용 · 1.2 길이와 내적" ("Linear algebra and its applications · 1.2 Length and inner product"), the form link reset, and the list replaced when the textbook changes. 0 page errors |
+| Playwright 390×844  | The same environment                                   | Textbook and chapter/section on one line each (294px), no horizontal scroll (`scrollWidth` 375, the difference is the vertical scrollbar)                                                                                                                                                                                   |
 
-- 건너뛴 5건은 DB 통합 테스트다. 이 PC에는 테스트 DB 연결 정보가 없다. 새 통합 테스트를 포함해 CI(PostgreSQL 17)에서 실행된다.
-- 브라우저 확인의 가짜 풀은 SQL을 실행하지 않으므로 FK·필터 SQL은 검증하지 못한다. 그 부분은 DB 통합 테스트가 맡는다.
-- 스크린샷: [PC 1440×900](assets/14-pc-1440x900.png), [모바일 390×844](assets/14-mobile-390x844.png).
+- The 5 skipped are DB integration tests. This PC has no test DB connection info. They run in CI (PostgreSQL 17), including the new integration tests.
+- The fake pool in the browser check does not run SQL, so it cannot verify the FK and filter SQL. The DB integration tests cover that part.
+- Screenshots: [PC 1440×900](assets/14-pc-1440x900.png), [mobile 390×844](assets/14-mobile-390x844.png).
 
-## 자동 코드 리뷰 1차
+## Automated code review, round 1
 
-별도 읽기 전용 리뷰 에이전트가 이슈 #14 완료 기준과 PR 변경을 검토했다.
+A separate read-only review agent reviewed the issue #14 done criteria and the PR changes.
 
-- 확인된 사항(문제없음):
-  - 마이그레이션 재실행 안전성
-  - 복합 FK(MATCH SIMPLE)와 CHECK의 역할 분담
-  - 교재 → 목차 CASCADE가 학습 기록 RESTRICT에 막히는 동작(하위 절 연결 시 상위 장 포함)
-  - 부분 인덱스 사용 가능성
-  - 23503 매핑 범위
-  - CTE 저장 응답
-  - 목록 쿼리 매개변수 번호
-  - 화면 상태(목차 목록 혼동 방지, 수정·취소, 요청 중 잠금)
-  - 문서 정확성
-- high·medium 지적은 없었다. 분리한 이슈도 없다.
-- 지적(low): PUT으로 없는 교재·다른 교재 목차를 보내는 경우와 기록 없는 교재 필터의 통합 테스트가 없었다.
-  - 반영: 두 경우를 통합 테스트에 추가했다. 거부된 수정은 기록을 바꾸지 않는다는 것도 확인한다.
-- 지적(low): PUT은 생략된 `textbookId`·`contentId`를 null로 받아 연결을 비운다. 기존 PUT이 전체 교체 방식이라 의도대로지만 문서에 적혀 있지 않았다.
-  - 반영: 아래 한계에 적었다.
-- 지적(low): 아래 두 가지는 드문 경우라 한계로 기록했다.
-  - 교재·목차 목록을 불러오지 못하면 선택 상자는 "선택 안 함"으로 보이지만 폼에는 기존 ID가 남는다. 수정 저장 시 연결이 그대로 유지된다.
-  - 다른 탭에서 목차가 삭제돼 400을 받아도 장/절 목록은 교재를 바꾸거나 화면을 다시 열 때 갱신된다.
+- Confirmed points (no problem):
+  - The migration being safe to re-run
+  - The division of roles between the composite FK (MATCH SIMPLE) and the CHECK
+  - The textbook -> table of contents CASCADE being blocked by the study log RESTRICT (including the parent chapter when a lower section is linked)
+  - The possibility of using the partial indexes
+  - The range of the 23503 mapping
+  - The CTE save response
+  - The list query parameter numbers
+  - Screen state (preventing mix-up of table of contents lists, edit and cancel, lock during a request)
+  - The accuracy of the docs
+- There were no high or medium comments. There was no issue to split off.
+- Comment (low): there were no integration tests for sending a missing textbook or a table of contents entry of another textbook with PUT, or for the filter on a textbook with no records.
+  - Applied: I added both cases to the integration tests. It also checks that a rejected edit does not change the record.
+- Comment (low): PUT takes an omitted `textbookId` and `contentId` as null and clears the link. It is intended because the existing PUT is a full replacement, but it was not written in the docs.
+  - Applied: I wrote it in the limits below.
+- Comment (low): I recorded the two following as limits because they are rare cases.
+  - If the textbook and table of contents lists cannot be loaded, the select box looks like "not selected" but the existing IDs remain in the form. When you save an edit, the link is kept as it is.
+  - Even if you get a 400 because the table of contents was deleted in another tab, the chapter/section list is updated when you change the textbook or reopen the screen.
 
-## 자동 코드 리뷰 2차
+## Automated code review, round 2
 
-별도 읽기 전용 리뷰 에이전트가 1차 반영(cc53b52)과 최종 파일을 다시 확인했다. 리뷰는 최대 2회이므로 3차 리뷰는 하지 않는다.
+A separate read-only review agent checked the first-round fix (cc53b52) and the final files again. The review is limited to 2 rounds, so I do not do a third.
 
-- 추가한 통합 테스트의 단언과 이후 단계의 순서가 코드와 맞는다고 확인됐다.
-  - 거부된 수정 후 기록이 `section`에 연결된 상태를 유지한다.
-  - 삭제 차단 → 연결 변경 → 삭제 성공 순서가 맞다.
-  - CHECK(23514) 확인도 맞다.
-- 코드 지적과 분리할 이슈는 없었다.
-- 지적(문서): 테스트 목록에 기록 없는 교재 필터와 거부된 수정이 빠져 있었다.
-  - 반영: 1차 반영 내용으로 테스트 목록에 추가했다.
+- It was confirmed that the assertions of the added integration tests and the order of later steps match the code.
+  - After a rejected edit, the record stays linked to `section`.
+  - The order delete blocked -> change the link -> delete succeeds is right.
+  - The CHECK (23514) check is right too.
+- There were no code comments and no issue to split off.
+- Comment (docs): the test list was missing the filter on a textbook with no records and the rejected edit.
+  - Applied: I added them to the test list as the first-round fix content.
 
-## 한계·후속
+## Limits and follow-up
 
-- `PUT /api/study-logs/:id`는 전체 교체다. `textbookId`·`contentId`를 생략하면 연결이 비워진다. 화면은 항상 두 값을 보낸다.
-- 교재·목차 목록을 불러오지 못했을 때와 다른 곳에서 목차가 삭제됐을 때의 화면 갱신은 위 1차 리뷰 기록대로다.
+- `PUT /api/study-logs/:id` is a full replacement. If you omit `textbookId` and `contentId`, the link is cleared. The screen always sends both values.
+- The screen update when the textbook and table of contents lists could not be loaded and when the table of contents was deleted elsewhere is as in the first review record above.
 
-- 교재 화면(#21)에서 삭제가 409로 거부되면 기존 오류 표시로 서버 메시지가 보인다. 별도 안내는 없다.
-- 목차 화면에서 연결된 목차를 삭제하는 경우의 표시는 목차 화면(#22)에서 다룬다.
+- When a delete is refused with 409 on the textbook screen (#21), the server message is shown with the existing error display. There is no separate notice.
+- The display for deleting a linked table of contents entry on the table of contents screen is handled in the table of contents screen (#22).

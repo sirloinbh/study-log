@@ -1,108 +1,108 @@
-# #21 교재 목록·상세·등록/수정/삭제 화면
+# #21 Textbook list, detail, and register, edit, and delete screens
 
-- 이슈: [#21](https://github.com/sirloinbh/study-log/issues/21) (상위 #5)
-- 브랜치: `feat/21-textbook-screens`
-- 선행: #12 교재 기본 정보 DB·API (병합 완료)
+- Issue: [#21](https://github.com/sirloinbh/study-log/issues/21) (parent #5)
+- Branch: `feat/21-textbook-screens`
+- Prerequisite: #12 textbook basic info DB and API (merged)
 
-## 목적
+## Purpose
 
-#12에서 만든 교재 API(`/api/textbooks`)를 화면에서 쓸 수 있게 한다. 교재를 등록하고, 목록에서 골라 상세를 보고, 수정·삭제한다.
+Make the textbook API (`/api/textbooks`) built in #12 usable on the screen. Register a textbook, pick it from the list to see the detail, and edit and delete it.
 
-## 변경
+## Changes
 
-- `frontend/src/Textbooks.tsx`: 교재 화면.
-  - 등록 폼: 제목(필수, 200자), 저자(200자), 판본(50자). 길이 제한은 API와 같고, 검증은 서버가 다시 한다.
-  - 등록하면 폼을 비우고, 새 교재를 상세에 보여 준다. 수정은 PUT으로 저장한다. 저장 후 목록을 서버에서 다시 불러온다.
-  - 서버의 한국어 검증 메시지(예: 공백 제목 → "제목을 입력하세요")를 `role="alert"`로 보여 주고 입력은 유지한다.
-  - 목록: 서버 순서(제목순)대로 제목과 "저자 · 판본"을 보여 준다. 비어 있는 값은 생략한다. 목록이 없으면 "아직 등록한 교재가 없습니다", 조회에 실패하면 "교재 목록을 불러오지 못했습니다: …"를 보여 준다. 실패해도 이미 보이던 목록은 유지한다.
-  - 상세: 목록에서 제목을 누르면 제목·저자·판본을 보여 준다. 빈 값은 "—"로 표시한다. 상세에서 수정과 삭제를 한다. 상세는 목록 데이터를 따르므로, 다른 곳에서 삭제된 교재는 다음 조회 때 상세에서도 사라진다.
-  - 삭제는 "삭제 확인"을 한 번 더 눌러야 실행된다. 확인 단계에서 취소할 수 있다.
-  - 학습 기록 화면과 같은 규칙을 따른다.
-    - 요청 중에는 입력과 동작 버튼을 잠근다.
-    - 수정을 저장하거나 취소하면 수정 전에 쓰던 새 교재 입력으로 돌아간다.
-    - 수정 중인 교재에 대한 404만 수정 모드를 끝낸다.
-    - 버튼 `aria-label`에 교재 제목을 넣는다.
-  - PC에서는 목록과 상세를 2열로, 모바일에서는 위아래로 놓는다. 한 열로 쌓이는 폭(760px 이하)에서만 교재를 고르면 상세 카드로 포커스를 옮긴다. PC에서는 키보드 포커스가 목록에 남는다(1차 리뷰 반영).
-- `frontend/src/textbook.ts`: 교재 타입, 길이 제한, 빈 폼, "저자 · 판본" 표시 함수. Windows처럼 대소문자를 구분하지 않는 파일 시스템에서 `Textbooks.tsx`와 충돌하지 않게 이름을 `textbook.ts`로 정했다.
-- `frontend/src/api.ts`: `requestJson`·`RequestError`를 `study-logs.ts`에서 옮겨 두 화면이 함께 쓴다. 동작은 바꾸지 않았다.
-- `frontend/src/main.tsx`: 메뉴에 "교재"를 추가했다(학습 기록과 설정 사이). 학습 기록처럼 서버 연결이 확인된 뒤에만 화면을 보여 준다.
-- `frontend/src/style.css`: 교재 폼(제목 2칸), 목록·상세 2열(760px 이하 1열), 상세 정의 목록 스타일. 기존 폼·목록 클래스를 재사용했다.
+- `frontend/src/Textbooks.tsx`: the textbook screen.
+  - Register form: title (required, 200 characters), author (200 characters), and edition (50 characters). The length limits are the same as the API, and the server validates again.
+  - When you register, it clears the form and shows the new textbook in the detail. An edit is saved with PUT. After saving, it loads the list again from the server.
+  - It shows the server's Korean validation messages (for example a title of only spaces -> "제목을 입력하세요", "Enter the title") with `role="alert"` and keeps the input.
+  - List: it shows the title and "author · edition" in the server order (by title). Empty values are left out. If there is no list, it shows "아직 등록한 교재가 없습니다" ("No textbooks registered yet"), and if the lookup fails, "교재 목록을 불러오지 못했습니다: …" ("Could not load the textbook list: …"). Even on failure, the list already showing is kept.
+  - Detail: when you press a title in the list, it shows the title, author, and edition. An empty value is shown as "—". You edit and delete from the detail. The detail follows the list data, so a textbook deleted elsewhere also disappears from the detail at the next lookup.
+  - Delete runs only after you press "삭제 확인" ("Confirm delete") once more. You can cancel at the confirm step.
+  - It follows the same rules as the study log screen.
+    - During a request, the inputs and action buttons are locked.
+    - When you save or cancel an edit, it goes back to the new textbook input you were writing before the edit.
+    - Only a 404 for the textbook being edited ends edit mode.
+    - It puts the textbook title in the button `aria-label`.
+  - On PC the list and detail are in 2 columns, and on mobile one above the other. Only at the width where they stack in one column (760px or less), picking a textbook moves focus to the detail card. On PC, keyboard focus stays in the list (first-review fix).
+- `frontend/src/textbook.ts`: the textbook type, the length limits, the empty form, and the "author · edition" display function. I named it `textbook.ts` so it does not collide with `Textbooks.tsx` on a file system that does not distinguish case, like Windows.
+- `frontend/src/api.ts`: moved `requestJson` and `RequestError` from `study-logs.ts` so the two screens share them. Behavior is unchanged.
+- `frontend/src/main.tsx`: added "교재" ("Textbooks") to the menu (between study logs and settings). Like study logs, it shows the screen only after the server connection is confirmed.
+- `frontend/src/style.css`: the textbook form (2 cells for the title), the list and detail in 2 columns (1 column at 760px or less), and the definition list style for the detail. I reused the existing form and list classes.
 
-## 테스트
+## Tests
 
-- `backend/test/ui-harness.ts`: 최소 React 대역이 hook 상태를 컴포넌트별로 보관한다. 렌더되지 않은 컴포넌트의 상태는 버린다(언마운트와 같음).
-  - 이전에는 hook 상태를 호출 순서로만 보관했다. 그래서 화면을 바꾸면 새 화면이 이전 화면의 상태 칸을 물려받았다(#11 기록의 하네스 한계).
-  - 이제 화면 전환을 테스트할 수 있다.
-- `backend/test/textbooks-ui.test.ts`(가짜 API, 요청 기록), 최초 15건(1차 리뷰 후 17건):
-  - 목록 표시(서버 순서, "저자 · 판본", 빈 값 생략)와 첫 요청 `GET /api/textbooks`
-  - 빈 목록 안내, 조회 실패 안내(빈 목록 문구를 함께 보여 주지 않음)
-  - 등록 POST 본문 → 목록 재조회 → "등록했습니다", 폼 비움, 상세에 새 교재 표시
-  - 서버 400 메시지 표시와 입력 유지
-  - 상세 표시(빈 값 "—", `aria-current`), 다른 교재로 전환
-  - 상세에서 수정 → PUT 본문 → 목록·상세 반영 → 등록 모드 복귀
-  - 수정 취소 시 작성 중이던 새 교재 입력 복원
-  - 삭제는 확인 전까지 DELETE를 보내지 않음, 확인 취소, 삭제 후 상세 비움
-  - 수정 중인 교재를 삭제하면 수정 종료
-  - 다른 곳에서 삭제된 교재를 수정 저장(404) → 수정 종료, 목록·상세 갱신
-  - 저장 요청 중 입력·버튼 잠금과 POST 1회
-  - 상세 버튼의 `aria-label`
-  - 화면을 떠났다 돌아오면 새로 시작(하네스 변경 검증, 학습 기록 → 교재 상태 섞임 없음)
-  - `textbookMeta` 단위 검사
-- 기존 `study-logs-ui.test.ts`, `app-ui.test.ts`는 수정 없이 통과한다.
+- `backend/test/ui-harness.ts`: the minimal React stand-in keeps the hook state per component. The state of a component that is not rendered is discarded (the same as unmounting).
+  - Before, hook state was kept only by call order. So when you changed screens, the new screen inherited the state cells of the previous screen (the harness limit in the #11 record).
+  - Now screen switching can be tested.
+- `backend/test/textbooks-ui.test.ts` (a fake API, request records), 15 at first (17 after the first review):
+  - The list display (server order, "author · edition", empty values left out) and the first request `GET /api/textbooks`
+  - The empty list notice, and the lookup failure notice (the empty list wording is not shown together)
+  - The register POST body -> reloading the list -> "등록했습니다" ("Registered"), clearing the form, and showing the new textbook in the detail
+  - Showing the server 400 message and keeping the input
+  - Detail display (an empty value "—", `aria-current`), and switching to another textbook
+  - Edit in the detail -> PUT body -> reflecting in the list and detail -> returning to register mode
+  - Restoring the new textbook input being written when an edit is cancelled
+  - Delete does not send DELETE until confirmed, cancelling the confirm, and clearing the detail after a delete
+  - Deleting the textbook being edited ends the edit
+  - Saving an edit of a textbook deleted elsewhere (404) -> the edit ends, and the list and detail are updated
+  - Locking the input and buttons during a save request and 1 POST
+  - The `aria-label` of the detail buttons
+  - If you leave the screen and come back, it starts anew (verifying the harness change, no state mix from study logs -> textbooks)
+  - A unit check of `textbookMeta`
+- The existing `study-logs-ui.test.ts` and `app-ui.test.ts` pass without changes.
 
-## 검증
+## Verification
 
-| 명령                                    | 환경                             | 결과                                                                                                                            |
-| --------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
-| `npm run check`                         | 로컬, `TEST_DATABASE_URL` 미설정 | exit 0. backend tests 53, pass 50, fail 0, **skipped 3**(DB 통합), 스킬 4 pass, 빌드 통과                                       |
-| Playwright(Chromium) 화면 확인 1440×900 | 아래 브라우저 확인 참고          | 등록·서버 검증 오류·상세·수정(제목 입력에 포커스)·삭제 확인 흐름이 기대대로 동작. 페이지 오류 0건                               |
-| Playwright(Chromium) 화면 확인 390×844  | 같은 환경                        | 목록·상세 1열, 가로 스크롤 없음(`scrollWidth` 375 ≤ `innerWidth` 390, 차이는 세로 스크롤바), 버튼 높이 44px, 상세로 포커스 이동 |
+| Command                                     | Environment                        | Result                                                                                                                                                                                |
+| ------------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run check`                             | Local, `TEST_DATABASE_URL` not set | exit 0. backend tests 53, pass 50, fail 0, **skipped 3** (DB integration), skills 4 pass, build passed                                                                                |
+| Playwright (Chromium) screen check 1440×900 | See the browser check below        | The flows of register, server validation error, detail, edit (focus on the title input), and delete confirmation work as expected. 0 page errors                                      |
+| Playwright (Chromium) screen check 390×844  | The same environment               | List and detail in 1 column, no horizontal scroll (`scrollWidth` 375 ≤ `innerWidth` 390, the difference is the vertical scrollbar), button height 44px, and focus moves to the detail |
 
-- 건너뛴 3건은 DB 통합 테스트다. 이번 변경은 화면과 테스트 하네스만 바꾸고 DB·API는 바꾸지 않았다. 다만 이 PC에는 `docs/next-steps`에 적힌 `TEST_DATABASE_URL`과 `pgpass.conf`가 없고, PostgreSQL 서비스도 `postgresql-x64-18`로 기록과 달라 로컬에서 실행하지 못했다. CI(PostgreSQL 17 서비스)에서 실행된다.
+- The 3 skipped are DB integration tests. This change changes only the screen and the test harness and does not change the DB or API. But this PC does not have the `TEST_DATABASE_URL` and `pgpass.conf` written in `docs/next-steps`, and the PostgreSQL service is `postgresql-x64-18`, different from the record, so I could not run it locally. They run in CI (a PostgreSQL 17 service).
 
-### 브라우저 확인
+### Browser check
 
-- 로컬에서 Docker와 테스트 DB를 쓸 수 없어 실제 Express 앱(`createApp`: 검증·라우터·오류 처리기)에 메모리 기반 가짜 풀을 붙였다. 이 앱을 3102 포트로 띄우고 Vite 개발 서버(5202, `/api` 프록시)로 접속했다. 가짜 풀 스크립트는 저장소에 넣지 않았다.
-- Chrome 확장이 연결되지 않아 Playwright(Chromium)로 조작했다.
-- 확인한 흐름(1440×900):
-  1. 메뉴 "교재" → 목록 "미적분학 | 선형대수와 그 응용 Gilbert Strang · 4판"
-  2. "확률과 통계 / 홍길동 / 2판" 등록 → "등록했습니다", 목록에 추가, 상세에 표시
-  3. 공백 제목 등록 → 서버 메시지 "제목을 입력하세요"
-  4. "미적분학" 상세(저자·판본 "—") → 수정(제목 입력에 포커스) → 판본 3판 → "수정했습니다", 상세 반영, 등록 모드 복귀
-  5. 삭제 → "삭제 확인" → "삭제했습니다", 목록에서 제거, 상세 비움
-- 콘솔 오류는 `favicon.ico` 404(기존)와 3번의 의도한 400 응답뿐이다.
-- 스크린샷: [PC 1440×900](assets/21-pc-1440x900.png), [모바일 390×844](assets/21-mobile-390x844.png).
+- I could not use Docker and the test DB locally, so I attached an in-memory fake pool to the real Express app (`createApp`: validation, routers, and the error handler). I started this app on port 3102 and connected with the Vite dev server (5202, `/api` proxy). I did not put the fake pool script in the repository.
+- The Chrome extension was not connected, so I operated with Playwright (Chromium).
+- Flows checked (1440×900):
+  1. Menu "교재" -> list "미적분학 | 선형대수와 그 응용 Gilbert Strang · 4판" ("Calculus | Linear algebra and its applications Gilbert Strang · 4th edition")
+  2. Register "확률과 통계 / 홍길동 / 2판" ("Probability and statistics / Hong Gildong / 2nd edition") -> "등록했습니다", added to the list, and shown in the detail
+  3. Register with a title of only spaces -> the server message "제목을 입력하세요"
+  4. Detail of "미적분학" (author and edition "—") -> edit (focus on the title input) -> edition 3rd -> "수정했습니다" ("Edited"), reflected in the detail, and back to register mode
+  5. Delete -> "삭제 확인" -> "삭제했습니다" ("Deleted"), removed from the list, and the detail cleared
+- The console errors were only the `favicon.ico` 404 (existing) and the intended 400 response of step 3.
+- Screenshots: [PC 1440×900](assets/21-pc-1440x900.png), [mobile 390×844](assets/21-mobile-390x844.png).
 
-## 자동 코드 리뷰 1차
+## Automated code review, round 1
 
-별도 읽기 전용 리뷰 에이전트가 이슈 #21 완료 기준과 PR 전체 변경을 검토했다.
+A separate read-only review agent reviewed the issue #21 done criteria and the whole PR changes.
 
-- API 계약, 하네스 변경(기존 테스트 영향 없음), 학습 기록 화면 CSS 회귀 없음, 문서 정확성은 문제없다고 확인됐다.
-- high·medium 지적은 없었다.
+- It was confirmed there is no problem with the API contract, the harness change (no effect on existing tests), no CSS regression on the study log screen, and the accuracy of the docs.
+- There were no high or medium comments.
 
-- 지적(low): 교재를 고르면 PC에서도 상세 카드로 포커스가 옮겨져, 키보드 사용자가 목록 위치를 잃는다. 문서는 "모바일에서"라고 적어 코드와 달랐다.
-  - 반영: `matchMedia('(max-width: 760px)')`가 맞을 때만 포커스를 옮긴다.
-  - 하네스 `mount`가 `document`·`matchMedia` 같은 브라우저 전역을 주입받게 했다.
-  - 테스트를 추가했다. PC 폭에서는 포커스 이동이 없고 모바일 폭에서는 `textbook-detail`로 옮긴다. 수정 전 코드에서 실패(fail 1)하고 수정 후 통과하는 것을 확인했다.
-  - 브라우저 재확인(Playwright, 제목 버튼에서 Enter): 1440에서는 포커스가 "미적분학" 버튼에 남고, 390에서는 `textbook-detail`로 옮겨진다.
-- 지적(low): "삭제" ↔ "삭제 확인/취소" 버튼이 바뀌거나 삭제가 끝나면 포커스를 가진 버튼이 사라져 포커스가 `<body>`로 떨어진다.
-  - 분리: 학습 기록 화면도 같은 구조라 두 화면에 걸친 수정이다. [#65](https://github.com/sirloinbh/study-log/issues/65)로 분리했다.
-- 지적(low): 이전 목록 응답 무시(effect 정리)는 하네스가 정리 함수를 실행하지 않아 테스트할 수 없다. 기존 한계이며 테스트했다고 주장하지 않는다.
-- 지적(참고): 삭제 실패 테스트가 없었다.
-  - 반영: 다른 곳에서 이미 삭제된 교재를 삭제 확인하면(404) 메시지를 보여 주고 목록을 다시 불러오며 상세를 비우는 테스트를 추가했다.
-- 검증: 반영 후 `npm run check`(`TEST_DATABASE_URL` 미설정) exit 0. backend tests 55, pass 52, fail 0, skipped 3(DB 통합), 스킬 4 pass, 빌드 통과. 위 검증 표는 리뷰 반영 전 최초 커밋 기준이다.
+- Comment (low): if you pick a textbook, focus moves to the detail card on PC too, so a keyboard user loses their place in the list. The document said "on mobile", which differed from the code.
+  - Applied: it moves focus only when `matchMedia('(max-width: 760px)')` matches.
+  - I made the harness `mount` take browser globals such as `document` and `matchMedia` as injected.
+  - I added tests. On a PC width there is no focus move, and on a mobile width it moves to `textbook-detail`. I confirmed it fails on the code before the fix (fail 1) and passes after the fix.
+  - Browser re-check (Playwright, Enter on the title button): at 1440, focus stays on the "미적분학" button, and at 390, it moves to `textbook-detail`.
+- Comment (low): when the "삭제" <-> "삭제 확인/취소" buttons swap or a delete finishes, the button that had focus disappears and focus falls to `<body>`.
+  - Split: the study log screen has the same structure, so it is a fix across two screens. I split it into [#65](https://github.com/sirloinbh/study-log/issues/65).
+- Comment (low): ignoring an earlier list response (effect cleanup) cannot be tested because the harness does not run cleanup functions. It is an existing limit, and I do not claim it was tested.
+- Comment (note): there was no delete failure test.
+  - Applied: I added a test that if you confirm the delete of a textbook already deleted elsewhere (404), it shows the message, loads the list again, and clears the detail.
+- Verification: after the fixes, `npm run check` (`TEST_DATABASE_URL` not set) exit 0. backend tests 55, pass 52, fail 0, skipped 3 (DB integration), skills 4 pass, build passed. The verification table above is based on the first commit before the review fixes.
 
-## 자동 코드 리뷰 2차
+## Automated code review, round 2
 
-별도 읽기 전용 리뷰 에이전트가 1차 반영(25c2827)과 최종 전체 변경을 다시 확인했다. 리뷰는 최대 2회이므로 3차 리뷰는 하지 않는다.
+A separate read-only review agent checked the first-round fix (25c2827) and the final whole changes again. The review is limited to 2 rounds, so I do not do a third.
 
-- 1차 반영 4건(조건부 포커스, 삭제 404 테스트, #65 분리, 하네스 한계 기록)은 정확하고 완전하다고 확인됐다.
-- 코드 지적은 없었다. 새로 분리할 이슈도 없다.
-- 지적(low, 문서): 검증 표는 tests 53이고 1차 절은 55라서, 표가 최신 결과처럼 읽혔다.
-  - 반영: 1차 절에 반영 후 `npm run check` 결과를 적고, 표가 최초 커밋 기준임을 밝혔다. 문서만 바꿨으므로 앱 테스트는 다시 실행하지 않고 `npm run format:check`로 확인했다.
+- It was confirmed that the 4 first-round fixes (conditional focus, the delete 404 test, the #65 split, and recording the harness limit) are exact and complete.
+- There were no code comments. There is no new issue to split off either.
+- Comment (low, docs): the verification table says tests 53 and the first-round section says 55, so the table read like the latest result.
+  - Applied: I wrote the `npm run check` result after the fixes in the first-round section and said the table is based on the first commit. I changed only the docs, so I did not re-run the app tests and checked with `npm run format:check`.
 
-## 한계·후속
+## Limits and follow-up
 
-- 목차·연습문제는 상세에 아직 없다. 목차 DB·API #13, 목차 화면 #22에서 상세에 붙인다.
-- 학습 기록이 연결된 교재의 삭제 차단(#14)이 생기면 서버 메시지를 그대로 보여 준다. 별도 화면 처리는 그때 확인한다.
-- 이 PC의 로컬 DB 환경이 `docs/next-steps/README.md`의 "로컬 환경 현황"과 다르다(위 검증 참고). 문서 갱신은 이 PR 범위 밖이다.
+- The table of contents and exercises are not in the detail yet. I attach them to the detail in the table of contents DB and API #13 and the table of contents screen #22.
+- When blocking the delete of a textbook with linked study logs (#14) arrives, the server message is shown as it is. I will check any separate screen handling then.
+- The local DB environment on this PC differs from "Local environment status" in `docs/next-steps/README.md` (see Verification above). Updating that document is outside this PR's scope.

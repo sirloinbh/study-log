@@ -1,69 +1,69 @@
-# #33 한국 공휴일 데이터와 평일/휴일 판정
+# #33 Korean holiday data and the weekday/holiday decision
 
-- 이슈: [#33](https://github.com/sirloinbh/study-log/issues/33)
-- 브랜치: `feat/33-holidays`
-- 규칙: [학습 일정 규칙](../decisions/schedule-rules.md) 3장
+- Issue: [#33](https://github.com/sirloinbh/study-log/issues/33)
+- Branch: `feat/33-holidays`
+- Rules: chapter 3 of the [study schedule rules](../decisions/schedule-rules.md)
 
-## 목적
+## Purpose
 
-일정 분량 계산(#34)에 쓸 공휴일 조회와 평일·주말·공휴일 판정을 서버에 둔다.
+Put the holiday lookup and the weekday, weekend, and holiday decision on the server, to use in the schedule amount calculation (#34).
 
-## 변경
+## Changes
 
-- `database/migrations/014_holidays.sql`: 연도별 조회 시각(`holiday_years`)과 공휴일(`holidays`).
+- `database/migrations/014_holidays.sql`: the lookup time per year (`holiday_years`) and the holidays (`holidays`).
 - `backend/src/holidays.ts`:
-  - `dayKind`: 날짜를 평일, 주말, 공휴일로 판정한다. 주말에 겹친 공휴일은 공휴일이다.
-  - `dataPortalHolidays`: 공공데이터포털 API를 한 해 12번 조회한다.
-  - `loadHolidays`: 저장한 공휴일을 쓰고, 규칙대로 다시 조회하거나 거부한다.
-- `compose.yaml`, `.env.example`: `HOLIDAY_API_KEY`를 더했다.
+  - `dayKind`: decides a date as a weekday, a weekend, or a holiday. A holiday that overlaps a weekend is a holiday.
+  - `dataPortalHolidays`: looks up the Public Data Portal API 12 times per year.
+  - `loadHolidays`: uses the saved holidays, and looks up again or rejects according to the rules.
+- `compose.yaml`, `.env.example`: added `HOLIDAY_API_KEY`.
 
-API 경로는 만들지 않았다. 규칙상 공휴일은 일정을 생성할 때만 쓰므로 #34가 `loadHolidays`를 부른다.
+I did not make an API route. By the rules, holidays are used only when a schedule is created, so #34 calls `loadHolidays`.
 
-## 확인하지 못한 것
+## Not confirmed
 
-API 키가 없어(#129) **실제 API를 호출해 보지 못했다.** 응답 해석은 공식 문서의 항목 설명과 이 API의 알려진 응답 형태를 바탕으로 한 것이다. 특히 다음은 키를 받은 뒤 확인해야 한다.
+There was no API key (#129), so **I could not call the real API.** The response interpretation is based on the item descriptions in the official documentation and the known response shape of this API. In particular, the following must be checked after the key is received.
 
-- JSON 응답을 요청하는 `_type=json`은 공식 문서에 없다.
-- 대체공휴일과 임시공휴일이 `isHoliday: Y`로 오는지.
-- 공휴일이 없는 달의 `items` 모양과 키 오류 응답의 모양.
+- `_type=json`, which requests a JSON response, is not in the official documentation.
+- Whether substitute holidays and temporary holidays come with `isHoliday: Y`.
+- The `items` shape of a month with no holidays, and the shape of the key error response.
 
-응답을 엄격하게 읽어 예상과 다른 모양은 조회 실패로 처리하고, 저장본이 없으면 일정 생성을 거부한다. 다만 완전하지는 않다. 고정 공휴일이 없는 달(2, 4, 7, 9, 11월)의 공휴일이 올바른 모양의 빈 응답으로 빠지거나, 실제로 쉬는 날이 `isHoliday: N`으로 오면 코드로 알아낼 수 없다. 설날과 추석이 여기에 걸릴 수 있어 키를 받은 뒤의 확인이 꼭 필요하다. 확인 절차는 `docs/next-steps/README.md`에 적었다. 이슈의 완료 기준에는 실제 호출이 없어 이 PR로 #33을 닫고, 확인은 #129에 맡긴다.
+I read the response strictly, so a shape different from what is expected is handled as a lookup failure, and if there is no saved copy, schedule creation is rejected. But it is not complete. If a holiday in a month with no fixed holiday (February, April, July, September, November) is dropped as an empty response of the right shape, or a day that is really off comes with `isHoliday: N`, the code cannot find out. The Lunar New Year and Chuseok could fall here, so checking after receiving the key is a must. I wrote the procedure for the check in `docs/next-steps/README.md`. The issue's done criteria have no real call, so this PR closes #33, and the check is left to #129.
 
-운영 서버의 `HOLIDAY_API_KEY` 전달 방식은 정하지 않았다. `compose.yaml`은 서버 `.env`의 값을 읽는다.
+How to pass `HOLIDAY_API_KEY` to the production server is not decided. `compose.yaml` reads the value from the server `.env`.
 
-## 구현 판단
+## Implementation judgment
 
-- 조회 실패 메시지에 원인을 싣지 않는다. 요청 URL에 키가 있어 오류 문구로 샐 수 있기 때문이다.
-- 포털은 키를 인코딩한 것과 하지 않은 것으로 함께 주므로, `%`가 있으면 그대로 보낸다.
-- 다시 조회하지 못해 저장본을 쓸 때는 조회 시각을 바꾸지 않아, 다음 생성 때 다시 시도한다.
-- 시간 제한은 한 해 12번을 합쳐 30초이다. 일정 생성 요청이 기다리고 있기 때문이다.
-- 두 조회가 겹치면 먼저 읽은 쪽이 나중에 저장할 수 있다. 다음 조회에서 바로잡히고 창이 좁아 막지 않았다.
-- `HolidayError`의 503과 메시지를 응답으로 돌려주는 일은 경로를 만드는 #34에서 한다. 전역 오류 처리는 4xx만 그대로 돌려준다.
+- The lookup failure message does not carry the cause. The request URL has the key, so it could leak into the error text.
+- The portal gives the key both encoded and not encoded, so if there is a `%`, I send it as it is.
+- When it cannot look up again and uses the saved copy, it does not change the lookup time, so it tries again at the next creation.
+- The time limit is 30 seconds in total for the 12 requests of a year. This is because the schedule creation request is waiting.
+- If two lookups overlap, the one that read first can save later. It is corrected at the next lookup, and the window is narrow, so I did not block it.
+- Returning the 503 and message of `HolidayError` as the response is done in #34, which makes the route. The global error handling returns only 4xx as it is.
 
-## 리뷰
+## Review
 
-1차 리뷰에서 큰 결함을 찾아 고쳤다. 정상 코드에 본문이 없는 응답을 공휴일 없는 달로 받아, 공휴일이 빠진 해를 저장하고 7일 동안 믿을 수 있었다. 함께 고친 것은 다음과 같다.
+In the first review I found a big defect and fixed it. A normal-status response with no body was taken as a month with no holidays, so a year missing holidays could be saved and trusted for 7 days. What was fixed together is as follows.
 
-- 건수와 항목 수의 불일치, 빈 `item` 배열, 알 수 없는 `isHoliday`, 다른 달의 날짜를 실패로 본다.
-- 고정 공휴일이 빠진 해를 실패로 본다.
-- 거꾸로 된 연도 범위를 거부한다. 빈 결과를 돌려주면 모든 날이 공휴일이 아닌 날로 판정된다.
-- 예상하지 못한 실패를 "공휴일 없음"으로 기록하지 않는다.
-- 시간 제한을 요청별 10초에서 한 해 합계 30초로 바꿨다.
-- 운영 서버의 키 입력을 사용자 할 일에 적었다.
+- A mismatch between the count and the number of items, an empty `item` array, an unknown `isHoliday`, and a date from another month are treated as failures.
+- A year missing a fixed holiday is treated as a failure.
+- A reversed year range is rejected. If it returned an empty result, every day would be decided as a non-holiday.
+- An unexpected failure is not recorded as "no holidays".
+- I changed the time limit from 10 seconds per request to 30 seconds in total for a year.
+- I wrote the key input for the production server in the user's tasks.
 
-2차 리뷰에서 3건을 더 찾아 고쳤다.
+In the second review I found and fixed 3 more.
 
-- `totalCount`를 숫자로 변환해, `null`이나 빈 문자열이 0이 되어 빈 달로 읽혔다. 숫자와 숫자 문자열만 받는다.
-- 빈 `item` 배열이 건수 0과 함께 오면 빈 달로 읽혔다. 거부한다.
-- 깨진 응답 테스트가 5월을 교체해, 스키마가 느슨해도 고정 공휴일 검사가 대신 막아 통과했다. 고정 공휴일이 없는 2월로 옮겼다.
+- `totalCount` was converted to a number, so `null` or an empty string became 0 and was read as an empty month. Only numbers and numeric strings are accepted.
+- An empty `item` array that came with a count of 0 was read as an empty month. I reject it.
+- The broken response test replaced May, so even if the schema was loose, the fixed holiday check blocked it in its place and the test passed. I moved it to February, which has no fixed holiday.
 
-리뷰는 2회까지라 3차 리뷰 대신, 스키마를 하나씩 느슨하게 되돌려 테스트가 잡는 것을 확인하고 되돌렸다.
+The review is limited to 2 rounds, so instead of a third review, I loosened the schema one thing at a time, confirmed that the tests catch it, and reverted.
 
-## 검증
+## Verification
 
-`TEST_DATABASE_URL`을 설정한 `npm run check`가 통과했다. 백엔드 358건, 프런트 154건, 스킬 4건이 통과했다. 건너뜀은 프런트 2건으로, 중앙 표준에서 온 다크 전용 앱 테스트이다. 테스트 DB에 마이그레이션 014를 적용했다. 화면 변경이 없어 브라우저 확인은 하지 않았다.
+`npm run check` with `TEST_DATABASE_URL` set passed. Backend 358, frontend 154, and skills 4 passed. The skips were 2 frontend tests, the dark-only app tests that came from the central standards. I applied migration 014 to the test DB. There was no screen change, so I did not check in a browser.
 
-## 테스트
+## Tests
 
-- `backend/test/holidays.test.ts`: 대체공휴일을 포함한 판정, 요청 형식과 키 인코딩, 한 건과 여러 건과 빈 달, 키 없음, 읽지 못하는 응답에서 키가 메시지에 없음, 깨진 응답 20가지가 빈 달로 읽히지 않음, 고정 공휴일 누락, 거꾸로 된 연도.
-- `backend/test/holidays.integration.test.ts`: 저장과 재사용, 7일 뒤 교체, 같은 날짜의 공휴일 둘, 실패와 빈 결과에서 저장본 사용, 저장본 없으면 거부.
+- `backend/test/holidays.test.ts`: the decision including substitute holidays, the request format and key encoding, one item, several items, and an empty month, no key, the key not being in the message for an unreadable response, 20 kinds of broken responses are not read as an empty month, a missing fixed holiday, and a reversed year.
+- `backend/test/holidays.integration.test.ts`: saving and reuse, replacing after 7 days, two holidays on the same date, using the saved copy on failure and on an empty result, and rejecting if there is no saved copy.

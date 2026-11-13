@@ -1,64 +1,64 @@
-# #34 학습 일정 DB·API
+# #34 Study schedule DB and API
 
-- 이슈: [#34](https://github.com/sirloinbh/study-log/issues/34)
-- 브랜치: `feat/34-schedules`
-- 규칙: [학습 일정 규칙](../decisions/schedule-rules.md) 1, 3, 6장
+- Issue: [#34](https://github.com/sirloinbh/study-log/issues/34)
+- Branch: `feat/34-schedules`
+- Rules: chapters 1, 3, and 6 of the [study schedule rules](../decisions/schedule-rules.md)
 
-## 목적
+## Purpose
 
-시작일부터 종료일까지 날짜별 목표 시간을 자동으로 만들고, 일정을 조회·수정·삭제한다.
+Automatically create the target time for each date from the start date to the end date, and look up, edit, and delete schedules.
 
-## 변경
+## Changes
 
 - `database/migrations/015_schedules.sql`: `schedules`, `schedule_items`.
 - `backend/src/schedules.ts`:
-  - `plannedItems`: 평일과 주말·공휴일의 분량으로 항목을 계산한다. 분량이 0인 날은 항목이 없다.
-  - `GET /api/schedules`, `GET /api/schedules/:id`, `POST /api/schedules`, `PUT /api/schedules/:id`(이름), `DELETE /api/schedules/:id`.
-- `backend/src/app.ts`: 경로를 연결하고 `holidayFetcher` 옵션을 더했다.
-- `backend/test/helpers.ts`: 테스트가 실제 공휴일 API를 부르지 않게 기본 조회를 실패로 둔다.
-- `docs/decisions/schedule-rules.md`: 5장(지금의 6장)을 더했다.
+  - `plannedItems`: calculates items from the amounts for weekdays and for weekends and holidays. A day with an amount of 0 has no item.
+  - `GET /api/schedules`, `GET /api/schedules/:id`, `POST /api/schedules`, `PUT /api/schedules/:id` (the name), `DELETE /api/schedules/:id`.
+- `backend/src/app.ts`: connected the routes and added the `holidayFetcher` option.
+- `backend/test/helpers.ts`: set the default lookup to fail so tests do not call the real holiday API.
+- `docs/decisions/schedule-rules.md`: added chapter 5 (now chapter 6).
 
-## 구현 판단
+## Implementation judgment
 
-이슈에 없어 에이전트가 정한 내용은 규칙 6장에 적었다.
+What the agent decided because the issue did not say is written in rule chapter 6.
 
-- 수정은 이름만 받는다. 기간이나 분량을 바꾸면 공휴일을 다시 읽어 항목을 새로 만들어야 하는데, 규칙 3장이 생성할 때만 쓰게 하고 완료하거나 옮긴 항목(#37)이 사라지기 때문이다.
-- 시작일은 오늘 이후만 받는다. 지난 항목은 #37의 자동 밀기로 바로 옮겨진다.
-- 기간은 366일 이하이다. 조회할 연도가 둘을 넘지 않는다.
-- 종료일은 내년 말까지이다. 빈 해는 저장하지 않아 먼 미래를 요청할 때마다 API를 12번씩 부르기 때문이다.
-- 분량은 분 단위 정수이다. 화면의 시간 입력을 분으로 바꾸는 일은 #35에서 한다.
-- `HolidayError`는 경로에서 잡아 503과 메시지를 돌려준다. 전역 오류 처리에 맡기면 일반 500이 된다.
+- An edit takes only the name. Changing the period or the amount would need reading the holidays again and creating the items anew, but rule chapter 3 says to use them only at creation, and the items that were completed or moved (#37) would disappear.
+- The start date accepts only today or later. Past items are moved right away by the automatic pushing in #37.
+- The period is at most 366 days. The years to look up do not exceed two.
+- The end date is at most the end of next year. An empty year is not saved, so each request for a far future would call the API 12 times.
+- The amount is an integer number of minutes. Converting the time input on the screen to minutes is done in #35.
+- `HolidayError` is caught in the route and returns 503 and the message. If left to the global error handling, it would become a generic 500.
 
-## 확인하지 못한 것
+## Not confirmed
 
-- API 키가 없어(#129) 실제 공휴일 API로 일정을 만들어 보지 못했다. 키가 없는 동안 실제 서버의 일정 생성은 503으로 거부된다. 저장된 공휴일이 있는 연도는 만들 수 있지만, 앱 DB에는 저장된 공휴일이 없다.
-- 두 해의 공휴일을 모두 처음 읽을 때 조회가 시간 제한까지 걸리면 응답이 최대 60초 걸린다. nginx의 기본 응답 대기도 60초라, 이 경우 화면에는 504로 보일 수 있다. 일정은 공휴일을 읽은 뒤에 만들므로, 조회가 실패하면 일정은 남지 않는다.
-- 내년 공휴일이 언제 공표되는지 확인하지 못했다(#129). 공표 전에 내년까지 이어지는 일정을 만들면 503으로 거부되고, 빈 해는 저장하지 않아 다시 시도할 때마다 12번씩 호출한다.
+- There was no API key (#129), so I could not create a schedule with the real holiday API. While there is no key, schedule creation on the real server is rejected with 503. A year with saved holidays can be created, but the app DB has no saved holidays.
+- When reading the holidays of both years for the first time, if the lookup runs to the time limit, the response can take up to 60 seconds. nginx's default response wait is also 60 seconds, so in this case the screen may show 504. The schedule is created after the holidays are read, so if the lookup fails, no schedule is left.
+- I could not confirm when next year's holidays are published (#129). If you create a schedule that extends to next year before they are published, it is rejected with 503, and an empty year is not saved, so each retry calls 12 times.
 
-## 리뷰
+## Review
 
-1차 리뷰에서 막아야 할 결함은 없었고, 다음을 고쳤다.
+The first review found no defects that had to be blocked, and I fixed the following.
 
-- 잘못된 날짜에 "기간은 366일 이하" 같은 거짓 문구가 함께 나왔다. 날짜가 틀리면 기간을 검사하지 않는다.
-- 이름 수정 직후 다른 탭에서 지우면 본문 없는 200이 나갔다. 404로 답한다.
-- 먼 미래 연도를 요청할 때마다 공휴일 API를 부를 수 있었다. 리뷰는 분리를 제안했지만, 키의 호출 한도가 걸린 문제이고 수정이 작아 여기서 고쳤다.
-- 전역 오류 처리에 대한 주석과 문서의 설명이 사실과 달랐다.
-- 하루 24시간 허용과 같은 시작일의 ID 순서를 테스트에 더했다.
+- A false message such as "the period must be 366 days or less" came together with a wrong date. If the date is wrong, the period is not checked.
+- If a schedule was deleted in another tab right after the name edit, a 200 with no body went out. It answers 404.
+- Each request for a far-future year could call the holiday API. The review suggested splitting it out, but it is a problem tied to the key's call limit and the fix is small, so I fixed it here.
+- The comment about the global error handling and the explanation in the document were not true to the facts.
+- I added to the tests allowing 24 hours a day and the ID order of the same start date.
 
-계산과 검증을 11가지로 일부러 망가뜨려(분량 뒤바꿈, 연도 상한 제거, 경계값 변경 등) 테스트가 모두 잡는 것을 확인하고 되돌렸다.
+I deliberately broke the calculation and validation in 11 ways (swapping the amounts, removing the year limit, changing a boundary value, and so on), confirmed that the tests catch all, and reverted.
 
-2차 리뷰에서도 막아야 할 결함은 없었다. 위 404 수정을 검증하는 테스트가 없다는 지적만 반영했다. 다음은 고치지 않았다.
+The second review also found no defects that had to be blocked. I applied only the comment that there was no test verifying the 404 fix above. I did not fix the following.
 
-- `loadSchedule`의 두 쿼리 사이에 일정이 지워지면 200과 빈 항목으로 답한다. 1인용 앱에서 밀리초 구간이고 데이터가 손상되지 않아, 조회를 트랜잭션으로 묶는 #37에서 함께 본다.
-- 형식이 틀린 날짜에 "존재하지 않는 날짜" 문구가 함께 나온다. 저장소 전체의 날짜 검증에 있는 패턴이라 #159로 분리했다.
+- If the schedule is deleted between the two queries of `loadSchedule`, it answers 200 with empty items. In a single-user app it is a millisecond window and no data is corrupted, so it is looked at together in #37, which wraps the lookup in a transaction.
+- A message "a date that does not exist" comes together with a wrongly formatted date. It is a pattern in the date validation of the whole repository, so I split it into #159.
 
-## 검증
+## Verification
 
-`TEST_DATABASE_URL`을 설정한 `npm run check`가 통과했다. 백엔드 377건, 프런트 154건, 스킬 4건이 통과했다. 건너뜀은 프런트 2건으로, 중앙 표준에서 온 다크 전용 앱 테스트이다. 테스트 DB에 마이그레이션 015를 적용했다. API만 바꿔 브라우저 확인은 하지 않았다.
+`npm run check` with `TEST_DATABASE_URL` set passed. Backend 377, frontend 154, and skills 4 passed. The skips were 2 frontend tests, the dark-only app tests that came from the central standards. I applied migration 015 to the test DB. Only the API changed, so I did not check in a browser.
 
-첫 실행에서는 프런트의 `stats-review` 테스트 1건이 20초 시간 초과로 실패했고, 코드를 바꾸지 않은 다음 실행에서 통과했다. 이 PR은 프런트를 바꾸지 않았다. 실행 시간이 42초와 12초로 달라, 캐시가 없는 첫 실행의 지연으로 추정하지만 측정하지는 않았다.
+In the first run, 1 frontend `stats-review` test failed with a 20 second timeout, and passed in the next run with no code change. This PR did not change the frontend. The run times differed (42 seconds and 12 seconds), so I presume it was a delay of the first run with no cache, but I did not measure it.
 
-## 테스트
+## Tests
 
-- `backend/test/schedules.test.ts`: 기간 일수, 날짜 종류별 분량, 분량 0인 날, 마지막 허용 날짜에서 멈춤, 잘못된 입력이 DB와 공휴일 조회 전에 한국어 400으로 거부됨.
-- `backend/test/schedules.integration.test.ts`: 생성과 항목, 저장한 공휴일 재사용, 연도 경계, 항목이 없는 기간 거부, 366일 경계, 하루 24시간, 내년 말 경계, 공휴일을 읽지 못할 때 503과 일정 없음, 목록과 조회, 이름 수정, 삭제와 항목 삭제, 404, 항목 저장 실패 때 일정이 남지 않음.
+- `backend/test/schedules.test.ts`: the number of days in a period, the amount per kind of day, a day with an amount of 0, stopping at the last allowed date, and wrong input rejected with a Korean 400 before the DB and the holiday lookup.
+- `backend/test/schedules.integration.test.ts`: creation and items, reusing saved holidays, the year boundary, rejecting a period with no items, the 366 day boundary, 24 hours a day, the end-of-next-year boundary, 503 and no schedule when holidays cannot be read, list and lookup, the name edit, deleting and deleting items, 404, and no schedule left when saving items fails.

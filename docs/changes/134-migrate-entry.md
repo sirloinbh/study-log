@@ -1,47 +1,47 @@
-# #134 배포 스크립트의 마이그레이션 단계 고치기
+# #134 Fix the migration step of the deployment script
 
-- 이슈: [#134](https://github.com/sirloinbh/study-log/issues/134)
-- 브랜치: `fix/134-migrate-entry`
+- Issue: [#134](https://github.com/sirloinbh/study-log/issues/134)
+- Branch: `fix/134-migrate-entry`
 
-## 목적
+## Purpose
 
-중앙 관리 파일 `deploy/remote-deploy.sh`는 `node dist/migrate.js`를 실행하는데, 이 앱에는 그 소스가 없었다. 첫 배포부터 마이그레이션 단계에서 실패할 상태였다.
+The centrally managed file `deploy/remote-deploy.sh` runs `node dist/migrate.js`, but this app had no source for it. From the first deployment, it would have failed at the migration step.
 
-## 변경
+## Changes
 
-- `backend/src/migrations.ts`, `backend/src/migrate.ts`: 아직 적용하지 않은 파일만 적용하는 도구. 같은 중앙 표준을 쓰는 `workout-memo`의 구현을 따랐다. 쓰지 않는 `--status` 기능은 빼고, 이 앱의 안내에 맞게 주석을 고쳤다.
+- `backend/src/migrations.ts`, `backend/src/migrate.ts`: a tool that applies only the files not applied yet. It follows the implementation of `workout-memo`, which uses the same central standard. I left out the unused `--status` feature and fixed the comments to match this app's instructions.
 - `backend/package.json`: `npm run db:migrate`.
-- `database/README.md`: 적용 절차.
+- `database/README.md`: the procedure for applying.
 
-## 결정한 점
+## Decisions
 
-- 이력 표 `schema_migrations`와 체크섬을 쓴다. 적용한 파일이 바뀌면 거부한다.
-- 이력 표가 없는 기존 DB는 첫 실행 때 모든 파일을 한 번 더 실행한다. 이 저장소의 마이그레이션 12개는 `IF NOT EXISTS` 등으로 재실행에 안전하고, 통합 테스트로 확인했다.
+- It uses the history table `schema_migrations` and checksums. If a file that was already applied changes, it refuses.
+- An existing DB without the history table runs all files once more on the first run. The 12 migrations in this repository are safe to re-run with `IF NOT EXISTS` and the like, and I confirmed that with integration tests.
 
-## 테스트
+## Tests
 
-- `backend/test/migrations.test.ts`: 체크섬, 대기 파일 계산, 이력 불일치 거부, 파일 이름과 번호 검사.
-- `backend/test/migrations.integration.test.ts`: 빈 스키마에 전체 적용, 재실행 시 변화 없음, 이력 없는 기존 DB의 데이터 보존, 바뀐 파일 거부, 실패한 파일만 되돌리기.
+- `backend/test/migrations.test.ts`: checksums, computing pending files, refusing a history mismatch, and checking file names and numbers.
+- `backend/test/migrations.integration.test.ts`: applying everything to an empty schema, no change on re-run, keeping data in an existing DB without history, refusing a changed file, and rolling back only the failed file.
 
-## 리뷰
+## Review
 
-1차 리뷰에서 배포를 잘못 통과시키는 결함은 없었고, 다음을 이 PR에서 고쳤다.
+In the first review there was no defect that would wrongly let a deployment pass, and I fixed the following in this PR.
 
-- 005, 006의 제약 가드가 스키마를 구분하지 않아, 테스트 스키마에서 제약 5개가 조용히 건너뛰어졌다. 가드에 `conrelid = 'study_logs'::regclass`를 더하고 제약 존재를 테스트한다. 아직 어느 DB에도 기록이 없어 지금은 이 파일을 고칠 수 있다. 로컬 테스트 DB에 남은 기록은 지웠다.
-- `compose.yaml`의 DB 헬스체크가 소켓으로 확인해, 새 볼륨 초기화 중에 통과하면 다음 단계의 TCP 접속이 실패할 수 있었다. `pg_isready -h 127.0.0.1`로 바꿨다. Docker가 없어 실행해 보지는 못했다.
-- 연결이 끊기면 실패한 파일 이름 없이 프로세스가 죽었다. `createPool`을 쓰고, 잠금 해제 실패가 원래 오류를 덮지 않게 했다.
-- `database/README.md`와 `docs/project-setup.md`의 절차를 실제 동작에 맞췄다.
+- The constraint guards in 005 and 006 did not tell schemas apart, so 5 constraints were silently skipped in a test schema. I added `conrelid = 'study_logs'::regclass` to the guards and test that the constraints exist. No DB has recorded them yet, so this file can be fixed now. I deleted the records left in the local test DB.
+- The DB healthcheck in `compose.yaml` checked through a socket, so if it passed during the initialization of a new volume, the TCP connection of the next step could fail. I changed it to `pg_isready -h 127.0.0.1`. I could not run it because there is no Docker.
+- If the connection dropped, the process died without the failed file name. I use `createPool`, and made a failure to release the lock not cover the original error.
+- I matched the procedures in `database/README.md` and `docs/project-setup.md` to the real behavior.
 
-`compose.yaml`이 배포 스크립트의 이미지 태그와 포트 전제를 지키지 않아 롤백이 동작하지 않는 기존 문제는 [#146](https://github.com/sirloinbh/study-log/issues/146)으로 분리했다.
+An existing problem, where `compose.yaml` does not keep the image tag and port assumptions of the deployment script so rollback does not work, was split into [#146](https://github.com/sirloinbh/study-log/issues/146).
 
-2차 리뷰에서 다음을 이 PR에서 고쳤다. 리뷰는 최대 2회이므로 3차 리뷰는 하지 않았다.
+In the second review, the following were fixed in this PR. The review is limited to 2 rounds, so I did not do a third review.
 
-- `localhost`에 접속이 거부되면 메시지가 빈 오류라 빈 줄만 남았다. `DB에 연결할 수 없습니다 (ECONNREFUSED)`로 안내하고, 닫힌 포트로 실행해 확인했다.
-- `docs/next-steps/README.md`에서 끝난 #133을 지우고, #146과 #142의 순서를 적었다.
-- `docs/project-setup.md`의 Compose 템플릿에도 고친 헬스체크를 반영했다.
+- When the connection to `localhost` was refused, the message was an empty error so only a blank line remained. It now tells `DB에 연결할 수 없습니다 (ECONNREFUSED)` ("Cannot connect to the DB (ECONNREFUSED)"), and I confirmed by running against a closed port.
+- In `docs/next-steps/README.md`, I removed the finished #133 and wrote the order of #146 and #142.
+- I reflected the fixed healthcheck in the Compose template in `docs/project-setup.md` too.
 
-## 검증
+## Verification
 
-- `TEST_DATABASE_URL`을 설정한 `npm run check`가 통과했다. 백엔드 325건, 프런트 100건, 스킬 4건이 통과했다. 건너뜀은 프런트 2건으로, 중앙 표준에서 온 다크 전용 앱 테스트이다.
-- 빌드한 `backend/dist/migrate.js`를 기존 테스트 DB에 실행했다. 첫 실행은 12개를 적용했고, 두 번째는 "적용할 마이그레이션이 없습니다"로 끝났다. `DATABASE_URL`이 없으면 안내 후 실패한다. 리뷰 보완 뒤 `npm run db:migrate -w backend`로도 같은 결과를 확인했다.
-- **실제 배포 흐름은 확인하지 못했다.** 이 PC에서 Docker가 실행되지 않아(BIOS의 SVM Mode 꺼짐) `docker compose run … api node dist/migrate.js`를 돌려 보지 못했다. 컨테이너의 경로는 `/app/dist`에서 `../../database/migrations`가 `/database/migrations` 마운트로 이어지는 것을 코드로만 확인했다. Docker를 켠 뒤 확인이 필요하다.
+- `npm run check` with `TEST_DATABASE_URL` set passed. Backend 325, frontend 100, and skills 4 passed. The skips were 2 frontend tests, the dark-only app tests that came from the central standards.
+- I ran the built `backend/dist/migrate.js` against the existing test DB. The first run applied 12, and the second ended with "적용할 마이그레이션이 없습니다" ("There are no migrations to apply"). Without `DATABASE_URL`, it prints a message and fails. After the review fixes, I confirmed the same result with `npm run db:migrate -w backend`.
+- **I could not check the real deployment flow.** Docker does not run on this PC (SVM Mode is off in the BIOS), so I could not run `docker compose run … api node dist/migrate.js`. I only confirmed in the code that in the container, `../../database/migrations` from `/app/dist` leads to the `/database/migrations` mount. It needs to be checked after Docker is turned on.

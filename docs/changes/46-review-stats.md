@@ -1,38 +1,38 @@
-# #46 복습 완료율 통계 API
+# #46 Review completion rate statistics API
 
-- 이슈: [#46](https://github.com/sirloinbh/study-log/issues/46)
-- 브랜치: `feat/46-review-stats`
-- 규칙: [복습 주기 규칙](../decisions/review-rules.md) 5장
+- Issue: [#46](https://github.com/sirloinbh/study-log/issues/46)
+- Branch: `feat/46-review-stats`
+- Rules: chapter 5 of the [review interval rules](../decisions/review-rules.md)
 
-## 목적
+## Purpose
 
-복습을 얼마나 지켰는지 수치로 제공한다. 화면은 #52에서 만든다.
+Provide a number for how well the reviews were kept. The screen is built in #52.
 
-## 변경
+## Changes
 
-- `backend/src/stats.ts`: `GET /api/stats/reviews?period=week|month|3months|all`. 기본은 이번 주이다. 예정, 완료, 지연 수와 정수 퍼센트 완료율을 준다.
-- `docs/decisions/review-rules.md`: 5장에 집계 기준을 적었다.
-- `docs/next-steps/README.md`: 다음 후보를 #52로 바꿨다.
+- `backend/src/stats.ts`: `GET /api/stats/reviews?period=week|month|3months|all`. The default is this week. It returns the due, completed, and late counts and the completion rate as a whole percent.
+- `docs/decisions/review-rules.md`: wrote the counting criteria in chapter 5.
+- `docs/next-steps/README.md`: changed the next candidate to #52.
 
-## 사용자 결정 (2026-11-01)
+## User decisions (2026-11-01)
 
-- 기간은 원래 예정일 기준이다.
-- 지연은 늦은 완료와 지난 미완료이다.
-- 완료율은 완료 ÷ 예정이고, 예정이 0이면 없다.
+- The period is based on the original due date.
+- Late means a late completion or a past incomplete round.
+- The completion rate is completed ÷ due, and there is none when due is 0.
 
-## 발견한 점
+## Finding
 
-`periodStart`의 `Date.UTC`는 0~99년을 1900년대로 해석한다. 기간은 오늘 날짜로 계산하므로 실제 서비스에서는 일어나지 않아 고치지 않았고, 테스트는 100년을 쓴다.
+`Date.UTC` in `periodStart` reads years 0 to 99 as the 1900s. The period is computed from today's date, so this does not happen in the real service and I did not fix it, and the test uses the year 100.
 
-## 리뷰
+## Review
 
-1차 리뷰에서 코드와 테스트의 결함은 없었다. 규칙 문서의 지연 정의가 3장과 5장에서 달랐고, 학습일 수정의 예외가 빠져 있어 고쳤다. 2차 리뷰는 보완점이 없었다.
+The first review found no defects in the code or the tests. The definition of late in the rules document differed between chapters 3 and 5, and the exception for fixing the study date was missing, so I fixed those. The second review found nothing to fix.
 
-## 검증
+## Verification
 
-`TEST_DATABASE_URL`을 설정한 `npm run check`가 통과했다. 백엔드 335건, 프런트 112건, 스킬 4건이 통과했다. 건너뜀은 프런트 2건으로, 중앙 표준에서 온 다크 전용 앱 테스트이다. 화면 변경이 없어 브라우저 확인은 하지 않았다.
+`npm run check` with `TEST_DATABASE_URL` set passed. Backend 335, frontend 112, and skills 4 passed. The skips were 2 frontend tests, the dark-only app tests that came from the central standards. There was no screen change, so I did not check in a browser.
 
-## 테스트
+## Tests
 
-- `backend/test/stats.test.ts`: 완료율 계산과 반올림, 예정 0.
-- `backend/test/review-stats.integration.test.ts`: 기간 4개의 샘플 계산, 제때·늦은·이른 완료, 지난 미완료, 오늘 예정, 미래 제외, 날짜를 옮겨도 변화 없음, 기본 기간, 400. 전체 합계를 비교하므로 다른 이른 날짜 테스트와 DB 잠금으로 순서를 맞춘다.
+- `backend/test/stats.test.ts`: the completion rate calculation and rounding, due 0.
+- `backend/test/review-stats.integration.test.ts`: sample calculations for the 4 periods, on-time, late, and early completion, a past incomplete round, due today, excluding the future, no change when dates are moved, the default period, 400. It compares whole totals, so the order is aligned with other tests of early dates by a DB lock.

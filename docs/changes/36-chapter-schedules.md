@@ -1,59 +1,59 @@
-# #36 교재 장 단위 일정 생성
+# #36 Create chapter-level schedules for a textbook
 
-- 이슈: [#36](https://github.com/sirloinbh/study-log/issues/36)
-- 브랜치: `feat/36-chapter-schedules`
-- 규칙: [학습 일정 규칙](../decisions/schedule-rules.md) 2장
+- Issue: [#36](https://github.com/sirloinbh/study-log/issues/36)
+- Branch: `feat/36-chapter-schedules`
+- Rules: chapter 2 of the [study schedule rules](../decisions/schedule-rules.md)
 
-## 목적
+## Purpose
 
-교재 목차를 기준으로 장별 학습 날짜를 배정한다. 학습 시간이 긴 날에 장을 더 많이 배정한다.
+Assign study dates per chapter based on a textbook's table of contents. Assign more chapters to days with longer study time.
 
-## 변경
+## Changes
 
 - `database/migrations/016_schedule_chapters.sql`: `schedules.textbook_id`, `schedule_item_contents`.
 - `backend/src/schedules.ts`:
-  - `chapterDays`: 규칙 2장의 배분 계산. 소수 오차를 피하려고 정수로 비교한다.
-  - `POST /api/schedules`의 `chapters`(교재, 첫 장, 마지막 장)를 받아 항목에 장을 배정한다.
-  - 조회 응답에 교재와 항목별 장을 더했다.
-- `backend/src/textbooks.ts`, `backend/src/textbook-contents.ts`: 삭제 거부 문구에 일정을 더했다.
-- `frontend/src/schedules.tsx`: 폼에 교재와 첫 장, 마지막 장 선택을 더하고, 날짜별 목록에 장을 보여 준다.
+  - `chapterDays`: the allocation calculation of rule chapter 2. It compares with integers to avoid fraction errors.
+  - `POST /api/schedules` takes `chapters` (textbook, first chapter, last chapter) and assigns chapters to items.
+  - Added the textbook and the chapters per item to the lookup response.
+- `backend/src/textbooks.ts`, `backend/src/textbook-contents.ts`: added schedules to the delete refusal message.
+- `frontend/src/schedules.tsx`: added textbook, first chapter, and last chapter selection to the form, and show chapters in the list by date.
 
-## 구현 판단
+## Implementation judgment
 
-- 일정이 연결된 교재와 장은 삭제를 막는다. 학습 기록과 같은 방식이고, 지우면 일정의 배정이 말없이 사라지기 때문이다. 일정을 지우면 다시 삭제할 수 있다.
-- 범위는 공휴일 조회 전에 먼저 검사해, 잘못된 입력으로 API를 부르지 않는다. 트랜잭션 안에서 교재 행을 잠그고 다시 읽어, 그사이의 목차 변경도 반영한다.
-- 이미 만든 일정의 배정은 목차가 바뀌어도 다시 계산하지 않는다.
-- 교재는 선택 사항이다. 고르지 않으면 #34, #35와 같이 시간만 있는 일정을 만든다.
+- A textbook and chapters linked to a schedule cannot be deleted. It is the same way as study records, and deleting would silently drop the schedule's assignment. If you delete the schedule, they can be deleted again.
+- The range is checked before the holiday lookup, so a wrong input does not call the API. Inside the transaction it locks the textbook row and reads again, so a table of contents change in between is reflected too.
+- The assignment of a schedule already created is not recalculated even if the table of contents changes.
+- The textbook is optional. If you do not pick one, it creates a schedule with time only, like #34 and #35.
 
-## 리뷰
+## Review
 
-1차 리뷰에서 막아야 할 결함은 없었다. 다음을 고쳤다.
+The first review found no defects that had to be blocked. I fixed the following.
 
-- 목차 순서를 바꾸면 같은 날의 장 순서가 뒤집혔다. 배정 때의 순서를 `position`에 저장한다. 016이 병합 전이라 그 파일을 고쳤고, 테스트 DB는 016을 지운 뒤 다시 적용했다.
-- 목차를 읽기 전이나 읽지 못한 상태에서 제출하면 책 전체 일정이 만들어졌다. 만든 뒤에는 범위를 고칠 수 없어 제출을 막는다.
-- 코드가 망가져도 통과하던 테스트를 보강했다. 트랜잭션 안의 재검사와 잠금, 순서를 바꾼 책의 범위, 교재를 바꾸는 중의 늦은 응답, 소수로는 어긋나는 경계이다.
+- If you reordered the table of contents, the order of chapters on the same day flipped. I save the order at assignment time in `position`. 016 was not merged yet, so I edited that file, and in the test DB I deleted 016 and applied it again.
+- Submitting before reading the table of contents or in a state where it could not be read created a whole-book schedule. Since the range cannot be fixed after creation, I block the submit.
+- I strengthened tests that passed even when the code was broken: the re-check and lock inside the transaction, the range of a book whose order was changed, a late response while changing the textbook, and boundaries that go wrong with fractions.
 
-2차 리뷰에서도 막아야 할 결함은 없었고, 2건을 고쳤다. 리뷰는 2회까지라 이후 리뷰는 하지 않았다.
+The second review also found no defects that had to be blocked, and I fixed 2. The review is limited to 2 rounds, so I did no further review.
 
-- 같은 교재를 다시 고르면 전에 읽은 목차로 제출 차단을 통과했다. 교재를 고를 때 읽은 목차를 지운다.
-- 잠금 테스트가 실패하면 트랜잭션이 남거나 테스트가 멈출 수 있었다. 어떤 경우에도 끝내고 연결을 돌려준다.
+- If you picked the same textbook again, it got past the submit block with the table of contents read before. I clear the table of contents read when you pick a textbook.
+- If the lock test failed, a transaction could be left or the test could hang. It now ends and returns the connection in every case.
 
-## 확인하지 못한 것
+## Not confirmed
 
-API 키가 없어(#129) 실제 공휴일 API로 일정을 만들어 보지 못했다. 브라우저 확인은 테스트 DB에 2026년 공휴일을 임시로 넣어 진행했고, 끝난 뒤 지웠다.
+There was no API key (#129), so I could not create a schedule with the real holiday API. The browser check was done by temporarily putting the 2026 holidays into the test DB, and I deleted them afterward.
 
-## 검증
+## Verification
 
-`TEST_DATABASE_URL`을 설정한 `npm run check`가 통과했다. 백엔드 395건, 프런트 180건, 스킬 4건이 통과했다. 건너뜀은 프런트 2건으로, 중앙 표준에서 온 다크 전용 앱 테스트이다. 테스트 DB에 마이그레이션 016을 적용했다.
+`npm run check` with `TEST_DATABASE_URL` set passed. Backend 395, frontend 180, and skills 4 passed. The skips were 2 frontend tests, the dark-only app tests that came from the central standards. I applied migration 016 to the test DB.
 
-headless Chrome으로 PC 1440×900과 모바일 390×844에서 확인했다. 24개 항목이 통과했고 스크린샷을 직접 봤다. 규칙 문서의 예시(2·2·2·2·2·5·5시간, 4장)가 그대로 나오고, 범위를 고르면 그 장만 나오며, 거꾸로 고른 범위는 거부된다. 일정에 쓴 교재의 삭제는 409로 막힌다. 긴 장 제목에서도 가로 스크롤이 없다.
+I checked with headless Chrome at PC 1440×900 and mobile 390×844. 24 items passed and I looked at the screenshots myself. The example in the rules document (2, 2, 2, 2, 2, 5, 5 hours, 4 chapters) comes out as it is, picking a range shows only those chapters, and a range picked backward is rejected. Deleting a textbook used in a schedule is blocked with 409. There is no horizontal scroll even with a long chapter title.
 
-배분과 범위 계산을 11가지로 일부러 망가뜨려 테스트가 모두 잡는 것을 확인하고 되돌렸다. 처음에는 "잠금 없음" 변형을 잡지 못했다. 테스트가 150ms 대기에 의존해 사전 검사가 대신 거부할 수 있었기 때문이다. 요청이 잠금을 기다리는 것을 확인한 뒤 커밋하게 고쳐 잡히는 것을 확인했다.
+I deliberately broke the allocation and range calculation in 11 ways and confirmed that the tests catch all, then reverted. At first the "no lock" variant was not caught. The test depended on a 150ms wait, so the pre-check could reject in its place. I fixed it to commit after confirming the request is waiting on the lock, and confirmed it is caught.
 
-전체 검사를 다른 작업과 동시에 돌렸을 때 `app.test`의 2건이 실패했고(5초 시간 초과와 그 뒤의 요소 찾기 실패, 전체 80초), 단독으로 다시 돌리면 통과했다(12초). 부하에 약한 테스트로 보이며, 원인 측정은 #160에서 함께 한다.
+When I ran the full check at the same time as other work, 2 tests in `app.test` failed (a 5 second timeout and then an element lookup failure after it, 80 seconds in total), and they passed when re-run alone (12 seconds). It looks like tests that are weak under load, and measuring the cause is done together in #160.
 
-## 테스트
+## Tests
 
-- `backend/test/schedule-chapters.test.ts`: 규칙의 예시, 경계에 딱 맞을 때와 넘을 때, 장이 날짜보다 많을 때와 적을 때, 정수 비교, 모든 장이 순서대로 나오고 마지막 날에 끝남.
-- `backend/test/schedule-chapters.integration.test.ts`: 책 전체와 범위, 분량 0인 날, 교재 없는 일정, 잘못된 범위가 공휴일 조회 전에 거부됨, 일정에 쓴 교재와 장의 삭제 거부, 나중에 더한 장이 배정되지 않음, 일정을 지우면 교재를 지울 수 있음.
-- `frontend/src/schedules.test.tsx`: 교재 없음, 책 전체, 범위, 교재를 바꾸면 범위가 지워짐, 장이 없는 책, 목차와 교재 목록을 읽지 못할 때, 목록의 교재 이름.
+- `backend/test/schedule-chapters.test.ts`: the example in the rules, exactly on a boundary and over it, when there are more chapters than days and fewer, integer comparison, and all chapters come out in order and end on the last day.
+- `backend/test/schedule-chapters.integration.test.ts`: the whole book and a range, a day with an amount of 0, a schedule with no textbook, a wrong range rejected before the holiday lookup, refusing to delete a textbook and chapters used in a schedule, a chapter added later is not assigned, and a textbook can be deleted once the schedule is deleted.
+- `frontend/src/schedules.test.tsx`: no textbook, the whole book, a range, changing the textbook clears the range, a book with no chapters, when the table of contents and the textbook list cannot be read, and the textbook name in the list.

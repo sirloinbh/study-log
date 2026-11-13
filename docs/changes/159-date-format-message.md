@@ -1,50 +1,50 @@
-# #159 형식이 틀린 날짜에 날짜 없음 문구가 함께 나오지 않게 하기
+# #159 Stop the "date does not exist" message from appearing together with a wrongly formatted date
 
-- 이슈: [#159](https://github.com/sirloinbh/study-log/issues/159)
-- 브랜치: `chore/159-date-format-message`
+- Issue: [#159](https://github.com/sirloinbh/study-log/issues/159)
+- Branch: `chore/159-date-format-message`
 
-## 목적
+## Purpose
 
-날짜의 형식이 틀리면 형식 오류와 함께 "존재하지 않는 날짜입니다"가 나왔다. 예: `2026/11/02` → `예정일은 YYYY-MM-DD 형식으로 입력하세요, 존재하지 않는 날짜입니다`. zod 4는 앞의 `regex` 검사가 실패해도 뒤의 `refine`을 실행하기 때문이다. PR #158 2차 리뷰의 지적이다.
+When a date's format was wrong, "존재하지 않는 날짜입니다" ("This date does not exist") came out together with the format error. Example: `2026/11/02` -> `예정일은 YYYY-MM-DD 형식으로 입력하세요, 존재하지 않는 날짜입니다` ("Enter the due date in YYYY-MM-DD format, this date does not exist"). This is because zod 4 runs the later `refine` even if the earlier `regex` check fails. It was a comment in the second review of PR #158.
 
-## 변경
+## Changes
 
-- `backend/src/dates.ts`: 공통 날짜 스키마 `calendarDate(text, formatMessage)`를 추가했다. `text`는 빠졌거나 타입이 틀렸을 때의 문구를 가진 `z.string(...)`이고, 그 뒤에 `YYYY-MM-DD` 형식 검사와 실제 날짜 검사를 붙인다. 두 검사에 zod 4의 `abort: true`를 주어, 실패하면 그 뒤의 검사를 하지 않는다. zod 4.6.7에서 이 옵션이 뒤의 `refine`을 막는 것을 먼저 확인했다.
-- 다음 6개 모듈의 날짜 스키마 정의 7곳(`dateField`가 세 번 쓰여 날짜 스키마 9개)을 이 함수로 바꿨다. 각 필드가 내는 문구 자체는 그대로다.
-  - `keywords.ts`: 키워드 날짜
-  - `retrospectives.ts`: 회고 날짜
-  - `reviews.ts`: 예정일
-  - `schedules.ts`: 시작일·종료일·이동일
-  - `stats.ts`: 패턴 조회의 시작일·종료일
-  - `study-logs.ts`: 학습일
-- 회고 날짜는 실제 날짜 검사 뒤에 1900~9998년 범위 검사가 있다. 이제 `0000-01-01`은 "존재하지 않는 날짜입니다"만 나오고 범위 문구는 함께 나오지 않는다. 형식이나 날짜가 맞는 경우의 범위 검사는 그대로다.
-- 날짜가 틀리면 객체 단위 검사도 하지 않는다. 빠졌거나 타입이 틀린 필드가 이미 그랬던 것과 같다. 대상은 `from`이 `to`보다 늦은지 보는 검사(키워드·통계·학습 기록), 학습 기록의 시작·종료 시각 비교와 교재 없는 목차 검사, 일정의 기간 검사(`superRefine`)다. 응답이 바뀌는 것은 키워드·통계·학습 기록뿐이다. 일정은 전에도 `superRefine` 첫 줄의 가드가 틀린 날짜에서 먼저 반환해 응답이 같다. 예: 없는 날짜인 `from=2026-02-30&to=2026-01-01`은 전에는 `존재하지 않는 날짜입니다, 시작일은 종료일보다 늦을 수 없습니다`였고 이제는 앞 문구만 나온다. 없는 날짜와 비교한 결과는 의미가 없으므로 고친 쪽이 맞다고 보았다. 다른 필드 각각의 검사 문구는 계속 함께 나오고, 날짜가 맞는 요청의 응답은 바뀌지 않는다. `schedules.ts`의 해당 주석도 이에 맞게 고쳤다.
-- `docs/next-steps/README.md`: 끝난 #159를 후보에서 지웠다. 테스트 DB를 Docker 컨테이너로 준비하기로 한 사용자 결정(#177)을 적었다.
+- `backend/src/dates.ts`: added the shared date schema `calendarDate(text, formatMessage)`. `text` is a `z.string(...)` that carries the message for when it is missing or the type is wrong, and after it come the `YYYY-MM-DD` format check and the real date check. I gave both checks zod 4's `abort: true`, so if one fails, the later checks are not run. I first confirmed that on zod 4.6.7 this option stops the later `refine`.
+- I changed 7 date schema definitions in the following 6 modules (`dateField` is used three times, so 9 date schemas) to this function. The message each field gives is unchanged.
+  - `keywords.ts`: the keyword date
+  - `retrospectives.ts`: the retrospective date
+  - `reviews.ts`: the due date
+  - `schedules.ts`: the start date, the end date, and the move date
+  - `stats.ts`: the start date and end date of the pattern lookup
+  - `study-logs.ts`: the study date
+- The retrospective date has a 1900 to 9998 range check after the real date check. Now `0000-01-01` gives only "존재하지 않는 날짜입니다" and the range message does not come with it. The range check when the format or date is right is unchanged.
+- If the date is wrong, object-level checks are not run either. It is the same as what already happened for a missing field or a wrong type. The targets are the check of whether `from` is later than `to` (keywords, statistics, study logs), the comparison of the start and end times of a study log and the check of a table of contents entry with no textbook, and the schedule's period check (`superRefine`). The response changes only for keywords, statistics, and study logs. For schedules, the guard on the first line of `superRefine` already returned first on a wrong date, so the response is the same. Example: for `from=2026-02-30&to=2026-01-01`, a date that does not exist, it used to be `존재하지 않는 날짜입니다, 시작일은 종료일보다 늦을 수 없습니다` ("This date does not exist, the start date cannot be later than the end date"), and now only the first message comes out. A result compared with a date that does not exist is meaningless, so I judged the fixed way to be right. The messages of each check on the other fields still come together, and the response for a request with right dates does not change. I fixed the related comment in `schedules.ts` to match.
+- `docs/next-steps/README.md`: removed the finished #159 from the candidates. I wrote the user's decision (#177) to prepare the test DB as a Docker container.
 
-## 테스트
+## Tests
 
-- `backend/test/date-format.test.ts`(새 파일): DB 없이 API를 불러 응답 문구를 정확히 비교한다.
-  - 형식이 틀린 날짜 12건: 바꾼 스키마 정의 7곳을 모두 지나는 요청. 키워드·학습 기록의 `?date`·`?to`와 수정(PUT) 본문은 같은 스키마라 따로 부르지 않았다. 형식 문구 하나만 나와야 한다.
-  - 없는 날짜 6건: 모듈마다 하나. "존재하지 않는 날짜입니다" 하나만 나와야 한다. 회고의 `0000-01-01`을 포함한다.
-  - 고치기 전에 실행하면 첫 경우에서 `날짜는 YYYY-MM-DD 형식으로 입력하세요, 존재하지 않는 날짜입니다`로 실패하는 것을 확인했다. 한 반복문이라 첫 실패에서 멈추므로 나머지 경우의 실패는 따로 확인하지 않았다. 리뷰어가 1차 리뷰에서 같은 결과를 따로 재현했다. 고친 뒤에는 모두 통과한다.
-- `backend/test/review-adjust.integration.test.ts`: 두 문구가 겹치는 것을 고정했던 기대값을 `예정일은 YYYY-MM-DD 형식으로 입력하세요`로 고쳤다. DB 통합 테스트라 이번에는 실행하지 못했다(아래 검증).
+- `backend/test/date-format.test.ts` (a new file): calls the API without a DB and compares the response message exactly.
+  - 12 wrongly formatted dates: requests that pass through all 7 changed schema definitions. The `?date` and `?to` of keywords and study logs and the edit (PUT) body use the same schema, so I did not call them separately. Only one format message must appear.
+  - 6 dates that do not exist: one per module. Only "존재하지 않는 날짜입니다" must appear. It includes `0000-01-01` for the retrospective.
+  - When I ran it before the fix, it failed on the first case with `날짜는 YYYY-MM-DD 형식으로 입력하세요, 존재하지 않는 날짜입니다`. It is one loop and stops at the first failure, so I did not separately confirm the failures of the other cases. The reviewer reproduced the same result separately in the first review. After the fix, all pass.
+- `backend/test/review-adjust.integration.test.ts`: changed the expected value that had fixed the two messages overlapping to `예정일은 YYYY-MM-DD 형식으로 입력하세요`. It is a DB integration test, so I could not run it this time (see Verification below).
 
-## 검증
+## Verification
 
-- `npm test -w backend`: 324개 중 통과 291, 실패 0, 건너뜀 33.
-- 건너뛴 33개는 DB 통합 테스트다. `TEST_DATABASE_URL`이 없어 실행하지 못했다(#177, #178). 그래서 고친 `review-adjust.integration.test.ts`의 기대값도 실행으로 확인하지 못했다. 같은 예정일 검사를 `date-format.test.ts`가 DB 없이 확인한다.
-- `npm run check`: 통과(exit 0). 백엔드 324개 중 통과 291, 실패 0, 건너뜀 33(위 DB 통합 테스트). 프런트 파일 32개, 통과 214, 건너뜀 2(중앙 표준의 다크 전용 앱 테스트). 스킬 테스트 4개 통과.
+- `npm test -w backend`: of 324, 291 passed, 0 failed, 33 skipped.
+- The 33 skipped are DB integration tests. I could not run them because there is no `TEST_DATABASE_URL` (#177, #178). So I could not confirm by running the fixed expected value in `review-adjust.integration.test.ts` either. `date-format.test.ts` checks the same due date check without a DB.
+- `npm run check`: passed (exit 0). Of 324 backend tests, 291 passed, 0 failed, 33 skipped (the DB integration tests above). Frontend 32 files, 214 passed, 2 skipped (the dark-only app tests from the central standards). 4 skill tests passed.
 
-## 리뷰
+## Review
 
-1차 리뷰에서 반드시 고칠 결함은 없었다. zod 4.6.7의 `abort: true`가 같은 스키마의 뒤 검사와 객체 단위 검사만 멈추고 다른 필드의 문구는 그대로 내는 것, 날짜가 맞는 요청의 응답이 바뀌지 않은 것, 빠진 날짜 필드가 없는 것(`holidays.ts`는 사용자 입력이 아니고 `calendar.ts`의 월은 정규식 하나뿐), 새 테스트가 고치기 전 코드에서 실패하는 것을 확인했다. 다음을 이 PR에서 고쳤다.
+The first review found no defects that had to be fixed. I confirmed that `abort: true` of zod 4.6.7 stops only the later checks and the object-level checks of the same schema and still gives the messages of other fields, that the response for a request with right dates did not change, that no date field was missed (`holidays.ts` is not user input, and the month in `calendar.ts` is only one regular expression), and that the new tests fail on the code before the fix. I fixed the following in this PR.
 
-- 날짜가 틀리면 객체 단위 검사의 문구도 빠진다는 점을 "변경"에 적었다.
-- "날짜 스키마 8곳"을 "정의 7곳(필드 9개)"으로 바로잡았다.
-- 테스트 범위와 고치기 전 실패 확인의 표현을 실제와 맞췄다.
-- `schedules.ts`의 `superRefine` 주석이 날짜 오류에는 맞지 않아 고쳤다. 동작은 같다.
+- I wrote in "Changes" that if the date is wrong, the message of object-level checks drops out too.
+- I corrected "8 date schemas" to "7 definitions (9 fields)".
+- I matched the wording of the test scope and the failure check before the fix to the facts.
+- The `superRefine` comment in `schedules.ts` was not right for a date error, so I fixed it. The behavior is the same.
 
-2차 리뷰에서 1차 지적 네 가지가 정확히 반영된 것과 전체 diff에 코드 결함이 없는 것을 확인했다(리뷰어 실행 `npm test -w backend` 통과 291, 실패 0, 건너뜀 33). 문서 지적 두 가지를 고쳤다. 리뷰는 최대 2회라 더 리뷰하지 않는다.
+In the second review I confirmed that the four first-round comments were applied exactly and that there are no code defects in the whole diff (the reviewer's run of `npm test -w backend`: 291 passed, 0 failed, 33 skipped). I fixed two document comments. The review is limited to 2 rounds, so there is no further review.
 
-- 객체 단위 검사로 응답이 바뀌는 것은 키워드·통계·학습 기록뿐이고, 일정은 전에도 가드가 먼저 반환해 같다고 적었다.
-- "필드 9개"를 쓰임 수와 헷갈리지 않게 "날짜 스키마 9개"로 고쳤다.
+- I wrote that the response changes through object-level checks only for keywords, statistics, and study logs, and that for schedules it is the same because the guard already returned first.
+- I changed "9 fields" to "9 date schemas" so it is not confused with the number of uses.

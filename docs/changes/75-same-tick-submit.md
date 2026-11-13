@@ -1,56 +1,56 @@
-# #75 같은 틱의 중복 제출을 렌더와 무관한 진행 표시로 막기
+# #75 Block duplicate submits in the same tick with a progress flag that does not depend on rendering
 
-- 이슈: [#75](https://github.com/sirloinbh/study-log/issues/75) (#73 리뷰에서 분리)
-- 브랜치: `fix/75-same-tick-submit`
+- Issue: [#75](https://github.com/sirloinbh/study-log/issues/75) (split from the #73 review)
+- Branch: `fix/75-same-tick-submit`
 
-## 문제
+## Problem
 
-화면들은 렌더 시점의 `busy` 값으로 중복 요청을 막았다(`if (busy) return`). 다시 그리기 전 같은 틱에 제출이 두 번 들어오면(빠른 Enter 연타 등) 두 핸들러가 모두 `busy === false`를 보았다. 그래서 두 요청이 나가 같은 항목이 두 번 추가될 수 있었다.
+The screens blocked duplicate requests with the `busy` value at render time (`if (busy) return`). If two submits came in the same tick before redrawing (rapid Enter presses and so on), both handlers saw `busy === false`. So two requests went out and the same item could be added twice.
 
-## 변경
+## Changes
 
-- `frontend/src/busy.ts`(새 파일): `useBusy()` 훅.
-  - `busy`(버튼·입력 잠금 표시용 상태)
-  - `begin()`: 진행 중이면 false. 아니면 진행 표시를 켜고 true. 진행 표시는 렌더와 무관한 `useRef`라 같은 틱의 두 번째 호출도 막는다.
-  - `end()`: 진행 표시와 `busy`를 끈다.
-- `busy` 패턴을 쓰는 화면 전부에 적용했다. `if (busy) return; setBusy(true)` → `if (!begin()) return`, `setBusy(false)` → `end()`.
-  - 이슈가 지목한 화면: 목차 카드(`TextbookContents.tsx`), 연습문제 카드(`Exercises.tsx`)
-  - 이슈가 확인을 요청한 화면: 교재(`Textbooks.tsx`), 학습 기록(`StudyLogs.tsx`)
-  - 같은 패턴이 있어 함께 바꾼 화면: 중요 문제 카드(`ImportantExercises.tsx`), 키워드 화면(`Keywords.tsx`, 추가·수정·삭제와 검색)
-- `backend/test/ui-harness.ts`: 테스트용 React 대역에 `useRef`를 추가했다. 상태와 같은 칸에 렌더 사이에 유지되는 객체 하나를 둔다.
+- `frontend/src/busy.ts` (new file): the `useBusy()` hook.
+  - `busy` (state for showing the lock on buttons and inputs)
+  - `begin()`: returns false if in progress. Otherwise turns on the progress flag and returns true. The progress flag is a `useRef` that does not depend on rendering, so it blocks the second call in the same tick too.
+  - `end()`: turns off the progress flag and `busy`.
+- Applied it to every screen that uses the `busy` pattern. `if (busy) return; setBusy(true)` became `if (!begin()) return`, and `setBusy(false)` became `end()`.
+  - Screens the issue named: the table of contents card (`TextbookContents.tsx`) and the exercises card (`Exercises.tsx`)
+  - Screens the issue asked to check: textbooks (`Textbooks.tsx`) and study logs (`StudyLogs.tsx`)
+  - Screens changed together because they have the same pattern: the important exercises card (`ImportantExercises.tsx`) and the keywords screen (`Keywords.tsx`, add, edit, delete, and search)
+- `backend/test/ui-harness.ts`: added `useRef` to the React stand-in for tests. It puts one object that persists between renders in the same slot as the state.
 
-## 테스트
+## Tests
 
-- 다시 그리기 전에 렌더된 폼의 `onSubmit`을 두 번 호출하는 테스트를 5개 화면에 하나씩 추가했다. 모두 요청이 한 번만 나가는지 확인한다.
-  - `exercises-ui.test.ts`: 문제 추가
-  - `textbook-contents-ui.test.ts`: 장 추가
-  - `textbooks-ui.test.ts`: 교재 등록
-  - `study-logs-ui.test.ts`: 학습 기록 저장
-  - `keywords-ui.test.ts`: 키워드 추가. 두 번째 요청의 409 오류도 나오지 않는다.
-- 수정 전 코드에서 5건 모두 실패하고(요청 2번), 수정 후 통과하는 것을 확인했다.
+- I added one test per screen to 5 screens that calls the rendered form's `onSubmit` twice before redrawing. Each checks that only one request goes out.
+  - `exercises-ui.test.ts`: adding an exercise
+  - `textbook-contents-ui.test.ts`: adding a chapter
+  - `textbooks-ui.test.ts`: registering a textbook
+  - `study-logs-ui.test.ts`: saving a study log
+  - `keywords-ui.test.ts`: adding a keyword. The 409 error of the second request does not appear either.
+- I confirmed that all 5 fail on the code before the fix (2 requests) and pass after the fix.
 
-## 검증
+## Verification
 
-| 명령            | 환경                             | 결과                                                        |
-| --------------- | -------------------------------- | ----------------------------------------------------------- |
-| `npm run check` | 로컬, `TEST_DATABASE_URL` 미설정 | exit 0. backend tests 173, pass 161, fail 0, skipped 12(DB) |
+| Command         | Environment                        | Result                                                       |
+| --------------- | ---------------------------------- | ------------------------------------------------------------ |
+| `npm run check` | Local, `TEST_DATABASE_URL` not set | exit 0. backend tests 173, pass 161, fail 0, skipped 12 (DB) |
 
-- 브라우저(Playwright Chromium, 390×844): 키워드 입력 폼에 `form.requestSubmit()`을 같은 틱에 두 번 호출했다.
-  - POST가 1번 나갔다.
-  - 목록에 키워드가 1개 생겼고, 409 오류가 없었다.
-- 화면 모양은 바뀌지 않아 스크린샷은 남기지 않았다.
+- Browser (Playwright Chromium, 390×844): I called `form.requestSubmit()` twice in the same tick on the keyword input form.
+  - POST went out once.
+  - One keyword appeared in the list, and there was no 409 error.
+- The look of the screen did not change, so I did not keep a screenshot.
 
-## 자동 코드 리뷰 1차
+## Automated code review, round 1
 
-별도 읽기 전용 리뷰 에이전트가 검토했다. 지적이 없어 2차 리뷰는 하지 않는다. 분리할 이슈도 없다.
+A separate read-only review agent reviewed it. There were no comments, so I do not do a second review. There is no issue to split off either.
 
-- 확인된 사항
-  - 모든 `begin()` 뒤에 `end()`가 반드시 실행된다. `begin()`은 `try` 바로 앞에 있고, `finally` 안에서 `end()` 전에 기다리는 호출은 내부에서 오류를 잡는다.
-  - `if (busy) return`이 남은 곳이 없다. 남은 `busy` 읽기는 잠금 표시와 포커스 effect뿐이다.
-  - 요청을 시작하는 핸들러는 모두 `run` 또는 `begin()`을 거친다.
-  - 테스트 대역의 `useRef`는 상태와 같은 칸을 써서 훅 순서가 유지되고, 화면에서 빠지면 함께 버려진다.
-  - React StrictMode는 이벤트 핸들러를 두 번 실행하지 않아 영향이 없다.
+- Confirmed points
+  - `end()` always runs after every `begin()`. `begin()` is right before the `try`, and calls that wait before `end()` in the `finally` catch errors inside.
+  - There is no place left with `if (busy) return`. The remaining reads of `busy` are only the lock display and the focus effect.
+  - Every handler that starts a request goes through `run` or `begin()`.
+  - The test stand-in `useRef` uses the same slot as state, so the hook order is kept, and it is discarded with it when it leaves the screen.
+  - React StrictMode does not run event handlers twice, so there is no effect.
 
-## 한계·후속
+## Limits and follow-up
 
-- 다른 카드가 보낸 다시 불러오기(예: #74의 목차 다시 불러오기)와 카드 자신의 변경 사이의 응답 순서는 이 변경으로 바뀌지 않는다. 늦게 도착한 옛 목록이 새 목록을 덮을 수 있는 좁은 경합은 남아 있다(#74 리뷰 참고 기록).
+- The order of responses between a reload sent by another card (for example the table of contents reload in #74) and the card's own change is not changed by this change. A narrow race remains where an old list that arrives late can overwrite the new list (see the reference note in the #74 review).

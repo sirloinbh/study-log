@@ -1,71 +1,71 @@
-# #37 일정 완료 체크와 지연·앞당김 조정
+# #37 Schedule completion check and delay and catch-up adjustments
 
-- 이슈: [#37](https://github.com/sirloinbh/study-log/issues/37)
-- 브랜치: `feat/37-schedule-adjust`
-- 규칙: [학습 일정 규칙](../decisions/schedule-rules.md) 4장
+- Issue: [#37](https://github.com/sirloinbh/study-log/issues/37)
+- Branch: `feat/37-schedule-adjust`
+- Rules: chapter 4 of the [study schedule rules](../decisions/schedule-rules.md)
 
-## 목적
+## Purpose
 
-진행 상황에 맞춰 일정을 고친다. 밀린 일정은 조회할 때 자동으로 민다.
+Adjust the schedule as progress goes. A delayed schedule is pushed automatically when it is read.
 
-## 변경
+## Changes
 
 - `database/migrations/017_schedule_item_completion.sql`: `schedule_items.completed_on`.
 - `backend/src/schedules.ts`:
-  - `moveOverdue`, `catchUp`: 오늘보다 앞선 미완료 항목이 있으면 미완료 항목 전체를 같은 일수만큼 민다. 목록과 상세를 조회할 때 일정별 트랜잭션으로 적용한다.
-  - `POST /api/schedules/:id/items/:itemId/complete`, `.../reopen`: 완료와 완료 취소.
-  - `PUT /api/schedules/:id/items/:itemId/date`: 항목 이동. `withLater`면 그 날짜 이후의 미완료 항목도 함께 옮긴다.
-  - 응답에 `currentEndDate`, `delayDays`, 항목의 `completedOn`을 더했다.
-- `frontend/src/schedules.tsx`: 날짜별 완료 체크, 옮기기 폼, 늦어진 일수 표시.
+  - `moveOverdue`, `catchUp`: if there are incomplete items on dates earlier than today, push all incomplete items by the same number of days. It is applied in a per-schedule transaction when the list and the detail are read.
+  - `POST /api/schedules/:id/items/:itemId/complete`, `.../reopen`: completing and cancelling a completion.
+  - `PUT /api/schedules/:id/items/:itemId/date`: moving an item. With `withLater`, the incomplete items on or after that date are moved together.
+  - Added `currentEndDate`, `delayDays`, and the item's `completedOn` to the response.
+- `frontend/src/schedules.tsx`: the completion check by date, the move form, and showing the number of days delayed.
 
-## 구현 판단
+## Implementation judgment
 
-- 밀 항목이 없으면 잠금과 쓰기 없이 읽는다. 밀 항목이 있을 때만 일정 행을 잠그고 다시 계산해, 동시에 읽어도 한 번만 민다.
-- 항목 변경은 일정 행을 잠근 뒤 먼저 밀고 나서 적용한다. 화면에 보이는 날짜를 기준으로 동작하기 위해서이다.
-- 항목을 옮길 수 있는 날짜는 오늘부터 730일 안이다(규칙 4장).
-- 공휴일을 다시 읽지 않는다. 옮겨 간 날이 평일이어도 목표 시간을 바꾸지 않는다(규칙 4장).
+- If there is no item to push, it reads with no lock and no write. Only when there is an item to push does it lock the schedule row and recalculate, so even if read concurrently, it pushes only once.
+- An item change locks the schedule row, pushes first, and then applies. This is to act based on the dates shown on the screen.
+- The dates an item can be moved to are within 730 days of today (rule chapter 4).
+- It does not read the holidays again. Even if the day it moves to is a weekday, it does not change the target time (rule chapter 4).
 
-## 리뷰
+## Review
 
-1차 리뷰에서 막아야 할 결함은 없었다. 다음을 고쳤다.
+The first review found no defects that had to be blocked. I fixed the following.
 
-- 지난 날짜의 항목을 완료 취소하면 일정 전체가 완료한 지 지난 일수만큼 밀리고 되돌릴 수 없었다. 처음에 에이전트가 정한 세부 규칙의 문제여서, 그 항목만 오늘로 옮기도록 규칙 4장을 고쳤다.
-- 이후 일정과 함께 옮긴 항목이 730일 제한을 넘을 수 있었다. 함께 옮긴 항목에도 적용한다.
-- 옮기기 폼을 열거나 이동이 거부되면 초점이 사라졌다. 날짜 입력으로 보낸다. 일정이 다른 탭에서 지워졌으면 제목으로 보낸다.
-- 날짜별 메시지가 다른 일정 화면에 남았다. 다른 작업을 시작하면 지우고, 날짜를 고쳐도 지운다.
-- 같은 날짜의 항목이 스크린 리더에서 같은 이름이었다. 순번을 붙인다.
-- 완료한 항목에 옮기기 폼이 남을 수 있었고, 다른 날을 체크하면 열린 폼이 닫혔다.
-- 이름 수정 응답에 밀리기 전의 날짜가 나갈 수 있었다.
-- 테스트를 더했다. 목표 시간과 장 유지, 같은 날짜의 항목, 시작일 앞으로 이동, 전부 완료, 거부될 때의 되돌림, 730일 경계이다.
+- If you un-completed an item with a past date, the whole schedule was pushed back by the number of days since completion, and it could not be undone. It was a problem of the detailed rule the agent set at first, so I fixed rule chapter 4 to move only that item to today.
+- Items moved together with the later schedule could exceed the 730 day limit. It now applies to the items moved together too.
+- When the move form was opened or a move was rejected, focus was lost. I send it to the date input. If the schedule was deleted in another tab, I send it to the title.
+- The by-date message remained on another schedule's screen. I clear it when you start another action, and also when you fix the date.
+- Items with the same date had the same name for a screen reader. I add a sequence number.
+- The move form could remain on a completed item, and checking another day closed the open form.
+- The name edit response could carry the date from before the push.
+- I added tests: keeping the target time and chapters, items with the same date, moving before the start date, completing everything, reverting when rejected, and the 730 day boundary.
 
-목록 조회의 자동 밀기는 모든 일정에 적용되어, 병렬로 도는 다른 테스트 파일의 일정까지 밀 수 있었다. 실제 앱에는 영향이 없는 테스트 간 간섭이다. 일정 통합 테스트 세 파일이 저장소의 공용 잠금을 차례로 잡게 했다.
+The automatic pushing in the list lookup applies to all schedules, so it could push the schedules of other test files running in parallel. It is interference between tests that has no effect on the real app. I made the three schedule integration test files take the repository's shared lock in turn.
 
-고치지 않은 것: `GET /:id`는 요약과 항목을 따로 읽어, 그 사이에 다른 탭의 이동이 커밋되면 한 번 어긋난 응답이 나올 수 있다. 다음 조회에서 바로잡히고 데이터는 손상되지 않는다.
+What I did not fix: `GET /:id` reads the summary and the items separately, so if a move from another tab commits in between, one mismatched response can come out. It is corrected at the next lookup and no data is corrupted.
 
-2차 리뷰에서도 데이터 결함은 없었고, 다음을 고쳤다. 리뷰는 2회까지라 이후 리뷰는 하지 않았다.
+The second review also found no data defects, and I fixed the following. The review is limited to 2 rounds, so I did no further review.
 
-- 일정이 다른 탭에서 지워졌을 때의 초점과 메시지가 실제로는 동작하지 않았다. 다시 읽으면 날짜별 카드와 함께 사라졌다. 테스트의 가짜 서버가 404 뒤에도 일정을 돌려줘서 드러나지 않았다. 메시지를 목록 카드에 보여 주고 초점도 그쪽으로 보낸다.
-- 다른 탭에서 완료한 날을 옮기려다 409가 나면 초점이 사라졌다. 폼을 닫고 그 날의 체크박스로 보낸다.
-- 조사가 틀린 오류 문구를 고쳤고, 쓸모없는 쿼리 조건을 지웠다.
-- 완료 취소 뒤 "늦어짐" 표시가 남는 문제는 규칙을 정해야 해서 #165로 분리했다.
+- The focus and message for when the schedule was deleted in another tab did not actually work. When read again, it disappeared with the by-date card. It was not revealed because the fake server in the test returned the schedule even after a 404. I show the message on the list card and send focus there too.
+- If a 409 came up while trying to move a day completed in another tab, focus was lost. I close the form and send focus to that day's checkbox.
+- I fixed an error message whose investigation was wrong, and removed a useless query condition.
+- The problem that the "늦어짐" ("Delayed") mark remains after cancelling a completion needed a rule to be decided, so I split it into #165.
 
-이 두 번째 수정은 실패 경로의 초점과 메시지여서 자동 테스트로 확인했고, 브라우저 확인은 그 앞 커밋까지의 결과이다.
+This second fix concerns focus and messages on failure paths, so I checked it with automated tests, and the browser check is the result up to the commit before it.
 
-## 확인하지 못한 것
+## Not confirmed
 
-API 키가 없어(#129) 실제 공휴일 API로 일정을 만들어 보지 못했다. 브라우저 확인은 테스트 DB에 2026년 공휴일을 임시로 넣어 진행했고, 끝난 뒤 지웠다. 자동 밀기는 서버 날짜를 바꿀 수 없어, 테스트 DB에서 항목 날짜를 과거로 당겨 재현했다.
+There was no API key (#129), so I could not create a schedule with the real holiday API. The browser check was done by temporarily putting the 2026 holidays into the test DB, and I deleted them afterward. I cannot change the server date, so I reproduced the automatic pushing by pulling item dates into the past in the test DB.
 
-로컬의 `node_modules`에는 zod 3.25.76이 있고, main의 `backend/package.json`은 다른 PR로 4.6.7이 되었다. 패키지 설치는 사용자가 하므로, 로컬 검사는 옛 버전으로 돌았고 새 버전은 CI로 확인한다.
+The local `node_modules` has zod 3.25.76, and `backend/package.json` on main became 4.6.7 through another PR. The user does the package installs, so the local checks ran with the old version, and the new version is checked by CI.
 
-## 검증
+## Verification
 
-`TEST_DATABASE_URL`을 설정한 `npm run check`가 통과했다. 백엔드 412건, 프런트 192건, 스킬 4건이 통과했다. 건너뜀은 프런트 2건으로, 중앙 표준에서 온 다크 전용 앱 테스트이다. 테스트 DB에 마이그레이션 017을 적용했다.
+`npm run check` with `TEST_DATABASE_URL` set passed. Backend 412, frontend 192, and skills 4 passed. The skips were 2 frontend tests, the dark-only app tests that came from the central standards. I applied migration 017 to the test DB.
 
-headless Chrome으로 PC 1440×900과 모바일 390×844에서 확인했다. 32개 항목이 통과했고 스크린샷을 직접 봤다. 완료와 취소선, 초점 유지, 완료한 날의 이동 버튼 없음, 혼자 옮기기, 이후 일정과 함께 옮기기, 늦어진 일수 표시, 자동 밀기와 간격 유지, 가로 스크롤 없음을 봤다.
+I checked with headless Chrome at PC 1440×900 and mobile 390×844. 32 items passed and I looked at the screenshots myself. I looked at completion and the strikethrough, keeping focus, no move button on a completed day, moving alone, moving together with the later schedule, the number of days delayed, automatic pushing and keeping gaps, and no horizontal scroll.
 
-로직을 14가지로 일부러 망가뜨려 테스트가 잡는지 확인했다. 처음에는 2가지(미래 항목이 앞당겨짐, 동시 조회의 잠금 없음)를 놓쳐, 앞당겨지지 않음을 확인하는 테스트와, 요청이 잠금을 기다리는 것을 확인한 뒤 커밋하는 테스트를 더했다. 지금은 모두 잡힌다.
+I deliberately broke the logic in 14 ways to see whether the tests catch it. At first they missed 2 (a future item being pulled earlier, and no lock on a concurrent lookup), so I added a test that checks it is not pulled earlier, and a test that commits after confirming the request is waiting on the lock. Now all are caught.
 
-## 테스트
+## Tests
 
-- `backend/test/schedule-adjust.integration.test.ts`: 자동 밀기와 간격 유지, 목록 조회의 밀기, 미래 항목은 앞당겨지지 않음, 동시 조회, 완료와 취소, 지난 항목의 완료 취소, 혼자 옮기기와 앞당기기, 이후 일정과 함께 옮기기, 잘못된 날짜와 경계, 다른 일정의 항목.
-- `frontend/src/schedules.test.tsx`: 완료와 취소, 초점, 옮기기와 취소, 이후 일정 포함, 거부 메시지, 늦어진 일수 표시.
+- `backend/test/schedule-adjust.integration.test.ts`: automatic pushing and keeping gaps, pushing on list lookup, future items not pulled earlier, concurrent lookups, completing and cancelling, cancelling a completion of a past item, moving alone and pulling earlier, moving together with the later schedule, wrong dates and boundaries, and an item of another schedule.
+- `frontend/src/schedules.test.tsx`: completing and cancelling, focus, moving and cancelling, including the later schedule, the rejection message, and showing the number of days delayed.

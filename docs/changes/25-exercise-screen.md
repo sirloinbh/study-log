@@ -1,30 +1,30 @@
-# #25 연습문제 입력·조회 화면 + AI 질문용 클립보드 복사
+# #25 Exercise input and view screen + clipboard copy for AI questions
 
-- 이슈: [#25](https://github.com/sirloinbh/study-log/issues/25) (상위 #5)
-- 브랜치: `feat/25-exercise-screen`
-- 선행: #24 연습문제 DB·API, #22 목차 화면 (모두 병합 완료)
+- Issue: [#25](https://github.com/sirloinbh/study-log/issues/25) (parent #5)
+- Branch: `feat/25-exercise-screen`
+- Prerequisites: #24 exercise DB and API, #22 table of contents screen (both merged)
 
-## 목적
+## Purpose
 
-교재의 장·절별 연습문제를 화면에서 입력·조회하고, AI에게 물어볼 수 있게 질문 형식으로 바로 복사한다.
+Enter and view the exercises for each chapter and section of a textbook on the screen, and copy them straight into a question format so you can ask an AI.
 
-## 변경
+## Changes
 
-- `frontend/src/Exercises.tsx`: 연습문제 카드. 교재 화면에서 교재를 고르면 목차 카드 아래에 나온다.
-  - "단원" 선택: 목차의 장·절을 읽는 순서대로 고른다. 처음에는 첫 장이 선택된다. 목차가 없으면 "목차를 먼저 추가하면 장·절별로 문제를 입력할 수 있습니다"를 보여 주고 "문제 추가"는 비활성이다.
-  - 목록: 고른 단원의 문제를 추가한 순서(#24 API 순서)로 보여 준다.
-    - 이름은 "문제 3"처럼 번호를 쓰고, 번호가 없으면 "2번째 문제"처럼 목록 순서를 쓴다.
-    - 중요 문제에는 "중요" 배지를 단다.
-    - 본문은 입력한 줄바꿈·들여쓰기 그대로 보여 준다.
-  - "문제 추가": 문제 번호(20자), 중요 표시, 문제 본문(20000자)을 입력한다.
-    - 추가한 뒤에도 입력 폼은 빈 채로 열려 있다. 여러 문제를 이어서 입력할 수 있고, 본문 칸으로 포커스가 돌아간다.
-    - "닫기"로 닫는다.
-  - "수정"은 번호·본문·중요 여부를 `PUT /api/exercises/:id`로 바꾸고 폼을 닫는다.
-  - "삭제"는 "삭제 확인"을 한 번 더 눌러야 실행된다.
-  - 다른 곳에서 지워진 문제를 저장하면 서버 메시지("연습문제를 찾을 수 없습니다")를 보여 주고 폼을 닫은 뒤 목록을 다시 불러온다. 다른 실패(예: 공백만 있는 본문)는 메시지를 보여 주고 입력을 유지한다.
-  - 상태는 목차 카드처럼 단원 ID로 표시해 둔다. 다른 단원을 고르면 이전 단원의 목록·폼·메시지가 보이지 않는다. 요청은 한 번에 하나만 보내고, 변경과 그 뒤의 목록 새로고침이 끝날 때까지 버튼과 단원 선택을 잠근다. "질문 복사"는 읽기만 하므로 잠그지 않는다.
-  - 목차를 불러오지 못하면 "목차를 불러오지 못해 단원을 고를 수 없습니다"를 보여 준다.
-- 질문 복사: 문제마다 "질문 복사" 버튼이 있다. `navigator.clipboard.writeText`로 아래 형식을 복사하고 "문제 3 질문을 복사했습니다"를 보여 준다.
+- `frontend/src/Exercises.tsx`: the exercises card. When you pick a textbook on the textbook screen, it appears under the table of contents card.
+  - The "단원" ("Chapter") select: pick from the chapters and sections of the table of contents in reading order. At first the first chapter is selected. If there is no table of contents, it shows "목차를 먼저 추가하면 장·절별로 문제를 입력할 수 있습니다" ("Add a table of contents first and you can enter problems per chapter and section"), and "문제 추가" ("Add problem") is disabled.
+  - List: shows the chosen chapter's problems in the order they were added (the #24 API order).
+    - The name uses the number like "문제 3" ("Problem 3"), and if there is no number, it uses the list order like "2번째 문제" ("2nd problem").
+    - An important problem gets an "중요" ("Important") badge.
+    - The body is shown with the line breaks and indentation as entered.
+  - "문제 추가": enter the problem number (20 characters), the important mark, and the problem body (20000 characters).
+    - Even after adding, the input form stays open and empty. You can enter several problems in a row, and focus goes back to the body field.
+    - You close it with "닫기" ("Close").
+  - "수정" ("Edit") changes the number, body, and important flag with `PUT /api/exercises/:id` and closes the form.
+  - "삭제" ("Delete") runs only after you press "삭제 확인" ("Confirm delete") once more.
+  - If you save a problem deleted elsewhere, it shows the server message ("연습문제를 찾을 수 없습니다", "Exercise not found"), closes the form, and loads the list again. For other failures (for example a body of only spaces), it shows the message and keeps the input.
+  - The state is marked with the chapter ID like the table of contents card. If you pick another chapter, the list, form, and message of the previous chapter are not visible. It sends only one request at a time, and locks the buttons and the chapter select until the change and the list refresh after it finish. "질문 복사" ("Copy question") only reads, so it is not locked.
+  - If the table of contents cannot be loaded, it shows "목차를 불러오지 못해 단원을 고를 수 없습니다" ("Could not load the table of contents, so you cannot pick a chapter").
+- Question copy: each problem has a "질문 복사" button. It copies the format below with `navigator.clipboard.writeText` and shows "문제 3 질문을 복사했습니다" ("Copied the question for problem 3").
 
   ```text
   교재: 선형대수 (Strang · 5판)
@@ -36,112 +36,114 @@
   이 연습문제의 풀이를 단계별로 설명해 주세요. 필요한 개념도 함께 알려 주세요.
   ```
 
-  - 저자·판본이 비어 있으면 괄호를 빼고, 번호가 없으면 "문제 번호" 줄을 뺀다.
-  - 본문 앞뒤의 빈 줄은 지우고, 본문 안의 줄바꿈·들여쓰기는 유지한다.
-  - 단원은 장부터 그 절까지의 경로다.
-  - 클립보드를 쓸 수 없으면(API 없음, 권한 거부) "클립보드에 복사하지 못했습니다. 문제 본문을 직접 선택해 복사하세요"를 보여 준다. 본문은 화면에 그대로 있다.
+  (In English: "Textbook: Linear algebra (Strang · 5th edition) / Chapter: 1 Vectors > 1.2 Inner product / Problem number: 3 / the problem body / Please explain the solution of this exercise step by step. Also tell me the concepts that are needed.")
 
-- `frontend/src/exercise.ts`: 화면과 테스트가 함께 쓰는 순수 함수.
-  - `questionText`: 복사 형식
-  - `contentPath`: 트리에서 장→절 경로 찾기
-  - `exerciseLabel`, 입력 한도
-- `frontend/src/TextbookContents.tsx`: 보여 주는 목차 트리와 첫 로드 실패 여부(`failed`)를 `onTree`로 알린다.
-- `frontend/src/Textbooks.tsx`: 받은 트리와 실패 여부를 연습문제 카드(`tree`, `treeFailed`)에 넘긴다. 목차 카드에서 장을 추가하면 연습문제의 단원 선택에 바로 나온다. 연습문제 카드가 목차를 따로 불러오지 않는다.
-- `frontend/src/style.css`: 단원 선택·입력 폼 간격, 중요 체크박스 정렬, 본문 줄바꿈 유지(`pre-wrap`).
+  - If the author and edition are empty, the parentheses are left out, and if there is no number, the "문제 번호" ("Problem number") line is left out.
+  - Blank lines before and after the body are removed, and line breaks and indentation inside the body are kept.
+  - The chapter is the path from the chapter to that section.
+  - If the clipboard cannot be used (no API, permission denied), it shows "클립보드에 복사하지 못했습니다. 문제 본문을 직접 선택해 복사하세요" ("Could not copy to the clipboard. Select and copy the problem body yourself"). The body is still on the screen.
 
-## 테스트
+- `frontend/src/exercise.ts`: pure functions the screen and tests share.
+  - `questionText`: the copy format
+  - `contentPath`: finding the chapter -> section path in the tree
+  - `exerciseLabel`, and the input limits
+- `frontend/src/TextbookContents.tsx`: it reports the table of contents tree it shows and whether the first load failed (`failed`) with `onTree`.
+- `frontend/src/Textbooks.tsx`: it passes the received tree and the failure flag to the exercises card (`tree`, `treeFailed`). If you add a chapter on the table of contents card, it shows up right away in the chapter select of the exercises. The exercises card does not load the table of contents separately.
+- `frontend/src/style.css`: the spacing of the chapter select and input form, the alignment of the important checkbox, and keeping body line breaks (`pre-wrap`).
 
-`backend/test/exercises-ui.test.ts`(기존 테스트용 React 대역, 19건):
+## Tests
 
-- 첫 단원 자동 선택과 목록 순서, 중요 배지, 단원을 바꾸면 그 단원의 목록을 요청하는지, 빈 단원 안내
-- 목차가 없는 교재의 안내와 "문제 추가" 비활성
-- 추가 요청 본문(번호·줄바꿈 있는 본문·중요 여부)
-  - 추가 뒤 폼이 빈 채로 열려 있는지
-  - 폼을 열 때와 추가 뒤(요청이 끝난 다음) 본문 칸에 포커스가 가는지
-- 수정 PUT 후 폼 닫힘, 삭제 확인·취소
-- 저장 실패 시 서버 메시지와 입력 유지, 다른 곳에서 지워진 문제 저장 시 폼 닫힘
-- 복사 텍스트 전체(교재·저자·판본·장→절 경로·번호·본문), 클립보드가 없거나 거부될 때 안내
-- 목차 카드에서 추가한 장이 단원 선택에 바로 나오는지
-- 버튼 접근성 이름("문제 3 질문 복사" 등)
-- 리뷰 반영 후 추가(6건):
-  - 폼이 열린 상태에서 다른 문제를 삭제해도 포커스가 옮겨지지 않는지
-  - 목차 로드 실패 안내
-  - 교재를 바꾸면 이전 교재의 폼·목록이 보이지 않는지
-  - 단원을 바꾸면 폼이 숨고, 돌아오면 쓰던 입력이 그대로인지
-  - 요청 중 버튼·단원 선택 잠금(질문 복사는 제외)
-  - 이미 지워진 문제 삭제 시 404 안내와 새로고침
-- `questionText`의 빈 번호·빈 저자/판본·본문 앞뒤 빈 줄 처리, `contentPath`
+`backend/test/exercises-ui.test.ts` (the existing React stand-in for tests, 19 tests):
 
-## 검증
+- Auto selecting the first chapter and the list order, the important badge, whether changing the chapter requests that chapter's list, and the empty chapter notice
+- The notice for a textbook with no table of contents and "문제 추가" disabled
+- The add request body (the number, a body with line breaks, and the important flag)
+  - Whether the form stays open and empty after adding
+  - Whether focus goes to the body field when the form opens and after adding (after the request ends)
+- The form closes after the edit PUT, and delete confirmation and cancel
+- The server message and keeping the input on save failure, and the form closing when saving a problem deleted elsewhere
+- The whole copy text (textbook, author, edition, chapter -> section path, number, and body), and the notice when there is no clipboard or it is denied
+- Whether a chapter added on the table of contents card shows up right away in the chapter select
+- Button accessibility names ("문제 3 질문 복사" and so on)
+- Added after the review fixes (6 tests):
+  - Whether focus is not moved when you delete another problem with the form open
+  - The table of contents load failure notice
+  - Whether the form and list of the previous textbook are not visible when you change the textbook
+  - Whether the form hides when you change the chapter and the input you were writing is as it was when you come back
+  - Locking the buttons and the chapter select during a request (except question copy)
+  - The 404 notice and refresh when deleting an already deleted problem
+- `questionText` handling of an empty number, an empty author/edition, and blank lines before and after the body, and `contentPath`
 
-| 명령·환경                                                        | 결과                                                                                |
-| ---------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `npm run check`, `TEST_DATABASE_URL` 설정(로컬 PostgreSQL 17.11) | exit 0. backend tests 104, pass 104, fail 0, **skipped 0**, 스킬 4 pass, 빌드 통과  |
-| headless Chrome(CDP) 1440×900, 실제 API + 로컬 테스트 DB         | 아래 흐름 모두 기대대로. 페이지 오류는 `favicon.ico` 404(기존)와 의도한 400 한 건뿐 |
-| headless Chrome(CDP) 390×844                                     | 가로 스크롤 없음(`scrollWidth` 390 = `innerWidth` 390), 버튼 높이 44px, 복사 정상   |
+## Verification
 
-- 로컬 테스트 DB에 004~007 마이그레이션이 빠져 있어 `docs/next-steps`의 `psql -f` 방식으로 적용했다. 그전에는 통합 테스트 5건이 실패했다(테이블 없음).
-- 브라우저 확인:
-  - 방식: 로컬 Chrome을 headless로 띄우고 DevTools 프로토콜로 조작했다. Chrome 확장은 아직 연결되지 않았다. 클립보드는 CDP 권한 부여와 포커스 에뮬레이션으로 실제로 읽어 확인했다.
-  - 데이터: API(테스트 DB 연결)로 "브라우저확인 …" 교재를 만들어 확인했고, 끝난 뒤 지웠다(교재·연습문제 0건 확인).
-- 확인한 흐름(PC):
-  1. 교재 선택 → 첫 장 선택, "이 단원에 입력한 문제가 없습니다"
-  2. "1.2 내적과 길이" 선택 → 문제 2건, 줄바꿈·들여쓰기 유지
-  3. 질문 복사 → 위 형식 그대로 클립보드에 들어감. Windows 클립보드라 줄바꿈은 CRLF로 읽힌다. "문제 3 질문을 복사했습니다"
-  4. 문제 추가 → 본문 칸 포커스 → 저장 → "추가했습니다", 폼이 빈 채로 남고 본문 칸에 다시 포커스
-  5. 수정 → "수정했습니다", 폼 닫힘
-  6. 공백만 있는 본문 → 서버 400 "문제 본문을 입력하세요"
-  7. 삭제 확인 → "삭제했습니다"
-  8. 목차 카드에서 장 추가 → 단원 선택에 바로 나옴
-- 브라우저에서 찾아 고친 문제: 처음에는 추가 뒤 포커스가 `BODY`로 빠졌다. 폼이 새로 그려질 때 본문 칸이 아직 비활성(새로고침 대기)이라 `autoFocus`가 먹지 않았다. 요청이 끝나 칸이 활성화된 뒤 effect로 포커스를 옮기도록 바꿨고, 테스트를 추가했다. 브라우저에서 다시 확인했다.
-- 스크린샷: [PC 1440×900](assets/25-pc-1440x900.png), [모바일 390×844](assets/25-mobile-390x844.png). PC 캡처의 사이드바가 중간에서 끊긴 것은 고정 사이드바를 스크롤 위치에서 함께 캡처한 결과다(#11·#22와 같음).
+| Command and environment                                           | Result                                                                                                           |
+| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `npm run check`, `TEST_DATABASE_URL` set (local PostgreSQL 17.11) | exit 0. backend tests 104, pass 104, fail 0, **skipped 0**, skills 4 pass, build passed                          |
+| headless Chrome (CDP) 1440×900, the real API + the local test DB  | All the flows below as expected. The page errors were only the `favicon.ico` 404 (existing) and one intended 400 |
+| headless Chrome (CDP) 390×844                                     | No horizontal scroll (`scrollWidth` 390 = `innerWidth` 390), button height 44px, and copy works                  |
 
-## 한계·후속
+- The local test DB was missing migrations 004 to 007, so I applied them with the `psql -f` method in `docs/next-steps`. Before that, 5 integration tests failed (no table).
+- Browser check:
+  - Method: I started the local Chrome headless and operated it with the DevTools protocol. The Chrome extension is not connected yet. I actually read the clipboard to check, with a CDP permission grant and focus emulation.
+  - Data: I made a "브라우저확인 …" ("Browser check …") textbook through the API (connected to the test DB) to check, and deleted it afterward (confirmed 0 textbooks and exercises).
+- Flows checked (PC):
+  1. Pick a textbook -> the first chapter is selected, "이 단원에 입력한 문제가 없습니다" ("There are no problems entered for this chapter")
+  2. Pick "1.2 내적과 길이" ("1.2 Inner product and length") -> 2 problems, line breaks and indentation kept
+  3. Copy question -> it goes into the clipboard in exactly the format above. It is a Windows clipboard, so line breaks read as CRLF. "문제 3 질문을 복사했습니다"
+  4. Add a problem -> focus on the body field -> save -> "추가했습니다" ("Added"), the form stays empty, and focus is on the body field again
+  5. Edit -> "수정했습니다" ("Edited"), the form closes
+  6. A body of only spaces -> the server 400 "문제 본문을 입력하세요"
+  7. Delete confirmation -> "삭제했습니다" ("Deleted")
+  8. Add a chapter on the table of contents card -> it shows up right away in the chapter select
+- A problem I found in the browser and fixed: at first, after adding, focus fell to `BODY`. When the form was redrawn, the body field was still disabled (waiting for the refresh), so `autoFocus` did not take effect. I changed it to move focus with an effect after the request ends and the field is enabled, and added a test. I confirmed again in the browser.
+- Screenshots: [PC 1440×900](assets/25-pc-1440x900.png), [mobile 390×844](assets/25-mobile-390x844.png). That the sidebar in the PC capture is cut off in the middle is the result of capturing the fixed sidebar together at the scroll position (the same as #11 and #22).
 
-- 목록 순서는 추가한 순서다. 번호 순 정렬은 번호가 "3", "3a", "연습 2"처럼 자유 형식이라 하지 않았다.
-- 다른 단원으로 문제를 옮기는 기능은 없다(#24 API에 없음).
-- 중요 문제 필터와 목록의 중요 토글은 #27 범위다. 이 화면에서는 입력·수정 폼에서 중요 여부를 정한다.
-- 정답 입력·펼쳐 보기는 #26에서 이 카드 위에 더한다.
-- 삭제 확인 전환 시 포커스 유실은 다른 화면과 같은 문제이며 #65에서 함께 다룬다.
-- 복사 문구는 이슈에 정해진 형식이 없어 위 형식으로 정했다. 바꾸려면 `questionText`만 고치면 된다.
-- 다른 곳에서 지워진 단원에 추가하면 목차가 갱신되지 않는 문제: [#74](https://github.com/sirloinbh/study-log/issues/74)
-- 같은 틱의 중복 제출 방지: [#75](https://github.com/sirloinbh/study-log/issues/75)
+## Limits and follow-up
 
-## 자동 코드 리뷰 1차
+- The list order is the order they were added. I did not sort by number because the number is free form, such as "3", "3a", and "연습 2" ("Exercise 2").
+- There is no feature to move a problem to another chapter (not in the #24 API).
+- The important problem filter and the important toggle in the list are in the scope of #27. On this screen, you decide the important flag in the input and edit form.
+- Entering and expanding answers is added on top of this card in #26.
+- Losing focus when the delete confirmation switches is the same problem as on other screens and is handled together in #65.
+- The copy wording had no format set in the issue, so I decided the format above. To change it, only `questionText` needs to be fixed.
+- The problem that the table of contents is not updated if you add to a chapter deleted elsewhere: [#74](https://github.com/sirloinbh/study-log/issues/74)
+- Preventing a duplicate submit in the same tick: [#75](https://github.com/sirloinbh/study-log/issues/75)
 
-별도 읽기 전용 리뷰 에이전트가 이슈 #25 완료 기준과 PR 전체 diff를 검토했다. high 지적은 없었다. 실제 React에서 렌더 루프가 없고, 교재·단원 전환 상태 처리와 보안(텍스트 렌더만 사용)에 문제가 없다고 확인됐다.
+## Automated code review, round 1
 
-반영한 지적:
+A separate read-only review agent reviewed the issue #25 done criteria and the whole PR diff. There were no high comments. It was confirmed that in a real React there is no render loop, and there is no problem with the textbook and chapter switching state handling or with security (only text rendering is used).
 
-1. (medium) 포커스: `busy`가 풀릴 때마다 본문 칸에 다시 포커스해서, 폼을 연 채 다른 문제를 삭제하면 포커스가 폼으로 끌려갔다.
-   - 폼을 열 때와 추가 직후에만 포커스를 요청하는 `wantFocus` 상태로 바꿨다. 요청이 끝나 칸이 활성화된 뒤 한 번만 옮긴다.
-   - 테스트를 추가했다.
-2. (low-medium) 목차 로드에 실패하면 연습문제 카드가 "목차를 불러오는 중…"에 머물렀다.
-   - `onTree`가 `failed`를 함께 알리게 했다. 카드는 실패 안내를 보여 준다.
-3. (low) `onTree`에 매 렌더 새 함수를 넘기면 무한 렌더가 될 수 있다. 안정적인 함수(상태 setter)여야 한다고 주석으로 명시했다. 테스트용 React 대역은 이 경우를 잡지 못한다.
-4. (low) 문서에 "질문 복사"는 잠그지 않는다고 적었다.
-5. (low) 누락 테스트 6건을 추가했다(위 테스트 목록).
-6. (low) "중요" 배지가 완료 상태 스타일(`badge done`)을 빌려 썼다. 전용 `badge important`(강조색)로 바꿨다.
+Comments applied:
 
-분리한 지적(이 PR 범위 밖):
+1. (medium) Focus: it focused the body field again every time `busy` was released, so if you deleted another problem with the form open, focus was pulled to the form.
+   - I changed it to a `wantFocus` state that requests focus only when the form opens and right after adding. It moves once after the request ends and the field is enabled.
+   - I added a test.
+2. (low-medium) If the table of contents load failed, the exercises card stayed at "목차를 불러오는 중…" ("Loading the table of contents…").
+   - I made `onTree` also report `failed`. The card shows a failure notice.
+3. (low) Passing a new function to `onTree` on every render could cause an infinite render. I stated in a comment that it must be a stable function (a state setter). The React stand-in for tests cannot catch this case.
+4. (low) I wrote in the docs that "질문 복사" is not locked.
+5. (low) I added 6 missing tests (the test list above).
+6. (low) The "중요" badge borrowed the completed state style (`badge done`). I changed it to a dedicated `badge important` (an accent color).
 
-- 다른 곳에서 지워진 단원에 추가하면 목차 카드가 갱신되지 않아 빠져나올 수 없다. 두 카드에 걸친 수정이다 → #74
-- `if (busy) return`은 렌더 시점 값이라 같은 틱의 중복 제출을 못 막는다. 목차 카드와 같은 패턴이고 여러 화면에 공통으로 적용할 수정이다 → #75
+Comments split off (outside this PR's scope):
 
-반영 후 검증:
+- If you add to a chapter deleted elsewhere, the table of contents card is not updated and you cannot get out. It is a fix across two cards -> #74
+- `if (busy) return` is a render-time value, so it cannot block a duplicate submit in the same tick. It is the same pattern as the table of contents card and a fix that applies in common to several screens -> #75
 
-- `npm run check`(DB 포함): exit 0. backend tests 110, pass 110, fail 0, skipped 0. 스킬 4 pass, 빌드 통과.
-- 브라우저 흐름을 다시 확인했다. 추가 뒤 본문 포커스, 복사, 수정, 400 안내, 삭제, 장 추가 반영이 모두 그대로 동작한다. 모바일은 가로 스크롤이 없다.
-- 스크린샷을 새 배지 색으로 다시 찍었다.
+Verification after the fixes:
 
-## 자동 코드 리뷰 2차
+- `npm run check` (including the DB): exit 0. backend tests 110, pass 110, fail 0, skipped 0. Skills 4 pass, build passed.
+- I checked the browser flows again. Focus on the body after adding, copy, edit, the 400 notice, delete, and reflecting an added chapter all work as before. There is no horizontal scroll on mobile.
+- I retook the screenshots with the new badge color.
 
-별도 읽기 전용 리뷰 에이전트가 1차 반영 커밋(36b9e29)과 최종 PR 전체 diff를 다시 검토했다. 리뷰는 최대 2회이므로 3차 리뷰는 하지 않는다.
+## Automated code review, round 2
 
-- 1차 반영 6건이 실제 React 19 기준으로 맞고 빠진 것이 없다고 확인됐다.
-  - 포커스: 열 때, 편집 대상 전환, 추가 후 요청이 끝난 뒤에만 옮긴다. 삭제로는 옮기지 않는다.
-  - `failed`: 트리를 한 번도 못 보여 줬을 때만 참이다. 교재를 바꾸면 초기화된다.
-  - `onTree`(상태 setter)의 의존성에 `error`를 더해도 렌더 루프가 생기지 않는다.
-- 새 버그나 high·medium 지적은 없었다. #74·#75는 다시 지적되지 않았다.
-- 지적(low, 문서): 변경 목록에 `failed`·`treeFailed` 전달이 빠져 있었다. 위 변경 목록에 반영했다.
-- 이 커밋은 문서만 바꿨다. 코드 검증 결과는 1차 반영 후 결과(110 pass, 0 skip)가 유효하다.
+A separate read-only review agent checked the first-round fix commit (36b9e29) and the whole final PR diff again. The review is limited to 2 rounds, so I do not do a third.
+
+- It was confirmed that the 6 first-round fixes are right on a real React 19 basis and nothing is missing.
+  - Focus: it moves only when opening, when switching the edit target, and after the request ends following an add. It does not move because of a delete.
+  - `failed`: it is true only when the tree was never shown. It is reset when you change the textbook.
+  - Adding `error` to the dependencies of `onTree` (a state setter) does not create a render loop.
+- There were no new bugs or high or medium comments. #74 and #75 were not pointed out again.
+- Comment (low, docs): passing `failed` and `treeFailed` was missing from the change list. I reflected it in the change list above.
+- This commit changed only docs. The code verification result is the result after the first-round fix (110 pass, 0 skip).

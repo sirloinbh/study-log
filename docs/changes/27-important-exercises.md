@@ -1,94 +1,94 @@
-# #27 중요 연습문제 표시·필터
+# #27 Mark and filter important exercises
 
-- 이슈: [#27](https://github.com/sirloinbh/study-log/issues/27) (상위 #5)
-- 브랜치: `feat/27-important-exercises`
-- 선행: #24 연습문제 DB·API, #25 연습문제 화면 (병합 완료)
+- Issue: [#27](https://github.com/sirloinbh/study-log/issues/27) (parent #5)
+- Branch: `feat/27-important-exercises`
+- Prerequisites: #24 exercise DB and API, #25 exercise screen (merged)
 
-## 목적
+## Purpose
 
-다시 봐야 할 문제를 표시하고, 교재 전체 또는 한 장 안에서 모아 본다.
+Mark the problems you need to look at again, and gather them for the whole textbook or within one chapter.
 
-## 결정
+## Decisions
 
-- 표시는 토글이 아니라 값 지정이다(`{ important: true | false }`). 같은 요청을 두 번 보내도 결과가 같다.
-- 장을 고르면 그 장과 하위 절의 문제를 함께 모은다. 장 하나만 보려면 그 항목을 고르면 된다(하위가 없으면 그 항목만).
-- 목록 순서는 목차 순서(장 → 그 하위 절 → 다음 장)이고, 같은 항목 안에서는 추가한 순서다.
-- 필터 목록은 연습문제 카드와 별도인 "중요 문제" 카드에 둔다.
-  - 연습문제 카드는 단원 하나를 기준으로 추가·수정 상태를 관리한다. 교재 전체 목록을 같은 카드에 넣으면 이 기준이 흔들린다.
-  - 한쪽 카드에서 바꾸면 다른 카드가 다시 불러온다.
+- The mark is set by value, not a toggle (`{ important: true | false }`). Sending the same request twice gives the same result.
+- If you pick a chapter, the problems of that chapter and its sections are gathered together. To see only one chapter, pick that entry (if it has nothing below it, only that entry).
+- The list order is the table of contents order (chapter -> its sections -> the next chapter), and within the same entry it is the order they were added.
+- The filter list goes on an "important problems" card separate from the exercises card.
+  - The exercises card manages the add and edit state based on one chapter. Putting the list for the whole textbook on the same card would shake this basis.
+  - If you change on one card, the other card loads again.
 
-## 변경
+## Changes
 
 - `backend/src/exercises.ts`, `backend/src/app.ts`
 
-  | 요청                                                             | 동작                                                                                       |
-  | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-  | `PATCH /api/exercises/:id/important`                             | `{ important }`로 중요 여부만 바꾼다. 200 `{ exercise }`                                   |
-  | `GET /api/textbooks/:textbookId/exercises?important=&contentId=` | 교재의 연습문제를 목차 순서로. `contentId`는 그 장과 하위 절, `important`는 `true`/`false` |
-  - 없는 문제: "연습문제를 찾을 수 없습니다" 404. 없는 교재: "교재를 찾을 수 없습니다" 404. 다른 교재의 목차: "목차를 찾을 수 없습니다" 404.
-  - 순서는 재귀 CTE로 목차를 내려가며 형제 `position`을 경로 배열로 모아 정렬한다.
-  - 검증 메시지: "중요 표시 여부를 보내세요", "중요 표시 형식이 올바르지 않습니다", "중요 표시 여부를 JSON 객체로 보내세요", "중요 표시 조건이 올바르지 않습니다", 경로·목차 ID 오류.
-  - 새 마이그레이션은 없다. `important` 열은 #24에 있다.
+  | Request                                                          | Behavior                                                                                                                             |
+  | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+  | `PATCH /api/exercises/:id/important`                             | Changes only the important flag with `{ important }`. 200 `{ exercise }`                                                             |
+  | `GET /api/textbooks/:textbookId/exercises?important=&contentId=` | The textbook's exercises in table of contents order. `contentId` is that chapter and its sections, and `important` is `true`/`false` |
+  - A missing exercise: "연습문제를 찾을 수 없습니다" ("Exercise not found") 404. A missing textbook: "교재를 찾을 수 없습니다" 404. A table of contents entry of another textbook: "목차를 찾을 수 없습니다" 404.
+  - The order is found by going down the table of contents with a recursive CTE, collecting the sibling `position` into a path array and sorting.
+  - Validation messages: "중요 표시 여부를 보내세요" ("Send whether it is marked important"), "중요 표시 형식이 올바르지 않습니다" ("The important mark format is not valid"), "중요 표시 여부를 JSON 객체로 보내세요" ("Send the important mark as a JSON object"), "중요 표시 조건이 올바르지 않습니다" ("The important mark condition is not valid"), and path and table of contents ID errors.
+  - There is no new migration. The `important` column is in #24.
 
 - `frontend/src/Exercises.tsx`
-  - 문제마다 "중요 표시/중요 해제" 버튼. 그 문제를 수정 중이면 입력란의 중요 체크도 함께 바꿔서, 수정 저장이 표시를 되돌리지 않게 한다.
-  - `reloadKey`·`onChanged`로 중요 문제 카드와 변경을 주고받는다.
-- `frontend/src/ImportantExercises.tsx`(새 파일), `frontend/src/Textbooks.tsx`
-  - "중요 문제" 카드: 범위(교재 전체 / 각 장·절), 위치(`1 벡터 > 1.2 내적 · 문제 1`), 본문, "중요 해제" 버튼.
-  - 두 카드의 변경 횟수를 `Textbooks`가 들고 있다가 상대 카드의 `reloadKey`로 넘긴다.
+  - A "중요 표시/중요 해제" ("Mark important / Unmark") button for each problem. If that problem is being edited, it also changes the important checkbox of the input, so saving the edit does not undo the mark.
+  - It exchanges changes with the important problems card through `reloadKey` and `onChanged`.
+- `frontend/src/ImportantExercises.tsx` (a new file), `frontend/src/Textbooks.tsx`
+  - The "중요 문제" ("Important problems") card: the scope (the whole textbook / each chapter and section), the location (`1 벡터 > 1.2 내적 · 문제 1`, "1 Vectors > 1.2 Inner product · Problem 1"), the body, and the "중요 해제" button.
+  - `Textbooks` holds the number of changes of the two cards and passes it to the other card's `reloadKey`.
 
-## 테스트
+## Tests
 
-- `backend/test/exercises.test.ts`(DB 없음)
-  - PATCH 본문 검증(누락·문자열·배열)과 없는 문제 404
-  - 교재 목록 필터 검증(교재 ID·목차 ID·`important` 값)
-  - 없는 교재·다른 교재 목차 404
-- `backend/test/exercises.integration.test.ts`(실제 DB)
-  - 목차 순서와 다르게 추가한 문제가 목차 순서로 나오는지
-  - 장 + 하위 절 범위, 절만 범위, `important=false`, 다른 교재 문제 제외
-  - 표시가 다른 열을 바꾸지 않는지, 해제 후 목록
-  - 장 순서를 바꾸면(`PUT /contents/order`) 목록 순서도 바뀌는지
-  - 404 세 가지
-- `backend/test/exercises-ui.test.ts`(화면)
-  - 연습문제 카드에서 표시·해제 → PATCH, 배지, 메시지, 중요 문제 카드 갱신
-  - 수정 중 표시하면 수정 저장(PUT)에 중요 여부가 유지되는지
-  - 중요 문제 카드의 교재 전체·장·절 범위와 요청 경로
-  - 중요 문제 카드에서 해제 → 연습문제 카드 다시 불러오기
-  - 중요 문제 불러오기 실패 메시지
-  - 기존 버튼 이름 목록에 "중요 표시" 추가. fake API가 행을 복사하게 바꿔 테스트끼리 데이터가 섞이지 않게 했다.
+- `backend/test/exercises.test.ts` (no DB)
+  - PATCH body validation (missing, string, array) and 404 for a missing problem
+  - Textbook list filter validation (textbook ID, table of contents ID, `important` value)
+  - 404 for a missing textbook and a table of contents entry of another textbook
+- `backend/test/exercises.integration.test.ts` (a real DB)
+  - Whether problems added in an order different from the table of contents come out in table of contents order
+  - A chapter + its sections scope, a section-only scope, `important=false`, and excluding problems of another textbook
+  - Whether marking does not change other columns, and the list after unmarking
+  - Whether changing the chapter order (`PUT /contents/order`) also changes the list order
+  - The three 404s
+- `backend/test/exercises-ui.test.ts` (screen)
+  - Marking and unmarking on the exercises card -> PATCH, the badge, the message, and updating the important problems card
+  - Whether the important flag is kept in the edit save (PUT) when you mark during an edit
+  - The scopes of the whole textbook, chapter, and section on the important problems card, and the request path
+  - Unmarking on the important problems card -> the exercises card loads again
+  - The failure message of loading important problems
+  - I added "중요 표시" to the existing button name list. I changed the fake API to copy rows so data does not mix between tests.
 
-## 검증
+## Verification
 
-| 명령                                                       | 환경                                                        | 결과                                                       |
-| ---------------------------------------------------------- | ----------------------------------------------------------- | ---------------------------------------------------------- |
-| `npm run check`                                            | 로컬, `TEST_DATABASE_URL` 미설정                            | exit 0. backend tests 128, pass 119, fail 0, skipped 9(DB) |
-| `tsx --test --test-concurrency=1 test/*.test.ts` (backend) | 로컬 Docker `postgres:17-alpine`, 마이그레이션 001~008 적용 | tests 128, pass 128, fail 0, skipped 0                     |
+| Command                                                    | Environment                                                      | Result                                                      |
+| ---------------------------------------------------------- | ---------------------------------------------------------------- | ----------------------------------------------------------- |
+| `npm run check`                                            | Local, `TEST_DATABASE_URL` not set                               | exit 0. backend tests 128, pass 119, fail 0, skipped 9 (DB) |
+| `tsx --test --test-concurrency=1 test/*.test.ts` (backend) | Local Docker `postgres:17-alpine`, migrations 001 to 008 applied | tests 128, pass 128, fail 0, skipped 0                      |
 
-- 직렬로 실행한 이유는 #76(병렬 실행 시 `study-logs.integration` 경합, 이 변경과 무관)이다.
-- 브라우저: Playwright(Chromium)로 Vite 개발 서버(5202)와 이 브랜치 API(3102, 위 테스트 DB)를 띄워 확인했다.
-  - 모바일 390×844
-    - 연습문제 카드에서 "중요 표시" → 중요 문제 카드에 목차 순서로 추가
-    - 범위 "1 벡터" → 그 장과 1.2 절만
-    - 중요 문제 카드에서 해제 → 목록과 연습문제 카드 배지 갱신
-    - 가로 스크롤 없음
-  - PC 1440×900: 두 카드 표시, 가로 스크롤 없음
-  - 스크린샷: [모바일 390×844 (중요 문제 카드, 범위 1 벡터)](assets/27-mobile-390x844.png), [PC 1440×900](assets/27-pc-1440x900.png)
+- The reason I ran it serially is #76 (a race in `study-logs.integration` in a parallel run, unrelated to this change).
+- Browser: I checked by starting the Vite dev server (5202) and this branch's API (3102, the test DB above) with Playwright (Chromium).
+  - Mobile 390×844
+    - "중요 표시" on the exercises card -> it is added to the important problems card in table of contents order
+    - Scope "1 벡터" -> only that chapter and the 1.2 section
+    - Unmarking on the important problems card -> the list and the badge on the exercises card are updated
+    - No horizontal scroll
+  - PC 1440×900: both cards are shown, no horizontal scroll
+  - Screenshots: [mobile 390×844 (important problems card, scope 1 Vectors)](assets/27-mobile-390x844.png), [PC 1440×900](assets/27-pc-1440x900.png)
 
-## 자동 코드 리뷰 1차
+## Automated code review, round 1
 
-별도 읽기 전용 리뷰 에이전트가 이슈 #27 완료 기준과 PR 변경을 검토했다. high·medium 지적은 없었다. 반영할 수정이 없어 2차 리뷰는 하지 않는다.
+A separate read-only review agent reviewed the issue #27 done criteria and the PR changes. There were no high or medium comments. There is nothing to fix, so I do not do a second review.
 
-- 문제없다고 확인된 사항
-  - 재귀 CTE: 종료, 교재 간 누출 없음, 경로 배열 정렬(장 → 하위 절), 열 모호성 없음, 매개변수 타입
-  - 라우트 마운트 순서와 충돌 없음
-  - `tree`·`reloadKey` effect 의존성에 재요청 반복 없음, 두 카드 간 갱신이 서로 되돌아오지 않음
-  - 수정 중인 폼의 중요 체크 동기화, busy 잠금
-  - docs와 코드 일치
-- low(유지): 변경 후 다시 불러오기에 응답 순서 보호가 없다. 변경 직전에 시작된 불러오기가 늦게 도착하면 더 새 목록을 덮을 수 있다. 같은 데이터를 받아 대부분 수렴한다.
-  - 연습문제 카드(#25)의 기존 `refresh`도 같은 방식이다. 고치려면 두 카드의 요청 관리를 함께 바꿔야 해서 이 PR에서는 하지 않는다.
-  - 테스트 하네스가 effect 정리를 실행하지 않아, 이 경합은 화면 테스트로 재현할 수 없다.
+- Points confirmed to have no problem
+  - The recursive CTE: termination, no leak between textbooks, sorting by the path array (chapter -> its sections), no column ambiguity, and parameter types
+  - The route mount order and no conflicts
+  - No repeated requests in the `tree` and `reloadKey` effect dependencies, and updates between the two cards do not bounce back
+  - Syncing the important checkbox of the form being edited, and the busy lock
+  - The docs match the code
+- low (kept): reloading after a change has no protection for response order. If a load that started just before a change arrives late, it can overwrite a newer list. It receives the same data, so it mostly converges.
+  - The existing `refresh` of the exercises card (#25) is the same way. To fix it, the request management of both cards must change together, so I do not do it in this PR.
+  - The test harness does not run effect cleanup, so this race cannot be reproduced with a screen test.
 
-## 한계·후속
+## Limits and follow-up
 
-- 중요 문제 카드에는 정답 보기·질문 복사가 없다. 연습문제 카드에서 한다.
-- 중요 문제 카드는 교재별이다. 여러 교재를 합친 목록은 없다.
+- The important problems card has no show answer or copy question. You do those on the exercises card.
+- The important problems card is per textbook. There is no merged list of several textbooks.

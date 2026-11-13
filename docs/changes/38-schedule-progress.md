@@ -1,42 +1,42 @@
-# #38 일정 진행률 조회와 표시
+# #38 Show and read schedule progress
 
-- 이슈: [#38](https://github.com/sirloinbh/study-log/issues/38)
-- 브랜치: `feat/38-schedule-progress`
-- 규칙: [학습 일정 규칙](../decisions/schedule-rules.md) 5장
+- Issue: [#38](https://github.com/sirloinbh/study-log/issues/38)
+- Branch: `feat/38-schedule-progress`
+- Rules: chapter 5 of the [study schedule rules](../decisions/schedule-rules.md)
 
-## 목적
+## Purpose
 
-계획 대비 얼마나 진행했는지 보여 준다.
+Show how far you have progressed against the plan.
 
-## 변경
+## Changes
 
-- `backend/src/schedules.ts`: 일정 요약에 `completedCount`, `completedMinutes`, `progressPercent`를 더했다.
-- `frontend/src/schedules.tsx`, `frontend/src/style.css`: 날짜별 일정의 진행률 막대와 수치, 목록의 진행률.
-- `docs/decisions/schedule-rules.md`: 5장 진행률을 더하고, 생성 입력과 수정을 6장으로 옮겼다.
+- `backend/src/schedules.ts`: added `completedCount`, `completedMinutes`, and `progressPercent` to the schedule summary.
+- `frontend/src/schedules.tsx`, `frontend/src/style.css`: a progress bar and figures in the schedule by date, and progress in the list.
+- `docs/decisions/schedule-rules.md`: added chapter 5 on progress, and moved creation input and editing to chapter 6.
 
-## 구현 판단
+## Implementation judgment
 
-이슈는 기준을 착수할 때 정하라고 했다. 완료한 항목의 목표 시간 ÷ 전체 목표 시간으로 정했다.
+The issue said to decide the criterion when starting. I chose the target time of completed items ÷ the total target time.
 
-- 일정과 학습 기록은 연결되어 있지 않아, 실제로 공부한 시간은 기준이 될 수 없다.
-- 항목 수가 아니라 시간을 쓰는 것은 일정이 시간 비례로 짜이기 때문이다. 항목 수는 함께 보여 준다.
-- 백분율은 내림해, 전부 끝내야 100%이다.
+- A schedule and study records are not linked, so the time actually studied cannot be the criterion.
+- I use time rather than the number of items because the schedule is built in proportion to time. The number of items is shown together.
+- The percentage is rounded down, so it is 100% only when everything is done.
 
-## 리뷰
+## Review
 
-1차 리뷰에서 막아야 할 결함은 없었다. 틀린 테스트 주석과 약한 단언, 이전 문서에 남은 장 번호를 고치고, 완료 후 목록이 따라 바뀌는 테스트를 더했다. 진행률 변화를 스크린 리더가 바로 읽어 주지 않는 점은 이슈 범위 밖이고, 완료 메시지는 읽히고 값은 막대에서 언제든 읽을 수 있어 그대로 두었다.
+The first review found no defects that had to be blocked. I fixed a wrong test comment, a weak assertion, and a chapter number left in an older document, and added a test that the list follows after completion. That a screen reader does not read the progress change right away is outside the issue's scope, and the completion message is read and the value can be read from the bar at any time, so I left it.
 
-## 확인하지 못한 것
+## Not confirmed
 
-API 키가 없어(#129) 실제 공휴일 API로 일정을 만들어 보지 못했다. 브라우저 확인은 테스트 DB에 2026년 공휴일을 임시로 넣어 진행했고, 끝난 뒤 지웠다.
+There was no API key (#129), so I could not create a schedule with the real holiday API. The browser check was done by temporarily putting the 2026 holidays into the test DB, and I deleted them afterward.
 
-## 검증
+## Verification
 
-`TEST_DATABASE_URL`을 설정한 `npm run check`가 통과했다. 백엔드 414건, 프런트 194건, 스킬 4건이 통과했다. 건너뜀은 프런트 2건으로, 중앙 표준에서 온 다크 전용 앱 테스트이다. 스키마 변경은 없다.
+`npm run check` with `TEST_DATABASE_URL` set passed. Backend 414, frontend 194, and skills 4 passed. The skips were 2 frontend tests, the dark-only app tests that came from the central standards. There is no schema change.
 
-headless Chrome으로 PC 1440×900과 모바일 390×844에서 확인했다. 40개 항목이 통과했고 스크린샷을 직접 봤다. 처음 0%, 15시간 중 2시간 완료하면 13%(내림), 막대 폭, 목록의 진행률을 봤다.
+I checked with headless Chrome at PC 1440×900 and mobile 390×844. 40 items passed and I looked at the screenshots myself. I looked at the initial 0%, 13% (rounded down) after completing 2 of 15 hours, the bar width, and the progress in the list.
 
-## 테스트
+## Tests
 
-- `backend/test/schedule-adjust.integration.test.ts`: 목표 시간 기준 계산, 이동해도 그대로, 완료 취소로 내려감, 전부 끝내야 100%, 내림, 목록과 상세가 같음.
-- `frontend/src/schedules.test.tsx`: 막대와 수치, 목록의 진행률, 완료하면 올라감.
+- `backend/test/schedule-adjust.integration.test.ts`: calculation by target time, unchanged when moved, goes down when completion is cancelled, 100% only when everything is done, rounding down, the list and the detail match.
+- `frontend/src/schedules.test.tsx`: the bar and figures, progress in the list, goes up when completed.

@@ -1,56 +1,56 @@
-# #32, #41 학습 일정·복습 주기 규칙 확정
+# #32, #41 Fix the study schedule and review interval rules
 
-- 이슈: [#32](https://github.com/sirloinbh/study-log/issues/32), [#41](https://github.com/sirloinbh/study-log/issues/41)
-- 브랜치: `docs/32-41-schedule-review-rules`
+- Issues: [#32](https://github.com/sirloinbh/study-log/issues/32), [#41](https://github.com/sirloinbh/study-log/issues/41)
+- Branch: `docs/32-41-schedule-review-rules`
 
-## 목적
+## Purpose
 
-일정(#33~#38)과 복습(#42~#46) 구현을 막고 있던 미정 규칙을 사용자에게 확인해 기록한다(2026-10-31).
+Ask the user about the undecided rules that were blocking the implementation of schedules (#33 to #38) and reviews (#42 to #46), and record them (2026-10-31).
 
-## 변경
+## Changes
 
-- `docs/decisions/schedule-rules.md`: 시간 분량, 장 배분, 공휴일 출처, 지연 처리 규칙.
-- `docs/decisions/review-rules.md`: 복습 대상, 기준일과 간격, 미루기, 주기 변경 규칙.
-- `AGENTS.project.md`: "서비스 규칙"에 두 문서의 링크를 넣었다.
+- `docs/decisions/schedule-rules.md`: rules for the amount of time, chapter allocation, the holiday source, and handling delays.
+- `docs/decisions/review-rules.md`: rules for what gets a review, the base date and intervals, postponing, and changing the intervals.
+- `AGENTS.project.md`: put links to the two documents in "Service rules".
 
-두 문서는 사용자 결정과 에이전트가 채운 세부 규칙을 구분해 적었다.
+The two documents separate the user's decisions from the detailed rules the agent filled in.
 
-## 결정 과정에서 나온 점
+## Points from the decision process
 
-- 처음 질문에서 "해당 회차만 이동"을 다음 회차 날짜가 그대로인 것으로 설명했는데, "직전 복습 완료일" 기준과 함께 쓰면 그렇게 되지 않는다. 다음 회차는 완료일로 정해지므로 늦게 완료하면 함께 늦어진다. 문서에는 실제 동작을 적었다.
-- 1·3·7·14·30을 완료일 기준 간격으로 그대로 쓰면 마지막 회차가 학습 55일 뒤가 된다. 사용자에게 다시 확인해 간격을 1·2·4·7·16일로 정했다.
+- In the first question, I explained "move only that round" as the next round's date staying the same, but combined with the "completion date of the previous review" base, it does not work that way. The next round is set from the completion date, so if you complete late, it is later too. The document describes the actual behavior.
+- If 1, 3, 7, 14, and 30 were used as they are as intervals from the completion date, the last round would be 55 days after studying. I asked the user again and set the intervals to 1, 2, 4, 7, and 16 days.
 
-## 검증
+## Verification
 
-앱 코드를 바꾸지 않아 테스트를 추가하지 않았다.
+I did not change app code, so I did not add tests.
 
-- `npm run test:skills`: 4건 통과.
-- 프로젝트 설정 없이 로컬 Prettier로 새 문서를 정렬했다.
-- `npm run format:check`, `npm run lint`, `npm run standards:check`는 로컬에서 끝까지 실행하지 못했다. 로컬 `node_modules`에 `@sirloinbh/*` 공유 패키지가 없고, 패키지 설치는 사용자 확인이 필요하기 때문이다. 이 검사들은 CI 결과로 확인한다.
+- `npm run test:skills`: 4 passed.
+- I aligned the new documents with the local Prettier without project settings.
+- I could not run `npm run format:check`, `npm run lint`, and `npm run standards:check` to the end locally. The local `node_modules` does not have the shared `@sirloinbh/*` packages, and installing packages needs the user's confirmation. These checks are confirmed with the CI result.
 
-## 리뷰
+## Review
 
-1차 리뷰에서 사용자 결정의 기록 오류는 없었고, 에이전트가 채운 세부 규칙에서 다음 지적이 나와 이 PR에서 고쳤다.
+In the first review there were no recording errors in the user's decisions, and the following comments came on the detailed rules the agent filled in, and I fixed them in this PR.
 
-- 장 배분의 경계 비교와 다음 장 시작일이 정해지지 않아 마지막 장이 끝나지 않을 수 있었다. `누적 × n ≥ T × k`와 시작일 규칙을 적고, 장 0개와 분량 0을 정했다.
-- 자동 밀기의 "오늘부터 하루 한 항목" 재배치는 항목을 앞당기고, 완료 항목과 날짜가 겹치고, 수동 이동을 지웠다. 미완료 항목 전체를 같은 일수만큼 미는 규칙으로 바꿨다.
-- 밀린 항목의 목표 시간을 다시 계산하면 전체 목표 시간과 시간 비례 배분이 깨졌다. 그대로 두도록 바꿨다. 그래서 조회 때 공휴일 데이터가 필요 없어졌고, 공휴일 데이터는 생성 때만 쓴다.
-- 복습에서 완료 해제, 학습일 수정, 기존 완료 기록, 회차 완료 되돌리기, 배지 기준, 지연 집계 근거를 정했다.
-- 이슈 코멘트 기록이 빠져 있었다. 완료 기준에 있는 #32, #41에 결정 내용을 코멘트로 남긴다.
+- The boundary comparison for chapter allocation and the start date of the next chapter were not set, so the last chapter might not end. I wrote `cumulative × n ≥ T × k` and the start date rule, and set the cases of 0 chapters and an amount of 0.
+- The "one item per day from today" rearrangement of automatic pushing pulled items earlier, overlapped dates with completed items, and erased manual moves. I changed it to a rule that pushes all incomplete items by the same number of days.
+- Recalculating the target time of pushed items broke the total target time and the time-proportional allocation. I changed it to leave them as they are. So holiday data is no longer needed at read time, and it is used only at creation.
+- For reviews, I set un-completing, fixing the study date, existing completed records, undoing a round completion, the badge criterion, and the basis of the late count.
+- The record in the issue comments was missing. I leave the decisions as comments on #32 and #41, which are in the done criteria.
 
-2차 리뷰에서 다음 지적이 나와 이 PR에서 고쳤다. 리뷰는 최대 2회이므로 3차 리뷰는 하지 않았다.
+In the second review, the following comments came, and I fixed them in this PR. The review is limited to 2 rounds, so I did not do a third review.
 
-- 학습일 수정으로 1회차를 다시 계산할 때 원래 예정일도 함께 바꾸도록 정했다. 그렇지 않으면 제때 복습해도 지연으로 집계된다.
-- 생성 거부 조건을 "분량이 둘 다 0"에서 "기간 전체 목표 시간이 0"으로 넓혔다. 평일 0시간에 월~금 기간처럼 항목이 없는 경우를 막는다.
-- 공휴일 API의 빈 성공 응답을 공휴일 없는 해로 저장하지 않도록 정했다.
+- When recalculating round 1 after fixing the study date, I set it to change the original due date too. Otherwise a review on time would be counted as late.
+- I widened the condition for rejecting creation from "both amounts are 0" to "the target time for the whole period is 0". It blocks cases with no items, such as a Monday to Friday period with 0 hours on weekdays.
+- I set that an empty successful response from the holiday API is not saved as a year with no holidays.
 
-## 후속 작업
+## Follow-up work
 
-영향받는 이슈(#33, #37, #42~#46)에 남기려던 코멘트는 자동 권한 검사에 막혀 아직 남기지 못했다. #33의 `needs-user` 라벨도 달지 못했다. 각 이슈는 착수할 때 이 문서와 `docs/decisions/`를 따른다.
+The comments I meant to leave on the affected issues (#33, #37, #42 to #46) were blocked by the automatic permission check and could not be left yet. I also could not add the `needs-user` label to #33. Each issue follows this document and `docs/decisions/` when it starts.
 
-- #33: 공공데이터포털 API 키 발급이 필요하다(사용자 단계).
-- #37: 자동 밀기를 범위에 더한다.
-- #42, #43: 1회차만 먼저 만들고 다음 회차는 완료 처리에서 만든다.
-- #44: 예정일이 오늘이거나 지난 미완료 회차만 센다.
-- #45: 미루기는 그 회차의 예정일만 바꾼다.
-- #46: 원래 예정일 기준으로 지연을 센다.
+- #33: a Public Data Portal API key is needed (a user step).
+- #37: add automatic pushing to the scope.
+- #42, #43: create only round 1 first, and create the next round in the completion handling.
+- #44: count only incomplete rounds whose due date is today or earlier.
+- #45: postponing changes only that round's due date.
+- #46: count lateness from the original due date.

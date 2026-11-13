@@ -1,39 +1,39 @@
-# #120 주요 화면과 로직 파일에 프런트 테스트 더하기
+# #120 Add frontend tests for the main screens and logic files
 
-- 이슈: [#120](https://github.com/sirloinbh/study-log/issues/120)
-- 브랜치: `chore/120-frontend-tests`
+- Issue: [#120](https://github.com/sirloinbh/study-log/issues/120)
+- Branch: `chore/120-frontend-tests`
 
-## 목적
+## Purpose
 
-주요 흐름을 실제 React와 DOM으로 검사한다. `backend/test/*-ui.test.ts`도 같은 화면을 검사하지만, 가짜 React로 요소 트리만 본다.
+Check the main flows with real React and the DOM. `backend/test/*-ui.test.ts` also checks the same screens, but it looks only at the element tree with a fake React.
 
-## 변경
+## Changes
 
-앱 코드는 바꾸지 않았다.
+I did not change the app code.
 
 - `frontend/src/logic.test.ts`: `month-calendar.ts`, `toc.ts`, `study-stats.ts`, `pdf-toc.ts`.
-- `frontend/src/screens.test.tsx`: 학습 기록(목록, 추가, 삭제, 저장 실패, 불러오기 실패), 교재(목록, 추가), 목차(순서 바꾸기, 거절된 이동), 연습문제(추가, 삭제).
-- `frontend/src/test/fake-api.ts`: 서버 없이 `fetch`를 대신한다.
+- `frontend/src/screens.test.tsx`: study logs (list, add, delete, save failure, load failure), textbooks (list, add), table of contents (reorder, a rejected move), exercises (add, delete).
+- `frontend/src/test/fake-api.ts`: stands in for `fetch` without a server.
 
-## 구현 판단
+## Implementation judgment
 
-- 이슈의 파일 이름은 #117 이전 이름이다. `study-logs.ts`는 `study-logs-data.ts`로 바뀌었고, 이 파일과 나머지 이름 변경은 #117 기록에 있다.
-- 이슈는 날짜 경계를 `Asia/Seoul`로 검사하라고 적었지만, 이 로직 파일들은 시계를 읽지 않는다. 날짜 문자열을 UTC로 계산하므로 시계를 고정할 곳이 없다. 대신 달의 시작 요일과 연말 이동을 검사한다.
+- The file names in the issue are the names from before #117. `study-logs.ts` became `study-logs-data.ts`, and this file and the other renames are in the #117 record.
+- The issue said to check date boundaries in `Asia/Seoul`, but these logic files do not read the clock. They compute date strings in UTC, so there is nowhere to fix the clock. Instead I check the weekday of the start of a month and the year-end move.
 
-## 검증
+## Verification
 
-`TEST_DATABASE_URL`을 설정한 `npm run check`가 통과했다. 백엔드 341건, 프런트 154건, 스킬 4건이 통과했다. 건너뜀은 프런트 2건으로, 중앙 표준에서 온 다크 전용 앱 테스트이다.
+`npm run check` with `TEST_DATABASE_URL` set passed. Backend 341, frontend 154, and skills 4 passed. The skips were 2 frontend tests, the dark-only app tests that came from the central standards.
 
-테스트가 결함을 잡는지 보려고 앱 코드에 결함을 하나씩 넣어 돌리고 되돌렸다. 7건 중 6건을 잡았고, 놓친 1건은 입력한 학습일이 오늘과 같아서 "날짜 유지"를 구별하지 못한 것이다. 다른 날짜를 쓰도록 고쳐 다시 확인했다. 이 작업은 테스트만 더해 브라우저 확인은 하지 않았다.
+To see whether the tests catch defects, I put in one defect at a time in the app code, ran them, and reverted. They caught 6 of 7, and the one missed was because the study date I entered was the same as today, so it could not tell "keep the date". I changed it to use a different date and checked again. This work only added tests, so I did not check in a browser.
 
-## 리뷰
+## Review
 
-1차 리뷰에서 테스트의 약점 5건을 찾아 고쳤다. 앱 코드의 결함은 없었다.
+The first review found 5 weak points in the tests and I fixed them. There were no defects in the app code.
 
-- 연습문제 추가 테스트가 입력칸의 글자를 찾아, 목록에 나타나는지 검사하지 못했다.
-- 가짜 서버가 조회 조건을 무시해, 최근 기록 대신 캘린더 목록으로 통과할 수 있었다. 조건대로 답하게 하고 최근 기록 카드 안에서만 찾는다.
-- 목차 이동 테스트가 저장 중의 비활성 상태로도 통과할 수 있었다. 답으로 받은 순서를 직접 검사한다.
-- 테스트별 제한만 늘리고 `findBy`와 `waitFor`의 1초는 그대로였다. `screens.test.tsx`와 `stats-review.test.tsx`에서 10초로 늘렸다. #117 기록에 남긴 한계도 함께 해소된다.
-- 가짜 서버가 다른 API에 틀린 모양으로 답해, 교재 상세의 카드와 캘린더가 그려지지 않았다.
+- The add exercise test looked for the text in the input field, so it could not check that it appears in the list.
+- The fake server ignored the query conditions, so it could pass with the calendar list instead of the recent logs. It now answers according to the conditions, and the test looks only inside the recent logs card.
+- The table of contents move test could pass even with the disabled state while saving. It now checks the order received in the answer directly.
+- Only the per-test limit was raised, and the 1 second of `findBy` and `waitFor` was unchanged. I raised it to 10 seconds in `screens.test.tsx` and `stats-review.test.tsx`. The limit recorded in the #117 record is resolved too.
+- The fake server answered other APIs in the wrong shape, so the cards and the calendar of the textbook detail were not drawn.
 
-지적된 결함 3건(목록 다시 불러오기 2건, 답으로 받은 순서 무시)을 앱 코드에 넣어 모두 잡는 것을 확인하고 되돌렸다. 2차 리뷰에서 결함은 없었다.
+I put the 3 reported defects (2 list reloads, ignoring the order received in the answer) into the app code, confirmed that all were caught, and reverted. The second review found no defects.

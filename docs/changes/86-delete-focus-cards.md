@@ -1,67 +1,67 @@
-# #86 연습문제·목차·키워드 화면의 삭제 확인 전환 시 포커스 유실
+# #86 Focus is lost when switching the delete confirmation on the exercises, table of contents, and keywords screens
 
-- 이슈: [#86](https://github.com/sirloinbh/study-log/issues/86) (#65 작업 중 발견)
-- 브랜치: `fix/86-delete-focus-cards`
+- Issue: [#86](https://github.com/sirloinbh/study-log/issues/86) (found while working on #65)
+- Branch: `fix/86-delete-focus-cards`
 
-## 문제
+## Problem
 
-#65에서 학습 기록·교재 화면의 삭제 흐름에 포커스 이동을 넣었다. 하지만 같은 2단계 삭제를 쓰는 연습문제 카드, 목차 카드, 키워드 화면은 버튼을 바꿔 끼울 때 포커스가 페이지로 떨어졌다. 키워드 화면은 삭제 후만 처리돼 있었고, 삭제 → 확인과 취소 단계는 처리되지 않았다.
+In #65 I added a focus move to the delete flow of the study log and textbook screens. But the exercises card, the table of contents card, and the keywords screen, which use the same 2-step delete, let focus fall to the page when the button is swapped. The keywords screen handled only after the delete, and the delete -> confirm and cancel steps were not handled.
 
-## 변경
+## Changes
 
-#65와 같은 규칙이다.
+It is the same rule as #65.
 
-| 단계                       | 포커스                                                              |
-| -------------------------- | ------------------------------------------------------------------- |
-| "삭제"를 누름              | 그 항목의 "삭제 확인"                                               |
-| "취소"를 누름              | 그 항목의 "삭제"                                                    |
-| 삭제 성공·이미 지워짐(404) | 카드 제목("연습문제" / "목차") 또는 그날 목록 제목(키워드)          |
-| 그 밖의 실패               | 그 항목의 "삭제"(예: 학습 기록이 연결된 목차의 409 — 항목이 남는다) |
+| Step                                     | Focus                                                                                                             |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Press "삭제" (Delete)                    | That item's "삭제 확인" (Confirm delete)                                                                          |
+| Press "취소" (Cancel)                    | That item's "삭제"                                                                                                |
+| Delete succeeds or already deleted (404) | The card title ("연습문제" / "목차") or that day's list title (keywords)                                          |
+| Other failures                           | That item's "삭제" (for example 409 for a table of contents entry with study logs linked, where the item remains) |
 
 - `frontend/src/Exercises.tsx`
-  - `wantFocus`를 boolean에서 요소 id로 바꿨다. 문제 추가 후 본문 포커스는 `'exercise-body'`로 그대로다.
-  - 버튼 id `exercise-delete-<id>`·`exercise-delete-confirm-<id>`, 제목 `exercise-heading`(`tabIndex=-1`)
+  - Changed `wantFocus` from a boolean to an element id. The focus on the body after adding an exercise is still `'exercise-body'`.
+  - Button ids `exercise-delete-<id>` and `exercise-delete-confirm-<id>`, and the title `exercise-heading` (`tabIndex=-1`)
 - `frontend/src/TextbookContents.tsx`
-  - 같은 `wantFocus` 구조를 새로 두었다.
-  - 버튼 id `content-delete-<id>`·`content-delete-confirm-<id>`, 제목 `contents-heading`
+  - Added the same `wantFocus` structure.
+  - Button ids `content-delete-<id>` and `content-delete-confirm-<id>`, and the title `contents-heading`
 - `frontend/src/Keywords.tsx`
-  - 삭제·확인·취소 단계를 추가했다. 버튼 id `keyword-delete-<id>`·`keyword-delete-confirm-<id>`
-  - 실패 시 404만 목록 제목으로 가고, 그 밖의 실패는 삭제 버튼으로 간다. 그전에는 실패해도 항상 목록 제목으로 갔다.
+  - Added the delete, confirm, and cancel steps. Button ids `keyword-delete-<id>` and `keyword-delete-confirm-<id>`
+  - On failure, only 404 goes to the list title, and other failures go to the delete button. Before, it always went to the list title even on failure.
 
-## 테스트
+## Tests
 
-- 화면마다 1건씩 추가했다(`exercises-ui`·`textbook-contents-ui`·`keywords-ui`).
-  - 삭제 → 확인 버튼, 취소 → 삭제 버튼, 500·409 실패 → 삭제 버튼, 404 또는 성공 → 제목
-  - #65 리뷰에서 강화한 방식처럼, 포커스 대상 id가 렌더된 화면에 정확히 하나 있어야 통과한다.
-- 기존 테스트 2건을 새 규칙에 맞게 고쳤다.
-  - 연습문제: "다른 문제를 지우면 포커스가 그대로"였다. 이제는 확인 버튼을 거쳐 카드 제목으로 가고, 수정 중인 폼은 열린 채 남는지 확인한다.
-  - 키워드: 포커스 순서에 "삭제 → 확인 버튼" 단계가 추가됐다.
-- 수정 전 코드에서 새 테스트 3건과 고친 테스트 2건이 실패하고, 수정 후 모두 통과하는 것을 확인했다.
+- I added one per screen (`exercises-ui`, `textbook-contents-ui`, `keywords-ui`).
+  - Delete -> confirm button, cancel -> delete button, 500 or 409 failure -> delete button, 404 or success -> title
+  - As with the way strengthened in the #65 review, it passes only if the focus target id is exactly one in the rendered screen.
+- I fixed 2 existing tests to match the new rule.
+  - Exercises: it was "if you delete another exercise, focus stays". Now it goes through the confirm button to the card title, and it checks that the form being edited stays open.
+  - Keywords: the focus order gained a "delete -> confirm button" step.
+- I confirmed that the 3 new tests and the 2 fixed tests fail on the code before the fix, and all pass after the fix.
 
-## 검증
+## Verification
 
-| 명령            | 환경                             | 결과                                                        |
-| --------------- | -------------------------------- | ----------------------------------------------------------- |
-| `npm run check` | 로컬, `TEST_DATABASE_URL` 미설정 | exit 0. backend tests 176, pass 164, fail 0, skipped 12(DB) |
+| Command         | Environment                        | Result                                                       |
+| --------------- | ---------------------------------- | ------------------------------------------------------------ |
+| `npm run check` | Local, `TEST_DATABASE_URL` not set | exit 0. backend tests 176, pass 164, fail 0, skipped 12 (DB) |
 
-- 브라우저(Playwright Chromium, Vite + API + 로컬 테스트 DB)에서 키보드(Enter·Tab)만으로 확인했다.
-  - 모바일 390×844, 연습문제 카드: 삭제 → 확인 → (Tab) 취소 → 삭제 → 확인 → 확인 → "연습문제" 제목. API로 삭제를 확인했고(404), 가로 스크롤이 없다.
-  - PC 1440×900, 목차 카드: 같은 흐름이 "목차" 제목으로 이동했고, 단원 "8 지울 장"이 목록에서 빠졌다. 가로 스크롤이 없다.
-  - 키워드 화면은 UI 테스트로 확인했다. 삭제 후 포커스는 #40에서 브라우저로 확인한 그대로다.
-- 화면 모양이 바뀌지 않아 스크린샷은 남기지 않았다.
+- In a browser (Playwright Chromium, Vite + API + a local test DB), I checked with only the keyboard (Enter and Tab).
+  - Mobile 390×844, the exercises card: delete -> confirm -> (Tab) cancel -> delete -> confirm -> confirm -> the "연습문제" title. I confirmed the delete through the API (404), and there is no horizontal scroll.
+  - PC 1440×900, the table of contents card: the same flow moved to the "목차" title, and the chapter "8 지울 장" ("8 Chapter to delete") left the list. There is no horizontal scroll.
+  - I checked the keywords screen with a UI test. The focus after delete is as I checked in the browser in #40.
+- The look of the screen did not change, so I did not keep screenshots.
 
-## 자동 코드 리뷰 1차
+## Automated code review, round 1
 
-별도 읽기 전용 리뷰 에이전트가 검토했다. 지적이 없어 2차 리뷰는 하지 않는다. 분리할 이슈도 없다.
+A separate read-only review agent reviewed it. There were no comments, so I do not do a second review. There is no issue to split off either.
 
-- 확인된 사항
-  - 세 화면의 `remove`는 실패할 때 포커스를 정한 뒤 오류를 다시 던진다. 그래서 `run`의 알림·404 처리가 그대로 동작한다.
-  - 포커스는 다시 불러오기가 끝나고 버튼이 활성화된 뒤에 옮겨진다.
-  - id가 겹치지 않는다. 목차 트리 id에는 항목 id가 들어가고, 중요 문제 카드는 이 id들을 쓰지 않는다.
-  - 문제 추가·수정의 본문 포커스는 그대로다.
-  - 목차 편집기의 자동 포커스와 충돌하지 않는다.
-- 참고(반영): `wantFocus` 위에 남아 있던 옛 주석 한 줄을 지웠다. 동작은 바뀌지 않는다.
+- Confirmed points
+  - In the three screens, `remove` decides the focus on failure and then throws the error again. So the notice and 404 handling of `run` still work.
+  - Focus is moved after the reload finishes and the button is enabled.
+  - The ids do not collide. The table of contents tree ids contain the item id, and the important exercises card does not use these ids.
+  - The body focus for adding and editing an exercise is unchanged.
+  - It does not conflict with the auto focus of the table of contents editor.
+- Note (applied): I deleted an old comment line left above `wantFocus`. The behavior does not change.
 
-## 한계·후속
+## Limits and follow-up
 
-- 실패 후 다시 불러온 목록에서 그 항목이 사라진 드문 경우(다른 곳에서 삭제)에는 포커스할 삭제 버튼이 없다. #65와 같은 한계다.
+- In the rare case where the item is gone from the list reloaded after a failure (deleted elsewhere), there is no delete button to focus. It is the same limit as #65.

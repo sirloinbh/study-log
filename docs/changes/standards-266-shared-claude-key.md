@@ -1,15 +1,15 @@
-# 공용 Claude API 키를 project-standards/.env에서 읽기 (sirloinbh/project-standards#266)
+# Read the shared Claude API key from project-standards/.env (sirloinbh/project-standards#266)
 
-## 목적
+## Purpose
 
-공용 Claude API 키를 앱마다 `.env`에 넣지 않고 PC의 `project-standards/.env` 한 곳에 둔다(project-standards ADR-0010 변경, 2026-10-29 사용자 결정).
+Keep the shared Claude API key in one place, `project-standards/.env` on the PC, instead of putting it in each app's `.env` (a change to project-standards ADR-0010, user decision on 2026-10-29).
 
-## 변경
+## Changes
 
-- `backend/package.json`의 `dev`: `../.env` 다음에 `../../project-standards/.env`도 읽는다. 앱 클론이 project-standards와 같은 상위 폴더에 있다고 본다. 파일이 없으면 건너뛴다.
-- 같은 키가 두 파일에 있으면 뒤에 읽는 `project-standards/.env`가 이긴다. 그래서 `.env`에 남은 빈 `ANTHROPIC_API_KEY=` 줄이 공용 키를 덮지 않는다.
-- `.env.example`: 로컬에서는 키를 비워 두라는 설명 추가.
+- `dev` in `backend/package.json`: after `../.env`, it also reads `../../project-standards/.env`. It assumes the app clone is in the same parent folder as project-standards. If the file is missing, it is skipped.
+- If the same key is in both files, the `project-standards/.env` read later wins. So an empty `ANTHROPIC_API_KEY=` line left in `.env` does not override the shared key.
+- `.env.example`: added a note to leave the key empty locally.
 
-## 키 넣기
+## Putting the key in
 
-project-standards에서 `node tools/app-secrets.mjs pull`을 실행한다(개인 AWS 프로필 필요).
+Run `node tools/app-secrets.mjs pull` in project-standards (a personal AWS profile is needed).

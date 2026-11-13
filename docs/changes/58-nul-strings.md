@@ -1,53 +1,53 @@
-# #58 문자열 본문의 NUL 문자가 500으로 응답
+# #58 A NUL character in a string body is answered with 500
 
-- 이슈: [#58](https://github.com/sirloinbh/study-log/issues/58) (PR #57 리뷰에서 분리)
-- 브랜치: `fix/58-nul-strings`
+- Issue: [#58](https://github.com/sirloinbh/study-log/issues/58) (split from the PR #57 review)
+- Branch: `fix/58-nul-strings`
 
-## 문제
+## Problem
 
-요청 문자열에 NUL 문자(U+0000)가 있으면 Zod 검증을 통과한다. 그 뒤 PostgreSQL이 text 값을 거부하고(SQLSTATE `22021`), 공통 오류 처리기가 500 "서버 오류가 발생했습니다"로 응답하며 서버 오류 로그를 남겼다. 클라이언트 입력 오류인데 서버 오류로 처리된 것이다.
+If a request string has a NUL character (U+0000), it passes the Zod validation. After that PostgreSQL rejects the text value (SQLSTATE `22021`), and the shared error handler answered 500 "서버 오류가 발생했습니다" ("A server error occurred") and wrote a server error log. A client input error was handled as a server error.
 
-- 본문 문자열: 교재 제목, 학습 기록 메모, 연습문제·정답 본문, 키워드 등
-- 검색어: 키워드 검색 `?q=%00`(LIKE 패턴 매개변수도 같은 오류)
+- Body strings: a textbook title, a study log note, exercise and answer bodies, keywords, and so on
+- Search terms: keyword search `?q=%00` (a LIKE pattern parameter gets the same error)
 
-## 변경
+## Changes
 
-- `backend/src/app.ts`: 공통 오류 처리기에서 `22021`을 400 "입력에 사용할 수 없는 문자(NUL)가 있습니다"로 응답한다. 서버 오류 로그는 남기지 않는다.
-  - 모든 API에 한 번에 적용된다. 교재, 목차, 학습 기록, 연습문제, 정답, 키워드가 대상이다.
-  - Zod 스키마마다 NUL 검사를 넣는 방법도 있었다. 하지만 문자열 필드와 쿼리 매개변수가 많아 빠뜨리기 쉽다. 그래서 DB가 거부하는 지점 한 곳에서 처리했다.
-  - `22021`은 "인코딩에 맞지 않는 바이트" 오류다. 이 서버의 DB는 UTF-8이고, JS 문자열은 드라이버가 UTF-8로 보낸다. 그래서 실제로 나는 경우는 NUL뿐이다. 로컬 PostgreSQL 17에서 매개변수에 NUL을 넣어 `22021`이 나는 것을 확인했다(일반 값과 LIKE 패턴 모두).
+- `backend/src/app.ts`: in the shared error handler, answer `22021` with 400 "입력에 사용할 수 없는 문자(NUL)가 있습니다" ("The input has a character that cannot be used (NUL)"). It does not write a server error log.
+  - It applies to all APIs at once: textbooks, table of contents, study logs, exercises, answers, and keywords.
+  - Adding a NUL check to each Zod schema was another option. But there are many string fields and query parameters, so it is easy to miss one. So I handled it in one place, the point where the DB rejects it.
+  - `22021` is the error for "a byte sequence that does not fit the encoding". The DB of this server is UTF-8, and the driver sends JS strings as UTF-8. So in practice only NUL causes it. I confirmed on a local PostgreSQL 17 that putting NUL in a parameter gives `22021` (for both a normal value and a LIKE pattern).
 
-## 테스트
+## Tests
 
-- `backend/test/textbooks.test.ts`, `backend/test/study-logs.test.ts`(DB 없음)
-  - DB가 `22021`을 던질 때 400과 한국어 메시지로 응답하는지
-  - `console.error`가 호출되지 않는지
-- `backend/test/nul-strings.integration.test.ts`(실제 DB, 새 파일)
-  - 교재 제목, 학습 기록 메모, 키워드 본문, 키워드 검색어 `%00`이 모두 400과 같은 메시지인지
-  - 서버 오류 로그가 없는지
-- 수정 전 코드(`app.ts`만 되돌림)에서 세 테스트가 실패하고, 수정 후 통과하는 것을 확인했다.
+- `backend/test/textbooks.test.ts`, `backend/test/study-logs.test.ts` (no DB)
+  - Whether it answers with 400 and a Korean message when the DB throws `22021`
+  - Whether `console.error` is not called
+- `backend/test/nul-strings.integration.test.ts` (a real DB, a new file)
+  - Whether a textbook title, a study log note, a keyword body, and the keyword search term `%00` all give 400 and the same message
+  - Whether there is no server error log
+- I confirmed that three tests fail on the code before the fix (only `app.ts` reverted) and pass after the fix.
 
-## 검증
+## Verification
 
-| 명령                   | 환경                                                        | 결과                                                        |
-| ---------------------- | ----------------------------------------------------------- | ----------------------------------------------------------- |
-| `npm run check`        | 로컬, `TEST_DATABASE_URL` 미설정                            | exit 0. backend tests 155, pass 144, fail 0, skipped 11(DB) |
-| `npm test` (기본 병렬) | 로컬 Docker `postgres:17-alpine`, 마이그레이션 001~009 적용 | exit 0. tests 155, pass 155, fail 0, skipped 0              |
+| Command                       | Environment                                                      | Result                                                       |
+| ----------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------ |
+| `npm run check`               | Local, `TEST_DATABASE_URL` not set                               | exit 0. backend tests 155, pass 144, fail 0, skipped 11 (DB) |
+| `npm test` (default parallel) | Local Docker `postgres:17-alpine`, migrations 001 to 009 applied | exit 0. tests 155, pass 155, fail 0, skipped 0               |
 
-- 화면 변경이 없어 브라우저 확인은 하지 않았다.
+- There was no screen change, so I did not check in a browser.
 
-## 자동 코드 리뷰 1차
+## Automated code review, round 1
 
-별도 읽기 전용 리뷰 에이전트가 검토했다. 지적이 없어 2차 리뷰는 하지 않는다. 분리할 이슈도 없다.
+A separate read-only review agent reviewed it. There were no comments, so I do not do a second review. There is no issue to split off either.
 
-- 확인된 사항
-  - 모든 라우트가 처리하는 오류 코드(23503·23505 등)만 잡고 나머지는 다시 던진다. 그래서 `22021`이 공통 처리기까지 온다.
-  - 트랜잭션 경로(`textbook-contents.ts`의 `writeContents`, 학습 기록 쓰기)는 ROLLBACK 후 다시 던진다.
-  - 경로 ID는 DB 전에 검증된다.
-  - 테스트 파일에는 NUL 바이트가 아니라 U+0000을 나타내는 이스케이프 문자열만 있다.
-  - docs가 코드와 일치한다.
-- 참고(유지): 목차 쓰기 트랜잭션 경로를 지나는 NUL 테스트는 없다. 코드상 같은 방식으로 다시 던지는 것을 확인했다.
+- Confirmed points
+  - Every route handles only the error codes it deals with (23503, 23505, and so on) and throws the rest again. So `22021` reaches the shared handler.
+  - The transaction paths (`writeContents` in `textbook-contents.ts`, study log writes) throw again after ROLLBACK.
+  - Path IDs are validated before the DB.
+  - The test files have only an escape string that stands for U+0000, not a NUL byte.
+  - The docs match the code.
+- Note (kept): there is no NUL test that goes through the table of contents write transaction path. I confirmed in the code that it throws again the same way.
 
-## 한계·후속
+## Limits and follow-up
 
-- NUL이 들어간 값은 저장되지 않고 거부된다. 붙여넣기 등으로 섞여 들어온 경우 사용자가 지우고 다시 보내야 한다. 화면에서 미리 걸러 주지는 않는다.
+- A value with NUL is not saved and is rejected. If it got mixed in by pasting or the like, the user must delete it and send again. The screen does not filter it out in advance.

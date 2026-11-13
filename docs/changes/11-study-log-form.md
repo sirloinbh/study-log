@@ -1,116 +1,116 @@
-# #11 학습 기록 입력 폼·최근 기록 목록 화면
+# #11 Study log input form and recent records list screen
 
-- 이슈: [#11](https://github.com/sirloinbh/study-log/issues/11) (상위 #9)
-- 브랜치: `feat/11-study-log-form`
-- 선행: #10 학습 기록 DB·API (PR #55 병합)
+- Issue: [#11](https://github.com/sirloinbh/study-log/issues/11) (parent #9)
+- Branch: `feat/11-study-log-form`
+- Prerequisite: #10 study log DB and API (PR #55 merged)
 
-## 목적
+## Purpose
 
-하루의 학습을 바로 입력하고 최근 기록을 확인하는 첫 화면을 만든다.
+Build the first screen where you enter a day's study right away and check recent records.
 
-## 변경
+## Changes
 
-- `frontend/src/StudyLogs.tsx`: 학습 기록 화면.
-  - 입력 폼: 학습일(기본값은 서버의 오늘), 시작·종료, 상태, 메모.
-  - 시작·종료를 입력하면 학습 시간을 미리 보여 준다. 자정을 넘기면 "(다음 날 종료)"를 붙인다.
-  - 저장은 POST, 수정은 PUT이다. 저장·수정 후 목록을 서버에서 다시 불러온다.
-  - 새 기록을 저장한 뒤에는 학습일을 유지한 채 폼을 비운다. 수정을 저장하거나 취소하면 수정 전에 쓰던 새 기록 입력값(없으면 오늘 날짜의 빈 폼)으로 돌아간다.
-  - 서버의 한국어 검증 메시지를 `role="alert"`로 표시하고 입력값은 유지한다.
-  - 최근 기록 20건: 날짜, 시작–종료, 서버가 계산한 학습 시간, 상태 배지, 메모(3줄까지). 기록이 없으면 "아직 학습 기록이 없습니다"를 보여 준다.
-  - 수정 버튼은 폼에 값을 채워 수정 모드로 바꾼다. 취소할 수 있다.
-  - 삭제는 "삭제 확인"을 한 번 더 눌러야 실행된다. 브라우저 `confirm` 대화상자는 쓰지 않는다.
-- `frontend/src/study-logs.ts`: 상태 이름, 학습 시간 미리보기(API와 같은 자정 넘김 규칙), 시간 표시(`1시간 30분`), API 호출 도우미(한국어 오류 전달, 연결 실패 메시지).
-- `frontend/src/main.tsx`: 첫 메뉴를 기능이 없던 "대시보드"에서 "학습 기록"으로 바꿨다. 통계 대시보드는 #48에서 추가한다. 서버 연결이 확인된 뒤에만 폼을 보여 준다.
-- `frontend/src/style.css`: 폼 그리드(PC 4열, 760px 이하 2열), 목록·배지·보조 버튼 스타일.
+- `frontend/src/StudyLogs.tsx`: the study log screen.
+  - Input form: the study date (the default is the server's today), start and end, status, and note.
+  - When you enter the start and end, it shows the study time in advance. If it crosses midnight, it adds "(다음 날 종료)" ("ends the next day").
+  - Save is POST and edit is PUT. After save and edit, it loads the list again from the server.
+  - After saving a new record, it clears the form keeping the study date. When you save or cancel an edit, it goes back to the new record input you were using before the edit (or an empty form with today's date if none).
+  - It shows the server's Korean validation messages with `role="alert"` and keeps the input values.
+  - The 20 recent records: the date, start-end, the study time the server calculated, the status badge, and the note (up to 3 lines). If there are no records, it shows "아직 학습 기록이 없습니다" ("No study records yet").
+  - The edit button fills the form with the values and switches to edit mode. You can cancel.
+  - Delete runs only after you press "삭제 확인" ("Confirm delete") once more. It does not use the browser `confirm` dialog.
+- `frontend/src/study-logs.ts`: the status names, the study time preview (the same midnight crossing rule as the API), the time display (`1시간 30분`, "1 hour 30 minutes"), and the API call helper (passing Korean errors, the connection failure message).
+- `frontend/src/main.tsx`: I changed the first menu from the "대시보드" ("Dashboard"), which had no function, to "학습 기록" ("Study logs"). The statistics dashboard is added in #48. It shows the form only after the server connection is confirmed.
+- `frontend/src/style.css`: the form grid (4 columns on PC, 2 columns at 760px or less), and the styles for the list, badges, and secondary buttons.
 
-## 테스트
+## Tests
 
-- `backend/test/ui-harness.ts`: `app-ui.test.ts`에 있던 최소 React 대역을 공유 모듈로 옮겼다.
-  - 하위 모듈(`.ts`, `.tsx`)을 같은 VM 컨텍스트에서 불러온다.
-  - `fetch`에 method·body를 넘긴다.
-  - 입력(`fill`)·제출(`submit`)·값 조회(`field`)·범위 지정 클릭을 지원한다.
-  - 자식이 `undefined`일 때 기본 매개변수 때문에 트리 루트부터 다시 탐색하던 무한 재귀를 막았다.
-- `backend/test/app-ui.test.ts`: 공유 하네스를 쓴다. 첫 화면 제목이 "학습 기록"인지, 서버 연결 실패 시 폼이 숨겨지는지 확인한다.
-- `backend/test/study-logs-ui.test.ts`(가짜 API, 요청 기록):
-  - 최근 기록에 날짜·시간 범위·학습 시간·상태·메모 표시, 첫 요청이 `GET /api/study-logs?limit=20`
-  - 빈 목록 안내
-  - 입력 → 학습 시간 미리보기(자정 넘김) → 저장 POST 본문 → 목록 재조회·반영, 폼 초기화(학습일 유지)
-  - 서버 400 메시지 표시와 입력 유지
-  - 수정 → 폼 채움 → PUT 본문 → 목록 반영
-  - 삭제는 확인 클릭 전까지 DELETE를 보내지 않음
-  - 학습 시간 미리보기·시간 표시 단위 검사
+- `backend/test/ui-harness.ts`: I moved the minimal React stand-in that was in `app-ui.test.ts` into a shared module.
+  - It loads submodules (`.ts`, `.tsx`) in the same VM context.
+  - It passes the method and body to `fetch`.
+  - It supports input (`fill`), submit (`submit`), value lookup (`field`), and scoped clicks.
+  - It prevents an infinite recursion that searched again from the tree root because of a default parameter when a child was `undefined`.
+- `backend/test/app-ui.test.ts`: it uses the shared harness. It checks that the first screen title is "학습 기록" and that the form is hidden when the server connection fails.
+- `backend/test/study-logs-ui.test.ts` (a fake API, request records):
+  - Showing the date, time range, study time, status, and note in the recent records, and the first request is `GET /api/study-logs?limit=20`
+  - The empty list notice
+  - Input -> the study time preview (crossing midnight) -> the save POST body -> reloading and reflecting the list, and resetting the form (the study date kept)
+  - Showing the server 400 message and keeping the input
+  - Edit -> filling the form -> the PUT body -> reflecting in the list
+  - Delete does not send DELETE until the confirm click
+  - Unit checks of the study time preview and the time display
 
-## 검증
+## Verification
 
-| 명령                                    | 환경                             | 결과                                                                                       |
-| --------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------ |
-| `npm run check`                         | 로컬, `TEST_DATABASE_URL` 미설정 | exit 0. backend tests 28, pass 25, fail 0, skipped 3(DB 통합), 스킬 4 pass, 빌드 통과      |
-| headless Chrome(CDP) 화면 확인 1440×900 | 아래 브라우저 확인 참고          | 입력·저장·검증 오류·수정·삭제 확인 흐름 모두 기대대로 동작. 페이지 오류 0건                |
-| headless Chrome(CDP) 화면 확인 390×844  | 같은 환경                        | 폼 2열, 가로 스크롤 없음(`scrollWidth` 390 = `innerWidth` 390), 목록 줄바꿈 정상. 오류 0건 |
+| Command                                     | Environment                        | Result                                                                                                                    |
+| ------------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `npm run check`                             | Local, `TEST_DATABASE_URL` not set | exit 0. backend tests 28, pass 25, fail 0, skipped 3 (DB integration), skills 4 pass, build passed                        |
+| headless Chrome (CDP) screen check 1440×900 | See the browser check below        | The flows of input, save, validation error, edit, and delete confirmation all work as expected. 0 page errors             |
+| headless Chrome (CDP) screen check 390×844  | The same environment               | The form in 2 columns, no horizontal scroll (`scrollWidth` 390 = `innerWidth` 390), and the list wraps normally. 0 errors |
 
-### 브라우저 확인
+### Browser check
 
-- 로컬에 PostgreSQL·Docker가 없어 실제 DB로 실행하지 못했다. 대신 실제 Express 앱(`createApp`: 검증·라우터·오류 처리기)에 메모리 기반 가짜 풀을 붙여 3012 포트로 띄우고, Vite 개발 서버(5172, `/api` 프록시)로 접속했다.
-- Chrome 확장이 연결되지 않아 로컬 Chrome을 headless로 실행하고 DevTools 프로토콜로 조작했다. 값은 React가 감지하는 네이티브 setter와 `input` 이벤트로 넣었다.
-- 확인한 흐름(1440×900):
-  1. 23:20~00:50 입력 → "학습 시간 1시간 30분 (다음 날 종료)"
-  2. 저장 → "저장했습니다", 목록 맨 위에 추가
-  3. 시작·종료가 같은 저장 → 서버 메시지 "종료 시각은 시작 시각과 달라야 합니다"
-  4. 수정 → 종료 01:20 → "수정했습니다", 목록에 2시간 반영
-  5. 삭제 → "삭제 확인" → "삭제했습니다", 목록에서 제거
-- 스크린샷: [PC 1440×900](assets/11-pc-1440x900.png), [모바일 390×844](assets/11-mobile-390x844.png).
-- PC 스크린샷은 뷰포트를 넘어 전체 페이지를 캡처해 고정 사이드바 배경이 900px에서 끝나 보인다. 실제 화면에서는 사이드바가 뷰포트 높이에 고정된다.
+- There was no PostgreSQL or Docker locally, so I could not run with a real DB. Instead I attached an in-memory fake pool to the real Express app (`createApp`: validation, routers, and the error handler), started it on port 3012, and connected with the Vite dev server (5172, `/api` proxy).
+- The Chrome extension was not connected, so I ran the local Chrome headless and operated it with the DevTools protocol. I put values in with the native setter and the `input` event that React detects.
+- Flows checked (1440×900):
+  1. Enter 23:20 to 00:50 -> "학습 시간 1시간 30분 (다음 날 종료)" ("Study time 1 hour 30 minutes (ends the next day)")
+  2. Save -> "저장했습니다" ("Saved"), added at the top of the list
+  3. Save with the same start and end -> the server message "종료 시각은 시작 시각과 달라야 합니다" ("The end time must differ from the start time")
+  4. Edit -> end 01:20 -> "수정했습니다" ("Edited"), and 2 hours is reflected in the list
+  5. Delete -> "삭제 확인" -> "삭제했습니다" ("Deleted"), removed from the list
+- Screenshots: [PC 1440×900](assets/11-pc-1440x900.png), [mobile 390×844](assets/11-mobile-390x844.png).
+- The PC screenshot captured the whole page beyond the viewport, so the fixed sidebar background looks like it ends at 900px. On the real screen, the sidebar is fixed to the viewport height.
 
-## 자동 코드 리뷰 1차
+## Automated code review, round 1
 
-별도 읽기 전용 리뷰 에이전트가 이슈 #11 완료 기준과 PR 전체 diff를 검토했다. API 계약(5개 필드, `?limit=20`, 삭제 204)은 맞았다. 지적은 모두 이 PR에서 반영했고 분리한 이슈는 없다.
+A separate read-only review agent reviewed the issue #11 done criteria and the whole PR diff. The API contract (5 fields, `?limit=20`, delete 204) was right. I applied all the comments in this PR, and no issue was split off.
 
-- 지적(medium): 지난 날짜 기록을 수정·취소하면 새 기록 폼이 그 날짜로 남았다.
-  - 반영: 수정에 들어갈 때 새 기록 입력값을 보관하고, 수정 저장·취소 후 그 값(없으면 오늘)으로 돌아간다.
-- 지적(medium): 목록 조회 실패 시 "아직 학습 기록이 없습니다"가 함께 보였고, 저장 후 재조회가 실패하면 보이던 목록이 사라졌다.
-  - 반영: 조회 실패는 "최근 기록을 불러오지 못했습니다: …"로만 알리고, 이미 보이던 목록은 유지한다.
-- 지적(low): 요청 중 다른 동작이 가능했다. "삭제 확인"을 빠르게 두 번 누르면 DELETE가 두 번 가 404 오류가 보였고, 저장 중 수정·취소가 저장 완료 처리에 덮였다.
-  - 반영: 저장·삭제 요청 중에는 모든 동작 버튼을 비활성화한다(입력 칸 잠금은 2차에서 추가).
-- 지적(low): PUT·DELETE가 404(이미 삭제됨)여도 화면이 갱신되지 않았다.
-  - 반영: 쓰기 실패 시 목록을 다시 불러온다. 수정 중 404면 수정 모드를 끝낸다. `RequestError`에 HTTP 상태를 담는다.
-- 지적(low): 늦게 도착한 이전 목록 응답이 새 응답을 덮을 수 있었다.
-  - 반영: effect 정리 함수로 이전 요청의 결과를 무시한다.
-- 지적(low): 알림이 계속 남았고, 알림 영역이 텍스트와 함께 생겨 스크린 리더가 읽지 않을 수 있었다.
-  - 반영: 입력을 바꾸면 알림을 지운다. `role="status"` 영역은 항상 둔다.
-- 지적(low): 행 버튼 이름이 모두 "수정"·"삭제"였다. 수정 시 폼으로 이동하지 않았고, 모바일 버튼 높이가 약 32px였다.
-  - 반영: `aria-label`에 날짜·시간 범위를 넣었다. 수정 시 학습일 입력으로 포커스를 옮긴다. 버튼은 PC 최소 36px, 모바일 44px이다.
-- 지적(low): 취소, 수정 중 기록 삭제, 삭제 확인 취소, 조회 실패, 네트워크 오류 테스트가 없었다.
-  - 반영: `study-logs-ui.test.ts`에 8건을 추가했다. 하네스는 비활성 버튼 클릭을 거부한다. 클릭 처리 완료를 기다리지 않아 요청 중 상태도 검사할 수 있다.
-  - 새 테스트 8건은 수정 전 `StudyLogs.tsx`에서 실패하고 수정 후 통과하는 것을 확인했다.
-- 하네스 한계(리뷰 메모): 최소 React 대역은 hook 상태를 호출 순서로 보관한다. 그래서 화면 전환(설정 → 학습 기록) 시 실제 React처럼 상태가 초기화되지 않는다. 화면 전환 상태 검사는 이 하네스로 하지 않는다.
+- Comment (medium): if you edited or cancelled a record with a past date, the new record form stayed at that date.
+  - Applied: when entering an edit, it keeps the new record input values, and after saving or cancelling the edit it goes back to that value (today if none).
+- Comment (medium): if the list lookup failed, "아직 학습 기록이 없습니다" appeared together, and if the reload after saving failed, the list that was showing disappeared.
+  - Applied: a lookup failure is shown only as "최근 기록을 불러오지 못했습니다: …" ("Could not load the recent records: …"), and the list that was already showing is kept.
+- Comment (low): other actions were possible during a request. If you pressed "삭제 확인" twice quickly, DELETE went twice and a 404 error showed, and an edit or cancel during a save was overwritten by the save completion handling.
+  - Applied: during a save and delete request, all action buttons are disabled (locking the input fields was added in round 2).
+- Comment (low): even if PUT or DELETE was 404 (already deleted), the screen was not updated.
+  - Applied: when a write fails, it loads the list again. If it is a 404 during an edit, it ends edit mode. `RequestError` holds the HTTP status.
+- Comment (low): an earlier list response that arrived late could overwrite the new response.
+  - Applied: it ignores the result of the earlier request with an effect cleanup function.
+- Comment (low): notices kept staying, and the notice area appeared together with the text, so a screen reader might not read it.
+  - Applied: it clears the notice when you change the input. The `role="status"` area is always present.
+- Comment (low): the row button names were all "수정" and "삭제". On edit it did not move to the form, and the mobile button height was about 32px.
+  - Applied: I put the date and time range in `aria-label`. On edit it moves focus to the study date input. The buttons are at least 36px on PC and 44px on mobile.
+- Comment (low): there were no tests for cancel, deleting a record while editing, cancelling the delete confirmation, a lookup failure, and a network error.
+  - Applied: I added 8 tests to `study-logs-ui.test.ts`. The harness rejects clicks on a disabled button. It does not wait for the click handling to complete, so it can also check the during-request state.
+  - I confirmed that the 8 new tests fail on the `StudyLogs.tsx` before the fix and pass after the fix.
+- Harness limit (review note): the minimal React stand-in keeps hook state by call order. So when you switch screens (settings -> study logs), the state is not reset like in a real React. State checks on screen switching are not done with this harness.
 
-### 1차 반영 검증
+### Verification after the first-round fix
 
-| 명령                                                      | 환경                                         | 결과                                                                                             |
-| --------------------------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------ |
-| `npm run check` (`TEST_DATABASE_URL` 설정)                | 로컬 PostgreSQL 17.11, 마이그레이션 2회 적용 | exit 0. backend tests 36, pass 36, fail 0, **skipped 0**(DB 통합 실제 실행), 스킬 4 pass         |
-| headless Chrome(CDP) 1440×900, 실제 API + 실제 PostgreSQL | Vite 5172 → `src/server.ts` 3012 → 로컬 DB   | 입력·저장·같은 시각 거부(서버 메시지)·수정(학습일 입력에 포커스)·삭제 확인 정상. 페이지 오류 0건 |
-| headless Chrome(CDP) 390×844                              | 같은 환경                                    | 폼 2열, 가로 스크롤 없음, 버튼 높이 44px. 페이지 오류 0건                                        |
+| Command                                                          | Environment                                       | Result                                                                                                                                         |
+| ---------------------------------------------------------------- | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| `npm run check` (`TEST_DATABASE_URL` set)                        | Local PostgreSQL 17.11, migrations applied twice  | exit 0. backend tests 36, pass 36, fail 0, **skipped 0** (the DB integration actually ran), skills 4 pass                                      |
+| headless Chrome (CDP) 1440×900, the real API + a real PostgreSQL | Vite 5172 -> `src/server.ts` 3012 -> the local DB | Input, save, rejecting the same time (server message), edit (focus on the study date input), and delete confirmation are normal. 0 page errors |
+| headless Chrome (CDP) 390×844                                    | The same environment                              | The form in 2 columns, no horizontal scroll, and button height 44px. 0 page errors                                                             |
 
-- 로컬 PostgreSQL 17을 설치하고 테스트 전용 DB `study_test`를 만들었다. 비밀번호는 `pgpass.conf`에만 있고 `TEST_DATABASE_URL`에는 넣지 않았다.
-- 브라우저 확인 뒤 테스트 DB에 남은 확인용 행은 지웠다.
-- 스크린샷은 실제 DB 기준으로 다시 찍었다.
+- I installed a local PostgreSQL 17 and made the test-only DB `study_test`. The password is only in `pgpass.conf` and I did not put it in `TEST_DATABASE_URL`.
+- After the browser check, I deleted the check rows left in the test DB.
+- I retook the screenshots with the real DB.
 
-## 자동 코드 리뷰 2차
+## Automated code review, round 2
 
-별도 읽기 전용 리뷰 에이전트가 1차 반영(69799ef), 추가 diff, 최종 전체 diff를 다시 확인했다. 1차 반영 8건은 모두 정확했다. 아래 지적은 이 PR에서 반영했고 분리한 이슈는 없다. 리뷰 최대 2회 정책에 따라 3차 리뷰는 하지 않는다.
+A separate read-only review agent checked the first-round fix (69799ef), the added diff, and the final whole diff again. All 8 first-round fixes were exact. I applied the comments below in this PR, and no issue was split off. Under the policy of at most 2 reviews, I do not do a third.
 
-- 지적(medium): 기록 A를 수정하는 중에 이미 삭제된 기록 B를 지우면(404) A의 수정이 끝나 입력이 사라졌다.
-  - 반영: 404가 수정 중인 그 기록에 대한 것일 때만 수정 모드를 끝낸다.
-- 지적(low): 저장 요청 중에도 입력 칸에 타이핑할 수 있었고, 저장 완료 시 그 입력이 덮였다.
-  - 반영: 요청 중에는 입력 칸도 비활성화한다.
-- 지적(low): 이전 응답 무시(effect 정리)는 하네스가 정리 함수를 실행하지 않아 테스트할 수 없다. 문서에서 테스트했다고 주장하지 않는다.
-- 테스트: 위 두 경우를 검사하는 2건을 추가했다. 수정 전 코드에서는 실패하고 수정 후 통과하는 것을 확인했다.
-- 검증: `TEST_DATABASE_URL` 설정 `npm run check` exit 0. backend tests 38, pass 38, fail 0, skipped 0. 스킬 4 pass, 빌드 통과.
+- Comment (medium): if you deleted an already deleted record B (404) while editing record A, A's edit ended and the input was lost.
+  - Applied: it ends edit mode only when the 404 is about the record being edited.
+- Comment (low): you could still type in the input fields during a save request, and the input was overwritten when the save finished.
+  - Applied: during a request, the input fields are disabled too.
+- Comment (low): ignoring an earlier response (effect cleanup) cannot be tested because the harness does not run cleanup functions. I do not claim in the docs that it was tested.
+- Tests: I added 2 tests that check the two cases above. I confirmed they fail on the code before the fix and pass after the fix.
+- Verification: `npm run check` with `TEST_DATABASE_URL` set exit 0. backend tests 38, pass 38, fail 0, skipped 0. Skills 4 pass, build passed.
 
-## 한계·후속
+## Limits and follow-up
 
-- 최초 커밋의 화면 확인은 가짜 풀로 했다. 1차 리뷰 반영 후 실제 PostgreSQL로 다시 확인했다(위 표).
-- Chrome 확장 연결과 Docker(Compose) 실행 확인은 이 PR 범위 밖이다.
-- 프런트엔드 전용 테스트 도구(Vitest, Testing Library, Playwright)는 도입하지 않았다. 기존 방식대로 backend `node --test`에서 최소 React 대역으로 화면 로직을 검증한다.
-- 교재·챕터 연결은 #14, 캘린더 뷰는 #17, 마크다운 메모는 #16에서 다룬다.
+- The screen check of the first commit was done with a fake pool. After the first-review fixes, I checked again with a real PostgreSQL (the table above).
+- Connecting the Chrome extension and checking running Docker (Compose) are outside this PR's scope.
+- I did not adopt frontend-only test tools (Vitest, Testing Library, Playwright). As before, I verify the screen logic in the backend `node --test` with the minimal React stand-in.
+- The textbook and chapter link is handled in #14, the calendar view in #17, and the Markdown note in #16.

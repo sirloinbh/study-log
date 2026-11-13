@@ -1,108 +1,108 @@
-# #19 주간·월간 회고 작성·조회
+# #19 Write and view weekly and monthly retrospectives
 
-- 이슈: [#19](https://github.com/sirloinbh/study-log/issues/19) (상위 #9)
-- 브랜치: `feat/19-retrospectives`
-- 선행: #10 학습 기록 DB·API, #96 주 시작 일요일 변경 (병합 완료)
+- Issue: [#19](https://github.com/sirloinbh/study-log/issues/19) (parent #9)
+- Branch: `feat/19-retrospectives`
+- Prerequisites: #10 study log DB and API, #96 week start changed to Sunday (merged)
 
-## 목적
+## Purpose
 
-한 주·한 달 단위로 학습을 돌아보는 회고를 남긴다. 그 기간의 학습 요약을 보면서 쓴다.
+Leave a retrospective that looks back at studying by week and by month. You write it while looking at the study summary of that period.
 
-## 결정(사용자 확인, 2026-10-23)
+## Decisions (confirmed with the user, 2026-10-23)
 
-[이슈 코멘트](https://github.com/sirloinbh/study-log/issues/19#issuecomment-6359133797)에 남겼다.
+I left them in an [issue comment](https://github.com/sirloinbh/study-log/issues/19#issuecomment-6359133797).
 
-- **주의 시작 요일: 일요일.** 주간 회고는 일요일 ~ 토요일이다. 기존 통계·히트맵·캘린더도 같은 기준으로 바꿨다(#96).
-- **같은 기간 회고는 하나.** 같은 주·달의 회고를 다시 저장하면 그 회고를 수정한다. 주간과 월간은 별개다(같은 날짜를 포함해도 각각 하나씩).
+- **The week start day: Sunday.** A weekly retrospective runs Sunday to Saturday. I changed the existing statistics, heatmap, and calendar to the same criterion (#96).
+- **One retrospective per period.** If you save a retrospective for the same week or month again, it edits that retrospective. Weekly and monthly are separate (even if they include the same date, one each).
 
-## 변경
+## Changes
 
-- `database/migrations/010_retrospectives.sql`: `retrospectives` 테이블
-  - 열: 종류(`weekly`/`monthly`), 기간 시작·끝, 본문(공백만 불가, 20000자 이하)
-  - 고유 제약 `(kind, period_start)`: 기간당 하나
-  - CHECK: 주간은 시작이 일요일이고 끝이 +6일, 월간은 시작이 1일이고 끝이 그 달 말일. API뿐 아니라 DB도 기간 모양을 지킨다.
-- `backend/src/retrospectives.ts`(새 파일), `backend/src/app.ts`
+- `database/migrations/010_retrospectives.sql`: the `retrospectives` table
+  - Columns: the kind (`weekly`/`monthly`), the period start and end, and the body (not only spaces, 20000 characters or fewer)
+  - Unique constraint `(kind, period_start)`: one per period
+  - CHECK: for weekly, the start is a Sunday and the end is +6 days, and for monthly, the start is the 1st and the end is the last day of that month. The DB also keeps the period shape, not only the API.
+- `backend/src/retrospectives.ts` (a new file), `backend/src/app.ts`
 
-  | 요청                                         | 동작                                                                                   |
-  | -------------------------------------------- | -------------------------------------------------------------------------------------- |
-  | `GET /api/retrospectives/period?kind=&date=` | 그 날짜가 든 주·달(기본: 주간, 오늘)의 기간, 쓴 회고(없으면 `null`), 그 기간 학습 요약 |
-  | `GET /api/retrospectives?kind=&limit=`       | 최근 회고(기간 시작 내림차순, 기본 20개)                                               |
-  | `PUT /api/retrospectives/:kind/:start`       | `{ body }`로 저장. 이미 있으면 수정(`ON CONFLICT`). 200 `{ retrospective }`            |
-  | `DELETE /api/retrospectives/:kind/:start`    | 204. 없으면 "회고를 찾을 수 없습니다" 404                                              |
-  - 학습 요약: 학습 시간, 공부한 날, 학습 기록 수, 목표 달성/표시한 기록 수. 통계와 같이 "계획" 기록은 학습으로 세지 않는다.
-  - 경로의 시작일이 기간 첫날이 아니면 400: "주간 회고는 일요일부터 시작합니다" / "월간 회고는 1일부터 시작합니다". 끝 날짜는 서버가 계산한다.
-  - 기간 계산은 통계의 `weekStart`(일요일)와 캘린더의 `monthRange`를 그대로 쓴다.
+  | Request                                      | Behavior                                                                                                                                                      |
+  | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+  | `GET /api/retrospectives/period?kind=&date=` | The period of the week or month that has that date (default: weekly, today), the retrospective written (`null` if none), and the study summary of that period |
+  | `GET /api/retrospectives?kind=&limit=`       | Recent retrospectives (by period start descending, default 20)                                                                                                |
+  | `PUT /api/retrospectives/:kind/:start`       | Saves with `{ body }`. If it exists, it edits (`ON CONFLICT`). 200 `{ retrospective }`                                                                        |
+  | `DELETE /api/retrospectives/:kind/:start`    | 204. If none, "회고를 찾을 수 없습니다" ("Retrospective not found") 404                                                                                       |
+  - Study summary: study time, days studied, number of study records, and the number of records marked goal achieved out of those marked. As in the statistics, "planned" records are not counted as study.
+  - If the start date in the path is not the first day of the period, 400: "주간 회고는 일요일부터 시작합니다" ("A weekly retrospective starts on Sunday") / "월간 회고는 1일부터 시작합니다" ("A monthly retrospective starts on the 1st"). The server calculates the end date.
+  - The period calculation uses the statistics' `weekStart` (Sunday) and the calendar's `monthRange` as they are.
 
-- `frontend/src/Retrospectives.tsx`, `frontend/src/retrospective.ts`(새 파일), `frontend/src/main.tsx`, `frontend/src/style.css`
-  - 메뉴에 "회고" 페이지를 추가했다. 모바일 메뉴 6개가 390px에 넘침 없이 들어간다.
-  - **작성 카드**
-    - 주간/월간 전환, 이전·다음, 지금 기간이 아니면 "이번 주/이번 달" 버튼
-    - 제목 "2026년 10월 18일 ~ 10월 24일 주간 회고"
-    - 학습 요약 4칸, 회고 입력란, 저장(이미 있으면 "수정 저장"), 삭제(확인 2단계), 마지막 저장 시각
-  - 저장하지 않은 입력은 기간(종류 + 시작일)에 묶어 둔다. 다른 기간에 다녀와도 그 기간으로 돌아오면 남아 있다.
-  - 삭제 흐름의 포커스는 #65·#86 규칙을 따른다: 확인 버튼 → 취소 시 삭제 버튼 → 삭제 후 회고 제목.
-  - **지난 회고 카드:** 최근 20개(종류·기간, 본문 두 줄 미리보기). 누르면 그 회고를 연다.
-  - 같은 틱 중복 저장은 `useBusy`(#75)로 막는다.
+- `frontend/src/Retrospectives.tsx`, `frontend/src/retrospective.ts` (a new file), `frontend/src/main.tsx`, `frontend/src/style.css`
+  - Added a "회고" ("Retrospective") page to the menu. The 6 mobile menu items fit at 390px with no overflow.
+  - **Writing card**
+    - Switching weekly/monthly, previous and next, and a "이번 주/이번 달" ("This week/This month") button if it is not the current period
+    - Title "2026년 10월 18일 ~ 10월 24일 주간 회고" ("Weekly retrospective for Oct 18 to Oct 24, 2026")
+    - 4 summary cells, the retrospective input, save ("수정 저장", "Save edit", if it exists), delete (2-step confirmation), and the last saved time
+  - Input not yet saved is kept tied to the period (kind + start date). Even if you go to another period and come back, it remains when you return to that period.
+  - Focus in the delete flow follows the #65 and #86 rule: the confirm button -> the delete button on cancel -> the retrospective title after delete.
+  - **Past retrospectives card:** the latest 20 (kind and period, a 2-line preview of the body). Pressing one opens that retrospective.
+  - A duplicate save in the same tick is blocked with `useBusy` (#75).
 
-## 테스트
+## Tests
 
-- `backend/test/retrospectives.test.ts`: 주·월 기간(토요일·일요일·연말·윤년 2월), 잘못된 종류·시작일·본문·조회 조건 400, 저장 매개변수(끝 날짜 계산), 기본 기간, 없는 회고 삭제 404
-- `backend/test/retrospectives.integration.test.ts`(실제 DB, 2102년)
-  - 기간 요약(계획 제외, 일요일·토요일 경계, 다음 주 제외, 목표 달성 수)
-  - 저장 후 다시 저장해도 한 행·같은 ID
-  - 같은 날짜의 월간 회고는 별개, 평년 2월 끝 날짜
-  - 목록 순서, 삭제
-  - DB 제약: 일요일이 아닌 주간 23514, 잘못된 월말 23514, 같은 기간 두 번째 23505
-- `backend/test/retrospectives-ui.test.ts`(새 파일, 1차 리뷰 반영 후 9건)
-  - 이번 주 회고와 요약 표시, 저장과 다시 저장(수정), 기간 이동과 초안 유지, 월간 전환
-  - 삭제 확인과 포커스, 지난 회고 열기, 불러오기 실패, 기간 함수(연말 걸친 주 제목)
+- `backend/test/retrospectives.test.ts`: week and month periods (Saturday, Sunday, the year end, a leap year February), 400 for a wrong kind, start date, body, and lookup conditions, the save parameters (end date calculation), the default period, and 404 for deleting a missing retrospective
+- `backend/test/retrospectives.integration.test.ts` (a real DB, year 2102)
+  - The period summary (excluding planned, the Sunday and Saturday boundaries, excluding the next week, the number of goals achieved)
+  - Even if you save again after saving, it is one row and the same ID
+  - A monthly retrospective of the same date is separate, and the end date of February in a common year
+  - The list order, and delete
+  - DB constraints: a weekly one that is not a Sunday 23514, a wrong month end 23514, and a second one for the same period 23505
+- `backend/test/retrospectives-ui.test.ts` (a new file, 9 tests after the first-review fixes)
+  - This week's retrospective and the summary display, save and save again (edit), moving the period and keeping the draft, and switching to monthly
+  - Delete confirmation and focus, opening a past retrospective, load failure, and the period functions (a week title that crosses the year end)
 
-## 검증
+## Verification
 
-| 명령                   | 환경                                                        | 결과                                                        |
-| ---------------------- | ----------------------------------------------------------- | ----------------------------------------------------------- |
-| `npm run check`        | 로컬, `TEST_DATABASE_URL` 미설정                            | exit 0. backend tests 221, pass 205, fail 0, skipped 16(DB) |
-| `npm test` (기본 병렬) | 로컬 Docker `postgres:17-alpine`, 마이그레이션 001~010 적용 | exit 0. tests 221, pass 221, fail 0, skipped 0              |
+| Command                       | Environment                                                      | Result                                                       |
+| ----------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------ |
+| `npm run check`               | Local, `TEST_DATABASE_URL` not set                               | exit 0. backend tests 221, pass 205, fail 0, skipped 16 (DB) |
+| `npm test` (default parallel) | Local Docker `postgres:17-alpine`, migrations 001 to 010 applied | exit 0. tests 221, pass 221, fail 0, skipped 0               |
 
-- 010을 같은 DB에 두 번 적용해 재실행 안전성을 확인했다.
-- 브라우저: Playwright(Chromium)로 Vite 개발 서버와 이 브랜치 API(로컬 Docker 테스트 DB)를 띄워 확인했다(오늘 2026-10-23).
-  - 모바일 390×844
-    - 메뉴 6개 넘침 없음
-    - "2026년 10월 18일 ~ 10월 24일 주간 회고", 요약 6시간 15분·4일·4개
-    - 여러 줄 회고 저장 → "저장했습니다", "수정 저장", 지난 회고 목록에 표시, API로 저장값 확인
-    - 가로 스크롤 없음
-  - PC 1440×900: 요약 4칸 한 줄, 가로 스크롤 없음
-  - 스크린샷: [모바일 390×844 (전체 페이지)](assets/19-mobile-390x844.png), [PC 1440×900](assets/19-pc-1440x900.png)
+- I applied 010 twice to the same DB and confirmed it is safe to re-run.
+- Browser: I checked by starting the Vite dev server and this branch's API (a local Docker test DB) with Playwright (Chromium) (today is 2026-10-23).
+  - Mobile 390×844
+    - The 6 menu items do not overflow
+    - "2026년 10월 18일 ~ 10월 24일 주간 회고", summary 6 hours 15 minutes, 4 days, 4 records
+    - Saving a multi-line retrospective -> "저장했습니다" ("Saved"), "수정 저장", shown in the past retrospectives list, and I confirmed the saved value through the API
+    - No horizontal scroll
+  - PC 1440×900: the 4 summary cells in a row, no horizontal scroll
+  - Screenshots: [mobile 390×844 (whole page)](assets/19-mobile-390x844.png), [PC 1440×900](assets/19-pc-1440x900.png)
 
-## 자동 코드 리뷰 1차
+## Automated code review, round 1
 
-별도 읽기 전용 리뷰 에이전트가 검토했다. 기준 이상의 지적은 없었다. 분리할 이슈도 없다.
+A separate read-only review agent reviewed it. There were no comments at or above the bar. There is no issue to split off either.
 
-- 확인된 사항
-  - 요약 SQL과 월말 CHECK 계산이 맞다.
-  - upsert와 `updated_at`이 맞다.
-  - 직접 만든 ZodError가 공통 오류 처리기에서 400이 된다.
-  - 경로 충돌과 순환 import가 없다.
-- 반영
-  - 저장 직후, 다시 불러오기가 끝날 때까지 옛 본문이 잠깐 보이고 편집 가능했다. 저장·삭제 응답으로 화면 값을 바로 바꾼다.
-    - 같은 작업에서, 다시 불러오기가 실패하면 입력 폼이 사라지고 오류만 남는 문제도 발견했다. 이미 받은 기간이 있으면 폼을 유지하고 오류를 위에 함께 보여 준다.
-  - 0001-01-01이나 9999-12-31 근처의 주는 DB가 저장할 수 없는 해로 넘어가 500이 됐다. 회고 날짜를 1900~9998년으로 제한하고 400 "회고 날짜는 1900년부터 9998년까지입니다"를 준다.
-  - 주간에서 월간으로 바꿀 때 주의 일요일이 든 달로 갔다. 예: 11/29(일)~12/5 주에서 11월로 갔다. 이제는 주의 수요일이 든 달, 곧 그 주의 대부분이 속한 달로 간다.
-  - 회귀 테스트 3건(날짜 범위, 저장 직후 표시·불러오기 실패 시 폼 유지, 월간 전환)을 추가했다. 수정 전 코드에서 실패하고 수정 후 통과하는 것을 확인했다.
-  - 기존 테스트 1건의 기대값을 새 규칙(주의 수요일)에 맞췄다.
-- 유지: 화면의 "오늘"은 서버 상태 확인 때 받은 날짜다. 화면을 연 채 자정을 넘기면 "이번 주" 판단이 하루 늦을 수 있다.
+- Confirmed points
+  - The summary SQL and the month end CHECK calculation are right.
+  - The upsert and `updated_at` are right.
+  - A ZodError made by hand becomes 400 in the shared error handler.
+  - There are no path conflicts or circular imports.
+- Applied
+  - Right after saving, until the reload finished, the old body was briefly visible and editable. The screen value is now changed right away with the save and delete responses.
+    - In the same work, I also found a problem that if the reload failed, the input form disappeared and only the error remained. If a period was already received, the form is kept and the error is shown together above it.
+  - A week near 0001-01-01 or 9999-12-31 went into a year the DB cannot store and became a 500. I limited the retrospective date to the years 1900 to 9998, and it gives 400 "회고 날짜는 1900년부터 9998년까지입니다" ("The retrospective date is from the year 1900 to 9998").
+  - When switching from weekly to monthly, it went to the month that has the week's Sunday. Example: from the week of 11/29 (Sun) to 12/5, it went to November. Now it goes to the month that has the week's Wednesday, that is, the month most of the week belongs to.
+  - I added 3 regression tests (the date range, display right after save and keeping the form when loading fails, and switching to monthly). I confirmed they fail on the code before the fix and pass after the fix.
+  - I fixed the expected value of 1 existing test to match the new rule (the week's Wednesday).
+- Kept: "today" on the screen is the date received at the server status check. If you cross midnight with the screen open, the "this week" decision can be a day late.
 
-## 자동 코드 리뷰 2차
+## Automated code review, round 2
 
-별도 읽기 전용 리뷰 에이전트가 1차 반영과 최종 PR 전체를 다시 확인했다. 리뷰는 최대 2회이므로 3차 리뷰는 하지 않는다.
+A separate read-only review agent checked the first-round fixes and the whole final PR again. The review is limited to 2 rounds, so I do not do a third.
 
-- 저장·삭제 응답 반영 위치, 삭제 뒤 요약 유지, 오류와 폼 함께 표시, 날짜 제한(경로 시작일 포함), 종류 전환 날짜가 맞다고 확인됐다.
-- 기준 이상의 지적과 분리할 이슈는 없었다.
-- 참고(유지)
-  - 이전·다음을 수천 번 눌러 1900년·9998년 끝에 닿으면, 그 기간은 400이라 폼 없이 오류만 남는다. 지난 회고 목록이나 새로 고침으로 나올 수 있다.
-  - 같은 기간을 다른 날짜 키로 열어 둔 경우, 돌아갈 때 옛 본문이 잠깐 보였다가 다시 불러오면 바뀐다.
+- It was confirmed that the place the save and delete responses are reflected, keeping the summary after a delete, showing the error and the form together, the date limit (including the start date in the path), and the date for switching kinds are right.
+- There were no comments at or above the bar and no issue to split off.
+- Note (kept)
+  - If you press previous and next thousands of times and reach the 1900 or 9998 end, that period is 400, so only the error remains without a form. It can come out through the past retrospectives list or a refresh.
+  - If the same period was left open with a different date key, when you go back, the old body is briefly shown and then changes when it is loaded again.
 
-## 한계·후속
+## Limits and follow-up
 
-- 학습 패턴 요약(#20)은 이 화면에 붙인다.
-- 회고 본문은 일반 텍스트다. 마크다운 렌더링은 #16에서 함께 검토한다.
+- The study pattern summary (#20) is attached to this screen.
+- The retrospective body is plain text. Markdown rendering is reviewed together in #16.

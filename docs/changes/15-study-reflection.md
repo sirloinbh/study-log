@@ -1,96 +1,96 @@
-# #15 이해도 자가 평가·어려웠던 부분·목표 달성 체크
+# #15 Understanding self-assessment, difficult parts, and goal achievement check
 
-- 이슈: [#15](https://github.com/sirloinbh/study-log/issues/15) (상위 #9)
-- 브랜치: `feat/15-study-reflection`
-- 선행: #10 학습 기록 DB·API (병합 완료)
+- Issue: [#15](https://github.com/sirloinbh/study-log/issues/15) (parent #9)
+- Branch: `feat/15-study-reflection`
+- Prerequisite: #10 study log DB and API (merged)
 
-## 목적
+## Purpose
 
-학습 직후의 이해도와 막힌 부분을 남겨 회고·복습에 쓴다.
+Leave the understanding right after studying and the parts you got stuck on, to use in retrospectives and reviews.
 
-## 결정
+## Decisions
 
-이슈 코멘트에 기록했다: [#15 결정](https://github.com/sirloinbh/study-log/issues/15#issuecomment-6335694653).
+I recorded them in an issue comment: [#15 decisions](https://github.com/sirloinbh/study-log/issues/15#issuecomment-6335694653).
 
-- 이해도: 1~5점 정수, 선택 입력. 0~100% 척도는 입력이 느리고 편차가 커서 채택하지 않았다.
-- 어려웠던 부분: 자유 텍스트, 선택, 2000자 이하.
-- 목표 달성 여부: 미입력 / 달성 / 미달성. 학습 기록에 별도 목표 필드가 없어, 그 학습의 목표를 이뤘는지 스스로 표시한다.
-- 학습 기록은 별도 상세 화면이 없어 입력 폼과 최근 기록 목록에 반영한다.
+- Understanding: an integer from 1 to 5, optional. I did not adopt a 0 to 100% scale because entering it is slow and the spread is large.
+- Difficult parts: free text, optional, 2000 characters or fewer.
+- Goal achieved: not entered / achieved / not achieved. A study record has no separate goal field, so you mark yourself whether you reached that study's goal.
+- A study record has no separate detail screen, so it is reflected in the input form and the recent records list.
 
-## 변경
+## Changes
 
 - `database/migrations/006_study_log_reflection.sql`
-  - `study_logs`에 `understanding smallint`, `difficulties text NOT NULL DEFAULT ''`, `goal_achieved boolean`을 추가했다. NULL은 미입력이다.
+  - Added `understanding smallint`, `difficulties text NOT NULL DEFAULT ''`, and `goal_achieved boolean` to `study_logs`. NULL means not entered.
   - CHECK: `understanding BETWEEN 1 AND 5`, `length(difficulties) <= 2000`.
-  - 제약은 `pg_constraint` 확인 후 추가하므로 재실행해도 안전하다.
+  - The constraints are added after checking `pg_constraint`, so it is safe to re-run.
 - `backend/src/study-logs.ts`
-  - 입력에 `understanding`(1~5 정수 또는 null), `difficulties`(2000자 이하), `goalAchieved`(boolean 또는 null)를 추가했다. 모두 선택이다.
-  - 검증 메시지:
-    - "이해도는 1~5 사이 정수로 입력하세요"
-    - "어려웠던 부분은 2000자 이하로 입력하세요"
-    - "어려웠던 부분 형식이 올바르지 않습니다"
-    - "목표 달성 여부 형식이 올바르지 않습니다"
-  - 조회·저장 응답에 세 필드를 추가했다. PUT은 기존처럼 전체 교체라, 생략하면 미입력으로 돌아간다.
-- 화면(`frontend/src/StudyLogs.tsx`, `study-logs.ts`)
-  - 입력 폼에 이해도 선택(1 · 거의 모름 … 5 · 완전히 이해), 목표 달성 선택(달성/미달성), 어려웠던 부분 입력을 추가했다. 모두 "선택 안 함"이 기본이다.
-  - 최근 기록에 "이해도 4/5 · 목표 미달성"과 "어려웠던 부분: …"을 표시한다. 답이 없으면 줄을 생략한다.
-  - 수정 시 값을 채운다. 새 기록을 저장하면 비운다.
+  - Added `understanding` (an integer 1 to 5 or null), `difficulties` (2000 characters or fewer), and `goalAchieved` (boolean or null) to the input. All are optional.
+  - Validation messages:
+    - "이해도는 1~5 사이 정수로 입력하세요" ("Enter the understanding as an integer from 1 to 5")
+    - "어려웠던 부분은 2000자 이하로 입력하세요" ("Enter the difficult parts in 2000 characters or fewer")
+    - "어려웠던 부분 형식이 올바르지 않습니다" ("The format of the difficult parts is not valid")
+    - "목표 달성 여부 형식이 올바르지 않습니다" ("The format of the goal achieved is not valid")
+  - Added the three fields to the lookup and save responses. PUT replaces the whole record as before, so leaving a field out returns it to not entered.
+- Screen (`frontend/src/StudyLogs.tsx`, `study-logs.ts`)
+  - Added to the input form the understanding select (1 · barely know ... 5 · fully understand), the goal achieved select (achieved/not achieved), and the difficult parts input. The default of all is "not selected".
+  - The recent records show "이해도 4/5 · 목표 미달성" ("Understanding 4/5 · Goal not achieved") and "어려웠던 부분: …" ("Difficult parts: …"). If there is no answer, the line is left out.
+  - When editing, the values are filled in. When a new record is saved, they are cleared.
 
-## 테스트
+## Tests
 
-- `backend/test/study-log-reflection.test.ts`(DB 없음)
-  - 범위 밖·소수·문자열 이해도, 2001자·숫자 어려운 부분, 문자열 목표 달성 → 한국어 400. POST와 PUT 모두 확인한다.
-  - 미입력과 경계값(1, 5, 2000자)이 받아들여지고 그대로 쿼리에 전달되는지 확인한다.
-- `backend/test/study-log-reflection.integration.test.ts`(실제 DB)
-  - 저장·목록·단건 조회
-  - 비우는 수정(NULL, 빈 텍스트)
-  - DB CHECK(이해도 6·0, 2001자 → 23514)
+- `backend/test/study-log-reflection.test.ts` (no DB)
+  - Understanding that is out of range, a decimal, or a string, 2001 characters or a number for difficult parts, and a string for goal achieved -> a Korean 400. Both POST and PUT are checked.
+  - It checks that not entered and the boundary values (1, 5, 2000 characters) are accepted and passed to the query as they are.
+- `backend/test/study-log-reflection.integration.test.ts` (a real DB)
+  - Save, list, and single lookup
+  - An edit that clears (NULL, empty text)
+  - DB CHECK (understanding 6 and 0, 2001 characters -> 23514)
 - `backend/test/study-logs-ui.test.ts`
-  - 새 테스트 3건: 입력·저장·목록 표시와 폼 초기화, 수정 시 채움·비우기, 표시 함수
-  - 기존 본문 비교에 새 필드를 넣었다. 잠금 칸은 7 → 10개다.
-- `backend/test/study-logs.integration.test.ts`: 응답 비교에 새 필드를 추가했다.
+  - 3 new tests: input, save, list display and form reset, filling and clearing when editing, and the display function
+  - I put the new fields into the existing body comparison. The lock cells went from 7 to 10.
+- `backend/test/study-logs.integration.test.ts`: added the new fields to the response comparison.
 
-## 검증
+## Verification
 
-| 명령                | 환경                                        | 결과                                                                                                                                       |
-| ------------------- | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `npm run check`     | 로컬, `TEST_DATABASE_URL` 미설정            | exit 0. backend tests 86, pass 80, fail 0, **skipped 6**(DB 통합), 스킬 4 pass, 빌드 통과                                                  |
-| Playwright 1440×900 | 실제 Express 앱 + 메모리 가짜 풀, Vite 5202 | 이해도 4·미달성·어려운 부분 입력 → 저장 → 목록 "이해도 4/5 · 목표 미달성", "어려웠던 부분: …", 폼 초기화, 수정 시 값 채움. 페이지 오류 0건 |
-| Playwright 390×844  | 같은 환경                                   | 가로 스크롤 없음(`scrollWidth` 375, 차이는 세로 스크롤바)                                                                                  |
+| Command             | Environment                                            | Result                                                                                                                                                                               |
+| ------------------- | ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `npm run check`     | Local, `TEST_DATABASE_URL` not set                     | exit 0. backend tests 86, pass 80, fail 0, **skipped 6** (DB integration), skills 4 pass, build passed                                                                               |
+| Playwright 1440×900 | A real Express app + an in-memory fake pool, Vite 5202 | Entered understanding 4, not achieved, and difficult parts -> save -> list "이해도 4/5 · 목표 미달성", "어려웠던 부분: …", form reset, and values filled when editing. 0 page errors |
+| Playwright 390×844  | The same environment                                   | No horizontal scroll (`scrollWidth` 375, the difference is the vertical scrollbar)                                                                                                   |
 
-- 건너뛴 6건은 DB 통합 테스트다(로컬 테스트 DB 없음). 새 통합 테스트를 포함해 CI(PostgreSQL 17)에서 실행된다.
-- 브라우저 확인의 가짜 풀은 SQL과 CHECK를 실행하지 않는다. 그 부분은 DB 통합 테스트가 맡는다.
-- 스크린샷: [PC 1440×900](assets/15-pc-1440x900.png), [모바일 390×844](assets/15-mobile-390x844.png).
-  - PC 전체 페이지 캡처에서 사이드바가 중간부터 보이는 것은 고정 사이드바 캡처 결과다(#11 기록과 같음).
+- The 6 skipped are DB integration tests (no local test DB). They run in CI (PostgreSQL 17), including the new integration tests.
+- The fake pool in the browser check does not run SQL or CHECK. The DB integration tests cover that part.
+- Screenshots: [PC 1440×900](assets/15-pc-1440x900.png), [mobile 390×844](assets/15-mobile-390x844.png).
+  - That the sidebar appears from the middle in the PC full page capture is the result of capturing a fixed sidebar (same as the #11 record).
 
-## 자동 코드 리뷰 1차
+## Automated code review, round 1
 
-별도 읽기 전용 리뷰 에이전트가 이슈 #15 완료 기준과 PR 변경을 검토했다.
+A separate read-only review agent reviewed the issue #15 done criteria and the PR changes.
 
-- 문제없다고 확인된 사항:
-  - INSERT·UPDATE 매개변수 번호($1~$11, $1~$12)와 배열 순서
-  - 마이그레이션 재실행 안전성과 기존 행에서 CHECK가 실패하지 않음
-  - Zod가 DB CHECK보다 엄격함(UTF-16 단위로 셈)
-  - 선택 값 변환과 폼 초기화·수정·취소 복원
-  - 기존 동작 회귀 없음
-  - 문서 정확성
-- high·medium 지적은 없었다. 분리할 이슈도 없다.
-- 지적(low): 다른 함수의 주석("교재를 바꾸면 장/절을 비운다")이 새 함수 위로 밀려나 있었다.
-  - 반영: 원래 자리로 옮겼다(동작 변경 없음).
-- 지적(low): `pg_constraint` 확인이 제약 이름만 본다.
-  - 유지: #14의 005 마이그레이션과 같은 방식이고 이름이 구체적이라 일관성을 위해 그대로 둔다.
-- 참고: 마이그레이션 재실행을 검증하는 테스트는 없다. 이슈 완료 기준 밖이다.
-- 검증: 주석 이동 후 `npm run check` exit 0.
+- Points confirmed to have no problem:
+  - The INSERT and UPDATE parameter numbers ($1 to $11, $1 to $12) and the array order
+  - The migration is safe to re-run, and CHECK does not fail on existing rows
+  - Zod is stricter than the DB CHECK (it counts in UTF-16 units)
+  - The conversion of optional values, form reset, and restoring on edit and cancel
+  - No regression in existing behavior
+  - The accuracy of the docs
+- There were no high or medium comments. There is no issue to split off either.
+- Comment (low): the comment of another function ("when you change the textbook, clear the chapter/section") had been pushed above the new function.
+  - Applied: moved it back to its original place (no behavior change).
+- Comment (low): the `pg_constraint` check looks only at the constraint name.
+  - Kept: it is the same way as the 005 migration in #14, and the name is specific, so I left it for consistency.
+- Note: there is no test that verifies re-running the migration. It is outside the issue's done criteria.
+- Verification: after moving the comment, `npm run check` exit 0.
 
-## 자동 코드 리뷰 2차
+## Automated code review, round 2
 
-별도 읽기 전용 리뷰 에이전트가 1차 반영(1eabe8c)과 최종 파일을 다시 확인했다. 리뷰는 최대 2회이므로 3차 리뷰는 하지 않는다.
+A separate read-only review agent checked the first-round fix (1eabe8c) and the final files again. The review is limited to 2 rounds, so I do not do a third.
 
-- 주석 이동은 동작 변경 없이 정확하다.
-- 마이그레이션, 매개변수 번호, 검증, 화면 변환, 테스트, 문서가 코드와 맞다고 확인됐다.
-- 지적과 분리할 이슈는 없었다.
+- Moving the comment is accurate with no behavior change.
+- It was confirmed that the migration, parameter numbers, validation, screen conversion, tests, and docs match the code.
+- There were no comments and no issue to split off.
 
-## 한계·후속
+## Limits and follow-up
 
-- 이해도·목표 달성 통계는 통계 대시보드(#47, #48)에서 다룬다.
-- 입력 칸이 늘어 폼이 길어졌다. 회고 칸을 접는 방안은 사용해 보고 판단한다.
+- Statistics for understanding and goal achievement are handled in the statistics dashboard (#47, #48).
+- The form got longer because of the added input fields. I will decide whether to collapse the retrospective fields after using it.
