@@ -3,26 +3,26 @@ name: study-log-foundation
 description: Establish or improve the repeatable development foundation of the study-log app, covering stack, structure, conventions, API contracts, design, tests, AI guidance, and deployment. Use for project foundation requests; apply only the requested scope through the study-log-implementation issue-to-PR workflow.
 ---
 
-# 공부 기록 개발 기반
+# Study Log development foundation
 
-이 앱의 개발·검증·운영 방식을 반복 가능하게 정리한다. 먼저 프로젝트 루트의 `AGENTS.md`와 `skills/study-log-implementation/SKILL.md`를 읽고, 이슈 → 번호 기반 브랜치 → 구현 및 docs 기록 → 테스트·PR → 자동 코드 리뷰(최대 2회) → CI 통과 후 병합 절차로 진행한다. 이 스킬이 이슈·PR 절차를 생략하거나 배포 권한을 부여하지 않으며, 병합은 implementation 스킬의 조건을 따른다.
+Make the way this app is developed, verified, and operated repeatable. First read `AGENTS.md` at the project root and `skills/study-log-implementation/SKILL.md`, then follow this flow: issue -> numbered branch -> implementation with a docs record -> tests and PR -> automated code review (at most 2 rounds) -> merge after CI passes. This skill does not skip the issue and PR steps or grant deploy permission, and merging follows the conditions in the implementation skill.
 
-## 기준
+## Baseline
 
-- 기준 문서는 `docs/project-setup.md`이다. 현재 package.json, 잠금 파일, API·SQL, Compose, CI를 확인해 실제 구현과 추천(미도입)을 구분한다. 추천 목록 전체를 자동 설치하지 않는다.
-- 사용자는 본인 한 명이며 로그인은 현재 요구사항에 없다. 날짜는 Asia/Seoul 기준이다.
-- 도구를 바꾸거나 추가할 때는 실제 문제·데이터 영향·검증 방법을 먼저 정리하고, 패키지 설치는 사용자 재확인 후에만 한다.
+- The reference document is `docs/project-setup.md`. Check the current package.json, lockfiles, API and SQL, Compose, and CI, and keep what is actually implemented separate from recommendations (not adopted). Do not auto-install the whole recommendation list.
+- There is one user (the owner), and login is not a current requirement. Dates use Asia/Seoul.
+- When you change or add a tool, first write down the real problem, the data impact, and how you will verify it, and install packages only after the user reconfirms.
 
-## 수행
+## Steps
 
-1. 현재 상태와 이슈의 완료 기준을 정하고, 선택 이유·구조·계약을 문서에 기록한다.
-2. 도구 설정, 실행 명령, CI와 문서를 같은 변경에서 맞춘다. 사용하지 않는 설정·스크립트·빈 모듈은 만들지 않는다.
-3. API·DB 변경은 기존 데이터와 날짜·단위 의미를 보존하고, 마이그레이션 적용과 실패 복구 방법을 검증한다. DB 마이그레이션 원본은 하나로 정한다.
-4. 화면 변경은 디자인 토큰(`@sirloinbh/design-tokens`)과 공통 UI 컴포넌트(`frontend/src/components/ui/`)를 쓰면서 로딩·빈 결과·오류·키보드 접근을 해당 범위에서 정리한다.
-5. `skills/study-log-testing/SKILL.md`를 함께 적용한다. 구현과 테스트를 함께 작성하고, 버그에는 회귀 테스트를 추가하며, 실제 결과를 docs·PR에 기록한다.
-6. 배포는 사용자 요청 범위에서만 한다. 이미지 버전, health check, 비밀값 관리, 백업·복원, 이전 버전 복구를 준비한다.
-7. 각 작업 커밋에 docs 기록을 포함하고 검증한 PR을 만든다. implementation 스킬의 절차로 자동 코드 리뷰를 최대 2회 거치고(큰 수정은 새 이슈카드로 분리), 필수 CI가 모두 통과하면 PR을 병합한다.
+1. Set the current state and the issue's done criteria, and record the reasons for choices, the structure, and the contracts in the docs.
+2. Align tool settings, run commands, CI, and docs in the same change. Do not create unused settings, scripts, or empty modules.
+3. For API and DB changes, keep the meaning of existing data, dates, and units, and verify how migrations are applied and how a failure is recovered. Pick one source of DB migrations.
+4. For screen changes, use the design tokens (`@sirloinbh/design-tokens`) and the shared UI components (`frontend/src/components/ui/`), and cover loading, empty results, errors, and keyboard access within that scope.
+5. Apply `skills/study-log-testing/SKILL.md` too. Write the implementation and tests together, add a regression test for each bug, and record the actual results in the docs and the PR.
+6. Deploy only within the scope the user asked for. Prepare image versions, health checks, secret management, backup and restore, and rollback to the previous version.
+7. Include a docs record in each work commit and open a verified PR. Go through the automated code review at most twice using the implementation skill's procedure (split large fixes into new issue cards), and merge the PR once all required CI checks pass.
 
-## 완료 기준
+## Done criteria
 
-새 환경에서 문서대로 설치·실행·검증을 재현할 수 있고, 선택한 도구가 실제 코드·명령·CI에 반영되어야 한다. 미설치 도구, 건너뛴 검사, 실제로 하지 않은 배포는 후속 작업으로 명시한다.
+Installing, running, and verifying must be reproducible in a fresh environment by following the docs, and the chosen tools must show up in the real code, commands, and CI. State tools that are not installed, checks that were skipped, and deployments that were not actually done as follow-up work.

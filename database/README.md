@@ -1,19 +1,19 @@
-# 공부 기록 PostgreSQL
+# Study Log PostgreSQL
 
-PostgreSQL 17. 마이그레이션 원본은 `migrations/NNN_<설명>.sql` 한 곳뿐이다. 빈 Docker 볼륨에서는 최초 실행 시 모든 파일이 이름순으로 자동 적용되고, CI도 모든 파일을 순서대로 적용한다.
+PostgreSQL 17. The only source of migrations is `migrations/NNN_<description>.sql`. On an empty Docker volume, all files are applied automatically by name order on first start, and CI also applies all files in order.
 
-기존 DB에는 적용 도구로 아직 적용하지 않은 파일만 적용한다. 배포(`deploy/remote-deploy.sh`)는 새 버전을 띄우기 전에 `node dist/migrate.js`로 같은 일을 하고, 실패하면 멈춘다.
+On an existing DB, only the files that have not been applied yet are applied with the migration tool. The deployment (`deploy/remote-deploy.sh`) does the same with `node dist/migrate.js` before it starts the new version, and stops if that fails.
 
 ```powershell
 npm run db:migrate -w backend
 ```
 
-`DATABASE_URL`을 쓴다. 저장소 루트의 `.env`에서 읽지만, 셸에 이미 설정되어 있으면 그 값이 우선하므로 대상 DB를 확인한다. 적용 기록은 `schema_migrations` 표에 남는다.
+It uses `DATABASE_URL`. It reads the value from `.env` at the repository root, but a value already set in the shell takes precedence, so check which DB it targets. The applied history is kept in the `schema_migrations` table.
 
-- 파일과 기록은 함께 커밋된다. 실패하면 그 파일만 되돌리고 멈추며, 앞선 파일의 기록은 남는다.
-- 적용한 파일을 고치거나 지우면 적용을 거부한다. 고칠 내용은 새 번호의 파일로 쓴다.
-- 기록이 없는 DB(이 표가 생기기 전에 직접 적용한 DB, 빈 볼륨에서 자동 적용된 DB)는 첫 실행 때 모든 파일을 한 번 더 실행한다. 아래 규칙대로 재실행해도 안전하기 때문이다.
+- A file and its record are committed together. If a file fails, only that file is rolled back and the run stops; the records of earlier files stay.
+- If you edit or delete a file that was already applied, the tool refuses to run. Write the change as a new numbered file.
+- A DB without records (one where files were applied by hand before this table existed, or one auto-applied from an empty volume) runs all files once more on the first run. This is safe because every migration is safe to re-run under the rule below.
 
-컨테이너의 파일을 직접 적용해야 할 때는 `psql -f`를 쓴다. 이렇게 적용하면 기록이 남지 않아 다음 실행 때 그 파일이 다시 실행된다. `Get-Content … | docker compose exec … psql`처럼 PowerShell 파이프로 넘기지 않는다. Windows PowerShell 5.1은 외부 프로그램으로 ASCII를 보내 한글이 `?`로 깨진다.
+When you must apply a file in the container by hand, use `psql -f`. A file applied this way leaves no record, so it runs again on the next run. Do not pipe it through PowerShell, as in `Get-Content … | docker compose exec … psql`. Windows PowerShell 5.1 sends ASCII to external programs, so Korean text turns into `?`.
 
-규칙: 모든 마이그레이션은 재실행해도 안전하게 쓴다. 병렬 브랜치는 착수 시 번호를 예약한다. 기존 데이터의 의미를 보존하고, 확인하지 못한 값은 NULL로 둔다. SQL의 한글 리터럴은 가능하면 `U&'\\XXXX'` 이스케이프를 쓴다.
+Rule: write every migration so it is safe to re-run. Reserve the number when you start a parallel branch. Keep the meaning of existing data, and leave values you could not confirm as NULL. For Korean literals in SQL, prefer the `U&'\XXXX'` escape.
