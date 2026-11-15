@@ -5,7 +5,7 @@ description: Write or update behavior-focused tests with study-log implementatio
 
 # Study Log test writing and running
 
-Follow the project's AGENTS.md and the study-log-implementation procedure together. This skill sets the standard for writing and running tests; it keeps the issue, branch, docs, and PR steps, the automated code review after the PR (at most 2 rounds), and the merge-after-CI policy.
+Follow the project's AGENTS.md and the study-log-implementation procedure together. This skill sets the standard for writing and running tests; it keeps the issue, branch, docs, and PR steps, the automated code review after the PR (1 or 2 rounds, more only while blocking findings remain), and the merge-after-CI policy.
 
 ## Write tests together with the implementation or fix
 

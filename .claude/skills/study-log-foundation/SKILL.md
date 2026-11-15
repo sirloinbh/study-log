@@ -5,7 +5,7 @@ description: Establish or improve the repeatable development foundation of the s
 
 # Study Log development foundation
 
-Make the way this app is developed, verified, and operated repeatable. First read `AGENTS.md` at the project root and `skills/study-log-implementation/SKILL.md`, then follow this flow: issue -> numbered branch -> implementation with a docs record -> tests and PR -> automated code review (at most 2 rounds) -> merge after CI passes. This skill does not skip the issue and PR steps or grant deploy permission, and merging follows the conditions in the implementation skill.
+Make the way this app is developed, verified, and operated repeatable. First read `AGENTS.md` at the project root and `skills/study-log-implementation/SKILL.md`, then follow this flow: issue -> numbered branch -> implementation with a docs record -> tests and PR -> automated code review (1 or 2 rounds, more only while blocking findings remain) -> merge after CI passes. This skill does not skip the issue and PR steps or grant deploy permission, and merging follows the conditions in the implementation skill.
 
 ## Baseline
 
