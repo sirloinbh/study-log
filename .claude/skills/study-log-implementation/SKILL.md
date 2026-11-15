@@ -5,7 +5,7 @@ description: Follow the user's issue, numbered branch, implementation with docs,
 
 # Study Log implementation procedure
 
-This skill applies to changes in `sirloinbh/study-log`. Do not apply this account, repository, or policy to other projects. First read `AGENTS.md` at the project root and the related documents. Follow the order below, go through the automated code review (at most 2 rounds) after the PR, and finish by merging the PR once the required CI passes.
+This skill applies to changes in `sirloinbh/study-log`. Do not apply this account, repository, or policy to other projects. First read `AGENTS.md` at the project root and the related documents. Follow the order below, go through the automated code review (1 or 2 rounds, more only while blocking findings remain) after the PR, and finish by merging the PR once the required CI passes.
 
 ## 1. Register an issue card
 
@@ -44,13 +44,13 @@ This skill applies to changes in `sirloinbh/study-log`. Do not apply this accoun
 
 ## 5. Automated code review after the PR (at most 2 rounds)
 
-After you open the PR, go through the automated code review at most twice. If there is nothing to fix, go straight to the CI check and the merge.
+After you open the PR, review it yourself 1 or 2 times (more only while blocking findings remain, std-code-review section 8). If there is nothing to fix, go straight to the CI check and the merge.
 
 1. **First review**: after you open the PR, run a read-only review that is separate from the authoring context (a separate agent, a review tool, and so on). Check correctness, regressions, security, missing tests, and the docs record against the issue's done criteria and the whole PR diff.
 2. **If there is nothing to fix**, end the review and go on to the CI check and the merge.
 3. **If there is something to fix**, apply only the comments that should be fixed within this PR's scope. Make an additional commit that includes the related tests and docs record, and push.
 4. **Second review**: check that the first comments were applied and check the added diff. Also look at the whole final PR diff. If there is nothing to fix, go on to CI.
-5. **Second fixes**: apply the second comments in an additional commit. The review is limited to 2 rounds, so do not do a third review; go on to CI.
+5. **Second fixes**: Apply the second findings in an additional commit. Stop after round 2 unless a blocking finding remains. If one does, fix it on the same branch and review again, repeating only while blocking findings remain (std-code-review section 8), then go on to CI.
 6. **Split large fixes**: do not fix comments of the following kinds in this PR. Instead, create a new issue card (with the problem, scope, and done criteria) in `sirloinbh/study-log`. Leave the issue link in a PR comment and in the docs record, and keep going with this PR.
    - A feature outside the requested scope
    - A change to the design or data structure
