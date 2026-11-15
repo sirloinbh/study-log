@@ -81,6 +81,10 @@ export function textbookRoutes(pool: Pool, storage: FileStorage) {
     const reply = await inTransaction<{ status: number; body?: unknown }>(
       pool,
       async (client) => {
+        // The textbook first, then its exercises: the same order as a chapter delete
+        // (writeContents), so the two never wait on each other in a deadlock.
+        const book = await client.query('SELECT 1 FROM textbooks WHERE id = $1 FOR UPDATE', [id]);
+        if (!book.rowCount) return { status: 404, body: notFound };
         const keys = await storedKeys(client, { textbookId: id });
         let rowCount: number | null;
         try {

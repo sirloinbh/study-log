@@ -57,3 +57,18 @@ Not applied:
 - Locks are held during the S3 calls; for one user this only makes other changes to those rows wait. This is noted in a code comment.
 - `removeStored` reports only the first failure.
 - No test for a non-storage error during removal (it rethrows, and `inTransaction` rolls back and answers 500, as for any query error).
+
+## Automated review, round 2
+
+A separate review agent checked the round 1 fix. It confirmed that `FOR UPDATE` conflicts with the `FOR KEY SHARE` an upload's foreign key check takes, and that the upload then fails cleanly through its existing 404 path. It also found the batching loop correct and the lock test meaningful. Applied in the commit "fix: lock the textbook first when deleting it (#209)":
+
+- **Deadlock:** the textbook delete locked the exercises and then needed the textbook row. A chapter delete (`writeContents`) locks the textbook row and then the exercises. Run together, PostgreSQL would abort one of them with 40P01 and the user would get a 500. The textbook delete now locks the textbook row first (404 if it is gone), so every path takes the locks in the same order. The exercise delete locks only its exercise and never needs the textbook row.
+- **Stub:** the `foreignKeyPool` stub matches only `FROM exercises` and `exercise_files` queries, instead of any SQL containing "exercise".
+
+Not applied:
+
+- A test for the deadlock (it needs two deletes interleaved at a precise point).
+- A test that an upload blocked by the lock fails with 404 after the delete commits.
+- The theoretical window in which a new exercise and its upload both land between a textbook delete's key read and its cascade: creating an exercise in that textbook is held back by the textbook lock only on the chapter path.
+
+`npm run check`: exit 0, backend 435 passed, 0 skipped. The review limit is two rounds, so there is no third review.

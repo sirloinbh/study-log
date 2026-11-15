@@ -17,7 +17,7 @@ const foreignKeyPool = (constraint: string) => {
     if (/^(BEGIN|ROLLBACK|COMMIT)/.test(sql)) return { rows: [], rowCount: 0 };
     if (sql.startsWith('SELECT 1 FROM textbooks')) return { rows: [{}], rowCount: 1 };
     // The exercises and stored files a delete takes with it (#209): none here.
-    if (sql.includes('exercise')) return { rows: [], rowCount: 0 };
+    if (/FROM exercises|exercise_files/.test(sql)) return { rows: [], rowCount: 0 };
     throw Object.assign(new Error('violates foreign key constraint'), {
       code: '23503',
       constraint,
