@@ -186,3 +186,25 @@ test('problem numbers match ignoring spaces, case and a trailing dot, and only w
   expect(matchExercise('12A', [exercise(5, '12a')])?.id).toBe(5);
   expect(matchExercise('4', [exercise(6, '4'), exercise(7, '4')])).toBeUndefined();
 });
+
+test('reading the file as something else clears the review', async () => {
+  fakeServer([{ number: '1', body: 'One', answer: null }]);
+  open();
+  pick();
+  fireEvent.click(screen.getByRole('button', { name: 'Read file' }));
+  await screen.findByRole('button', { name: 'Save 1 problem' });
+  fireEvent.click(screen.getByLabelText('Answers only, for problems already in this section'));
+  expect(screen.queryByRole('button', { name: /^Save \d/ })).toBeNull();
+  expect(screen.queryByText('Found 1. Check them before saving')).toBeNull();
+});
+
+test('a save over 2 MB is stopped before it is sent', async () => {
+  const sent = fakeServer([{ number: '1', body: 'x'.repeat(2 * 1024 * 1024), answer: null }]);
+  const onSaved = open();
+  pick();
+  fireEvent.click(screen.getByRole('button', { name: 'Read file' }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Save 1 problem' }));
+  expect(screen.getByRole('alert')).toHaveTextContent('This is too much to save at once');
+  expect(sent).toHaveLength(1);
+  expect(onSaved).not.toHaveBeenCalled();
+});

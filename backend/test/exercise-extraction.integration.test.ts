@@ -92,10 +92,14 @@ test(
           items: [{ number: '1.2', body: 'Find the inverse.', answer: null }],
           model: 'claude-sonnet-5-5',
         });
+        const { signal, ...source } = asked[0];
         assert.deepEqual(
-          { ...asked[0], bytes: asked[0].bytes.toString() },
+          { ...source, bytes: source.bytes.toString() },
           { bytes: pdf.toString(), type: 'application/pdf', kind: 'problems' },
         );
+        // The call gets a signal that stays unused once the reply is sent.
+        assert.ok(signal instanceof AbortSignal);
+        assert.equal(signal.aborted, false);
         // Reading saves nothing.
         assert.deepEqual((await call(base)).data, { exercises: [] });
 
@@ -201,6 +205,21 @@ test(
             )
           ).status,
           404,
+        );
+
+        // A whole chapter may be larger than other requests: /bulk takes 2 MB, the rest 256 KB.
+        const long = Array.from({ length: 20 }, (_, i) => ({
+          number: `9.${i}`,
+          body: 'x'.repeat(15000),
+        }));
+        assert.equal((await bulk(long)).status, 201);
+        const tooLarge = await call(`/api/exercises/${first11.id}`, {
+          method: 'PUT',
+          body: { number: '1.1', body: 'x'.repeat(300000) },
+        });
+        assert.deepEqual(
+          [tooLarge.status, tooLarge.data],
+          [413, { error: 'Request body is too large' }],
         );
       },
       { extractor },

@@ -17,6 +17,8 @@ type Review = { kind: 'problems'; rows: ProblemRow[] } | { kind: 'answers'; rows
 
 // Same bound as uploads (#28); the server checks it too.
 const maxBytes = 20 * 1024 * 1024;
+// The most the API takes in one save (app.ts).
+const maxSaveBytes = 2 * 1024 * 1024;
 
 // Reads the problems, or the answers, in one PDF or photo with Claude, shows them for review, and
 // saves what the person keeps into the chapter at `url` (its exercises API). Rules:
@@ -93,6 +95,13 @@ export function ExerciseExtraction({
     }
   };
 
+  // A review belongs to what the file was read as; reading it as something else starts over.
+  const changeKind = (next: Kind) => {
+    setKind(next);
+    setReview(undefined);
+    setNotice(undefined);
+  };
+
   const editProblem = (key: number, change: Partial<ProblemRow>) =>
     setReview((current) =>
       current?.kind === 'problems'
@@ -132,13 +141,9 @@ export function ExerciseExtraction({
 
   const save = async () => {
     if (!review || !kept.length || problems.length) return;
-    nameNext('save');
-    if (!begin()) return;
-    try {
-      if (review.kind === 'problems') {
-        await requestJson(`${url}/bulk`, {
-          method: 'POST',
-          body: {
+    const body =
+      review.kind === 'problems'
+        ? {
             exercises: review.rows
               .filter((row) => row.include)
               .map((row) => ({
@@ -146,18 +151,23 @@ export function ExerciseExtraction({
                 body: row.body,
                 answer: row.answer.trim() ? row.answer : null,
               })),
-          },
-        });
-      } else {
-        await requestJson(`${url}/answers`, {
-          method: 'PUT',
-          body: {
+          }
+        : {
             answers: review.rows
               .filter((row) => row.exerciseId !== '')
               .map((row) => ({ exerciseId: Number(row.exerciseId), body: row.answer })),
-          },
-        });
-      }
+          };
+    if (new Blob([JSON.stringify(body)]).size > maxSaveBytes)
+      return setNotice({
+        kind: 'alert',
+        text: 'This is too much to save at once. Untick some, save, then read the file again for the rest',
+      });
+    nameNext('save');
+    if (!begin()) return;
+    try {
+      await (review.kind === 'problems'
+        ? requestJson(`${url}/bulk`, { method: 'POST', body })
+        : requestJson(`${url}/answers`, { method: 'PUT', body }));
       end();
       onSaved(
         `Saved ${kept.length} ${review.kind === 'problems' ? 'problem' : 'answer'}${kept.length === 1 ? '' : 's'}`,
@@ -193,7 +203,7 @@ export function ExerciseExtraction({
               name="extraction-kind"
               disabled={busy}
               checked={kind === 'problems'}
-              onChange={() => setKind('problems')}
+              onChange={() => changeKind('problems')}
             />
             Problems (with answers when they are shown)
           </label>
@@ -203,7 +213,7 @@ export function ExerciseExtraction({
               name="extraction-kind"
               disabled={busy}
               checked={kind === 'answers'}
-              onChange={() => setKind('answers')}
+              onChange={() => changeKind('answers')}
             />
             Answers only, for problems already in this section
           </label>

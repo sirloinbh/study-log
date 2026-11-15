@@ -79,9 +79,12 @@ export function createApp(
       skip: (req) => (req.method === 'GET' || req.method === 'HEAD') && req.path === '/health',
     }),
   );
-  // A whole chapter of reviewed problems (#30) can be larger than other requests.
+  // A whole chapter of reviewed problems or answers (#30) can be larger than other requests.
   app.use(
-    '/api/textbooks/:textbookId/contents/:contentId/exercises/bulk',
+    [
+      '/api/textbooks/:textbookId/contents/:contentId/exercises/bulk',
+      '/api/textbooks/:textbookId/contents/:contentId/exercises/answers',
+    ],
     express.json({ limit: '2mb' }),
   );
   app.use(express.json({ limit: '256kb' }));

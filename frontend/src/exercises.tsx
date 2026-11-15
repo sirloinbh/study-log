@@ -365,6 +365,7 @@ export function Exercises({
           type="button"
           className="secondary"
           disabled={busy || exercises === undefined}
+          id="exercise-read"
           aria-expanded={readingShown}
           onClick={() => setReading(readingShown ? undefined : contentId)}
         >
@@ -451,6 +452,8 @@ export function Exercises({
               disabled={busy}
               onSaved={(message) => {
                 setReading(undefined);
+                // The panel and its focused Save button are gone; focus goes back to its button.
+                setWantFocus('exercise-read');
                 // Nothing more to change: run reloads the list with the new problems or answers.
                 void run(() => {
                   say('status', message);

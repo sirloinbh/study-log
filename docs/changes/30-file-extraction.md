@@ -22,7 +22,7 @@ Typing every problem of a chapter by hand is slow. The user picks a PDF page or 
 - `backend/src/translation.ts`: the SDK error mapping moved into `apiFailure(error, what)`, shared by translation and extraction. Translation messages are unchanged.
 - `backend/src/exercises.ts`, under `/api/textbooks/:textbookId/contents/:contentId/exercises`:
   - `POST /extract` (multipart `file`, `kind` = `problems` or `answers`): needs the app header (403), multipart (415), an existing chapter (404, checked before the body is read), a known format (415). Returns `{ items, model }` and saves nothing.
-  - `POST /bulk` `{ exercises: [{ number, body, important?, answer? }] }`: saves 1 to 200 problems with their answers in one transaction, holding the chapter row so it cannot be deleted halfway. Its JSON body may be up to 2 MB (`app.ts`); other requests keep 256 KB.
+  - `POST /bulk` `{ exercises: [{ number, body, important?, answer? }] }`: saves 1 to 200 problems with their answers in one transaction, holding the chapter row so it cannot be deleted halfway. Its JSON body may be up to 2 MB (`app.ts`), as may that of `/answers`; other requests keep 256 KB.
   - `PUT /answers` `{ answers: [{ exerciseId, body }] }`: replaces the answers of exercises in this chapter in one transaction. 400 if an id repeats or an exercise is not (any more) in the chapter.
 - `backend/src/exercise-files.ts`: `receive` is exported for the extract route.
 - `backend/src/app.ts`: `createApp` takes `extractor` (default `claudeExtractor()`).
@@ -48,3 +48,22 @@ Typing every problem of a chapter by hand is slow. The user picks a PDF page or 
 - Not checked against the real Claude API or real textbook pages: I could not confirm a key is set locally, and no sample pages were available. The first real use is the check of extraction quality.
 - Only one file per reading; a whole book should be read a chapter at a time.
 - Deploying needs the nginx body limit raised for files over 1 MB ([project-standards#589](https://github.com/sirloinbh/project-standards/issues/589)), as for uploads.
+
+## Automated review, round 1
+
+A separate review agent read the whole diff. It found nothing blocking. It confirmed the chapter and exercise locks, that the 409 guard is always released, the body parser order, that the translation messages are unchanged, and the CSRF header. Applied in the commit "fix: lock answers in id order, stop paid reads on abort, guard save size (#30)":
+
+- **Body size tests:** a 300 KB `/bulk` save answers 201, and a 300 KB edit of one exercise answers 413, so a reordering of the parsers fails a test.
+- **Deadlock:** `/answers` locks the exercises in id order (`ORDER BY id FOR UPDATE`).
+- **Save size:** 200 items of up to 20,000 characters can exceed 2 MB. The panel now checks the size before sending and asks to save part of it. `/answers` gets the same 2 MB limit as `/bulk`; it had 256 KB.
+- **Focus:** after a save, focus returns to the "Read from file" button instead of the page.
+- **Abort:** the extract route aborts the Claude call when the request closes before the reply (a closed tab), so a retry does not pay twice. The extractor passes the signal to the SDK.
+- **Kind change:** choosing what the file holds again clears the review, so the radios and the Save button never disagree.
+- New tests: the signal in `extraction.test.ts` and the integration test, the two size cases, and two panel tests (the kind change and the size guard).
+
+Not applied:
+
+- The answer panel keeps the exercise list from when it was read; a stale match is refused by the server with "Reload and match again". That is acceptable for one user.
+- No test against the real Claude API with sample pages; see Limits.
+
+`npm run check` after the fixes (2026-11-16): exit 0. Backend 441 passed, 0 skipped (the new cases are assertions inside the existing tests); frontend 230 passed, 2 skipped; other suites 4 passed.

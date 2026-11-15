@@ -11,6 +11,8 @@ export type ExtractionSource = {
   bytes: Buffer;
   type: 'application/pdf' | 'image/jpeg' | 'image/png';
   kind: ExtractionKind;
+  // Aborts the call when the request that asked for it is gone.
+  signal?: AbortSignal;
 };
 // `body` is empty for answers read from an answers-only file.
 export type ExtractedItem = { number: string; body: string; answer: string | null };
@@ -87,7 +89,7 @@ function explain(error: unknown): never {
 // can be long, so the reply is streamed with room for it.
 export function claudeExtractor(client?: Anthropic): Extractor {
   let anthropic = client;
-  return async ({ bytes, type, kind }) => {
+  return async ({ bytes, type, kind, signal }) => {
     try {
       anthropic ??= new Anthropic();
       const data = bytes.toString('base64');
@@ -96,15 +98,18 @@ export function claudeExtractor(client?: Anthropic): Extractor {
           ? { type: 'document', source: { type: 'base64', media_type: type, data } }
           : { type: 'image', source: { type: 'base64', media_type: type, data } };
       const response = await anthropic.beta.messages
-        .stream({
-          model: extractionModel,
-          max_tokens: 64000,
-          betas: ['server-side-fallback-2026-07-01'],
-          fallbacks: 'default',
-          output_config: { effort: 'medium', format: { type: 'json_schema', schema } },
-          system,
-          messages: [{ role: 'user', content: [file, { type: 'text', text: tasks[kind] }] }],
-        })
+        .stream(
+          {
+            model: extractionModel,
+            max_tokens: 64000,
+            betas: ['server-side-fallback-2026-07-01'],
+            fallbacks: 'default',
+            output_config: { effort: 'medium', format: { type: 'json_schema', schema } },
+            system,
+            messages: [{ role: 'user', content: [file, { type: 'text', text: tasks[kind] }] }],
+          },
+          { signal },
+        )
         .finalMessage();
       if (response.stop_reason === 'refusal')
         throw new ExtractionError(422, 'This file cannot be read');

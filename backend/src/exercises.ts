@@ -201,8 +201,15 @@ export function contentExerciseRoutes(pool: Pool, extractor: Extractor) {
       const format = detectFormat(file.buffer);
       if (!format)
         return void res.status(415).json({ error: 'Only PDF, JPEG and PNG files can be read' });
+      // A request the person gave up on (tab closed) stops the paid call too.
+      const stop = new AbortController();
+      res.on('close', () => {
+        if (!res.writableFinished) stop.abort();
+      });
       try {
-        res.json(await extractor({ bytes: file.buffer, type: format.type, kind }));
+        res.json(
+          await extractor({ bytes: file.buffer, type: format.type, kind, signal: stop.signal }),
+        );
       } catch (error) {
         if (!(error instanceof ExtractionError)) throw error;
         res.status(error.status).json({ error: error.message });
@@ -262,10 +269,12 @@ export function contentExerciseRoutes(pool: Pool, extractor: Extractor) {
           [contentId, textbookId],
         );
         if (!content.rowCount) return { status: 404, body: contentNotFound };
-        // Locked, so none of them is deleted or moved before the answers are in.
+        // Locked, so none of them is deleted or moved before the answers are in; in id order, so
+        // two saves over the same exercises never wait on each other in a deadlock.
         const { rows } = await client.query(
           `SELECT id FROM exercises
-           WHERE id = ANY($1::bigint[]) AND textbook_id = $2 AND content_id = $3 FOR UPDATE`,
+           WHERE id = ANY($1::bigint[]) AND textbook_id = $2 AND content_id = $3
+           ORDER BY id FOR UPDATE`,
           [ids, textbookId, contentId],
         );
         if (rows.length !== ids.length)

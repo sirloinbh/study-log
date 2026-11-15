@@ -11,8 +11,8 @@ function fakeClient(reply: (params: Record<string, unknown>) => unknown) {
   const client = {
     beta: {
       messages: {
-        stream: (params: Record<string, unknown>) => {
-          sent.push(params);
+        stream: (params: Record<string, unknown>, options?: { signal?: AbortSignal }) => {
+          sent.push({ ...params, signal: options?.signal });
           return { finalMessage: async () => reply(params) };
         },
       },
@@ -42,10 +42,12 @@ test('a PDF goes to Claude Sonnet 5.5 as a document, streamed with structured ou
       { number: '1.3', body: 'Prove it.', answer: 'By induction.' },
     ),
   );
+  const stop = new AbortController();
   const extracted = await claudeExtractor(client)({
     bytes: pdf,
     type: 'application/pdf',
     kind: 'problems',
+    signal: stop.signal,
   });
   assert.deepEqual(extracted, {
     items: [
@@ -55,6 +57,8 @@ test('a PDF goes to Claude Sonnet 5.5 as a document, streamed with structured ou
     model: 'claude-sonnet-5-5',
   });
   const [params] = sent;
+  // The request's abort signal reaches the SDK call.
+  assert.equal(params.signal, stop.signal);
   assert.equal(params.model, 'claude-sonnet-5-5');
   assert.equal(params.max_tokens, 64000);
   assert.deepEqual(params.betas, ['server-side-fallback-2026-07-01']);
