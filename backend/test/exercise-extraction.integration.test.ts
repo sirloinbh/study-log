@@ -213,6 +213,11 @@ test(
           body: 'x'.repeat(15000),
         }));
         assert.equal((await bulk(long)).status, 201);
+        const savedLong = (await call(base)).data.exercises as Exercise[];
+        const bigAnswers = savedLong
+          .filter((exercise) => exercise.number.startsWith('9.'))
+          .map((exercise) => ({ exerciseId: exercise.id, body: 'y'.repeat(15000) }));
+        assert.deepEqual((await answers(bigAnswers)).data, { saved: 20 });
         const tooLarge = await call(`/api/exercises/${first11.id}`, {
           method: 'PUT',
           body: { number: '1.1', body: 'x'.repeat(300000) },

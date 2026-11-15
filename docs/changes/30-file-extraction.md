@@ -67,3 +67,18 @@ Not applied:
 - No test against the real Claude API with sample pages; see Limits.
 
 `npm run check` after the fixes (2026-11-16): exit 0. Backend 441 passed, 0 skipped (the new cases are assertions inside the existing tests); frontend 230 passed, 2 skipped; other suites 4 passed.
+
+## Automated review, round 2
+
+A separate review agent checked the round 1 fixes and the final diff. It found nothing blocking. It confirmed:
+
+- The abort fires only when the client leaves before the reply; a normal reply never aborts.
+- The array path for the 2 MB parser is valid in Express 5.
+- The panel's size check measures the same bytes as the server.
+- The focus effect waits for the reload.
+
+Applied in the commit "test: check that a large answer save is accepted (#30)": the integration test saves 20 answers of 15,000 characters (over 256 KB) to `/answers`, so dropping that path from the 2 MB parser fails a test.
+
+Not applied: a screen test for focus returning to "Read from file" after a save (checked by reading the effect); the 2 MB parser also matching paths below `/bulk`, where no route exists.
+
+`npm run check` after the fix (2026-11-16): exit 0. Backend 441 passed, 0 skipped; frontend 230 passed, 2 skipped; other suites 4 passed. The review limit is two rounds, so there is no third review.
