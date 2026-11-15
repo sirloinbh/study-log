@@ -58,3 +58,20 @@ Keep the original files (PDFs, photos) of exercises and answers, so #29 and #30 
 - The production nginx (`frontend/nginx.conf`, a centrally managed file) keeps the default 1 MB request body limit, so uploads over 1 MB through it would get 413. Local development through Vite is not affected. This needs a change in `sirloinbh/project-standards` before files are uploaded through the deployed web server.
 - Deleting an exercise, chapter or textbook removes the file rows but leaves their S3 objects. Tracked in [#209](https://github.com/sirloinbh/study-log/issues/209).
 - No screen yet; #30 adds the upload and review screen.
+
+## Automated review, round 1
+
+A separate review agent read the whole PR diff. No blocking issues. Applied in the commit "fix: check the exercise before reading an upload (#28)":
+
+- The upload read the body (up to 20 MB in memory) before checking that the exercise exists. The check now comes first; the insert still catches an exercise deleted in the meantime. Test: `an upload for a missing exercise is refused before its body is read or stored`.
+- `filename*` now also percent-encodes `' ( ) *`, which `encodeURIComponent` leaves as they are (RFC 5987).
+- File names also lose bidi direction overrides (U+202A to U+202E, U+2066 to U+2069, U+200E, U+200F).
+- The refusal test now uses a pool where the exercise exists and every other query fails, since the existence check is the first query.
+
+Not applied:
+
+- `Content-Security-Policy: sandbox` on `/content`: it stops Chrome's built-in PDF viewer, and the type is already fixed from the bytes with `nosniff`.
+- A separate rate limit for uploads: the 20 MiB cap, one file per request, and the existence check before reading bound each request; the API is not exposed (see below).
+- No test for the race where the exercise is deleted between the check and the insert (the `23503` path): it needs two requests timed against each other.
+
+The file API has no authentication, like the rest of the API (AGENTS.md: one user, no login, design private access before any public exposure). The `X-Requested-With` check only stops other sites' forms. Anyone who can reach the server can read, add, or delete files, so the API must stay unexposed until private access exists.

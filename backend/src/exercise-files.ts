@@ -37,13 +37,24 @@ const roleInput = z.enum(['problem', 'answer'], {
       : 'The file role must be problem or answer',
 });
 
-// The name as the person saw it, kept only for showing and downloading. Control characters go and
-// an empty name becomes "file"; it is never used as a storage path.
+// The name as the person saw it, kept only for showing and downloading. Control characters go, and
+// so do the direction overrides that could make "exe.pdf" read as something else; an empty name
+// becomes "file". It is never used as a storage path.
+// eslint-disable-next-line no-control-regex
+const hiddenCharacters = /[\u0000-\u001f\u007f\u200e\u200f\u202a-\u202e\u2066-\u2069]/g;
+
 export function displayName(raw: string) {
-  // eslint-disable-next-line no-control-regex
-  const name = raw.replace(/[\u0000-\u001f\u007f]/g, '').trim();
+  const name = raw.replace(hiddenCharacters, '').trim();
   return name.length === 0 ? 'file' : name;
 }
+
+// RFC 5987 value for `filename*`: encodeURIComponent leaves ' ( ) * as they are, which it does not
+// allow.
+export const encodeName = (name: string) =>
+  encodeURIComponent(name).replace(
+    /['()*]/g,
+    (c) => `%${c.charCodeAt(0).toString(16).toUpperCase()}`,
+  );
 
 const columns = `id, exercise_id AS "exerciseId", role, original_name AS name,
   content_type AS "contentType", size_bytes AS size,
@@ -113,6 +124,10 @@ export function exerciseFileRoutes(pool: Pool, storage: FileStorage) {
     if (!req.is('multipart/form-data'))
       return void res.status(415).json({ error: 'Send the file as multipart/form-data' });
     const id = exerciseIdParam.parse((req.params as Record<string, string>).id);
+    // Before reading the body, so a request for an exercise that does not exist never holds up to
+    // 20 MB in memory. The insert below still catches one deleted in the meantime.
+    const exercise = await pool.query('SELECT 1 FROM exercises WHERE id = $1', [id]);
+    if (!exercise.rowCount) return void res.status(404).json(notFound);
     if (!(await receive(req, res))) return;
     const role = roleInput.parse((req.body as Record<string, unknown> | undefined)?.role);
     const file = req.file;
@@ -123,8 +138,6 @@ export function exerciseFileRoutes(pool: Pool, storage: FileStorage) {
     const name = displayName(file.originalname);
     if (name.length > 255)
       return void res.status(400).json({ error: 'The file name must be at most 255 characters' });
-    const exercise = await pool.query('SELECT 1 FROM exercises WHERE id = $1', [id]);
-    if (!exercise.rowCount) return void res.status(404).json(notFound);
 
     const key = `exercises/${id}/${randomUUID()}.${format.extension}`;
     try {
@@ -184,7 +197,7 @@ export function fileRoutes(pool: Pool, storage: FileStorage) {
     }
     res.set({
       'content-type': type,
-      'content-disposition': `inline; filename*=UTF-8''${encodeURIComponent(name)}`,
+      'content-disposition': `inline; filename*=UTF-8''${encodeName(name)}`,
       'x-content-type-options': 'nosniff',
       'cache-control': 'private, no-cache',
     });

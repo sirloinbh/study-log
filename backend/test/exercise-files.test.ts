@@ -3,13 +3,15 @@ import { test } from 'node:test';
 
 import type { Pool } from 'pg';
 
-import { detectFormat, displayName, maxFileBytes } from '../src/exercise-files.js';
+import { detectFormat, displayName, encodeName, maxFileBytes } from '../src/exercise-files.js';
 import { FileStorageError, s3Storage } from '../src/file-storage.js';
 import { withApi } from './helpers.js';
 
-// Validation must reject an upload before any query reaches the database or S3 (#28).
-const untouchedPool = {
-  query: async () => {
+// Validation must reject an upload before it is stored (#28): the only query allowed is the check
+// that the exercise exists, and S3 is never called (the helper's storage refuses).
+const exercisePool = {
+  query: async (sql: string) => {
+    if (sql.startsWith('SELECT 1 FROM exercises')) return { rows: [{}], rowCount: 1 };
     throw new Error('DB must not be queried for invalid input');
   },
 } as unknown as Pool;
@@ -40,10 +42,32 @@ test('file names lose control characters and never end up empty (#28)', () => {
   assert.equal(displayName('  1장 연습문제.pdf '), '1장 연습문제.pdf');
   assert.equal(displayName('a\u0000b\r\n.png'), 'ab.png');
   assert.equal(displayName(' \t '), 'file');
+  assert.equal(displayName('report\u202efdp.exe'), 'reportfdp.exe');
+  assert.equal(encodeName("1장 (풀이)'*.pdf"), '1%EC%9E%A5%20%28%ED%92%80%EC%9D%B4%29%27%2A.pdf');
 });
 
-test('uploads that are not allowed are refused before the DB and S3 (#28)', async () => {
-  await withApi(untouchedPool, async (call) => {
+test('an upload for a missing exercise is refused before its body is read or stored (#28)', async () => {
+  const emptyPool = { query: async () => ({ rows: [], rowCount: 0 }) } as unknown as Pool;
+  const refuse = async (): Promise<never> => {
+    throw new Error('S3 must not be called for a missing exercise');
+  };
+  await withApi(
+    emptyPool,
+    async (call) => {
+      // Not even a valid file: the body is never looked at.
+      const { status, data } = await call('/api/exercises/7/files', {
+        method: 'POST',
+        form: form(Buffer.from('not read')),
+        headers: app,
+      });
+      assert.deepEqual([status, data.error], [404, 'Exercise not found']);
+    },
+    { fileStorage: { put: refuse, get: refuse, remove: refuse } },
+  );
+});
+
+test('uploads that are not allowed are refused before anything is stored (#28)', async () => {
+  await withApi(exercisePool, async (call) => {
     const post = (init: { form?: FormData; headers?: Record<string, string>; path?: string }) =>
       call(init.path ?? '/api/exercises/1/files', {
         method: 'POST',
