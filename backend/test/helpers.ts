@@ -3,6 +3,7 @@ import type { Server } from 'node:http';
 import { Client, type Pool } from 'pg';
 
 import { createApp } from '../src/app.js';
+import type { Extractor } from '../src/extraction.js';
 import type { FileStorage } from '../src/file-storage.js';
 import type { HolidayFetcher } from '../src/holidays.js';
 import type { Translator } from '../src/translation.js';
@@ -79,6 +80,7 @@ export async function withApi(
   options: {
     today?: () => string;
     translator?: Translator;
+    extractor?: Extractor;
     holidayFetcher?: HolidayFetcher;
     fileStorage?: FileStorage;
     requestsPerMinute?: number;
@@ -88,6 +90,12 @@ export async function withApi(
     // Tests never reach Claude: translating fails unless a test hands in its own translator (#31).
     const translator: Translator =
       options.translator ??
+      (async () => {
+        throw new Error('tests must not call the Claude API');
+      });
+    // Nor for reading files (#30).
+    const extractor: Extractor =
+      options.extractor ??
       (async () => {
         throw new Error('tests must not call the Claude API');
       });
@@ -106,10 +114,13 @@ export async function withApi(
       get: refuse,
       remove: refuse,
     };
-    const server = createApp(pool, { ...options, translator, holidayFetcher, fileStorage }).listen(
-      0,
-      '127.0.0.1',
-    );
+    const server = createApp(pool, {
+      ...options,
+      translator,
+      extractor,
+      holidayFetcher,
+      fileStorage,
+    }).listen(0, '127.0.0.1');
     await new Promise<void>((resolve, reject) => {
       server.once('listening', resolve);
       server.once('error', reject);

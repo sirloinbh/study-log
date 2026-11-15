@@ -23,16 +23,20 @@ The sample-page accuracy comparison listed in #29 was not run: no sample pages w
 
 Detailed rules:
 
-- Extraction runs only when the user presses a button for one uploaded file, as translation (#31) does. Uploading a file never starts a paid call.
+- User decision (2026-11-16, [#30 comment](https://github.com/sirloinbh/study-log/issues/30#issuecomment-6902994260)): on a chapter's exercises screen the user picks a PDF or photo and presses "Read file". The server sends it to Claude **without keeping it**, so no S3 bucket is needed. Attaching originals to each exercise (#28) stays a separate step.
+- Nothing is read on its own: each reading is one button press, as translation (#31) is. While a file is being read for a chapter, a second request for the same chapter answers 409.
 - The model is the one the user chose for translation, Claude Sonnet 5.5 (`claude-sonnet-5-5`), through the official SDK `@anthropic-ai/sdk` already in the backend. The key is the same `ANTHROPIC_API_KEY`; without it, only extraction fails, with a notice.
-- The file is read from storage on the server and sent as is: a PDF as a document, a JPEG or PNG as an image.
+- The file is sent as is: a PDF as a document, a JPEG or PNG as an image. Its type comes from its first bytes, and it can be at most 20 MB, as for uploads (#28). The request needs the app's `X-Requested-With: study-log` header, as uploads do.
+- The reply is streamed with room for 64,000 output tokens, enough for a chapter of problems. A file that holds more than 200 items, or more than fits, is refused with a message to upload fewer pages.
 
 ## 3. What it returns
 
 Detailed rules:
 
-- The result is a list of problems, each with its number as printed, its text, and its answer when the file shows one. It comes back as structured JSON, the same way translation does.
+- The user says what the file holds: **problems** (with answers when they are shown next to them) or **answers only** (for example the back of the book).
+- The result is a list of items, each with its number as printed (cut to 20 characters), its problem text, and its answer when the file shows one. It comes back as structured JSON, the same way translation does. Problems without text, and answers without text in an answers-only file, are left out.
 - Formulas are written in LaTeX, and the text is kept in its original language. Translation stays a separate step (#31).
 - The file content is material to read, never instructions to follow.
-- Nothing is saved directly. The user reviews and edits the list, then saves it as exercises in one transaction (#30).
+- Nothing is saved directly. The user reviews the list, edits it, and unticks what to leave out, then saves the problems (with their answers) into the chapter in one transaction.
+- User decision (2026-11-16): answers from an answers-only file go to the chapter's exercise with the same number. Numbers match ignoring spaces, case and a trailing dot, and only when exactly one exercise has that number; otherwise the answer starts as "Don't save". The user can move or drop each one; two answers cannot go to one exercise. Saving replaces an answer already there, all in one transaction, and answers 400 if any of those exercises left the chapter in the meantime.
 - A refusal, a cut-off output, or an unreadable result stores nothing and answers with an error, using the same status mapping as translation.

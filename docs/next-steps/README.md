@@ -8,7 +8,7 @@ The agent proceeds in this order.
 
 1. Ask whether the items under "What the user does by hand" below are done.
 2. The API key (#129) is in AWS SSM (`/sirloinbh/shared/data-go-kr-service-key`) since 2026-11-15. `node tools/app-secrets.mjs pull study-log` in project-standards writes it into the local `.env`, and the server deploy reads it from SSM. The real responses and a Seollal 2027 schedule were checked on 2026-11-15 ([#33 comments](https://github.com/sirloinbh/study-log/issues/33)); no code change was needed.
-3. #28 (S3 storage and upload API, decisions in the [#28 comments](https://github.com/sirloinbh/study-log/issues/28)) and #209 (stored files removed with their exercise, chapter, or textbook) were merged on 2026-11-15. #29 settled the extraction method on 2026-11-16: Claude reads the files ([extraction rules](../decisions/extraction-rules.md)). Next is #30 (P3), which builds it. Real S3 uploads need `FILE_BUCKET`, `AWS_REGION` and credentials in `.env`.
+3. #28 (S3 storage and upload API, decisions in the [#28 comments](https://github.com/sirloinbh/study-log/issues/28)) and #209 (stored files removed with their exercise, chapter, or textbook) were merged on 2026-11-15. #29 settled the extraction method on 2026-11-16: Claude reads the files ([extraction rules](../decisions/extraction-rules.md)). #30 built it (reading problems and answers from a PDF or photo on a chapter's exercises screen); it needs `ANTHROPIC_API_KEY` in `.env` for a real call, and its first real use is the check of extraction quality. With it, the parent issue #5 is closed. Real S3 uploads need `FILE_BUCKET`, `AWS_REGION` and credentials in `.env`.
 4. Ask the user about "What the user decides" below.
 5. If all of the above are blocked, do the items under "Issues that can be done without the API key and the app DB" in "Next issue candidates", in the order listed.
 
@@ -52,14 +52,13 @@ As of 2026-11-15 (#177, #178), both DBs run in the Docker Compose `db` container
 
 The rules follow the [study schedule](../decisions/schedule-rules.md), [review interval](../decisions/review-rules.md) and [text extraction](../decisions/extraction-rules.md) documents.
 
-| Issue | Content                              | Priority | Note                                                                                                                                                  |
-| ----- | ------------------------------------ | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| #30   | Extract problems from uploaded files | P3       | Follows the [extraction rules](../decisions/extraction-rules.md); needs `ANTHROPIC_API_KEY` for a real call                                           |
-| —     | nginx 1 MB body limit for uploads    | —        | Centrally managed `frontend/nginx.conf`: [project-standards#589](https://github.com/sirloinbh/project-standards/issues/589), before deploying uploads |
+| Issue | Content                           | Priority | Note                                                                                                                                                  |
+| ----- | --------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| —     | nginx 1 MB body limit for uploads | —        | Centrally managed `frontend/nginx.conf`: [project-standards#589](https://github.com/sirloinbh/project-standards/issues/589), before deploying uploads |
 
-What can be done without user input: #30. Register new requirements as issues or wait for the user steps above.
+What can be done without user input: nothing right now. Register new requirements as issues or wait for the user steps above.
 
-Close the parent issue #5 when #30 is done (#29 decided; #28 and #209 merged).
+The parent issue #5 is closed with #30 (#28, #29, #209 and #30 all done).
 
 ## Execution boundary
 

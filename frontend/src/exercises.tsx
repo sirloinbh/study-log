@@ -12,6 +12,7 @@ import {
   exerciseLimits,
   questionText,
 } from './exercise';
+import { ExerciseExtraction } from './exercise-extraction';
 import { ExerciseTranslation } from './exercise-translation';
 import { ButtonSpinner, Loading } from './loading';
 import { type ContentNode, contentOptions, type Textbook } from './textbook';
@@ -63,6 +64,8 @@ export function Exercises({
   const [answer, setAnswer] = useState<AnswerPanel>();
   // The one exercise whose Korean translation is shown (#31).
   const [translating, setTranslating] = useState<{ contentId: number; id: number }>();
+  // The chapter whose "read from a file" panel is open (#30).
+  const [reading, setReading] = useState<number>();
   const [notice, setNotice] = useState<Notice>(undefined);
   // One request at a time, including the reload after a change, like the contents card.
   const { busy, action, nameNext, begin, end } = useBusy();
@@ -119,6 +122,7 @@ export function Exercises({
   const shown = mine(notice);
   const answerShown = mine(answer);
   const translationShown = mine(translating)?.id;
+  const readingShown = contentId !== undefined && reading === contentId;
   // The reported chapter is gone from the reloaded tree.
   const chapterGone =
     lost !== undefined && tree !== undefined && !options.some((option) => option.id === lost);
@@ -357,6 +361,16 @@ export function Exercises({
         >
           Add problem
         </button>
+        <button
+          type="button"
+          className="secondary"
+          disabled={busy || exercises === undefined}
+          id="exercise-read"
+          aria-expanded={readingShown}
+          onClick={() => setReading(readingShown ? undefined : contentId)}
+        >
+          Read from file
+        </button>
       </div>
       {treeFailed ? (
         <p className="status">Could not load the contents, so a section cannot be chosen</p>
@@ -429,6 +443,25 @@ export function Exercises({
                 </button>
               </div>
             </form>
+          )}
+          {readingShown && exercises && (
+            <ExerciseExtraction
+              key={contentId}
+              url={url}
+              exercises={exercises}
+              disabled={busy}
+              onSaved={(message) => {
+                setReading(undefined);
+                // The panel and its focused Save button are gone; focus goes back to its button.
+                setWantFocus('exercise-read');
+                // Nothing more to change: run reloads the list with the new problems or answers.
+                void run(() => {
+                  say('status', message);
+                  return Promise.resolve();
+                });
+              }}
+              onClose={() => setReading(undefined)}
+            />
           )}
         </>
       )}
