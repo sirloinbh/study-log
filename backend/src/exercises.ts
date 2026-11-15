@@ -2,6 +2,9 @@ import { type Response, Router } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod/v4';
 
+import { removeStored, storedKeys } from './exercise-files.js';
+import type { FileStorage } from './file-storage.js';
+import { inTransaction } from './sql.js';
 import { TranslationError, type Translator } from './translation.js';
 import { missingOrInvalid } from './validation.js';
 
@@ -159,7 +162,7 @@ const translationColumns = `t.body, t.answer, t.model,
 
 // Reading, editing and deleting one exercise, its answer and its translation:
 // /api/exercises/:id(/answer|/translation)
-export function exerciseRoutes(pool: Pool, translator: Translator) {
+export function exerciseRoutes(pool: Pool, translator: Translator, storage: FileStorage) {
   const router = Router();
   // Exercises being translated right now: a second request for one waits for the first instead of
   // paying for the same translation twice.
@@ -197,11 +200,21 @@ export function exerciseRoutes(pool: Pool, translator: Translator) {
     res.json({ exercise: rows[0] });
   });
 
+  // Its stored files go too (#209); if S3 cannot remove them, nothing is deleted.
   router.delete('/:id', async (req, res) => {
     const id = exerciseIdParam.parse(req.params.id);
-    const { rowCount } = await pool.query('DELETE FROM exercises WHERE id = $1', [id]);
-    if (!rowCount) return void res.status(404).json(notFound);
-    res.status(204).end();
+    const reply = await inTransaction<{ status: number; body?: unknown }>(
+      pool,
+      async (client) => {
+        const keys = await storedKeys(client, { exerciseId: id });
+        const { rowCount } = await client.query('DELETE FROM exercises WHERE id = $1', [id]);
+        if (!rowCount) return { status: 404, body: notFound };
+        return (await removeStored(storage, keys)) ?? { status: 204 };
+      },
+      (reply) => reply.status < 400,
+    );
+    if (reply.body === undefined) return void res.status(reply.status).end();
+    res.status(reply.status).json(reply.body);
   });
 
   // The answer of one exercise (#26): `{ answer: null }` until one is saved.

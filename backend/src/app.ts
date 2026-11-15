@@ -94,12 +94,15 @@ export function createApp(
     scheduleRoutes(pool, today, options.holidayFetcher ?? dataPortalHolidays()),
   );
   app.use('/api/textbooks/:textbookId/contents/:contentId/exercises', contentExerciseRoutes(pool));
-  app.use('/api/textbooks/:textbookId/contents', textbookContentRoutes(pool));
+  app.use('/api/textbooks/:textbookId/contents', textbookContentRoutes(pool, fileStorage));
   app.use('/api/textbooks/:textbookId/exercises', textbookExerciseRoutes(pool));
   app.use('/api/exercises/:id/files', exerciseFileRoutes(pool, fileStorage));
   app.use('/api/exercise-files', fileRoutes(pool, fileStorage));
-  app.use('/api/exercises', exerciseRoutes(pool, options.translator ?? claudeTranslator()));
-  app.use('/api/textbooks', textbookRoutes(pool));
+  app.use(
+    '/api/exercises',
+    exerciseRoutes(pool, options.translator ?? claudeTranslator(), fileStorage),
+  );
+  app.use('/api/textbooks', textbookRoutes(pool, fileStorage));
   app.use('/api', (_req, res) => {
     res.status(404).json({ error: 'API not found' });
   });
