@@ -31,6 +31,12 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       # Public holidays for schedules (#33); without it only reading holidays fails.
       HOLIDAY_API_KEY: ${HOLIDAY_API_KEY:-}
+      # Exercise files in S3 (#28); without the bucket and region only file requests fail. Empty
+      # keys fall through to the server's IAM role.
+      FILE_BUCKET: ${FILE_BUCKET:-}
+      AWS_REGION: ${AWS_REGION:-}
+      AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
+      AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
     depends_on:
       db: { condition: service_healthy }
     restart: unless-stopped

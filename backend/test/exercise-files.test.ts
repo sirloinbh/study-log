@@ -1,0 +1,164 @@
+import assert from 'node:assert/strict';
+import { test } from 'node:test';
+
+import type { Pool } from 'pg';
+
+import { detectFormat, displayName, maxFileBytes } from '../src/exercise-files.js';
+import { FileStorageError, s3Storage } from '../src/file-storage.js';
+import { withApi } from './helpers.js';
+
+// Validation must reject an upload before any query reaches the database or S3 (#28).
+const untouchedPool = {
+  query: async () => {
+    throw new Error('DB must not be queried for invalid input');
+  },
+} as unknown as Pool;
+
+const pdf = Buffer.concat([Buffer.from('%PDF-1.7\n'), Buffer.alloc(32, 0x20)]);
+const png = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0x0d]);
+const jpeg = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0x10, 0x4a, 0x46]);
+
+const form = (bytes: Buffer, fields: Record<string, string> = { role: 'problem' }, name = 'a') => {
+  const data = new FormData();
+  for (const [key, value] of Object.entries(fields)) data.append(key, value);
+  data.append('file', new Blob([new Uint8Array(bytes)]), name);
+  return data;
+};
+const app = { 'x-requested-with': 'study-log' };
+
+test('the file type is read from the first bytes, not the name (#28)', () => {
+  assert.equal(detectFormat(pdf)?.type, 'application/pdf');
+  assert.equal(detectFormat(png)?.type, 'image/png');
+  assert.equal(detectFormat(jpeg)?.type, 'image/jpeg');
+  assert.equal(detectFormat(Buffer.from('GIF89a')), undefined);
+  assert.equal(detectFormat(Buffer.from('<html>%PDF-')), undefined);
+  assert.equal(detectFormat(Buffer.from([0xff, 0xd8])), undefined);
+  assert.equal(detectFormat(Buffer.alloc(0)), undefined);
+});
+
+test('file names lose control characters and never end up empty (#28)', () => {
+  assert.equal(displayName('  1장 연습문제.pdf '), '1장 연습문제.pdf');
+  assert.equal(displayName('a\u0000b\r\n.png'), 'ab.png');
+  assert.equal(displayName(' \t '), 'file');
+});
+
+test('uploads that are not allowed are refused before the DB and S3 (#28)', async () => {
+  await withApi(untouchedPool, async (call) => {
+    const post = (init: { form?: FormData; headers?: Record<string, string>; path?: string }) =>
+      call(init.path ?? '/api/exercises/1/files', {
+        method: 'POST',
+        form: init.form,
+        headers: init.headers ?? app,
+      });
+    const cases: [Promise<{ status: number; data: Record<string, unknown> }>, number, RegExp][] = [
+      // Another site's form cannot add the app's header.
+      [post({ form: form(pdf), headers: {} }), 403, /Upload files from the study log app/],
+      [
+        call('/api/exercises/1/files', { method: 'POST', body: { role: 'problem' }, headers: app }),
+        415,
+        /multipart\/form-data/,
+      ],
+      [post({ form: form(pdf), path: '/api/exercises/0/files' }), 400, /Invalid exercise ID/],
+      [post({ form: form(pdf, {}) }), 400, /problem or the answer/],
+      [post({ form: form(pdf, { role: 'hint' }) }), 400, /must be problem or answer/],
+      [post({ form: form(Buffer.alloc(0)) }), 400, /Choose a file/],
+      [post({ form: form(Buffer.from('GIF89a....')) }), 415, /Only PDF, JPEG and PNG/],
+      // A text file named like a PDF is still not a PDF.
+      [post({ form: form(Buffer.from('hello'), undefined, 'a.pdf') }), 415, /Only PDF/],
+      [
+        post({ form: form(Buffer.concat([pdf, Buffer.alloc(maxFileBytes)])) }),
+        413,
+        /at most 20 MB/,
+      ],
+      [post({ form: form(pdf, undefined, 'x'.repeat(256)) }), 400, /at most 255 characters/],
+      [
+        call('/api/exercises/1/files', {
+          method: 'POST',
+          rawBody: '--nope\r\nbroken',
+          contentType: 'multipart/form-data; boundary=other',
+          headers: app,
+        }),
+        400,
+        /Could not read the uploaded file/,
+      ],
+    ];
+    for (const [request, status, message] of cases) {
+      const response = await request;
+      assert.equal(response.status, status, String(response.data.error));
+      assert.match(String(response.data.error), message);
+    }
+
+    const two = form(pdf);
+    two.append('file', new Blob([new Uint8Array(png)]), 'b.png');
+    const otherField = new FormData();
+    otherField.append('role', 'problem');
+    otherField.append('photo', new Blob([new Uint8Array(png)]), 'b.png');
+    for (const sent of [two, otherField]) {
+      const { status, data } = await post({ form: sent });
+      assert.equal(status, 400);
+      assert.match(String(data.error), /Send one file in the file field/);
+    }
+  });
+});
+
+test('S3 storage refuses with a setup message until bucket and region are set (#28)', async () => {
+  const neverSend = {
+    send: async () => {
+      throw new Error('must not reach S3');
+    },
+  };
+  for (const settings of [{}, { bucket: 'b' }, { region: 'ap-northeast-2' }, { bucket: ' ' }]) {
+    const storage = s3Storage(settings, neverSend);
+    await assert.rejects(storage.put('k', pdf, 'application/pdf'), (error: unknown) => {
+      assert.ok(error instanceof FileStorageError);
+      assert.equal(error.status, 503);
+      assert.match(error.message, /FILE_BUCKET and AWS_REGION/);
+      return true;
+    });
+  }
+});
+
+test('S3 storage sends to the configured bucket and explains SDK failures (#28)', async () => {
+  const sent: { name: string; input: Record<string, unknown> }[] = [];
+  let failWith: string | undefined;
+  const client = {
+    send: async (command: { constructor: { name: string }; input: Record<string, unknown> }) => {
+      sent.push({ name: command.constructor.name, input: command.input });
+      if (failWith) throw Object.assign(new Error(failWith), { name: failWith });
+      return { Body: { transformToByteArray: async () => new Uint8Array(png) } };
+    },
+  };
+  const storage = s3Storage(
+    { bucket: 'study-files', region: 'ap-northeast-2' },
+    client as unknown as Parameters<typeof s3Storage>[1],
+  );
+
+  await storage.put('exercises/1/a.pdf', pdf, 'application/pdf');
+  assert.deepEqual(await storage.get('exercises/1/a.png'), png);
+  await storage.remove('exercises/1/a.pdf');
+  assert.deepEqual(
+    sent.map(({ name, input }) => [name, input.Bucket, input.Key, input.ContentType]),
+    [
+      ['PutObjectCommand', 'study-files', 'exercises/1/a.pdf', 'application/pdf'],
+      ['GetObjectCommand', 'study-files', 'exercises/1/a.png', undefined],
+      ['DeleteObjectCommand', 'study-files', 'exercises/1/a.pdf', undefined],
+    ],
+  );
+
+  const cases: [string, number, RegExp][] = [
+    ['NoSuchKey', 404, /stored file is missing/],
+    ['CredentialsProviderError', 503, /credentials/],
+    ['AccessDenied', 503, /refused the server credentials/],
+    ['NoSuchBucket', 503, /FILE_BUCKET/],
+    ['TimeoutError', 502, /File storage error/],
+  ];
+  for (const [name, status, message] of cases) {
+    failWith = name;
+    await assert.rejects(storage.get('k'), (error: unknown) => {
+      assert.ok(error instanceof FileStorageError, name);
+      assert.equal(error.status, status, name);
+      assert.match(error.message, message);
+      return true;
+    });
+  }
+});

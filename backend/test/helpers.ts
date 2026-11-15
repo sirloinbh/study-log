@@ -3,6 +3,7 @@ import type { Server } from 'node:http';
 import { Client, type Pool } from 'pg';
 
 import { createApp } from '../src/app.js';
+import type { FileStorage } from '../src/file-storage.js';
 import type { HolidayFetcher } from '../src/holidays.js';
 import type { Translator } from '../src/translation.js';
 
@@ -64,15 +65,22 @@ export async function withApi(
         method?: string;
         body?: unknown;
         rawBody?: string;
+        form?: FormData;
         contentType?: string;
         headers?: Record<string, string>;
       },
-    ) => Promise<{ status: number; data: Record<string, unknown> }>,
+    ) => Promise<{
+      status: number;
+      data: Record<string, unknown>;
+      headers: Headers;
+      bytes: Buffer;
+    }>,
   ) => Promise<void>,
   options: {
     today?: () => string;
     translator?: Translator;
     holidayFetcher?: HolidayFetcher;
+    fileStorage?: FileStorage;
     requestsPerMinute?: number;
   } = {},
 ) {
@@ -89,7 +97,16 @@ export async function withApi(
       (async () => {
         throw new Error('tests must not call the holiday API');
       });
-    const server = createApp(pool, { ...options, translator, holidayFetcher }).listen(
+    // Nor S3 (#28).
+    const refuse = async (): Promise<never> => {
+      throw new Error('tests must not call S3');
+    };
+    const fileStorage: FileStorage = options.fileStorage ?? {
+      put: refuse,
+      get: refuse,
+      remove: refuse,
+    };
+    const server = createApp(pool, { ...options, translator, holidayFetcher, fileStorage }).listen(
       0,
       '127.0.0.1',
     );
@@ -114,13 +131,23 @@ export async function withApi(
             : { 'content-type': init.contentType ?? 'application/json' }),
           ...init.headers,
         },
-        body: init.rawBody ?? (init.body === undefined ? undefined : JSON.stringify(init.body)),
+        // A form sets its own multipart content type and boundary (#28).
+        body:
+          init.form ??
+          init.rawBody ??
+          (init.body === undefined ? undefined : JSON.stringify(init.body)),
       });
-      // 204 responses have no body.
-      const text = await response.text();
+      // 204 responses have no body; a stored file (#28) is not JSON.
+      const bytes = Buffer.from(await response.arrayBuffer());
+      const json = response.headers.get('content-type')?.includes('application/json');
       return {
         status: response.status,
-        data: (text ? JSON.parse(text) : {}) as Record<string, unknown>,
+        data: (json && bytes.length ? JSON.parse(bytes.toString('utf8')) : {}) as Record<
+          string,
+          unknown
+        >,
+        headers: response.headers,
+        bytes,
       };
     });
   } finally {

@@ -5,7 +5,9 @@ import { types } from 'pg';
 import { ZodError } from 'zod/v4';
 
 import { calendarRoutes } from './calendar.js';
+import { exerciseFileRoutes, fileRoutes } from './exercise-files.js';
 import { contentExerciseRoutes, exerciseRoutes, textbookExerciseRoutes } from './exercises.js';
+import { type FileStorage, s3Storage } from './file-storage.js';
 import { dataPortalHolidays, type HolidayFetcher } from './holidays.js';
 import { keywordRoutes } from './keywords.js';
 import { retrospectiveRoutes } from './retrospectives.js';
@@ -53,9 +55,11 @@ export function createApp(
     today?: () => string;
     translator?: Translator;
     holidayFetcher?: HolidayFetcher;
+    fileStorage?: FileStorage;
     requestsPerMinute?: number;
   } = {},
 ) {
+  const fileStorage = options.fileStorage ?? s3Storage();
   const today = options.today ?? (() => serviceDate());
   const app = express();
   app.disable('x-powered-by');
@@ -92,6 +96,8 @@ export function createApp(
   app.use('/api/textbooks/:textbookId/contents/:contentId/exercises', contentExerciseRoutes(pool));
   app.use('/api/textbooks/:textbookId/contents', textbookContentRoutes(pool));
   app.use('/api/textbooks/:textbookId/exercises', textbookExerciseRoutes(pool));
+  app.use('/api/exercises/:id/files', exerciseFileRoutes(pool, fileStorage));
+  app.use('/api/exercise-files', fileRoutes(pool, fileStorage));
   app.use('/api/exercises', exerciseRoutes(pool, options.translator ?? claudeTranslator()));
   app.use('/api/textbooks', textbookRoutes(pool));
   app.use('/api', (_req, res) => {
