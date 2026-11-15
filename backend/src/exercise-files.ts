@@ -12,39 +12,54 @@ import { type FileStorage, FileStorageError } from './file-storage.js';
 export type FileOwner = { exerciseId: number } | { textbookId: number; contentId?: number };
 
 export async function storedKeys(db: Pick<PoolClient, 'query'>, owner: FileOwner) {
-  const { rows } = await db.query<{ key: string }>(
+  // The exercises are locked first. An upload to one of them needs its row, so it waits, and fails
+  // as a missing exercise once the delete commits, instead of slipping in a file after the keys
+  // were read whose copy nobody would remove.
+  const { rows: exercises } = await db.query<{ id: number }>(
     'exerciseId' in owner
-      ? 'SELECT storage_key AS key FROM exercise_files WHERE exercise_id = $1'
+      ? 'SELECT id FROM exercises WHERE id = $1 FOR UPDATE'
       : owner.contentId === undefined
-        ? `SELECT f.storage_key AS key FROM exercise_files f
-           JOIN exercises e ON e.id = f.exercise_id WHERE e.textbook_id = $1`
+        ? 'SELECT id FROM exercises WHERE textbook_id = $1 FOR UPDATE'
         : `WITH RECURSIVE tree AS (
              SELECT id FROM textbook_contents WHERE textbook_id = $1 AND id = $2
              UNION ALL
              SELECT c.id FROM textbook_contents c JOIN tree t ON c.textbook_id = $1 AND c.parent_id = t.id
            )
-           SELECT f.storage_key AS key FROM exercise_files f
-           JOIN exercises e ON e.id = f.exercise_id
-           WHERE e.textbook_id = $1 AND e.content_id IN (SELECT id FROM tree)`,
+           SELECT e.id FROM exercises e
+           WHERE e.textbook_id = $1 AND e.content_id IN (SELECT id FROM tree) FOR UPDATE OF e`,
     'exerciseId' in owner
       ? [owner.exerciseId]
       : owner.contentId === undefined
         ? [owner.textbookId]
         : [owner.textbookId, owner.contentId],
   );
+  if (exercises.length === 0) return [];
+  const { rows } = await db.query<{ key: string }>(
+    'SELECT storage_key AS key FROM exercise_files WHERE exercise_id = ANY($1::bigint[])',
+    [exercises.map((exercise) => exercise.id)],
+  );
   return rows.map((row) => row.key);
 }
+
+// At most this many S3 calls at once, so a textbook with many files does not fire them all together.
+const removeBatch = 10;
 
 // Removes those stored copies (#209). The caller runs it inside the delete's transaction, after the
 // delete itself succeeded, and rolls back when this returns a failure: the delete is then refused
 // and can be repeated, and no copy is ever left in S3 without its row (the user's choice). Copies
 // removed before a failure stay removed; their rows answer 404 for the content until the retry.
+// The rows stay locked meanwhile, which only makes other changes to them wait.
 export async function removeStored(storage: FileStorage, keys: string[]) {
-  const results = await Promise.allSettled(keys.map((key) => storage.remove(key)));
-  const failed = results.find((result) => result.status === 'rejected');
-  if (!failed) return undefined;
-  if (!(failed.reason instanceof FileStorageError)) throw failed.reason;
-  return { status: failed.reason.status, body: { error: failed.reason.message } };
+  for (let start = 0; start < keys.length; start += removeBatch) {
+    const results = await Promise.allSettled(
+      keys.slice(start, start + removeBatch).map((key) => storage.remove(key)),
+    );
+    const failed = results.find((result) => result.status === 'rejected');
+    if (!failed) continue;
+    if (!(failed.reason instanceof FileStorageError)) throw failed.reason;
+    return { status: failed.reason.status, body: { error: failed.reason.message } };
+  }
+  return undefined;
 }
 
 // Original files of exercises and answers (#28): PDFs and photos, kept in S3 with a row each in

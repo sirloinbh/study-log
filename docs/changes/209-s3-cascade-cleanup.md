@@ -36,8 +36,24 @@ Since #28, deleting one file removes its S3 object, but deleting an exercise, a 
   - `textbooks.test.ts` and `exercises.test.ts`: `emptyPool` gets `connect()` for the transaction.
   - `study-log-textbooks.test.ts`: `foreignKeyPool` answers the file key lookup with no rows.
 - Commands (2026-11-15, Docker `db` container):
-  - `TEST_DATABASE_URL=postgres://study_test@localhost:15402/study_test npm run check`: exit 0, backend 434 passed, 0 skipped.
+  - `TEST_DATABASE_URL=postgres://study_test@localhost:15402/study_test npm run check`: exit 0, backend 434 passed, 0 skipped (435 after the round 1 fix).
 
 ## Limits and follow-up
 
 - Not checked against a real S3 bucket (none configured yet).
+
+## Automated review, round 1
+
+A separate review agent read the whole diff. It found nothing blocking; it confirmed the subtree query, that these three deletes are the only cascade paths to `exercise_files`, the rollback on 404, 409, and storage failures, and that the stub changes do not weaken assertions. Applied in the commit "fix: lock the exercises before reading the keys of a delete (#209)":
+
+- **Race:** an upload that committed its row after the keys were read, but before the delete, was cascaded away with its S3 copy left behind. `storedKeys` now locks the exercises in scope (`FOR UPDATE`) and then reads their file keys. A concurrent upload waits, then fails as a missing exercise (and removes its own copy, as in #28).
+  - New test: `reading the keys for a delete holds back uploads to those exercises (#209)`. While each kind of key read holds the lock, an `exercise_files` insert for that exercise times out on `lock_timeout` (55P03).
+  - Removing `FOR UPDATE` makes this test fail.
+- **Bounded removal:** S3 removals run at most 10 at a time instead of all at once.
+- **Stub:** the `foreignKeyPool` stub in `study-log-textbooks.test.ts` answers every exercise query with no rows, since the lock query comes first.
+
+Not applied:
+
+- Locks are held during the S3 calls; for one user this only makes other changes to those rows wait. This is noted in a code comment.
+- `removeStored` reports only the first failure.
+- No test for a non-storage error during removal (it rethrows, and `inTransaction` rolls back and answers 500, as for any query error).

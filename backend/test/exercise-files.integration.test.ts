@@ -3,6 +3,7 @@ import { test } from 'node:test';
 
 import { Pool } from 'pg';
 
+import { storedKeys } from '../src/exercise-files.js';
 import { type FileStorage, FileStorageError } from '../src/file-storage.js';
 import { withApi } from './helpers.js';
 
@@ -289,5 +290,65 @@ test(
       },
       { fileStorage: storage },
     );
+  },
+);
+
+test(
+  'reading the keys for a delete holds back uploads to those exercises (#209)',
+  { skip: !url },
+  async (t) => {
+    const pool = new Pool({ connectionString: url });
+    const prefix = '[통합테스트 파일 잠금]';
+    const cleanup = () => pool.query('DELETE FROM textbooks WHERE title LIKE $1', [`${prefix}%`]);
+    await cleanup();
+    const deleting = await pool.connect();
+    const uploading = await pool.connect();
+    t.after(async () => {
+      await deleting.query('ROLLBACK').catch(() => undefined);
+      deleting.release();
+      uploading.release();
+      await cleanup();
+      await pool.end();
+    });
+    const book = (
+      await pool.query<{ id: number }>('INSERT INTO textbooks (title) VALUES ($1) RETURNING id', [
+        `${prefix} 선형대수`,
+      ])
+    ).rows[0].id;
+    const content = (
+      await pool.query<{ id: number }>(
+        `INSERT INTO textbook_contents (textbook_id, title, position) VALUES ($1, '1장', 1)
+         RETURNING id`,
+        [book],
+      )
+    ).rows[0].id;
+    const exercise = (
+      await pool.query<{ id: number }>(
+        `INSERT INTO exercises (textbook_id, content_id, body) VALUES ($1, $2, '문제') RETURNING id`,
+        [book, content],
+      )
+    ).rows[0].id;
+
+    for (const owner of [
+      { exerciseId: exercise },
+      { textbookId: book, contentId: content },
+      { textbookId: book },
+    ]) {
+      await deleting.query('BEGIN');
+      assert.deepEqual(await storedKeys(deleting, owner), []);
+      // An upload's row needs the exercise; it must wait for the delete instead of slipping in.
+      await uploading.query("SET lock_timeout = '200ms'");
+      await assert.rejects(
+        uploading.query(
+          `INSERT INTO exercise_files
+             (exercise_id, role, storage_key, original_name, content_type, size_bytes)
+           VALUES ($1, 'problem', $2, 'a.pdf', 'application/pdf', 1)`,
+          [exercise, `exercises/${exercise}/lock-test.pdf`],
+        ),
+        (error: { code?: string }) => error.code === '55P03',
+        JSON.stringify(owner),
+      );
+      await deleting.query('ROLLBACK');
+    }
   },
 );
