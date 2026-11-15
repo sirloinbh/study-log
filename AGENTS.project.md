@@ -15,3 +15,4 @@
 
 - 학습 일정: [docs/decisions/schedule-rules.md](docs/decisions/schedule-rules.md)
 - 복습 주기: [docs/decisions/review-rules.md](docs/decisions/review-rules.md)
+- Text extraction from files: [docs/decisions/extraction-rules.md](docs/decisions/extraction-rules.md)
