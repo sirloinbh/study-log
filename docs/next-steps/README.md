@@ -8,7 +8,7 @@ The agent proceeds in this order.
 
 1. Ask whether the items under "What the user does by hand" below are done.
 2. The API key (#129) is in AWS SSM (`/sirloinbh/shared/data-go-kr-service-key`) since 2026-11-15. `node tools/app-secrets.mjs pull study-log` in project-standards writes it into the local `.env`, and the server deploy reads it from SSM. The real responses and a Seollal 2027 schedule were checked on 2026-11-15 ([#33 comments](https://github.com/sirloinbh/study-log/issues/33)); no code change was needed.
-3. For #28 (P2), the user must decide the storage location and the package installs. #29 and #30 (P3) are tied to #28. The app DB and the test DB are ready (#177, #178, 2026-11-15).
+3. #28 (P2) is built in its PR (S3 storage, upload API, decisions in the [#28 comments](https://github.com/sirloinbh/study-log/issues/28)). Next is #29 (P3): the user decides the OCR method. #30 (P3) follows #29. Real S3 uploads need `FILE_BUCKET`, `AWS_REGION` and credentials in `.env`.
 4. Ask the user about "What the user decides" below.
 5. If all of the above are blocked, do the items under "Issues that can be done without the API key and the app DB" in "Next issue candidates", in the order listed.
 
@@ -52,13 +52,15 @@ As of 2026-11-15 (#177, #178), both DBs run in the Docker Compose `db` container
 
 The rules follow the [study schedule](../decisions/schedule-rules.md) and [review interval](../decisions/review-rules.md) documents.
 
-| Issue | Content                        | Priority | Note                                                  |
-| ----- | ------------------------------ | -------- | ----------------------------------------------------- |
-| #28   | PDF and image file upload base | P2       | Need to confirm storage location and package installs |
+| Issue | Content                               | Priority | Note                                                                                                                                                  |
+| ----- | ------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| #29   | Decide the OCR extraction method      | P3       | Needs the user's choice of method                                                                                                                     |
+| #209  | Remove S3 objects on cascaded deletes | P3       | Follow-up of #28                                                                                                                                      |
+| —     | nginx 1 MB body limit for uploads     | —        | Centrally managed `frontend/nginx.conf`: [project-standards#589](https://github.com/sirloinbh/project-standards/issues/589), before deploying uploads |
 
-What can be done without the API key and the app DB: nothing right now. Register new requirements as issues or wait for the user steps above.
+What can be done without user input: #209. Register new requirements as issues or wait for the user steps above.
 
-Close the parent issue #5 when #28, #29, and #30 are done.
+Close the parent issue #5 when #28, #29, #30, and #209 are done.
 
 ## Execution boundary
 
