@@ -274,6 +274,47 @@
 .exercise-form .check input {
   width: auto;
 }
+/* Reading problems or answers from a file (#30). */
+.exercise-extraction {
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius);
+}
+.exercise-extraction fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: calc(var(--radius) - 2px);
+}
+.exercise-extraction legend {
+  padding: 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.exercise-extraction .extraction-kind {
+  display: grid;
+  gap: 8px;
+}
+.exercise-extraction .check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+.exercise-extraction .check input {
+  width: auto;
+}
+.extraction-review {
+  display: grid;
+  gap: 10px;
+}
+.extraction-review .log-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
 .exercise-body {
   margin: 0;
   white-space: pre-wrap;

@@ -23,6 +23,26 @@ export async function requestJson<T>(
   } catch {
     throw new RequestError('Cannot reach the server');
   }
+  return reply<T>(response);
+}
+
+// Sends a file with its form fields as multipart and resolves like requestJson (#30). The header
+// marks the app's own request; the API refuses file requests without it.
+export async function requestForm<T>(path: string, form: FormData): Promise<T> {
+  let response: Response;
+  try {
+    response = await fetch(path, {
+      method: 'POST',
+      headers: { 'x-requested-with': 'study-log' },
+      body: form,
+    });
+  } catch {
+    throw new RequestError('Cannot reach the server');
+  }
+  return reply<T>(response);
+}
+
+async function reply<T>(response: Response): Promise<T> {
   if (response.status === 204) return undefined as T;
   const data = (await response.json().catch(() => ({}))) as { error?: string };
   if (!response.ok)

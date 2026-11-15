@@ -2,7 +2,8 @@ import { type Response, Router } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod/v4';
 
-import { removeStored, storedKeys } from './exercise-files.js';
+import { detectFormat, receive, removeStored, storedKeys } from './exercise-files.js';
+import { ExtractionError, extractionLimit, type Extractor } from './extraction.js';
 import type { FileStorage } from './file-storage.js';
 import { inTransaction } from './sql.js';
 import { TranslationError, type Translator } from './translation.js';
@@ -47,6 +48,56 @@ const answerInput = z.object(
   { error: 'Send the answer as a JSON object' },
 );
 
+// Problems read from a file (#30), reviewed and saved into one chapter at once, each with its
+// answer when the file showed one.
+const bulkInput = z.object(
+  {
+    // .max() first, as in textbook-contents.ts.
+    exercises: z
+      .array(
+        exerciseInput.extend({
+          answer: answerInput.shape.body.nullable().default(null),
+        }),
+        { error: 'Send the list of problems to save' },
+      )
+      .max(extractionLimit, `At most ${extractionLimit} problems can be saved at once`)
+      .refine((value) => value.length >= 1, 'There are no problems to save'),
+  },
+  { error: 'Send the problems as a JSON object' },
+);
+
+// Answers read from an answers-only file (#30), each matched to an exercise of the chapter.
+const answersInput = z.object(
+  {
+    answers: z
+      .array(
+        z.object(
+          {
+            exerciseId: z
+              .number({ error: 'Invalid exercise ID' })
+              .int('Invalid exercise ID')
+              .min(1, 'Invalid exercise ID')
+              .max(999_999_999_999_999, 'Invalid exercise ID'),
+            body: answerInput.shape.body,
+          },
+          { error: 'Send each answer as a JSON object' },
+        ),
+        { error: 'Send the list of answers to save' },
+      )
+      .max(extractionLimit, `At most ${extractionLimit} answers can be saved at once`)
+      .refine((value) => value.length >= 1, 'There are no answers to save')
+      .refine(
+        (answers) => new Set(answers.map((a) => a.exerciseId)).size === answers.length,
+        'Two answers are matched to the same problem',
+      ),
+  },
+  { error: 'Send the answers as a JSON object' },
+);
+
+const extractionKind = z.enum(['problems', 'answers'], {
+  error: 'Choose whether the file holds problems or answers',
+});
+
 const importantInput = z.object(
   {
     important: z.boolean(
@@ -77,8 +128,20 @@ const notFound = { error: 'Exercise not found' };
 const answerNotFound = { error: 'Answer not found' };
 
 // Listing and adding the exercises of one chapter: /api/textbooks/:textbookId/contents/:contentId/exercises
-export function contentExerciseRoutes(pool: Pool) {
+// Also reading problems or answers out of a file and saving them at once (#30).
+export function contentExerciseRoutes(pool: Pool, extractor: Extractor) {
   const router = Router({ mergeParams: true });
+  // Chapters being read right now: a second request waits for the first instead of paying twice.
+  const extracting = new Set<number>();
+  const chapterExists = async (textbookId: number, contentId: number) =>
+    Boolean(
+      (
+        await pool.query('SELECT 1 FROM textbook_contents WHERE id = $1 AND textbook_id = $2', [
+          contentId,
+          textbookId,
+        ])
+      ).rowCount,
+    );
   const target = (params: Record<string, string>) => ({
     textbookId: textbookIdParam.parse(params.textbookId),
     contentId: contentIdParam.parse(params.contentId),
@@ -113,6 +176,114 @@ export function contentExerciseRoutes(pool: Pool) {
       if ((error as { code?: string }).code !== '23503') throw error;
       res.status(404).json(contentNotFound);
     }
+  });
+
+  // Reads the problems, or the answers, in one PDF or photo with Claude (#30) and returns them for
+  // review. Nothing is saved, and the file is not kept.
+  router.post('/extract', async (req, res) => {
+    // As for uploads (#28): another site's form cannot add this header, and reading costs money.
+    if (req.get('x-requested-with') !== 'study-log')
+      return void res.status(403).json({ error: 'Read files from the study log app' });
+    if (!req.is('multipart/form-data'))
+      return void res.status(415).json({ error: 'Send the file as multipart/form-data' });
+    const { textbookId, contentId } = target(req.params);
+    // Before reading the body, as for uploads.
+    if (!(await chapterExists(textbookId, contentId)))
+      return void res.status(404).json(contentNotFound);
+    if (extracting.has(contentId))
+      return void res.status(409).json({ error: 'A file is already being read for this section' });
+    extracting.add(contentId);
+    try {
+      if (!(await receive(req, res))) return;
+      const kind = extractionKind.parse((req.body as Record<string, unknown> | undefined)?.kind);
+      const file = req.file;
+      if (!file || file.size === 0) return void res.status(400).json({ error: 'Choose a file' });
+      const format = detectFormat(file.buffer);
+      if (!format)
+        return void res.status(415).json({ error: 'Only PDF, JPEG and PNG files can be read' });
+      try {
+        res.json(await extractor({ bytes: file.buffer, type: format.type, kind }));
+      } catch (error) {
+        if (!(error instanceof ExtractionError)) throw error;
+        res.status(error.status).json({ error: error.message });
+      }
+    } finally {
+      extracting.delete(contentId);
+    }
+  });
+
+  // Saves reviewed problems into the chapter, with their answers, all or nothing (#30).
+  router.post('/bulk', async (req, res) => {
+    const { textbookId, contentId } = target(req.params);
+    const { exercises } = bulkInput.parse(req.body);
+    const reply = await inTransaction<{ status: number; body: unknown }>(
+      pool,
+      async (client) => {
+        // Held until the end, so the chapter cannot be deleted halfway through.
+        const content = await client.query(
+          'SELECT 1 FROM textbook_contents WHERE id = $1 AND textbook_id = $2 FOR SHARE',
+          [contentId, textbookId],
+        );
+        if (!content.rowCount) return { status: 404, body: contentNotFound };
+        for (const exercise of exercises) {
+          const { rows } = await client.query<{ id: number }>(
+            `INSERT INTO exercises (textbook_id, content_id, number, body, important)
+             VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+            [textbookId, contentId, exercise.number, exercise.body, exercise.important],
+          );
+          if (exercise.answer !== null)
+            await client.query('INSERT INTO exercise_answers (exercise_id, body) VALUES ($1, $2)', [
+              rows[0].id,
+              exercise.answer,
+            ]);
+        }
+        const { rows } = await client.query(
+          `SELECT ${columns} FROM exercises WHERE textbook_id = $1 AND content_id = $2 ORDER BY id`,
+          [textbookId, contentId],
+        );
+        return { status: 201, body: { exercises: rows } };
+      },
+      (reply) => reply.status < 400,
+    );
+    res.status(reply.status).json(reply.body);
+  });
+
+  // Saves answers read from an answers-only file into the chapter's exercises they were matched
+  // to, replacing answers already there, all or nothing (#30).
+  router.put('/answers', async (req, res) => {
+    const { textbookId, contentId } = target(req.params);
+    const { answers } = answersInput.parse(req.body);
+    const ids = answers.map((answer) => answer.exerciseId);
+    const reply = await inTransaction<{ status: number; body: unknown }>(
+      pool,
+      async (client) => {
+        const content = await client.query(
+          'SELECT 1 FROM textbook_contents WHERE id = $1 AND textbook_id = $2',
+          [contentId, textbookId],
+        );
+        if (!content.rowCount) return { status: 404, body: contentNotFound };
+        // Locked, so none of them is deleted or moved before the answers are in.
+        const { rows } = await client.query(
+          `SELECT id FROM exercises
+           WHERE id = ANY($1::bigint[]) AND textbook_id = $2 AND content_id = $3 FOR UPDATE`,
+          [ids, textbookId, contentId],
+        );
+        if (rows.length !== ids.length)
+          return {
+            status: 400,
+            body: { error: 'Some problems are no longer in this section. Reload and match again' },
+          };
+        await client.query(
+          `INSERT INTO exercise_answers (exercise_id, body)
+           SELECT * FROM unnest($1::bigint[], $2::text[])
+           ON CONFLICT (exercise_id) DO UPDATE SET body = EXCLUDED.body, updated_at = now()`,
+          [ids, answers.map((answer) => answer.body)],
+        );
+        return { status: 200, body: { saved: answers.length } };
+      },
+      (reply) => reply.status < 400,
+    );
+    res.status(reply.status).json(reply.body);
   });
 
   return router;

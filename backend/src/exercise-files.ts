@@ -129,8 +129,8 @@ const upload = multer({
 }).single('file');
 
 // Runs multer and turns what it refuses into a client error; a body that is not valid multipart is
-// one too, not a server fault.
-async function receive(req: Request, res: Response) {
+// one too, not a server fault. Extraction (#30) reads its file the same way.
+export async function receive(req: Request, res: Response) {
   try {
     await new Promise<void>((resolve, reject) =>
       upload(req, res, (error: unknown) => (error ? reject(error) : resolve())),

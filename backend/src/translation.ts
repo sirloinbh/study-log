@@ -42,32 +42,40 @@ const reply = z.object({
   answer: z.string(),
 });
 
-// Turns API failures into what the person can act on. Most specific first. Credentials missing
-// altogether fail before any request with a plain Error (not an SDK error class), so that one is
-// told apart by its message.
-function explain(error: unknown): never {
-  if (error instanceof TranslationError) throw error;
+// Turns API failures into what the person can act on: a status and a message naming the service
+// (`what`: "translation" or "extraction", #30). Most specific first. Credentials missing altogether
+// fail before any request with a plain Error (not an SDK error class), so that one is told apart by
+// its message. Anything else is not an API failure and is returned as undefined.
+export function apiFailure(error: unknown, what: string) {
+  const What = what[0].toUpperCase() + what.slice(1);
   if (
     error instanceof Anthropic.AuthenticationError ||
     error instanceof Anthropic.PermissionDeniedError
   )
-    throw new TranslationError(
-      503,
-      'Translation API authentication failed. Check ANTHROPIC_API_KEY on the server',
-    );
+    return {
+      status: 503,
+      message: `${What} API authentication failed. Check ANTHROPIC_API_KEY on the server`,
+    };
   if (error instanceof Anthropic.RateLimitError)
-    throw new TranslationError(429, 'Too many translation requests. Try again in a moment');
+    return { status: 429, message: `Too many ${what} requests. Try again in a moment` };
   if (error instanceof Anthropic.APIConnectionError)
-    throw new TranslationError(502, 'Could not connect to the translation service');
+    return { status: 502, message: `Could not connect to the ${what} service` };
   if (error instanceof Anthropic.APIError)
-    throw new TranslationError(502, `Translation service error (${error.status ?? 'no response'})`);
+    return { status: 502, message: `${What} service error (${error.status ?? 'no response'})` };
   if (error instanceof Error && error.message.startsWith('Could not resolve authentication method'))
-    throw new TranslationError(
-      503,
-      'The translation API key (ANTHROPIC_API_KEY) is not set on the server',
-    );
+    return {
+      status: 503,
+      message: `The ${what} API key (ANTHROPIC_API_KEY) is not set on the server`,
+    };
   if (error instanceof Anthropic.AnthropicError)
-    throw new TranslationError(502, 'Translation service error');
+    return { status: 502, message: `${What} service error` };
+  return undefined;
+}
+
+function explain(error: unknown): never {
+  if (error instanceof TranslationError) throw error;
+  const failure = apiFailure(error, 'translation');
+  if (failure) throw new TranslationError(failure.status, failure.message);
   throw error;
 }
 

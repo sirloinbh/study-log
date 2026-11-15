@@ -7,6 +7,7 @@ import { ZodError } from 'zod/v4';
 import { calendarRoutes } from './calendar.js';
 import { exerciseFileRoutes, fileRoutes } from './exercise-files.js';
 import { contentExerciseRoutes, exerciseRoutes, textbookExerciseRoutes } from './exercises.js';
+import { claudeExtractor, type Extractor } from './extraction.js';
 import { type FileStorage, s3Storage } from './file-storage.js';
 import { dataPortalHolidays, type HolidayFetcher } from './holidays.js';
 import { keywordRoutes } from './keywords.js';
@@ -54,6 +55,7 @@ export function createApp(
   options: {
     today?: () => string;
     translator?: Translator;
+    extractor?: Extractor;
     holidayFetcher?: HolidayFetcher;
     fileStorage?: FileStorage;
     requestsPerMinute?: number;
@@ -77,6 +79,11 @@ export function createApp(
       skip: (req) => (req.method === 'GET' || req.method === 'HEAD') && req.path === '/health',
     }),
   );
+  // A whole chapter of reviewed problems (#30) can be larger than other requests.
+  app.use(
+    '/api/textbooks/:textbookId/contents/:contentId/exercises/bulk',
+    express.json({ limit: '2mb' }),
+  );
   app.use(express.json({ limit: '256kb' }));
   app.get('/api/health', async (_req, res) => {
     await pool.query('SELECT 1');
@@ -93,7 +100,10 @@ export function createApp(
     '/api/schedules',
     scheduleRoutes(pool, today, options.holidayFetcher ?? dataPortalHolidays()),
   );
-  app.use('/api/textbooks/:textbookId/contents/:contentId/exercises', contentExerciseRoutes(pool));
+  app.use(
+    '/api/textbooks/:textbookId/contents/:contentId/exercises',
+    contentExerciseRoutes(pool, options.extractor ?? claudeExtractor()),
+  );
   app.use('/api/textbooks/:textbookId/contents', textbookContentRoutes(pool, fileStorage));
   app.use('/api/textbooks/:textbookId/exercises', textbookExerciseRoutes(pool));
   app.use('/api/exercises/:id/files', exerciseFileRoutes(pool, fileStorage));

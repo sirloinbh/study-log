@@ -42,6 +42,20 @@ export function contentPath(nodes: ContentNode[], id: number): ContentNode[] | u
 export const exerciseLabel = (exercise: { number: string }, index: number) =>
   exercise.number.trim() ? `Problem ${exercise.number.trim()}` : `Problem #${index + 1}`;
 
+// Problem numbers match ignoring spaces, case and a trailing dot: "1.2." and " 1.2" do, and so do
+// "12A" and "12a" (#30).
+const sameNumber = (a: string, b: string) => {
+  const plain = (value: string) =>
+    value.trim().replace(/\.$/, '').replace(/\s+/g, '').toLowerCase();
+  return plain(a) !== '' && plain(a) === plain(b);
+};
+
+// The one exercise of the chapter with this number, or none when no exercise or several have it.
+export function matchExercise(number: string, exercises: Exercise[]) {
+  const found = exercises.filter((exercise) => sameNumber(exercise.number, number));
+  return found.length === 1 ? found[0] : undefined;
+}
+
 // The text copied for asking an AI: where the problem comes from, the problem as typed, and the
 // request. Blank lines around the body are dropped; its line breaks and indentation are kept.
 export function questionText(
