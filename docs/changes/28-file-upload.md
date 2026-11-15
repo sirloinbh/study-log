@@ -55,7 +55,7 @@ Keep the original files (PDFs, photos) of exercises and answers, so #29 and #30 
 
 ## Limits and follow-up
 
-- The production nginx (`frontend/nginx.conf`, a centrally managed file) keeps the default 1 MB request body limit, so uploads over 1 MB through it would get 413. Local development through Vite is not affected. This needs a change in `sirloinbh/project-standards` before files are uploaded through the deployed web server.
+- The production nginx (`frontend/nginx.conf`, a centrally managed file) keeps the default 1 MB request body limit, so uploads over 1 MB through it would get 413. Local development through Vite is not affected. Tracked in [sirloinbh/project-standards#589](https://github.com/sirloinbh/project-standards/issues/589).
 - Deleting an exercise, chapter or textbook removes the file rows but leaves their S3 objects. Tracked in [#209](https://github.com/sirloinbh/study-log/issues/209).
 - No screen yet; #30 adds the upload and review screen.
 
@@ -75,3 +75,13 @@ Not applied:
 - No test for the race where the exercise is deleted between the check and the insert (the `23503` path): it needs two requests timed against each other.
 
 The file API has no authentication, like the rest of the API (AGENTS.md: one user, no login, design private access before any public exposure). The `X-Requested-With` check only stops other sites' forms. Anyone who can reach the server can read, add, or delete files, so the API must stay unexposed until private access exists.
+
+## Automated review, round 2
+
+A separate review agent checked the round 1 fixes and the whole diff. All four fixes are correct and tested; no blocking issues. No code change in this round:
+
+- The production nginx 1 MB body limit: `frontend/nginx.conf` is centrally managed, so it is raised in [sirloinbh/project-standards#589](https://github.com/sirloinbh/project-standards/issues/589).
+- S3 objects left after cascaded deletes: already [#209](https://github.com/sirloinbh/study-log/issues/209).
+- Nits not applied: other invisible characters (U+061C, U+200B to U+200D, U+2028, U+2029) are lower risk; `$` left as is in `filename*` is valid RFC 5987.
+
+The review limit is two rounds, so there is no third review.
