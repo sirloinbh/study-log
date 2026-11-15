@@ -16,6 +16,8 @@ const foreignKeyPool = (constraint: string) => {
   const query = async (sql: string) => {
     if (/^(BEGIN|ROLLBACK|COMMIT)/.test(sql)) return { rows: [], rowCount: 0 };
     if (sql.startsWith('SELECT 1 FROM textbooks')) return { rows: [{}], rowCount: 1 };
+    // The stored files a delete takes with it (#209): none here.
+    if (sql.includes('exercise_files')) return { rows: [], rowCount: 0 };
     throw Object.assign(new Error('violates foreign key constraint'), {
       code: '23503',
       constraint,

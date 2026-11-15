@@ -52,15 +52,14 @@ As of 2026-11-15 (#177, #178), both DBs run in the Docker Compose `db` container
 
 The rules follow the [study schedule](../decisions/schedule-rules.md) and [review interval](../decisions/review-rules.md) documents.
 
-| Issue | Content                               | Priority | Note                                                                                                                                                  |
-| ----- | ------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| #29   | Decide the OCR extraction method      | P3       | Needs the user's choice of method                                                                                                                     |
-| #209  | Remove S3 objects on cascaded deletes | P3       | Follow-up of #28                                                                                                                                      |
-| —     | nginx 1 MB body limit for uploads     | —        | Centrally managed `frontend/nginx.conf`: [project-standards#589](https://github.com/sirloinbh/project-standards/issues/589), before deploying uploads |
+| Issue | Content                           | Priority | Note                                                                                                                                                  |
+| ----- | --------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| #29   | Decide the OCR extraction method  | P3       | Needs the user's choice of method                                                                                                                     |
+| —     | nginx 1 MB body limit for uploads | —        | Centrally managed `frontend/nginx.conf`: [project-standards#589](https://github.com/sirloinbh/project-standards/issues/589), before deploying uploads |
 
-What can be done without user input: #209. Register new requirements as issues or wait for the user steps above.
+What can be done without user input: nothing right now (#209 is done in its PR). Register new requirements as issues or wait for the user steps above.
 
-Close the parent issue #5 when #28, #29, #30, and #209 are done.
+Close the parent issue #5 when #29 and #30 are done (#28 merged; #209 in its PR).
 
 ## Execution boundary
 

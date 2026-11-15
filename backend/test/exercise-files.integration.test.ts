@@ -179,3 +179,115 @@ test(
     );
   },
 );
+
+test(
+  'deleting an exercise, chapter or textbook removes its stored files, or nothing (#209)',
+  { skip: !url },
+  async (t) => {
+    const pool = new Pool({ connectionString: url });
+    const prefix = '[통합테스트 파일 정리]';
+    const cleanup = async () => {
+      await pool.query(
+        `DELETE FROM study_logs WHERE textbook_id IN (SELECT id FROM textbooks WHERE title LIKE $1)`,
+        [`${prefix}%`],
+      );
+      await pool.query('DELETE FROM textbooks WHERE title LIKE $1', [`${prefix}%`]);
+    };
+    await cleanup();
+    t.after(async () => {
+      await cleanup();
+      await pool.end();
+    });
+    const { storage, objects, failing } = memoryStorage();
+
+    await withApi(
+      pool,
+      async (call) => {
+        const post = async (path: string, body: unknown, field: string) =>
+          ((await call(path, { method: 'POST', body })).data[field] as { id: number }).id;
+        const book = await post('/api/textbooks', { title: `${prefix} 선형대수` }, 'textbook');
+        const contents = `/api/textbooks/${book}/contents`;
+        const chapter = await post(contents, { title: '1장' }, 'content');
+        const section = await post(contents, { title: '1.1', parentId: chapter }, 'content');
+        const other = await post(contents, { title: '2장' }, 'content');
+        // One exercise with one file in each place; returns the exercise id and its S3 key.
+        const exerciseWithFile = async (contentId: number) => {
+          const id = await post(
+            `${contents}/${contentId}/exercises`,
+            { body: `문제 ${contentId}` },
+            'exercise',
+          );
+          const before = new Set(objects.keys());
+          const { status } = await call(`/api/exercises/${id}/files`, {
+            method: 'POST',
+            form: form(pdf, 'problem', 'a.pdf'),
+            headers: app,
+          });
+          assert.equal(status, 201);
+          const key = [...objects.keys()].find((k) => !before.has(k));
+          assert.ok(key);
+          return { id, key };
+        };
+        const inChapter = await exerciseWithFile(chapter);
+        const inSection = await exerciseWithFile(section);
+        const inOther = await exerciseWithFile(other);
+        const lone = await exerciseWithFile(other);
+        const rows = async () =>
+          Number(
+            (
+              await pool.query(
+                `SELECT count(*) AS n FROM exercise_files f JOIN exercises e ON e.id = f.exercise_id
+                 WHERE e.textbook_id = $1`,
+                [book],
+              )
+            ).rows[0].n,
+          );
+
+        // S3 refuses: every kind of delete is refused with its error and nothing changes.
+        failing.remove = true;
+        for (const path of [
+          `/api/exercises/${lone.id}`,
+          `${contents}/${section}`,
+          `${contents}/${chapter}`,
+          `/api/textbooks/${book}`,
+        ]) {
+          const refused = await call(path, { method: 'DELETE' });
+          assert.deepEqual([refused.status, refused.data.error], [502, 'File storage error'], path);
+        }
+        failing.remove = false;
+        assert.equal(objects.size, 4);
+        assert.equal(await rows(), 4);
+        assert.equal((await call(`/api/exercises/${lone.id}`)).status, 200);
+        assert.equal((await call(`${contents}`)).status, 200);
+
+        // One exercise: only its file goes.
+        assert.equal((await call(`/api/exercises/${lone.id}`, { method: 'DELETE' })).status, 204);
+        assert.equal(objects.has(lone.key), false);
+        assert.equal(objects.size, 3);
+
+        // A chapter takes its sections' files with it, and no other chapter's.
+        assert.equal((await call(`${contents}/${chapter}`, { method: 'DELETE' })).status, 204);
+        assert.deepEqual([...objects.keys()], [inOther.key]);
+        assert.equal(objects.has(inSection.key) || objects.has(inChapter.key), false);
+
+        // A textbook a study log points to cannot be deleted: its files stay.
+        const log = await call('/api/study-logs', {
+          method: 'POST',
+          body: { studyDate: '2026-11-15', startTime: '09:00', endTime: '10:00', textbookId: book },
+        });
+        assert.equal(log.status, 201);
+        const blocked = await call(`/api/textbooks/${book}`, { method: 'DELETE' });
+        assert.equal(blocked.status, 409);
+        assert.deepEqual([...objects.keys()], [inOther.key]);
+        assert.equal(await rows(), 1);
+
+        // Without the log, the textbook and its last file go.
+        await pool.query('DELETE FROM study_logs WHERE textbook_id = $1', [book]);
+        assert.equal((await call(`/api/textbooks/${book}`, { method: 'DELETE' })).status, 204);
+        assert.equal(objects.size, 0);
+        assert.equal(await rows(), 0);
+      },
+      { fileStorage: storage },
+    );
+  },
+);

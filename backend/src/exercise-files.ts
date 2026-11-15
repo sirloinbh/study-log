@@ -2,10 +2,50 @@ import { randomUUID } from 'node:crypto';
 
 import { type Request, type Response, Router } from 'express';
 import multer from 'multer';
-import type { Pool } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod/v4';
 
 import { type FileStorage, FileStorageError } from './file-storage.js';
+
+// The files a delete of an exercise, a chapter (with its sections) or a textbook takes with it
+// (#209). Read before the delete, which cascades the rows away.
+export type FileOwner = { exerciseId: number } | { textbookId: number; contentId?: number };
+
+export async function storedKeys(db: Pick<PoolClient, 'query'>, owner: FileOwner) {
+  const { rows } = await db.query<{ key: string }>(
+    'exerciseId' in owner
+      ? 'SELECT storage_key AS key FROM exercise_files WHERE exercise_id = $1'
+      : owner.contentId === undefined
+        ? `SELECT f.storage_key AS key FROM exercise_files f
+           JOIN exercises e ON e.id = f.exercise_id WHERE e.textbook_id = $1`
+        : `WITH RECURSIVE tree AS (
+             SELECT id FROM textbook_contents WHERE textbook_id = $1 AND id = $2
+             UNION ALL
+             SELECT c.id FROM textbook_contents c JOIN tree t ON c.textbook_id = $1 AND c.parent_id = t.id
+           )
+           SELECT f.storage_key AS key FROM exercise_files f
+           JOIN exercises e ON e.id = f.exercise_id
+           WHERE e.textbook_id = $1 AND e.content_id IN (SELECT id FROM tree)`,
+    'exerciseId' in owner
+      ? [owner.exerciseId]
+      : owner.contentId === undefined
+        ? [owner.textbookId]
+        : [owner.textbookId, owner.contentId],
+  );
+  return rows.map((row) => row.key);
+}
+
+// Removes those stored copies (#209). The caller runs it inside the delete's transaction, after the
+// delete itself succeeded, and rolls back when this returns a failure: the delete is then refused
+// and can be repeated, and no copy is ever left in S3 without its row (the user's choice). Copies
+// removed before a failure stay removed; their rows answer 404 for the content until the retry.
+export async function removeStored(storage: FileStorage, keys: string[]) {
+  const results = await Promise.allSettled(keys.map((key) => storage.remove(key)));
+  const failed = results.find((result) => result.status === 'rejected');
+  if (!failed) return undefined;
+  if (!(failed.reason instanceof FileStorageError)) throw failed.reason;
+  return { status: failed.reason.status, body: { error: failed.reason.message } };
+}
 
 // Original files of exercises and answers (#28): PDFs and photos, kept in S3 with a row each in
 // exercise_files. Same bound as the table.

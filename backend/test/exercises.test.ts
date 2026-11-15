@@ -11,7 +11,12 @@ const untouchedPool = {
     throw new Error('DB must not be queried for invalid input');
   },
 } as unknown as Pool;
-const emptyPool = { query: async () => ({ rows: [], rowCount: 0 }) } as unknown as Pool;
+// Deletes run in a transaction (#209), so the stub hands out itself as the client.
+const emptyQuery = async () => ({ rows: [], rowCount: 0 });
+const emptyPool = {
+  query: emptyQuery,
+  connect: async () => ({ query: emptyQuery, release: () => {} }),
+} as unknown as Pool;
 
 const list = '/api/textbooks/1/contents/2/exercises';
 

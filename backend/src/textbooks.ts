@@ -2,6 +2,9 @@ import { Router } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod/v4';
 
+import { removeStored, storedKeys } from './exercise-files.js';
+import type { FileStorage } from './file-storage.js';
+import { inTransaction } from './sql.js';
 import { missingOrInvalid } from './validation.js';
 
 const text = (label: string, max: number) =>
@@ -34,7 +37,7 @@ const columns = 'id, title, author, edition';
 
 const notFound = { error: 'Textbook not found' };
 
-export function textbookRoutes(pool: Pool) {
+export function textbookRoutes(pool: Pool, storage: FileStorage) {
   const router = Router();
 
   router.get('/', async (_req, res) => {
@@ -71,20 +74,31 @@ export function textbookRoutes(pool: Pool) {
   });
 
   // Contents and exercises cascade; study logs and schedules that point to the textbook or one of
-  // its chapters block the deletion (foreign keys with RESTRICT).
+  // its chapters block the deletion (foreign keys with RESTRICT). The stored files of its exercises
+  // go too (#209); if S3 cannot remove them, nothing is deleted.
   router.delete('/:id', async (req, res) => {
     const id = idParam.parse(req.params.id);
-    let rowCount: number | null;
-    try {
-      ({ rowCount } = await pool.query('DELETE FROM textbooks WHERE id = $1', [id]));
-    } catch (error) {
-      if ((error as { code?: string }).code !== '23503') throw error;
-      return void res
-        .status(409)
-        .json({ error: 'A textbook with a study log or schedule attached cannot be deleted' });
-    }
-    if (!rowCount) return void res.status(404).json(notFound);
-    res.status(204).end();
+    const reply = await inTransaction<{ status: number; body?: unknown }>(
+      pool,
+      async (client) => {
+        const keys = await storedKeys(client, { textbookId: id });
+        let rowCount: number | null;
+        try {
+          ({ rowCount } = await client.query('DELETE FROM textbooks WHERE id = $1', [id]));
+        } catch (error) {
+          if ((error as { code?: string }).code !== '23503') throw error;
+          return {
+            status: 409,
+            body: { error: 'A textbook with a study log or schedule attached cannot be deleted' },
+          };
+        }
+        if (!rowCount) return { status: 404, body: notFound };
+        return (await removeStored(storage, keys)) ?? { status: 204 };
+      },
+      (reply) => reply.status < 400,
+    );
+    if (reply.body === undefined) return void res.status(reply.status).end();
+    res.status(reply.status).json(reply.body);
   });
 
   return router;
