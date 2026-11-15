@@ -7,7 +7,7 @@ Last updated: **2026-11-15 (Asia/Seoul)**.
 The agent proceeds in this order.
 
 1. Ask whether the items under "What the user does by hand" below are done.
-2. When the API key (#129) is ready, first check the real responses for #33 and try creating a schedule with real holidays (see "What the agent does after confirmation" below). Without a key, schedule creation on the real server is rejected with 503 and the screen shows the reason.
+2. The API key (#129) is in AWS SSM (`/sirloinbh/shared/data-go-kr-service-key`) since 2026-11-15. `node tools/app-secrets.mjs pull study-log` in project-standards writes it into the local `.env`, and the server deploy reads it from SSM. First check the real responses for #33 and try creating a schedule with real holidays (see "What the agent does after confirmation" below). Without a key, schedule creation on the real server is rejected with 503 and the screen shows the reason.
 3. For #28 (P2), the user must decide the storage location and the package installs. #29 and #30 (P3) are tied to #28. The app DB and the test DB are ready (#177, #178, 2026-11-15).
 4. Ask the user about "What the user decides" below.
 5. If all of the above are blocked, do the items under "Issues that can be done without the API key and the app DB" in "Next issue candidates", in the order listed.
@@ -16,10 +16,9 @@ The agent proceeds in this order.
 
 These are steps the agent could not finish because they need administrator approval, a reboot, or an account login. When a new session starts, the agent asks the user whether the items below are done, before any other work.
 
-| Order | Task                                                                                         | Status                                                                                                                            | What the user does                                                                                                                                                                               |
-| ----- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1     | Connect the Claude in Chrome extension account                                               | Not done. The extension (Chrome "Profile 1") and the native host work, but the list of connected browsers in Claude Code is empty | In the "Profile 1" window, check that the Claude extension is logged in to claude.ai with the same account as Claude Code, then reconnect with `/chrome` in Claude Code                          |
-| 2     | [Get a Public Data Portal API key (#129)](https://github.com/sirloinbh/study-log/issues/129) | The user decided to do it later by hand. It is needed for creating schedules and for checking the real responses for #33          | Apply for the Korea Astronomy and Space Science Institute special day information API and put the key in `HOLIDAY_API_KEY` in the local `.env`. When you deploy, put it in the server `.env` too |
+| Order | Task                                           | Status                                                                                                                            | What the user does                                                                                                                                                      |
+| ----- | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1     | Connect the Claude in Chrome extension account | Not done. The extension (Chrome "Profile 1") and the native host work, but the list of connected browsers in Claude Code is empty | In the "Profile 1" window, check that the Claude extension is logged in to claude.ai with the same account as Claude Code, then reconnect with `/chrome` in Claude Code |
 
 ### What the user decides
 
@@ -38,7 +37,7 @@ What the user decided on 2026-11-04:
 - After item 1 is done:
   - Check that listing tabs (`tabs_context_mcp`) works with the Claude in Chrome tools
   - Record that screen change verification can now be done with the extension. Until then, it was verified with headless Chrome (the DevTools protocol)
-- After item 2 is done:
+- After the API key (#129) is in `.env`:
   - Look up one year with the real key and check that the response matches how `backend/src/holidays.ts` interprets it. Check that substitute holidays and temporary holidays come back with `isHoliday: Y`, and look at the `items` shape of an empty month and the key error response. Check whether fixed holidays that fall on a weekend also appear in the response. `_type=json` is not in the official documentation, so this is when it is first confirmed.
   - Create a schedule with real holidays and check in the browser the amount for a period that has the Lunar New Year or Chuseok. So far it was checked only with holidays put into the test DB.
   - Use the app DB: start Docker Desktop, then `docker compose up -d db` and `npm run dev` (both read `.env`).
