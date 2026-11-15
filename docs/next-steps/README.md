@@ -1,6 +1,6 @@
 # Next steps
 
-Last updated: **2026-11-15 (Asia/Seoul)**.
+Last updated: **2026-11-16 (Asia/Seoul)**.
 
 ## What to do next
 
@@ -8,7 +8,7 @@ The agent proceeds in this order.
 
 1. Ask whether the items under "What the user does by hand" below are done.
 2. The API key (#129) is in AWS SSM (`/sirloinbh/shared/data-go-kr-service-key`) since 2026-11-15. `node tools/app-secrets.mjs pull study-log` in project-standards writes it into the local `.env`, and the server deploy reads it from SSM. The real responses and a Seollal 2027 schedule were checked on 2026-11-15 ([#33 comments](https://github.com/sirloinbh/study-log/issues/33)); no code change was needed.
-3. #28 (P2) is built in its PR (S3 storage, upload API, decisions in the [#28 comments](https://github.com/sirloinbh/study-log/issues/28)). Next is #29 (P3): the user decides the OCR method. #30 (P3) follows #29. Real S3 uploads need `FILE_BUCKET`, `AWS_REGION` and credentials in `.env`.
+3. #28 (S3 storage and upload API, decisions in the [#28 comments](https://github.com/sirloinbh/study-log/issues/28)) and #209 (stored files removed with their exercise, chapter, or textbook) were merged on 2026-11-15. Next is #29 (P3): the user decides the OCR method. #30 (P3) follows #29. Real S3 uploads need `FILE_BUCKET`, `AWS_REGION` and credentials in `.env`.
 4. Ask the user about "What the user decides" below.
 5. If all of the above are blocked, do the items under "Issues that can be done without the API key and the app DB" in "Next issue candidates", in the order listed.
 
@@ -43,8 +43,8 @@ What the user decided on 2026-11-04:
 
 As of 2026-11-15 (#177, #178), both DBs run in the Docker Compose `db` container (PostgreSQL 17, host port 15402). Docker Desktop must be running; if DB integration tests are skipped or cannot connect, start it and run `docker compose up -d db`.
 
-- App DB `study` (user `study`): the password is in the local `.env` (`POSTGRES_PASSWORD` and `DATABASE_URL`). Migrations 001 to 019 are applied (`npm run db:migrate -w backend`).
-- Test DB `study_test` (owner `study_test`) in the same container. Migrations 001 to 019 are applied. The user environment variable is `TEST_DATABASE_URL=postgres://study_test@localhost:15402/study_test`, and the password is only in `%APPDATA%\postgresql\pgpass.conf`. With it, `npm test` ran 426 backend tests with 0 skipped.
+- App DB `study` (user `study`): the password is in the local `.env` (`POSTGRES_PASSWORD` and `DATABASE_URL`). Migrations 001 to 019 are applied; apply 020 (`exercise_files`, #28) with `npm run db:migrate -w backend` before using uploads in the app.
+- Test DB `study_test` (owner `study_test`) in the same container. Migrations 001 to 020 are applied. The user environment variable is `TEST_DATABASE_URL=postgres://study_test@localhost:15402/study_test`, and the password is only in `%APPDATA%\postgresql\pgpass.conf`. With it, `npm test` ran 435 backend tests with 0 skipped (2026-11-16).
 - To apply a new migration to the test DB (repository root, Git Bash): `DATABASE_URL="$TEST_DATABASE_URL" npm run db:migrate -w backend`. Before you apply it, the integration tests that use its tables fail.
 - The native Windows service `postgresql-17` (port 5432) from earlier work is stopped and no longer used.
 
@@ -57,9 +57,9 @@ The rules follow the [study schedule](../decisions/schedule-rules.md) and [revie
 | #29   | Decide the OCR extraction method  | P3       | Needs the user's choice of method                                                                                                                     |
 | —     | nginx 1 MB body limit for uploads | —        | Centrally managed `frontend/nginx.conf`: [project-standards#589](https://github.com/sirloinbh/project-standards/issues/589), before deploying uploads |
 
-What can be done without user input: nothing right now (#209 is done in its PR). Register new requirements as issues or wait for the user steps above.
+What can be done without user input: nothing right now. Register new requirements as issues or wait for the user steps above.
 
-Close the parent issue #5 when #29 and #30 are done (#28 merged; #209 in its PR).
+Close the parent issue #5 when #29 and #30 are done (#28 and #209 merged).
 
 ## Execution boundary
 
