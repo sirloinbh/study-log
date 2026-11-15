@@ -1,5 +1,5 @@
 {
-  "centralSha": "33d737bf7d53689d3c16730036236f6cd4188aed",
+  "centralSha": "162da42858972a7a9e321c6b7d1c3b690f112105",
   "profile": "app",
   "project": "study-log",
   "files": {
@@ -165,7 +165,7 @@
     },
     ".standards/check.mjs": {
       "mode": "full",
-      "sha256": "91ac23ba0d4e95ad4fb673d9c5b533947f048d96da2092d16f69572b49d4aa08",
+      "sha256": "94ad732bfdb58d7abb249b3c70d4675f7e71d34192a47e670990569fb39e7f35",
       "source": "scripts/standards-check.mjs"
     },
     ".standards/ioc-scan.mjs": {
@@ -373,7 +373,7 @@
     },
     "frontend/nginx.conf": {
       "mode": "full",
-      "sha256": "a2546dc330ee11fddde36fecf4472b06ae84cb60db7f07c81c8c91c48cbceb55",
+      "sha256": "701f3fcf9b1c619bf36d7bc823bf2e782c4addfb410d8d675c468a620e3c2d1c",
       "source": "templates/app/frontend/nginx.conf.tmpl"
     },
     "frontend/package.json": {
@@ -804,6 +804,7 @@
     "db": {
       "name": "study",
       "testName": "study_test"
-    }
+    },
+    "host": "study-log.daysofme.com"
   }
 }
