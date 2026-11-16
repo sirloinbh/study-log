@@ -17,3 +17,7 @@ The first real Claude extraction (#30) ran on 2026-11-17, but the docs still sai
 
 - `npm run check` (2026-11-17, `TEST_DATABASE_URL` set to the Docker test DB): exit 0. Backend 444 passed, 0 skipped; frontend 234 passed, 2 skipped; other suites 4 passed.
 - The recorded results are copied from the output the user pasted into the session; no values were rerun.
+
+## Review
+
+- Round 1 (self-review of the diff): two LaTeX examples in `docs/changes/30-file-extraction.md` were broken by shell escaping (`\times` became a tab, `\det` lost its backslash). Fixed to match the extractor output.
