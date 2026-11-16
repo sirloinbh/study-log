@@ -44,7 +44,7 @@ What the user decided on 2026-11-04:
 As of 2026-11-15 (#177, #178), both DBs run in the Docker Compose `db` container (PostgreSQL 17, host port 15402). Docker Desktop must be running; if DB integration tests are skipped or cannot connect, start it and run `docker compose up -d db`.
 
 - App DB `study` (user `study`): the password is in the local `.env` (`POSTGRES_PASSWORD` and `DATABASE_URL`). Migrations 001 to 019 are applied; apply 020 (`exercise_files`, #28) with `npm run db:migrate -w backend` before using uploads in the app.
-- Test DB `study_test` (owner `study_test`) in the same container. Migrations 001 to 020 are applied. The user environment variable is `TEST_DATABASE_URL=postgres://study_test@localhost:15402/study_test`, and the password is only in `%APPDATA%\postgresql\pgpass.conf`. With it, `npm test` ran 435 backend tests with 0 skipped (2026-11-16).
+- Test DB `study_test` (owner `study_test`) in the same container. Migrations 001 to 020 are applied. The user environment variable is `TEST_DATABASE_URL=postgres://study_test@localhost:15402/study_test`, and the password is only in `%APPDATA%\postgresql\pgpass.conf`. With it, `npm test` ran 441 backend tests with 0 skipped (2026-11-16).
 - To apply a new migration to the test DB (repository root, Git Bash): `DATABASE_URL="$TEST_DATABASE_URL" npm run db:migrate -w backend`. Before you apply it, the integration tests that use its tables fail.
 - The native Windows service `postgresql-17` (port 5432) from earlier work is stopped and no longer used.
 
