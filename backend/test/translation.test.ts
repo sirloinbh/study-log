@@ -1,9 +1,13 @@
 import assert from 'node:assert/strict';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { test } from 'node:test';
 
 import Anthropic from '@anthropic-ai/sdk';
 import type { Pool } from 'pg';
 
+import { claudeExtractor, ExtractionError } from '../src/extraction.js';
 import { claudeTranslator, TranslationError, translationModel } from '../src/translation.js';
 import { withApi } from './helpers.js';
 
@@ -256,5 +260,56 @@ test('translating takes only JSON, and one request per exercise at a time', asyn
         return { body: '증명하라.', answer: null, model: 'claude-sonnet-5-5' };
       },
     },
+  );
+});
+
+// The real SDK client with no credentials, so a change in what the SDK throws is caught (#224).
+// A config folder with a CLI sign-in profile but no saved credentials stands in for the user's (as on
+// a PC signed in with the Anthropic CLI), and the address refuses connections.
+test('a missing key is reported as not set, with the real SDK client', async (t) => {
+  const names = [
+    'ANTHROPIC_API_KEY',
+    'ANTHROPIC_AUTH_TOKEN',
+    'ANTHROPIC_PROFILE',
+    'ANTHROPIC_IDENTITY_TOKEN',
+    'ANTHROPIC_IDENTITY_TOKEN_FILE',
+    'ANTHROPIC_FEDERATION_RULE_ID',
+    'ANTHROPIC_CONFIG_DIR',
+  ];
+  const saved = Object.fromEntries(names.map((name) => [name, process.env[name]]));
+  const empty = await mkdtemp(join(tmpdir(), 'anthropic-config-'));
+  await mkdir(join(empty, 'configs'));
+  await writeFile(
+    join(empty, 'configs', 'default.json'),
+    JSON.stringify({ authentication: { type: 'user_oauth' } }),
+  );
+  for (const name of names) delete process.env[name];
+  process.env.ANTHROPIC_CONFIG_DIR = empty;
+  t.after(async () => {
+    for (const name of names) {
+      if (saved[name] === undefined) delete process.env[name];
+      else process.env[name] = saved[name];
+    }
+    await rm(empty, { recursive: true, force: true });
+  });
+  const client = () => new Anthropic({ baseURL: 'http://127.0.0.1:9', maxRetries: 0 });
+
+  await assert.rejects(
+    claudeTranslator(client())({ body: 'Prove it.', answer: null }),
+    (thrown: unknown) =>
+      thrown instanceof TranslationError &&
+      thrown.status === 503 &&
+      thrown.message === 'The translation API key (ANTHROPIC_API_KEY) is not set on the server',
+  );
+  await assert.rejects(
+    claudeExtractor(client())({
+      bytes: Buffer.from('%PDF-1.7'),
+      type: 'application/pdf',
+      kind: 'problems',
+    }),
+    (thrown: unknown) =>
+      thrown instanceof ExtractionError &&
+      thrown.status === 503 &&
+      thrown.message === 'The extraction API key (ANTHROPIC_API_KEY) is not set on the server',
   );
 });
