@@ -1,5 +1,6 @@
 import type { Server } from 'node:http';
 
+import type express from 'express';
 import { Client, type Pool } from 'pg';
 
 import { createApp } from '../src/app.js';
@@ -84,6 +85,7 @@ export async function withApi(
     holidayFetcher?: HolidayFetcher;
     fileStorage?: FileStorage;
     requestsPerMinute?: number;
+    auth?: express.RequestHandler;
   } = {},
 ) {
   const { server, port } = await openFetchablePort(async () => {
