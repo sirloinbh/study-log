@@ -1,6 +1,6 @@
 # Next steps
 
-Last updated: **2026-11-16 (Asia/Seoul)**.
+Last updated: **2026-11-17 (Asia/Seoul)**.
 
 ## What to do next
 
@@ -8,7 +8,7 @@ The agent proceeds in this order.
 
 1. Ask whether the items under "What the user does by hand" below are done.
 2. The API key (#129) is in AWS SSM (`/sirloinbh/shared/data-go-kr-service-key`) since 2026-11-15. `node tools/app-secrets.mjs pull study-log` in project-standards writes it into the local `.env`, and the server deploy reads it from SSM. The real responses and a Seollal 2027 schedule were checked on 2026-11-15 ([#33 comments](https://github.com/sirloinbh/study-log/issues/33)); no code change was needed.
-3. #28 (S3 storage and upload API, decisions in the [#28 comments](https://github.com/sirloinbh/study-log/issues/28)) and #209 (stored files removed with their exercise, chapter, or textbook) were merged on 2026-11-15. #29 settled the extraction method on 2026-11-16: Claude reads the files ([extraction rules](../decisions/extraction-rules.md)). #30 built it (reading problems and answers from a PDF or photo on a chapter's exercises screen); it needs `ANTHROPIC_API_KEY` in `.env` for a real call, and its first real use is the check of extraction quality. With it, the parent issue #5 is closed. Real S3 uploads need `FILE_BUCKET`, `AWS_REGION` and credentials in `.env`.
+3. #28 (S3 storage and upload API, decisions in the [#28 comments](https://github.com/sirloinbh/study-log/issues/28)) and #209 (stored files removed with their exercise, chapter, or textbook) were merged on 2026-11-15. #29 settled the extraction method on 2026-11-16: Claude reads the files ([extraction rules](../decisions/extraction-rules.md)). #30 built it (reading problems and answers from a PDF or photo on a chapter's exercises screen); `npm run dev` gets the shared Claude key from `project-standards/.env` (its source is AWS SSM), and its first real use is the check of extraction quality. With it, the parent issue #5 is closed. Real S3 uploads need `FILE_BUCKET`, `AWS_REGION` and credentials in `.env`.
 4. Ask the user about "What the user decides" below.
 5. If all of the above are blocked, do the items under "Issues that can be done without the API key and the app DB" in "Next issue candidates", in the order listed.
 
@@ -44,7 +44,7 @@ What the user decided on 2026-11-04:
 As of 2026-11-15 (#177, #178), both DBs run in the Docker Compose `db` container (PostgreSQL 17, host port 15402). Docker Desktop must be running; if DB integration tests are skipped or cannot connect, start it and run `docker compose up -d db`.
 
 - App DB `study` (user `study`): the password is in the local `.env` (`POSTGRES_PASSWORD` and `DATABASE_URL`). Migrations 001 to 019 are applied; apply 020 (`exercise_files`, #28) with `npm run db:migrate -w backend` before using uploads in the app.
-- Test DB `study_test` (owner `study_test`) in the same container. Migrations 001 to 020 are applied. The user environment variable is `TEST_DATABASE_URL=postgres://study_test@localhost:15402/study_test`, and the password is only in `%APPDATA%\postgresql\pgpass.conf`. With it, `npm test` ran 441 backend tests with 0 skipped (2026-11-16).
+- Test DB `study_test` (owner `study_test`) in the same container. Migrations 001 to 020 are applied. The user environment variable is `TEST_DATABASE_URL=postgres://study_test@localhost:15402/study_test`, and the password is only in `%APPDATA%\postgresql\pgpass.conf`. With it, `npm test` ran 444 backend tests with 0 skipped (2026-11-16).
 - To apply a new migration to the test DB (repository root, Git Bash): `DATABASE_URL="$TEST_DATABASE_URL" npm run db:migrate -w backend`. Before you apply it, the integration tests that use its tables fail.
 - The native Windows service `postgresql-17` (port 5432) from earlier work is stopped and no longer used.
 
