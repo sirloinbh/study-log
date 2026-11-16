@@ -1,3 +1,4 @@
+import { meHandler } from '@sirloinbh/auth-client';
 import express from 'express';
 import { rateLimit } from 'express-rate-limit';
 import type { Pool } from 'pg';
@@ -59,6 +60,7 @@ export function createApp(
     holidayFetcher?: HolidayFetcher;
     fileStorage?: FileStorage;
     requestsPerMinute?: number;
+    auth?: express.RequestHandler;
   } = {},
 ) {
   const fileStorage = options.fileStorage ?? s3Storage();
@@ -88,6 +90,9 @@ export function createApp(
     express.json({ limit: '2mb' }),
   );
   app.use(express.json({ limit: '256kb' }));
+  // #221: the shared sign-in guards every /api route except /api/health, before any route registers.
+  if (options.auth) app.use('/api', options.auth);
+  app.get('/api/me', meHandler);
   app.get('/api/health', async (_req, res) => {
     await pool.query('SELECT 1');
     res.json({ ok: true, service: 'study-log', today: today() });

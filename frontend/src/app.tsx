@@ -20,6 +20,7 @@ import { Retrospectives } from './retrospectives';
 import { ReviewBadge } from './review-badge';
 import { Reviews } from './reviews';
 import { Schedules } from './schedules';
+import { AccountActions, SignInGate } from './sign-in';
 import { Stats } from './stats';
 import { StudyLogs } from './study-logs';
 import { Textbooks } from './textbooks';
@@ -105,113 +106,124 @@ export function App() {
   const reviewsChanged = () => setReviewVersion((version) => version + 1);
   return (
     <BrowserRouter>
-      <AppShell
-        appName="Study Log"
-        nav={nav}
-        actions={<ReviewBadge to={pages.reviews} version={reviewVersion} />}
-      >
-        <Routes>
-          <Route
-            path={pages.logs}
-            element={
-              <Page
-                title="Study log"
-                description="Record the time and topics you studied today and review recent logs"
-                health={health}
-              >
-                {(today) => <StudyLogs today={today} onChange={reviewsChanged} />}
-              </Page>
-            }
-          />
-          <Route
-            path={pages.schedules}
-            element={
-              <Page
-                title="Schedules"
-                description="Set a period and a daily amount to make a study goal for each day"
-                health={health}
-              >
-                {(today) => <Schedules today={today} />}
-              </Page>
-            }
-          />
-          <Route
-            path={pages.reviews}
-            element={
-              <Page
-                title="Reviews"
-                description="Check what to review by period, then mark it done or change its date"
-                health={health}
-              >
-                {() => <Reviews onChange={reviewsChanged} />}
-              </Page>
-            }
-          />
-          <Route
-            path={pages.textbooks}
-            element={
-              <Page
-                title="Textbooks"
-                description="Register textbooks and manage the title, author, and edition"
-                health={health}
-              >
-                {() => <Textbooks />}
-              </Page>
-            }
-          />
-          <Route
-            path={pages.keywords}
-            element={
-              <Page
-                title="Keywords"
-                description="Save important keywords you meet while studying by date and find them again"
-                health={health}
-              >
-                {(today) => <Keywords today={today} />}
-              </Page>
-            }
-          />
-          <Route
-            path={pages.stats}
-            element={
-              <Page
-                title="Stats"
-                description="See study time by period and the daily average at a glance"
-                health={health}
-              >
-                {() => <Stats />}
-              </Page>
-            }
-          />
-          <Route
-            path={pages.retrospectives}
-            element={
-              <Page
-                title="Retrospectives"
-                description="Look back on a week or a month of study and write a retrospective"
-                health={health}
-              >
-                {(today) => <Retrospectives today={today} />}
-              </Page>
-            }
-          />
-          <Route
-            path={pages.settings}
-            element={
-              <Page title="Settings" description="App settings and data management" health={health}>
-                {() => (
-                  <EmptyState
-                    title="No settings yet"
-                    description="Settings are added in the related issue cards."
-                  />
-                )}
-              </Page>
-            }
-          />
-          <Route path="*" element={<Navigate to={pages.logs} replace />} />
-        </Routes>
-      </AppShell>
-      <Toaster />
+      <SignInGate>
+        <AppShell
+          appName="Study Log"
+          nav={nav}
+          actions={
+            <>
+              <ReviewBadge to={pages.reviews} version={reviewVersion} />
+              <AccountActions />
+            </>
+          }
+        >
+          <Routes>
+            <Route
+              path={pages.logs}
+              element={
+                <Page
+                  title="Study log"
+                  description="Record the time and topics you studied today and review recent logs"
+                  health={health}
+                >
+                  {(today) => <StudyLogs today={today} onChange={reviewsChanged} />}
+                </Page>
+              }
+            />
+            <Route
+              path={pages.schedules}
+              element={
+                <Page
+                  title="Schedules"
+                  description="Set a period and a daily amount to make a study goal for each day"
+                  health={health}
+                >
+                  {(today) => <Schedules today={today} />}
+                </Page>
+              }
+            />
+            <Route
+              path={pages.reviews}
+              element={
+                <Page
+                  title="Reviews"
+                  description="Check what to review by period, then mark it done or change its date"
+                  health={health}
+                >
+                  {() => <Reviews onChange={reviewsChanged} />}
+                </Page>
+              }
+            />
+            <Route
+              path={pages.textbooks}
+              element={
+                <Page
+                  title="Textbooks"
+                  description="Register textbooks and manage the title, author, and edition"
+                  health={health}
+                >
+                  {() => <Textbooks />}
+                </Page>
+              }
+            />
+            <Route
+              path={pages.keywords}
+              element={
+                <Page
+                  title="Keywords"
+                  description="Save important keywords you meet while studying by date and find them again"
+                  health={health}
+                >
+                  {(today) => <Keywords today={today} />}
+                </Page>
+              }
+            />
+            <Route
+              path={pages.stats}
+              element={
+                <Page
+                  title="Stats"
+                  description="See study time by period and the daily average at a glance"
+                  health={health}
+                >
+                  {() => <Stats />}
+                </Page>
+              }
+            />
+            <Route
+              path={pages.retrospectives}
+              element={
+                <Page
+                  title="Retrospectives"
+                  description="Look back on a week or a month of study and write a retrospective"
+                  health={health}
+                >
+                  {(today) => <Retrospectives today={today} />}
+                </Page>
+              }
+            />
+            <Route
+              path={pages.settings}
+              element={
+                <Page
+                  title="Settings"
+                  description="App settings and data management"
+                  health={health}
+                >
+                  {() => (
+                    <EmptyState
+                      title="No settings yet"
+                      description="Settings are added in the related issue cards."
+                    />
+                  )}
+                </Page>
+              }
+            />
+            <Route path="*" element={<Navigate to={pages.logs} replace />} />
+          </Routes>
+        </AppShell>
+        <Toaster />
+      </SignInGate>
     </BrowserRouter>
   );
 }
