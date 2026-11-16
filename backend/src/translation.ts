@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { WorkloadIdentityError } from '@anthropic-ai/sdk/lib/credentials/types';
 import { z } from 'zod/v4';
 
 // Translating an exercise and its answer into Korean with Claude (#31). The route takes a
@@ -62,7 +63,12 @@ export function apiFailure(error: unknown, what: string) {
     return { status: 502, message: `Could not connect to the ${what} service` };
   if (error instanceof Anthropic.APIError)
     return { status: 502, message: `${What} service error (${error.status ?? 'no response'})` };
-  if (error instanceof Error && error.message.startsWith('Could not resolve authentication method'))
+  // Without a key the SDK throws a plain error, or WorkloadIdentityError when it falls back to an
+  // Anthropic CLI sign-in profile whose credentials file is missing (#224).
+  if (
+    error instanceof WorkloadIdentityError ||
+    (error instanceof Error && error.message.startsWith('Could not resolve authentication method'))
+  )
     return {
       status: 503,
       message: `The ${what} API key (ANTHROPIC_API_KEY) is not set on the server`,
