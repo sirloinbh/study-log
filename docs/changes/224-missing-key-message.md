@@ -23,3 +23,7 @@ Found on 2026-11-16 while preparing a real extraction test: running the extracto
 - New test run against the old `translation.ts` (git stash): failed. With the fix: passed.
 - `npm run check` (2026-11-16, `TEST_DATABASE_URL` set to the Docker test DB): exit 0. Backend 444 passed, 0 skipped; frontend 232 passed, 2 skipped; other suites 4 passed.
 - Before the check, `npm ci --ignore-scripts` installed `@sirloinbh/auth-client` 1.0.0 from the lockfile; main had added it in #221 (PR #212).
+
+## Review
+
+- Round 1 (separate read-only review): no blocking findings. A suggestion to word the message as "not set or no usable credentials" was not applied, since the app uses only `ANTHROPIC_API_KEY`. The profile and missing credentials file on this PC were confirmed with `Test-Path`.
