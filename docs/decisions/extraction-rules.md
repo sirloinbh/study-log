@@ -40,3 +40,12 @@ Detailed rules:
 - Nothing is saved directly. The user reviews the list, edits it, and unticks what to leave out, then saves the problems (with their answers) into the chapter in one transaction.
 - User decision (2026-11-16): answers from an answers-only file go to the chapter's exercise with the same number. Numbers match ignoring spaces, case and a trailing dot, and only when exactly one exercise has that number; otherwise the answer starts as "Don't save". The user can move or drop each one; two answers cannot go to one exercise. Saving replaces an answer already there, all in one transaction, and answers 400 if any of those exercises left the chapter in the meantime.
 - A refusal, a cut-off output, or an unreadable result stores nothing and answers with an error, using the same status mapping as translation.
+
+## 4. Usage log
+
+Each Claude call, from extraction and from translation, writes one JSON line (#245, ADR-0019 in `sirloinbh/project-standards`: no LLM gateway, each caller records its own calls). The code is `backend/src/claude-usage.ts`.
+
+- A call that returned logs to stdout: `time`, `level: "info"`, `event: "claude_call"`, `requestId`, `feature` (`translation` or `extraction`), `model`, `input_tokens`, `output_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens` (each `null` when `usage` lacks it), `stop_reason`, `ms`. It is logged as soon as the call returns, so a refusal or a cut-off reply also has its line.
+- A call that threw logs to stderr: `level: "error"`, `event: "claude_call_failed"`, `feature`, `model`, `error_type` (the error class name), `status` (HTTP status, or `null`), `ms`. The error message is left out because an API error can echo part of the request.
+- Prompt text, file content and answers are never logged.
+- `requestId` is filled when the caller passes `requestId` in the translation or extraction source. The routes do not pass it yet, so for now the field is absent; matching the line to its request log line by time and feature works meanwhile.

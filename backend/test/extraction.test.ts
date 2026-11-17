@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { test } from 'node:test';
+import { mock, test } from 'node:test';
 
 import Anthropic from '@anthropic-ai/sdk';
 
@@ -161,4 +161,83 @@ test('other failures are not dressed up as extraction errors', async () => {
     claudeExtractor(client)({ bytes: pdf, type: 'application/pdf', kind: 'problems' }),
     TypeError,
   );
+});
+
+// The usage log (#245): one JSON line per call, with the model and token counts but no text.
+async function captureLogs(run: () => Promise<unknown>) {
+  const logs: string[] = [];
+  const errors: string[] = [];
+  const log = mock.method(console, 'log', (line: string) => logs.push(line));
+  const error = mock.method(console, 'error', (line: string) => errors.push(line));
+  try {
+    await run().catch(() => undefined);
+  } finally {
+    log.mock.restore();
+    error.mock.restore();
+  }
+  return { logs, errors };
+}
+
+test('a successful call logs its model and token use, never the text (#245)', async () => {
+  const { client } = fakeClient(() => ({
+    ...items({ number: '1', body: 'SECRET-PROBLEM-TEXT', answer: '' }),
+    usage: {
+      input_tokens: 1200,
+      output_tokens: 80,
+      cache_read_input_tokens: 5,
+      cache_creation_input_tokens: null,
+    },
+  }));
+  const { logs, errors } = await captureLogs(() =>
+    claudeExtractor(client)({
+      bytes: pdf,
+      type: 'application/pdf',
+      kind: 'problems',
+      requestId: 'req-1',
+    }),
+  );
+  assert.equal(errors.length, 0);
+  assert.equal(logs.length, 1);
+  const line = JSON.parse(logs[0]) as Record<string, unknown>;
+  assert.match(String(line.time), /^\d{4}-\d\d-\d\dT/);
+  assert.equal(typeof line.ms, 'number');
+  assert.deepEqual(
+    { ...line, time: undefined, ms: undefined },
+    {
+      time: undefined,
+      level: 'info',
+      event: 'claude_call',
+      requestId: 'req-1',
+      feature: 'extraction',
+      model: 'claude-sonnet-5-5',
+      input_tokens: 1200,
+      output_tokens: 80,
+      cache_read_input_tokens: 5,
+      cache_creation_input_tokens: null,
+      stop_reason: 'end_turn',
+      ms: undefined,
+    },
+  );
+  assert.ok(!logs[0].includes('SECRET-PROBLEM-TEXT'));
+  assert.ok(!logs[0].includes(pdf.toString('base64')));
+});
+
+test('a failed call logs its error type and status, not its message (#245)', async () => {
+  const { client } = fakeClient(() => {
+    throw new Anthropic.BadRequestError(400, {}, 'SECRET-ECHOED-PROMPT', new Headers());
+  });
+  const { logs, errors } = await captureLogs(() =>
+    claudeExtractor(client)({ bytes: pdf, type: 'application/pdf', kind: 'problems' }),
+  );
+  assert.equal(logs.length, 0);
+  assert.equal(errors.length, 1);
+  const line = JSON.parse(errors[0]) as Record<string, unknown>;
+  assert.equal(line.level, 'error');
+  assert.equal(line.event, 'claude_call_failed');
+  assert.equal(line.feature, 'extraction');
+  assert.equal(line.model, 'claude-sonnet-5-5');
+  assert.equal(line.error_type, 'BadRequestError');
+  assert.equal(line.status, 400);
+  assert.equal(typeof line.ms, 'number');
+  assert.ok(!errors[0].includes('SECRET-ECHOED-PROMPT'));
 });

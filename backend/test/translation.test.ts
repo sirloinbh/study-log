@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { test } from 'node:test';
+import { mock, test } from 'node:test';
 
 import Anthropic from '@anthropic-ai/sdk';
 import type { Pool } from 'pg';
@@ -312,4 +312,72 @@ test('a missing key is reported as not set, with the real SDK client', async (t)
       thrown.status === 503 &&
       thrown.message === 'The extraction API key (ANTHROPIC_API_KEY) is not set on the server',
   );
+});
+
+// The usage log (#245): one JSON line per call, with the model and token counts but no text.
+async function captureLogs(run: () => Promise<unknown>) {
+  const logs: string[] = [];
+  const errors: string[] = [];
+  const log = mock.method(console, 'log', (line: string) => logs.push(line));
+  const error = mock.method(console, 'error', (line: string) => errors.push(line));
+  try {
+    await run().catch(() => undefined);
+  } finally {
+    log.mock.restore();
+    error.mock.restore();
+  }
+  return { logs, errors };
+}
+
+test('a successful call logs its model and token use, never the text (#245)', async () => {
+  const { client } = fakeClient(() => ({
+    ...message(JSON.stringify({ body: 'SECRET-TRANSLATION', answer: '' })),
+    usage: { input_tokens: 300, output_tokens: 40, cache_read_input_tokens: 0 },
+  }));
+  const { logs, errors } = await captureLogs(() =>
+    claudeTranslator(client)({ body: 'SECRET-PROBLEM', answer: null, requestId: 'req-2' }),
+  );
+  assert.equal(errors.length, 0);
+  assert.equal(logs.length, 1);
+  const line = JSON.parse(logs[0]) as Record<string, unknown>;
+  assert.match(String(line.time), /^\d{4}-\d\d-\d\dT/);
+  assert.equal(typeof line.ms, 'number');
+  assert.deepEqual(
+    { ...line, time: undefined, ms: undefined },
+    {
+      time: undefined,
+      level: 'info',
+      event: 'claude_call',
+      requestId: 'req-2',
+      feature: 'translation',
+      model: 'claude-sonnet-5-5',
+      input_tokens: 300,
+      output_tokens: 40,
+      cache_read_input_tokens: 0,
+      cache_creation_input_tokens: null,
+      stop_reason: 'end_turn',
+      ms: undefined,
+    },
+  );
+  assert.ok(!logs[0].includes('SECRET'));
+});
+
+test('a failed call logs its error type and status, not its message (#245)', async () => {
+  const { client } = fakeClient(() => {
+    throw new Anthropic.RateLimitError(429, {}, 'SECRET-ECHOED-PROMPT', new Headers());
+  });
+  const { logs, errors } = await captureLogs(() =>
+    claudeTranslator(client)({ body: 'SECRET-PROBLEM', answer: null }),
+  );
+  assert.equal(logs.length, 0);
+  assert.equal(errors.length, 1);
+  const line = JSON.parse(errors[0]) as Record<string, unknown>;
+  assert.equal(line.level, 'error');
+  assert.equal(line.event, 'claude_call_failed');
+  assert.equal(line.feature, 'translation');
+  assert.equal(line.model, 'claude-sonnet-5-5');
+  assert.equal(line.error_type, 'RateLimitError');
+  assert.equal(line.status, 429);
+  assert.equal(typeof line.ms, 'number');
+  assert.ok(!errors[0].includes('SECRET'));
 });
