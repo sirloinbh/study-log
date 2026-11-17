@@ -1,5 +1,5 @@
 {
-  "centralSha": "35cf9c97e8e34a1f206c2f95be8c9cb4b81bd14a",
+  "centralSha": "71970fbfc3b70cbd4fe281523d5bb0f88ff9e08b",
   "profile": "app",
   "project": "study-log",
   "files": {
@@ -10,7 +10,7 @@
     },
     ".claude/hooks/block-package-installs.mjs": {
       "mode": "full",
-      "sha256": "ca5a2591b9e84553b7b325321b5300e30cb2aa3403575edf003aecce4433fdd8",
+      "sha256": "56de5f100cf31c4acf790c7277912779af129786596333dc206bbf1a134f756f",
       "source": "templates/common/.claude/hooks/block-package-installs.mjs"
     },
     ".claude/hooks/pc-setup-notice.mjs": {
@@ -40,7 +40,7 @@
     },
     ".claude/settings.json": {
       "mode": "full",
-      "sha256": "7babc0f79219971126c67980940c1e02ab6ccc794a69e93aadd19b3dc95ea976",
+      "sha256": "e67554ab7dd656ab57a1690d5a0ef18df592c96c562f482f92beb78045286003",
       "source": "templates/common/.claude/settings.json.tmpl"
     },
     ".claude/skills/std-backlog/SKILL.md": {
@@ -100,7 +100,7 @@
     },
     ".codex/rules/package-installs.rules": {
       "mode": "full",
-      "sha256": "a5700cbb8d7bc53e289102f760da94f2f49a19fbc5432ac88793c846cbe94122",
+      "sha256": "54e445ed8f356607b51e18b3b3d44520aa3e8aa19f6099a96f7ae26dd179a381",
       "source": "templates/common/.codex/rules/package-installs.rules"
     },
     ".editorconfig": {
@@ -130,7 +130,7 @@
     },
     ".github/workflows/ci.yml": {
       "mode": "full",
-      "sha256": "fa35e5a05c097bfa32df9c245476d170a018c80277ef53278976b7a7e1ddc186",
+      "sha256": "3f089f8f191d8cba240a5ed01c34e32475f69443805c6f838c98e4ff5ac44f9e",
       "source": "templates/app/.github/workflows/ci.yml.tmpl"
     },
     ".gitignore": {
@@ -738,8 +738,13 @@
     },
     "knip.json": {
       "mode": "full",
-      "sha256": "2daa22b9f4d1fae152acda1d84c7aabb6559ff5c44a2281a6c4f43dbb6f9e5d4",
+      "sha256": "d2bbbdec2d8561e99fae53f7465aa288df780f25a662a730a4243eef10d307ca",
       "source": "templates/app/knip.json"
+    },
+    "lighthouserc.json": {
+      "mode": "full",
+      "sha256": "82a4bc06ef0dc1d9de27a6284edf0f898920d4e81d09afcb519e547b32970946",
+      "source": "templates/lighthouse/lighthouserc.json"
     },
     "orca.yaml": {
       "mode": "full",
@@ -771,6 +776,11 @@
         "devDependencies.typescript-eslint": "8.71.2"
       },
       "source": "templates/index.json"
+    },
+    "playwright.config.ts": {
+      "mode": "full",
+      "sha256": "81a598de133a665498a5fb8b16df1b3518456f36973e3112df24c8b071a42db3",
+      "source": "templates/e2e/playwright.config.ts.tmpl"
     },
     "prettier.config.mjs": {
       "mode": "full",
