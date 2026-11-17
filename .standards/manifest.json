@@ -1,5 +1,5 @@
 {
-  "centralSha": "74a105e99e677d4609f99dc4873ed79a2cd204df",
+  "centralSha": "9f05ff31ce4c4151dfe85a0ffd38195fe8ecdee4",
   "profile": "app",
   "project": "study-log",
   "files": {
@@ -220,7 +220,7 @@
     },
     "AGENTS.md": {
       "mode": "full",
-      "sha256": "572aa11c29f391219fb6f39b9ce349e81380b93ec56d7381d3dc573a196dc28e",
+      "sha256": "3e3ddb9ea299b2743b21b74b45e9bc974cf0ff8430b1fd264374951c4e9a88b7",
       "source": "templates/app/AGENTS.md.tmpl"
     },
     "backend/.npmrc": {
@@ -339,7 +339,7 @@
     },
     "deploy/remote-deploy.sh": {
       "mode": "full",
-      "sha256": "4f30da0de3a513b680cd2122b69d4972612f6d53de0dd1c2f1b354e5d2a7921b",
+      "sha256": "396791ce2401d4044a507561ca12929c2dc57cceba85ad1513bcec45ac833521",
       "source": "templates/app/deploy/remote-deploy.sh.tmpl"
     },
     "deploy/report.service": {
@@ -349,7 +349,7 @@
     },
     "deploy/report.sh": {
       "mode": "full",
-      "sha256": "8d53c18655b9f11760149056658d71451b8f49874182e9b68fdee42475cb6b4c",
+      "sha256": "f6950b615c730c63fa6a79891cfb4e76520aa04d4a9d1e26f907aa0185066d16",
       "source": "templates/app/deploy/report.sh.tmpl"
     },
     "deploy/report.timer": {
@@ -428,7 +428,7 @@
     },
     "frontend/public/manifest.webmanifest": {
       "mode": "full",
-      "sha256": "303c738f4666047e2ebbe597455dca8350af00655625e7123a7ccce0d063f493",
+      "sha256": "4898db83d48f43e2b68a80283e9f882aae3b2fa27e2d5ca3717fc3a04a4185e8",
       "source": "templates/app/frontend/public/manifest.webmanifest.tmpl"
     },
     "frontend/public/offline.html": {
@@ -738,7 +738,7 @@
     },
     "knip.json": {
       "mode": "full",
-      "sha256": "98d012da1b99df680e21a39d1c4ea63cdebaffdf2ca1d7183aa554e2c019a93c",
+      "sha256": "b3b9fcc9dd9c425b8d7043d4d5a306f32044317ee5c53ff6ce3c6700c2eefc85",
       "source": "templates/app/knip.json"
     },
     "lighthouserc.json": {
@@ -804,7 +804,7 @@
     },
     "scripts/push-repositories.ps1": {
       "mode": "full",
-      "sha256": "d76ec628108cff2d6a7907ed197bc10e3f3e2318bd6185fa8539d5b4180822f9",
+      "sha256": "5513bcbd5f92c188f059c6cf7728fce97133ca3b664dcffce107e97d653f0653",
       "source": "templates/app/scripts/push-repositories.ps1"
     },
     "skills/std-backlog/SKILL.md": {
