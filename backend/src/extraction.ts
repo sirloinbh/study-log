@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod/v4';
 
+import { logClaudeFailure, logClaudeSuccess, startClaudeCall } from './claude-usage.js';
 import { apiFailure } from './translation.js';
 
 // Reading the exercises or answers on uploaded textbook pages with Claude (#30, rules in
@@ -13,6 +14,8 @@ export type ExtractionSource = {
   kind: ExtractionKind;
   // Aborts the call when the request that asked for it is gone.
   signal?: AbortSignal;
+  // Written to the usage log line (#245) when the caller has it.
+  requestId?: string;
 };
 // `body` is empty for answers read from an answers-only file.
 export type ExtractedItem = { number: string; body: string; answer: string | null };
@@ -89,7 +92,7 @@ function explain(error: unknown): never {
 // can be long, so the reply is streamed with room for it.
 export function claudeExtractor(client?: Anthropic): Extractor {
   let anthropic = client;
-  return async ({ bytes, type, kind, signal }) => {
+  return async ({ bytes, type, kind, signal, requestId }) => {
     try {
       anthropic ??= new Anthropic();
       const data = bytes.toString('base64');
@@ -97,6 +100,7 @@ export function claudeExtractor(client?: Anthropic): Extractor {
         type === 'application/pdf'
           ? { type: 'document', source: { type: 'base64', media_type: type, data } }
           : { type: 'image', source: { type: 'base64', media_type: type, data } };
+      const call = startClaudeCall('extraction', extractionModel, requestId);
       const response = await anthropic.beta.messages
         .stream(
           {
@@ -110,7 +114,14 @@ export function claudeExtractor(client?: Anthropic): Extractor {
           },
           { signal },
         )
-        .finalMessage();
+        .finalMessage()
+        .then(
+          (done) => (logClaudeSuccess(call, done), done),
+          (error: unknown) => {
+            logClaudeFailure(call, error);
+            throw error;
+          },
+        );
       if (response.stop_reason === 'refusal')
         throw new ExtractionError(422, 'This file cannot be read');
       if (response.stop_reason === 'max_tokens')

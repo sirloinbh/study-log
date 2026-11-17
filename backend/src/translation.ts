@@ -2,9 +2,16 @@ import Anthropic from '@anthropic-ai/sdk';
 import { WorkloadIdentityError } from '@anthropic-ai/sdk/lib/credentials/types';
 import { z } from 'zod/v4';
 
+import { logClaudeFailure, logClaudeSuccess, startClaudeCall } from './claude-usage.js';
+
 // Translating an exercise and its answer into Korean with Claude (#31). The route takes a
 // `Translator`, so tests hand in a stand-in and never call the API.
-export type TranslationSource = { body: string; answer: string | null };
+export type TranslationSource = {
+  body: string;
+  answer: string | null;
+  // Written to the usage log line (#245) when the caller has it.
+  requestId?: string;
+};
 export type Translated = { body: string; answer: string | null; model: string };
 export type Translator = (source: TranslationSource) => Promise<Translated>;
 
@@ -96,15 +103,24 @@ export function claudeTranslator(client?: Anthropic): Translator {
       const texts =
         `<problem>\n${source.body}\n</problem>` +
         (source.answer === null ? '' : `\n<answer>\n${source.answer}\n</answer>`);
-      const response = await anthropic.beta.messages.create({
-        model: translationModel,
-        max_tokens: 16000,
-        betas: ['server-side-fallback-2026-07-01'],
-        fallbacks: 'default',
-        output_config: { effort: 'low', format: { type: 'json_schema', schema } },
-        system,
-        messages: [{ role: 'user', content: texts }],
-      });
+      const call = startClaudeCall('translation', translationModel, source.requestId);
+      const response = await anthropic.beta.messages
+        .create({
+          model: translationModel,
+          max_tokens: 16000,
+          betas: ['server-side-fallback-2026-07-01'],
+          fallbacks: 'default',
+          output_config: { effort: 'low', format: { type: 'json_schema', schema } },
+          system,
+          messages: [{ role: 'user', content: texts }],
+        })
+        .then(
+          (done) => (logClaudeSuccess(call, done), done),
+          (error: unknown) => {
+            logClaudeFailure(call, error);
+            throw error;
+          },
+        );
       if (response.stop_reason === 'refusal')
         throw new TranslationError(422, 'This content cannot be translated');
       if (response.stop_reason === 'max_tokens')
