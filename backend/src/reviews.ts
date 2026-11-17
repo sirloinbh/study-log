@@ -64,7 +64,7 @@ const idParam = z
   .regex(/^[1-9]\d{0,14}$/, 'Invalid review ID')
   .transform(Number);
 
-const dueDateInput = z.object(
+export const dueDateInput = z.object(
   {
     dueDate: calendarDate(
       z.string(missingOrInvalid('Enter the due date', 'The due date format is invalid')),

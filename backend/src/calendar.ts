@@ -2,7 +2,7 @@ import { Router } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod/v4';
 
-const query = z.object({
+export const calendarQuery = z.object({
   month: z
     .string({ error: 'The month format is invalid' })
     .regex(/^(?!0000)\d{4}-(0[1-9]|1[0-2])$/, 'The month must be in YYYY-MM format')
@@ -23,7 +23,7 @@ export function calendarRoutes(pool: Pool, today: () => string) {
   const router = Router();
 
   router.get('/', async (req, res) => {
-    const month = query.parse(req.query).month ?? today().slice(0, 7);
+    const month = calendarQuery.parse(req.query).month ?? today().slice(0, 7);
     const { from, to } = monthRange(month);
     const { rows } = await pool.query(
       `SELECT day::date AS date,

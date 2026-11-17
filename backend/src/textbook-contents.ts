@@ -41,15 +41,15 @@ const entryFields = {
 };
 
 // A new entry goes last among its siblings; no parent means a top-level chapter.
-const createInput = z.object(
+export const contentCreateInput = z.object(
   { parentId: bodyId('parent contents entry').nullable().default(null), ...entryFields },
   asObject,
 );
-const updateInput = z.object(entryFields, asObject);
+export const contentUpdateInput = z.object(entryFields, asObject);
 // A length limit keeps one oversized request from raising an issue per element
 // (zod 3 advisory GHSA-mrhx-c7xc-m3w5, sirloinbh/project-standards#326).
 export const orderLimit = 1000;
-const orderInput = z.object(
+export const contentOrderInput = z.object(
   {
     parentId: bodyId('parent contents entry').nullable().default(null),
     // .max() first: zod 4.6.7 rejects before reading the elements only when no refine precedes it.
@@ -65,7 +65,7 @@ const orderInput = z.object(
 // A pasted table of contents (#23): entries in reading order, each one level deeper than the
 // entry it belongs to at most. Kept flat so validating deep input needs no recursion.
 export const bulkLimits = { entries: 500, levels: 10 } as const;
-const bulkInput = z.object(
+export const contentBulkInput = z.object(
   {
     // .max() first, as in orderInput.
     entries: z
@@ -170,7 +170,7 @@ export function textbookContentRoutes(pool: Pool, storage: FileStorage) {
 
   router.post('/', async (req, res) => {
     const textbookId = textbookOf(req.params);
-    const entry = createInput.parse(req.body);
+    const entry = contentCreateInput.parse(req.body);
     const reply = await writeContents(pool, textbookId, async (client) => {
       if (entry.parentId !== null) {
         const parent = await client.query(
@@ -195,7 +195,7 @@ export function textbookContentRoutes(pool: Pool, storage: FileStorage) {
   // Adds a whole pasted table of contents after the chapters already there, all or nothing.
   router.post('/bulk', async (req, res) => {
     const textbookId = textbookOf(req.params);
-    const { entries } = bulkInput.parse(req.body);
+    const { entries } = contentBulkInput.parse(req.body);
     const reply = await writeContents(pool, textbookId, async (client) => {
       const { rows } = await client.query<{ next: number }>(
         `SELECT COALESCE(MAX(position) + 1, 0) AS next FROM textbook_contents
@@ -225,7 +225,7 @@ export function textbookContentRoutes(pool: Pool, storage: FileStorage) {
   // Registered before '/:id' so "order" is not read as a content id.
   router.put('/order', async (req, res) => {
     const textbookId = textbookOf(req.params);
-    const { parentId, ids } = orderInput.parse(req.body);
+    const { parentId, ids } = contentOrderInput.parse(req.body);
     const reply = await writeContents(pool, textbookId, async (client) => {
       const { rows } = await client.query<{ id: number }>(
         `SELECT id FROM textbook_contents
@@ -252,7 +252,7 @@ export function textbookContentRoutes(pool: Pool, storage: FileStorage) {
   router.put('/:id', async (req, res) => {
     const textbookId = textbookOf(req.params);
     const id = contentIdParam.parse(req.params.id);
-    const entry = updateInput.parse(req.body);
+    const entry = contentUpdateInput.parse(req.body);
     const { rows } = await pool.query<Entry>(
       `UPDATE textbook_contents SET number = $3, title = $4, updated_at = now()
        WHERE id = $1 AND textbook_id = $2 RETURNING ${columns}`,

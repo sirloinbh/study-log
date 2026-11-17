@@ -21,7 +21,7 @@ const exerciseIdParam = pathId('exercise');
 
 // The body keeps its line breaks and indentation as typed, so it is not trimmed; it only has to
 // contain something other than whitespace.
-const exerciseInput = z.object(
+export const exerciseInput = z.object(
   {
     number: z
       .string({ error: 'The problem number format is invalid' })
@@ -38,7 +38,7 @@ const exerciseInput = z.object(
 );
 
 // The answer body follows the exercise body: line breaks kept, not trimmed.
-const answerInput = z.object(
+export const answerInput = z.object(
   {
     body: z
       .string(missingOrInvalid('Enter the answer', 'The answer format is invalid'))
@@ -50,7 +50,7 @@ const answerInput = z.object(
 
 // Problems read from a file (#30), reviewed and saved into one chapter at once, each with its
 // answer when the file showed one.
-const bulkInput = z.object(
+export const exerciseBulkInput = z.object(
   {
     // .max() first, as in textbook-contents.ts.
     exercises: z
@@ -67,7 +67,7 @@ const bulkInput = z.object(
 );
 
 // Answers read from an answers-only file (#30), each matched to an exercise of the chapter.
-const answersInput = z.object(
+export const answersInput = z.object(
   {
     answers: z
       .array(
@@ -98,7 +98,7 @@ const extractionKind = z.enum(['problems', 'answers'], {
   error: 'Choose whether the file holds problems or answers',
 });
 
-const importantInput = z.object(
+export const importantInput = z.object(
   {
     important: z.boolean(
       missingOrInvalid('Send the important flag', 'The important flag format is invalid'),
@@ -108,7 +108,7 @@ const importantInput = z.object(
 );
 
 // Filters for a textbook's exercises: one chapter (with its sections) and the important mark.
-const textbookListQuery = z.object({
+export const textbookListQuery = z.object({
   contentId: z
     .string({ error: 'Invalid contents entry ID' })
     .regex(/^[1-9]\d{0,14}$/, 'Invalid contents entry ID')
@@ -222,7 +222,7 @@ export function contentExerciseRoutes(pool: Pool, extractor: Extractor) {
   // Saves reviewed problems into the chapter, with their answers, all or nothing (#30).
   router.post('/bulk', async (req, res) => {
     const { textbookId, contentId } = target(req.params);
-    const { exercises } = bulkInput.parse(req.body);
+    const { exercises } = exerciseBulkInput.parse(req.body);
     const reply = await inTransaction<{ status: number; body: unknown }>(
       pool,
       async (client) => {

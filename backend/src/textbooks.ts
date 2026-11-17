@@ -13,7 +13,7 @@ const text = (label: string, max: number) =>
     .trim()
     .refine((value) => value.length <= max, `The ${label} must be at most ${max} characters`);
 
-const textbookInput = z.object(
+export const textbookInput = z.object(
   {
     title: z
       .string(missingOrInvalid('Enter the title', 'The title format is invalid'))

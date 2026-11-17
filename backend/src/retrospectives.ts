@@ -24,7 +24,7 @@ const day = calendarDate(
   'The retrospective date must be between 1900 and 9998',
 );
 
-const bodyInput = z.object(
+export const bodyInput = z.object(
   {
     body: z
       .string(
@@ -41,6 +41,18 @@ const bodyInput = z.object(
   },
   { error: 'Send the retrospective as a JSON object' },
 );
+
+export const periodQuery = z.object({ kind: kind.default('weekly'), date: day.optional() });
+
+export const listQuery = z.object({
+  kind: kind.optional(),
+  limit: z.coerce
+    .number({ error: 'The limit is invalid' })
+    .int('The limit is invalid')
+    .min(1, 'The limit must be at least 1')
+    .max(100, 'The limit must be at most 100')
+    .default(20),
+});
 
 // The week (Sunday to Saturday, #96) or month that holds `date`.
 export function periodOf(kind: RetrospectiveKind, date: string) {
@@ -82,7 +94,7 @@ export function retrospectiveRoutes(pool: Pool, today: () => string) {
   // The period holding ?date (today by default), its retrospective if written, and a summary of
   // its study logs (planned ones do not count as studied, as in the stats).
   router.get('/period', async (req, res) => {
-    const query = z.object({ kind: kind.default('weekly'), date: day.optional() }).parse(req.query);
+    const query = periodQuery.parse(req.query);
     const { from, to } = periodOf(query.kind, query.date ?? today());
     const [written, summary] = await Promise.all([
       pool.query(`SELECT ${columns} FROM retrospectives WHERE kind = $1 AND period_start = $2`, [
@@ -110,17 +122,7 @@ export function retrospectiveRoutes(pool: Pool, today: () => string) {
 
   // The latest retrospectives of a kind, newest period first.
   router.get('/', async (req, res) => {
-    const query = z
-      .object({
-        kind: kind.optional(),
-        limit: z.coerce
-          .number({ error: 'The limit is invalid' })
-          .int('The limit is invalid')
-          .min(1, 'The limit must be at least 1')
-          .max(100, 'The limit must be at most 100')
-          .default(20),
-      })
-      .parse(req.query);
+    const query = listQuery.parse(req.query);
     const { rows } = await pool.query(
       `SELECT ${columns} FROM retrospectives
        WHERE $1::text IS NULL OR kind = $1 ORDER BY period_start DESC, kind LIMIT $2`,
