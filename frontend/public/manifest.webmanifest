@@ -1,7 +1,7 @@
 {
   "name": "Study Log",
   "short_name": "Study Log",
-  "description": "A personal service for recording what and how long I study and looking back on how my learning goes. There is one user (me) and no login. Before any public exposure, design private access or authentication first.",
+  "description": "Record what you study and for how long, and look back on your progress.",
   "lang": "en",
   "start_url": "/",
   "scope": "/",
