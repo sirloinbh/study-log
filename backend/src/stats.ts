@@ -8,7 +8,7 @@ import { studyTypes } from './study-logs.js';
 export const statPeriods = ['week', 'month', '3months', 'all'] as const;
 export type StatPeriod = (typeof statPeriods)[number];
 
-const query = z.object({
+export const statsPeriodQuery = z.object({
   period: z
     .enum(statPeriods, { error: 'The period must be this week, this month, last 3 months, or all' })
     .default('week'),
@@ -21,7 +21,7 @@ const textbookIdParam = z
   .optional();
 
 // Study time can be narrowed to one kind of study (#52) and to the logs of one textbook (#180).
-const studyTimeQuery = query.extend({
+export const studyTimeQuery = statsPeriodQuery.extend({
   type: z
     .enum(['all', ...studyTypes], { error: 'The study type must be all, new, or review' })
     .default('all'),
@@ -145,7 +145,7 @@ export const completionRate = (completed: number, scheduled: number) =>
 
 // The dates of a pattern request, within the years the other date APIs accept and at most
 // `maxSeriesDays` long, like the stats series.
-const patternQuery = z
+export const patternQuery = z
   .object({
     from: calendarDate(
       z.string({ error: 'The start date format is invalid' }),
@@ -160,7 +160,7 @@ const patternQuery = z
     error: 'The start date cannot be after the end date',
   });
 
-const textbookQuery = z.object({ textbookId: textbookIdParam });
+export const textbookQuery = z.object({ textbookId: textbookIdParam });
 
 // Whole percent rounded down, so nearly all is not shown as all; none when there is nothing to count.
 export const percentDown = (part: number, whole: number) =>
@@ -226,7 +226,7 @@ export function statsRoutes(pool: Pool, today: () => string) {
   // A round belongs to the period of its original due date, so moving it changes nothing here. A
   // round due today is not late yet. "All" has no first date to cut at: it counts every round.
   router.get('/reviews', async (req, res) => {
-    const { period } = query.parse(req.query);
+    const { period } = statsPeriodQuery.parse(req.query);
     const to = today();
     const from = period === 'all' ? null : periodStart(period, to);
     const { rows } = await pool.query<{

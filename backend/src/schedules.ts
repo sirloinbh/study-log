@@ -85,7 +85,7 @@ const minutes = (label: string) =>
     .min(0, `The ${label} amount must be at least 0 minutes`)
     .max(1440, `The ${label} amount must be at most 24 hours`);
 
-const createInput = z
+export const scheduleCreateInput = z
   .object(
     {
       title,
@@ -126,7 +126,10 @@ const createInput = z
 
 // The period and the amounts stay: changing them would need the holidays again, and they are read
 // only when creating (rule sections 3, 6).
-const updateInput = z.object({ title }, { error: 'Send the schedule as a JSON object' });
+export const scheduleUpdateInput = z.object(
+  { title },
+  { error: 'Send the schedule as a JSON object' },
+);
 
 const itemIdParam = z
   .string()
@@ -134,7 +137,7 @@ const itemIdParam = z
   .transform(Number);
 
 // Moving a day (rule section 4). `withLater` takes the open days from it onward along, keeping their gaps.
-const moveInput = z.object(
+export const moveInput = z.object(
   {
     date: dateField('move date'),
     withLater: z.boolean({ error: 'The move-later flag is invalid' }).default(false),
@@ -391,7 +394,7 @@ export function scheduleRoutes(pool: Pool, today: () => string, fetcher: Holiday
   });
 
   router.post('/', async (req, res) => {
-    const input = createInput.parse(req.body);
+    const input = scheduleCreateInput.parse(req.body);
     // An item already overdue would be moved as soon as the schedule is read (rule section 4).
     const date = today();
     if (input.startDate < date)
@@ -482,7 +485,7 @@ export function scheduleRoutes(pool: Pool, today: () => string, fetcher: Holiday
 
   router.put('/:id', async (req, res) => {
     const id = idParam.parse(req.params.id);
-    const input = updateInput.parse(req.body);
+    const input = scheduleUpdateInput.parse(req.body);
     const { rowCount } = await pool.query(
       'UPDATE schedules SET title = $2, updated_at = now() WHERE id = $1',
       [id, input.title],

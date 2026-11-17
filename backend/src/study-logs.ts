@@ -40,7 +40,7 @@ const referenceId = (label: string) => {
     .default(null);
 };
 
-const studyLogInput = z
+export const studyLogInput = z
   .object(
     {
       studyDate,
@@ -97,7 +97,7 @@ const idParam = z
 
 // ?date for one day in time order; otherwise the most recent logs, narrowed by ?textbookId, ?q
 // (memo or difficulties, any case) and ?from/?to (#18). Every given condition applies.
-const listQuery = z
+export const studyLogListQuery = z
   .object({
     date: studyDate.optional(),
     q: z
@@ -159,7 +159,7 @@ export function studyLogRoutes(pool: Pool) {
   const router = Router();
 
   router.get('/', async (req, res) => {
-    const { date, limit, textbookId, q, from, to } = listQuery.parse(req.query);
+    const { date, limit, textbookId, q, from, to } = studyLogListQuery.parse(req.query);
     const params: unknown[] = [];
     const where: string[] = [];
     if (date) where.push(`l.study_date = $${params.push(date)}`);

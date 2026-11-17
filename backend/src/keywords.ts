@@ -12,7 +12,7 @@ const keywordDate = calendarDate(
 );
 
 // `date` left out means today in the service time zone; the route fills it in.
-const keywordInput = z.object(
+export const keywordInput = z.object(
   {
     date: keywordDate.optional(),
     keyword: z
@@ -31,7 +31,7 @@ const keywordInput = z.object(
 
 // ?date for one day; otherwise the most recent keywords, narrowed by ?q (keyword or memo, any
 // case) and ?from/?to.
-const listQuery = z
+export const keywordListQuery = z
   .object({
     date: keywordDate.optional(),
     q: z
@@ -71,7 +71,7 @@ export function keywordRoutes(pool: Pool, today: () => string) {
   const router = Router();
 
   router.get('/', async (req, res) => {
-    const { date, q, from, to, limit } = listQuery.parse(req.query);
+    const { date, q, from, to, limit } = keywordListQuery.parse(req.query);
     if (date) {
       const { rows } = await pool.query(
         `SELECT ${columns} FROM keywords WHERE keyword_date = $1 ORDER BY id`,
