@@ -52,9 +52,7 @@ As of 2026-11-15 (#177, #178), both DBs run in the Docker Compose `db` container
 
 The rules follow the [study schedule](../decisions/schedule-rules.md), [review interval](../decisions/review-rules.md) and [text extraction](../decisions/extraction-rules.md) documents.
 
-| Issue | Content                           | Priority | Note                                                                                                                                                  |
-| ----- | --------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| —     | nginx 1 MB body limit for uploads | —        | Centrally managed `frontend/nginx.conf`: [project-standards#589](https://github.com/sirloinbh/project-standards/issues/589), before deploying uploads |
+No candidates are open. The upload limit (project-standards#589) was raised to 21 MB for `/api/` on 2026-11-17 (PR #233, checked in `docs/changes/234-upload-limit-check.md`).
 
 What can be done without user input: nothing right now. Register new requirements as issues or wait for the user steps above.
 
