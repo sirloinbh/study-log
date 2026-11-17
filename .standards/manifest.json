@@ -1,5 +1,5 @@
 {
-  "centralSha": "9f05ff31ce4c4151dfe85a0ffd38195fe8ecdee4",
+  "centralSha": "d974c93bf39765824b671009f2b2d2cec202e6ee",
   "profile": "app",
   "project": "study-log",
   "files": {
@@ -339,7 +339,7 @@
     },
     "deploy/remote-deploy.sh": {
       "mode": "full",
-      "sha256": "396791ce2401d4044a507561ca12929c2dc57cceba85ad1513bcec45ac833521",
+      "sha256": "e27b16efabad4651ca0f9e980e23d0c9f9822bc5f7cc00aa6fa48de46a544956",
       "source": "templates/app/deploy/remote-deploy.sh.tmpl"
     },
     "deploy/report.service": {
@@ -349,7 +349,7 @@
     },
     "deploy/report.sh": {
       "mode": "full",
-      "sha256": "f6950b615c730c63fa6a79891cfb4e76520aa04d4a9d1e26f907aa0185066d16",
+      "sha256": "de2318d64563dd1aa6e089edf0822afec1d564e9137e5ce8258a2e61192574c2",
       "source": "templates/app/deploy/report.sh.tmpl"
     },
     "deploy/report.timer": {
