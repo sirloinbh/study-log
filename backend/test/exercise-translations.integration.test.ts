@@ -86,7 +86,9 @@ test(
           ['번역: Find the inverse of $A$.\n  (a) 2x2', null, 'claude-sonnet-5-5', false],
         );
         assert.match(made.updatedAt, /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
-        assert.deepEqual(given, [{ body: 'Find the inverse of $A$.\n  (a) 2x2', answer: null }]);
+        assert.deepEqual(given, [
+          { body: 'Find the inverse of $A$.\n  (a) 2x2', answer: null, requestId: 'req-248' },
+        ]);
 
         // A new answer makes it out of date; translating again includes the answer.
         await call(`/api/exercises/${exercise}/answer`, {
