@@ -6,6 +6,7 @@ import { detectFormat, receive, removeStored, storedKeys } from './exercise-file
 import { ExtractionError, extractionLimit, type Extractor } from './extraction.js';
 import type { FileStorage } from './file-storage.js';
 import { inTransaction } from './sql.js';
+import { requestIdOf } from './standard/http.js';
 import { TranslationError, type Translator } from './translation.js';
 import { missingOrInvalid } from './validation.js';
 
@@ -208,7 +209,13 @@ export function contentExerciseRoutes(pool: Pool, extractor: Extractor) {
       });
       try {
         res.json(
-          await extractor({ bytes: file.buffer, type: format.type, kind, signal: stop.signal }),
+          await extractor({
+            bytes: file.buffer,
+            type: format.type,
+            kind,
+            signal: stop.signal,
+            requestId: requestIdOf(res),
+          }),
         );
       } catch (error) {
         if (!(error instanceof ExtractionError)) throw error;
@@ -472,7 +479,7 @@ export function exerciseRoutes(pool: Pool, translator: Translator, storage: File
     const source = rows[0];
     let translated;
     try {
-      translated = await translator(source);
+      translated = await translator({ ...source, requestId: requestIdOf(res) });
     } catch (error) {
       if (!(error instanceof TranslationError)) throw error;
       return void res.status(error.status).json({ error: error.message });

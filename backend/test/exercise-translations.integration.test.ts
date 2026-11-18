@@ -73,7 +73,12 @@ test(
         assert.equal(await read(), null, 'nothing translated yet');
 
         // Without an answer, only the problem is translated; line breaks are kept.
-        const first = await call(path, { method: 'POST', body: {} });
+        // The request ID reaches the translator, so its usage log line matches the request log line (#248).
+        const first = await call(path, {
+          method: 'POST',
+          body: {},
+          headers: { 'x-request-id': 'req-248' },
+        });
         assert.equal(first.status, 200);
         const made = first.data.translation as Translation;
         assert.deepEqual(
