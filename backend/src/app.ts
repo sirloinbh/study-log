@@ -15,6 +15,7 @@ import { keywordRoutes } from './keywords.js';
 import { retrospectiveRoutes } from './retrospectives.js';
 import { reviewRoutes } from './reviews.js';
 import { scheduleRoutes } from './schedules.js';
+import { requestLog } from './standard/http.js';
 import { statsRoutes } from './stats.js';
 import { studyLogRoutes } from './study-logs.js';
 import { textbookContentRoutes } from './textbook-contents.js';
@@ -67,6 +68,8 @@ export function createApp(
   const today = options.today ?? (() => serviceDate());
   const app = express();
   app.disable('x-powered-by');
+  // First, so every later log line (the Claude usage lines too, #248) can carry the request ID.
+  app.use(requestLog);
   // Before the body parser, so refused requests cost as little as possible.
   app.use(
     '/api',

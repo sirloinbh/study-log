@@ -86,7 +86,11 @@ test(
         );
         assert.equal(asked.length, 0);
 
-        const read = await extract(form(pdf, 'problems'));
+        // The request ID reaches the extractor, so its usage log line matches the request log line (#248).
+        const read = await extract(form(pdf, 'problems'), base, {
+          ...app,
+          'x-request-id': 'req-248',
+        });
         assert.equal(read.status, 200);
         assert.deepEqual(read.data, {
           items: [{ number: '1.2', body: 'Find the inverse.', answer: null }],
@@ -95,7 +99,12 @@ test(
         const { signal, ...source } = asked[0];
         assert.deepEqual(
           { ...source, bytes: source.bytes.toString() },
-          { bytes: pdf.toString(), type: 'application/pdf', kind: 'problems' },
+          {
+            bytes: pdf.toString(),
+            type: 'application/pdf',
+            kind: 'problems',
+            requestId: 'req-248',
+          },
         );
         // The call gets a signal that stays unused once the reply is sent.
         assert.ok(signal instanceof AbortSignal);

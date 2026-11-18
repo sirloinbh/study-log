@@ -73,7 +73,12 @@ test(
         assert.equal(await read(), null, 'nothing translated yet');
 
         // Without an answer, only the problem is translated; line breaks are kept.
-        const first = await call(path, { method: 'POST', body: {} });
+        // The request ID reaches the translator, so its usage log line matches the request log line (#248).
+        const first = await call(path, {
+          method: 'POST',
+          body: {},
+          headers: { 'x-request-id': 'req-248' },
+        });
         assert.equal(first.status, 200);
         const made = first.data.translation as Translation;
         assert.deepEqual(
@@ -81,7 +86,9 @@ test(
           ['번역: Find the inverse of $A$.\n  (a) 2x2', null, 'claude-sonnet-5-5', false],
         );
         assert.match(made.updatedAt, /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/);
-        assert.deepEqual(given, [{ body: 'Find the inverse of $A$.\n  (a) 2x2', answer: null }]);
+        assert.deepEqual(given, [
+          { body: 'Find the inverse of $A$.\n  (a) 2x2', answer: null, requestId: 'req-248' },
+        ]);
 
         // A new answer makes it out of date; translating again includes the answer.
         await call(`/api/exercises/${exercise}/answer`, {
