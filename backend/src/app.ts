@@ -15,6 +15,7 @@ import { keywordRoutes } from './keywords.js';
 import { retrospectiveRoutes } from './retrospectives.js';
 import { reviewRoutes } from './reviews.js';
 import { scheduleRoutes } from './schedules.js';
+import { setInt8Parser } from './standard/db.js';
 import { requestLog } from './standard/http.js';
 import { statsRoutes } from './stats.js';
 import { studyLogRoutes } from './study-logs.js';
@@ -25,14 +26,8 @@ import { claudeTranslator, type Translator } from './translation.js';
 // DATE columns stay YYYY-MM-DD strings so the service time zone never shifts them.
 types.setTypeParser(1082, (value) => value);
 
-// BIGINT ids come back as JS numbers (#67). The API accepts ids of up to 15 digits, all exact as
-// numbers, so ids need no ::int cast that would fail past 2^31. A value a number cannot hold
-// exactly is refused rather than silently rounded.
-types.setTypeParser(20, (value) => {
-  const number = Number(value);
-  if (!Number.isSafeInteger(number)) throw new Error(`bigint ${value} does not fit a JS number`);
-  return number;
-});
+// BIGINT ids come back as JS numbers; a value a number cannot hold exactly throws (ADR-0025).
+setInt8Parser(types);
 
 const serviceTimeZone = 'Asia/Seoul';
 
