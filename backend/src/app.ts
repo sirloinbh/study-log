@@ -1,6 +1,5 @@
 import { meHandler } from '@sirloinbh/auth-client';
 import express from 'express';
-import { rateLimit } from 'express-rate-limit';
 import type { Pool } from 'pg';
 import { types } from 'pg';
 import { ZodError } from 'zod/v4';
@@ -17,6 +16,7 @@ import { reviewRoutes } from './reviews.js';
 import { scheduleRoutes } from './schedules.js';
 import { setInt8Parser } from './standard/db.js';
 import { requestLog } from './standard/http.js';
+import { apiRateLimit } from './standard/rate-limit.js';
 import { statsRoutes } from './stats.js';
 import { studyLogRoutes } from './study-logs.js';
 import { textbookContentRoutes } from './textbook-contents.js';
@@ -41,12 +41,6 @@ export function serviceDate(now = new Date()) {
   }).format(now);
 }
 
-// A safety net above nginx's limit (10 a second per client, frontend/nginx.conf). nginx does not
-// add the client's address, so here every request through it counts as one client. It does pass on
-// a forwarded header the client sent, which could only be forged: trust proxy stays off, so the
-// header is ignored, and the check that would log it is off too.
-const defaultRequestsPerMinute = 1200;
-
 export function createApp(
   pool: Pool,
   options: {
@@ -66,19 +60,7 @@ export function createApp(
   // First, so every later log line (the Claude usage lines too, #248) can carry the request ID.
   app.use(requestLog);
   // Before the body parser, so refused requests cost as little as possible.
-  app.use(
-    '/api',
-    rateLimit({
-      windowMs: 60_000,
-      limit: options.requestsPerMinute ?? defaultRequestsPerMinute,
-      standardHeaders: 'draft-8',
-      legacyHeaders: false,
-      message: { error: 'Too many requests. Try again in a moment' },
-      validate: { xForwardedForHeader: false, forwardedHeader: false },
-      // Deploys and monitoring read health; busy pages must not make a healthy API look down.
-      skip: (req) => (req.method === 'GET' || req.method === 'HEAD') && req.path === '/health',
-    }),
-  );
+  apiRateLimit(app, { limitPerMinute: options.requestsPerMinute });
   // A whole chapter of reviewed problems or answers (#30) can be larger than other requests.
   app.use(
     [
