@@ -1,5 +1,5 @@
 {
-  "centralSha": "7812b9c848637f018e66f23aad2d35417d3f38a8",
+  "centralSha": "9c4e4f38ea0abdff378b74588953d8afc81ad8b5",
   "profile": "app",
   "project": "study-log",
   "files": {
@@ -140,7 +140,7 @@
     },
     ".github/workflows/ci.yml": {
       "mode": "full",
-      "sha256": "b94b67127327e96f8db8b4f6c8e04e67cd91101a0d121a5675e8e33fc4cfc10d",
+      "sha256": "42187ae072884d403b6ff8123d5d870fa326aa93be49e8edb8f5f76570edd492",
       "source": "templates/app/.github/workflows/ci.yml.tmpl"
     },
     ".gitignore": {
@@ -345,7 +345,7 @@
     },
     "deploy/autodeploy.sh": {
       "mode": "full",
-      "sha256": "16b598a3c5e3e5e1258514eaacfef863dc9270e7425bfc036b61e668dacc1955",
+      "sha256": "1db45aac05059bf1126be0ed6bacba02ca5266743f22a0fc5e91b3dca5b6cecd",
       "source": "templates/deploy/deploy/autodeploy.sh.tmpl"
     },
     "deploy/autodeploy.timer": {
@@ -400,7 +400,7 @@
     },
     "deploy/remote-deploy.sh": {
       "mode": "full",
-      "sha256": "b47ef79bb1a4ca76325de9a059a6dbdaa1a6b41d1a7bcf3a0e61248631a85f38",
+      "sha256": "363647624d684e46d9ddf15ebf1f57a27a71820565d97dd622030c2564fceca1",
       "source": "templates/deploy/deploy/remote-deploy.sh.tmpl"
     },
     "deploy/report.service": {
