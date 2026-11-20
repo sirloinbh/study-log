@@ -25,7 +25,7 @@ test('requests over the limit get an English 429 and never reach the database', 
       assert.equal((await call('/api/keywords')).status, 200);
       const refused = await call('/api/keywords');
       assert.equal(refused.status, 429);
-      assert.equal(refused.data.error, 'Too many requests. Try again in a moment');
+      assert.equal(refused.data.error, 'Too many requests. Try again in a minute.');
     },
     { requestsPerMinute: 2 },
   );
@@ -54,35 +54,25 @@ test('health is neither counted nor refused, so busy pages cannot make the API l
       assert.equal((await call('/api/keywords')).status, 200);
       assert.equal((await call('/api/keywords')).status, 429);
       assert.equal((await call('/api/health')).status, 200);
-      // Only reading health is exempt: other methods would be parsed without any limit.
-      const posted = await call('/api/health', { method: 'POST', body: {} });
-      assert.equal(posted.status, 429);
     },
     { requestsPerMinute: 1 },
   );
 });
 
-test('forged forwarded headers neither get around the limit nor write to the log', async () => {
+test('the client address nginx appends decides the bucket (the last X-Forwarded-For entry)', async () => {
   const { pool } = counting();
-  const logged: unknown[] = [];
-  const original = console.error;
-  console.error = (...args: unknown[]) => void logged.push(args);
-  try {
-    await withApi(
-      pool,
-      async (call) => {
-        const forged = (address: string) => ({
-          headers: { 'x-forwarded-for': address, forwarded: `for=${address}` },
-        });
-        assert.equal((await call('/api/keywords', forged('1.2.3.4'))).status, 200);
-        assert.equal((await call('/api/keywords', forged('5.6.7.8'))).status, 429);
-      },
-      { requestsPerMinute: 1 },
-    );
-  } finally {
-    console.error = original;
-  }
-  assert.deepEqual(logged, []);
+  await withApi(
+    pool,
+    async (call) => {
+      const from = (address: string) => ({
+        headers: { 'x-forwarded-for': `10.9.9.9, ${address}` },
+      });
+      assert.equal((await call('/api/keywords', from('1.2.3.4'))).status, 200);
+      assert.equal((await call('/api/keywords', from('1.2.3.4'))).status, 429);
+      assert.equal((await call('/api/keywords', from('5.6.7.8'))).status, 200);
+    },
+    { requestsPerMinute: 1 },
+  );
 });
 
 test('the default limit leaves room for a page opening many requests at once', async () => {

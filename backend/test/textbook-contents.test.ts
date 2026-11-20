@@ -182,10 +182,9 @@ test('a client whose ROLLBACK fails is destroyed, not returned to the pool', asy
       assert.equal(releases.length, 1, 'released once');
       const [reason] = releases[0];
       if (rollbackFails) {
-        assert.ok(reason instanceof Error, 'released with the rollback error, so pg destroys it');
-        assert.match(reason.message, /Connection terminated/);
+        assert.equal(reason, true, 'released with true, so pg destroys it');
       } else {
-        assert.equal(reason, undefined, 'a clean rollback returns the client to the pool');
+        assert.equal(reason, false, 'a clean rollback returns the client to the pool');
       }
     }
   } finally {
