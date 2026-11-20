@@ -20,7 +20,6 @@
     "lint": "eslint . --max-warnings 0",
     "typecheck": "npm run typecheck --workspaces && tsc -p e2e/tsconfig.json",
     "standards:check": "node .standards/check.mjs",
-    "lockfiles:sync": "node .standards/lockfiles.mjs --write",
     "knip": "knip",
     "openapi": "npm run openapi -w backend",
     "contract:sync": "node scripts/contract.mjs sync",
