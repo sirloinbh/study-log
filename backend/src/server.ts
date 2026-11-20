@@ -1,8 +1,10 @@
-import { createApp } from './app.js';
-import { connectPool } from './pool.js';
-import { sharedAuth } from './standard/auth.js';
+import { Pool } from 'pg';
 
-const pool = connectPool(process.env.DATABASE_URL);
+import { createApp } from './app.js';
+import { sharedAuth } from './standard/auth.js';
+import { createPool } from './standard/db.js';
+
+const pool = createPool(new Pool({ connectionString: process.env.DATABASE_URL }));
 const port = Number(process.env.PORT ?? 3102);
 const server = createApp(pool, { auth: sharedAuth() }).listen(port, '0.0.0.0', () =>
   console.log(`API http://localhost:${port}`),

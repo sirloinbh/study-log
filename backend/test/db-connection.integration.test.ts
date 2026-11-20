@@ -3,8 +3,8 @@ import { test } from 'node:test';
 
 import { Pool } from 'pg';
 
-import { connectPool } from '../src/pool.js';
 import { inTransaction } from '../src/sql.js';
+import { createPool } from '../src/standard/db.js';
 import { withApi } from './helpers.js';
 
 const url = process.env.TEST_DATABASE_URL;
@@ -16,7 +16,7 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 // and fail the file.
 test('losing database connections never ends the process', { skip: !url }, async (t) => {
   const admin = new Pool({ connectionString: url });
-  const pool = connectPool(url);
+  const pool = createPool(new Pool({ connectionString: url }));
   const original = console.error;
   const logged: string[] = [];
   console.error = (...args: unknown[]) => void logged.push(args.join(' '));
