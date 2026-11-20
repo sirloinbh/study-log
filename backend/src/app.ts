@@ -4,6 +4,7 @@ import type { Pool } from 'pg';
 import { types } from 'pg';
 import { ZodError } from 'zod/v4';
 
+import { tools } from './ai-tools.js';
 import { calendarRoutes } from './calendar.js';
 import { exerciseFileRoutes, fileRoutes } from './exercise-files.js';
 import { contentExerciseRoutes, exerciseRoutes, textbookExerciseRoutes } from './exercises.js';
@@ -17,6 +18,7 @@ import { scheduleRoutes } from './schedules.js';
 import { setInt8Parser } from './standard/db.js';
 import { requestLog } from './standard/http.js';
 import { apiRateLimit } from './standard/rate-limit.js';
+import { registerToolRoutes } from './standard/tools.js';
 import { statsRoutes } from './stats.js';
 import { studyLogRoutes } from './study-logs.js';
 import { textbookContentRoutes } from './textbook-contents.js';
@@ -51,6 +53,7 @@ export function createApp(
     fileStorage?: FileStorage;
     requestsPerMinute?: number;
     auth?: express.RequestHandler;
+    toolsPublicKey?: string;
   } = {},
 ) {
   const fileStorage = options.fileStorage ?? s3Storage();
@@ -101,6 +104,14 @@ export function createApp(
     exerciseRoutes(pool, options.translator ?? claudeTranslator(), fileStorage),
   );
   app.use('/api/textbooks', textbookRoutes(pool, fileStorage));
+  // #711: shared-ai calls the AI tools here with a signed token. Outside /api, so the proxy never reaches it.
+  registerToolRoutes(app, {
+    app: 'study-log',
+    tools,
+    pool,
+    publicKey: options.toolsPublicKey,
+    requireBinding: true,
+  });
   app.use('/api', (_req, res) => {
     res.status(404).json({ error: 'API not found' });
   });
