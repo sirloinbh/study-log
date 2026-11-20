@@ -1,5 +1,5 @@
 {
-  "centralSha": "9c1f654987fbeb535abcfddb0cb2bf5828c53c10",
+  "centralSha": "231b85c13855402bdb017ac428cd70dd60fc5a5e",
   "profile": "app",
   "project": "study-log",
   "files": {
@@ -345,7 +345,7 @@
     },
     "deploy/autodeploy.sh": {
       "mode": "full",
-      "sha256": "48cf093dd2c66205506f7a9d9b0842d1bbd2df289e83f016608f0e5113671702",
+      "sha256": "16b598a3c5e3e5e1258514eaacfef863dc9270e7425bfc036b61e668dacc1955",
       "source": "templates/deploy/deploy/autodeploy.sh.tmpl"
     },
     "deploy/autodeploy.timer": {
