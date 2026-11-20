@@ -138,6 +138,35 @@ const select = (source: string) => `SELECT l.id, l.study_date AS "studyDate",
 
 const notFound = { error: 'Study log not found' };
 
+export type Db = Pick<Pool, 'query'>;
+export type StudyLogListQuery = z.output<typeof studyLogListQuery>;
+
+/** The list of GET /api/study-logs, also read by the AI tool. */
+export async function listStudyLogs(db: Db, query: StudyLogListQuery) {
+  const { date, limit, textbookId, q, from, to } = query;
+  const params: unknown[] = [];
+  const where: string[] = [];
+  // A placeholder is "$" and the parameter number: the template literal below writes that as "$" plus an expression.
+  const ph = (value: unknown) => '$' + params.push(value);
+  if (date) where.push(`l.study_date = ${ph(date)}`);
+  if (textbookId !== undefined) where.push(`l.textbook_id = ${ph(textbookId)}`);
+  if (q) {
+    const pattern = ph(likePattern(q));
+    where.push(`(l.memo ILIKE ${pattern} OR l.difficulties ILIKE ${pattern})`);
+  }
+  if (from) where.push(`l.study_date >= ${ph(from)}`);
+  if (to) where.push(`l.study_date <= ${ph(to)}`);
+  const filter = where.length ? `WHERE ${where.join(' AND ')}` : '';
+  const { rows } = date
+    ? await db.query(`${select('study_logs')} ${filter} ORDER BY l.start_time, l.id`, params)
+    : await db.query(
+        `${select('study_logs')} ${filter}
+           ORDER BY l.study_date DESC, l.start_time DESC, l.id DESC LIMIT ${ph(limit)}`,
+        params,
+      );
+  return rows;
+}
+
 // A reference that does not exist (or a chapter of another textbook) fails its foreign key.
 const missingReference: Record<string, string> = {
   study_logs_textbook_fkey: 'Textbook not found',
@@ -159,26 +188,7 @@ export function studyLogRoutes(pool: Pool) {
   const router = Router();
 
   router.get('/', async (req, res) => {
-    const { date, limit, textbookId, q, from, to } = studyLogListQuery.parse(req.query);
-    const params: unknown[] = [];
-    const where: string[] = [];
-    if (date) where.push(`l.study_date = $${params.push(date)}`);
-    if (textbookId !== undefined) where.push(`l.textbook_id = $${params.push(textbookId)}`);
-    if (q) {
-      const pattern = `$${params.push(likePattern(q))}`;
-      where.push(`(l.memo ILIKE ${pattern} OR l.difficulties ILIKE ${pattern})`);
-    }
-    if (from) where.push(`l.study_date >= $${params.push(from)}`);
-    if (to) where.push(`l.study_date <= $${params.push(to)}`);
-    const filter = where.length ? `WHERE ${where.join(' AND ')}` : '';
-    const { rows } = date
-      ? await pool.query(`${select('study_logs')} ${filter} ORDER BY l.start_time, l.id`, params)
-      : await pool.query(
-          `${select('study_logs')} ${filter}
-           ORDER BY l.study_date DESC, l.start_time DESC, l.id DESC LIMIT $${params.push(limit)}`,
-          params,
-        );
-    res.json({ studyLogs: rows });
+    res.json({ studyLogs: await listStudyLogs(pool, studyLogListQuery.parse(req.query)) });
   });
 
   router.get('/:id', async (req, res) => {
