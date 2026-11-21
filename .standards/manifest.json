@@ -1,5 +1,5 @@
 {
-  "centralSha": "52d0d2c2eb7310dae0d93356742a36fc4914fb30",
+  "centralSha": "b205088594b7c7295df8eba87cb06a37e0a32e0e",
   "profile": "app",
   "project": "study-log",
   "files": {
@@ -395,7 +395,7 @@
     },
     "deploy/install-backup.sh": {
       "mode": "full",
-      "sha256": "410e40aa22b85092d670d7cf0a38098e5b2e1e2942b079fc1b4451ce1376c2dd",
+      "sha256": "f97a3857c8c85ba85a20b9e6c74d5e0594afb21a31ccbb7fd1d112690016ea6f",
       "source": "templates/deploy/deploy/install-backup.sh.tmpl"
     },
     "deploy/notify.sh": {
@@ -410,18 +410,18 @@
     },
     "deploy/report.service": {
       "mode": "full",
-      "sha256": "b40ccb566ac92177e290c14f0e99c890cd0634d4de0206d4fb8a0ade39f6bdaa",
-      "source": "templates/app/deploy/report.service.tmpl"
+      "sha256": "da6b68f66308cfaf8ddc0159ed8106784fd7f312f8975f50452050181741cc91",
+      "source": "templates/deploy/deploy/report.service.tmpl"
     },
     "deploy/report.sh": {
       "mode": "full",
-      "sha256": "de2318d64563dd1aa6e089edf0822afec1d564e9137e5ce8258a2e61192574c2",
-      "source": "templates/app/deploy/report.sh.tmpl"
+      "sha256": "c4e1d6814395d2d5884a8221d9a887a171533101a5b720fe70c76866608deddc",
+      "source": "templates/deploy/deploy/report.sh.tmpl"
     },
     "deploy/report.timer": {
       "mode": "full",
-      "sha256": "3dfbe2c098ae160880657730fa8ba922eeb03b3fb68d089e7124c1c3e10ae0ed",
-      "source": "templates/app/deploy/report.timer.tmpl"
+      "sha256": "b05d7d9eedee59abb993bf4eb488b198daa4f39a311f47a049bbdc787816a129",
+      "source": "templates/deploy/deploy/report.timer.tmpl"
     },
     "deploy/restore-check.service": {
       "mode": "full",
