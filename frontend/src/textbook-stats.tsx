@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 
+import { Button } from './components/ui/button';
+import { NativeSelect } from './components/ui/native-select';
 import { apiKey, useApiQuery } from './lib/query';
 import { Loading } from './loading';
 import { plural } from './plural';
@@ -26,14 +28,14 @@ export function TextbookStats() {
       <h2>Textbooks and schedules</h2>
       <label className="textbook-filter">
         Textbook
-        <select value={textbookId} onChange={(event) => setTextbookId(event.target.value)}>
+        <NativeSelect value={textbookId} onChange={(event) => setTextbookId(event.target.value)}>
           <option value="">All</option>
           {choices.map((book) => (
             <option key={book.id} value={book.id}>
               {book.title}
             </option>
           ))}
-        </select>
+        </NativeSelect>
       </label>
       {error ? (
         <>
@@ -41,9 +43,9 @@ export function TextbookStats() {
             Could not load the textbook stats: {error}
           </p>
           {/* With the first answer lost there is no other pick to come back from. */}
-          <button type="button" className="secondary" onClick={() => void query.refetch()}>
+          <Button type="button" variant="outline" onClick={() => void query.refetch()}>
             Reload
-          </button>
+          </Button>
         </>
       ) : !stats ? (
         <Loading label="Loading the textbook stats" kind="text" />

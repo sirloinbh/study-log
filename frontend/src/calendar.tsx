@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import React, { useEffect, useRef, useState } from 'react';
 
+import { Button } from './components/ui/button';
 import { apiKey, useApiQuery } from './lib/query';
 import { Loading } from './loading';
 import { Memo } from './memo';
@@ -59,34 +60,34 @@ export function Calendar({ today, reloadKey }: { today: string; reloadKey?: numb
       <div className="calendar-head">
         <h2>{monthTitle(month)}</h2>
         <div className="actions">
-          <button
+          <Button
             type="button"
-            className="secondary"
+            variant="outline"
             aria-label="Previous month"
             onClick={() => setMonth(shiftMonth(month, -1))}
           >
             Previous
-          </button>
+          </Button>
           {month !== today.slice(0, 7) && (
-            <button
+            <Button
               type="button"
-              className="secondary"
+              variant="outline"
               onClick={() => {
                 setMonth(today.slice(0, 7));
                 setSelected(today);
               }}
             >
               This month
-            </button>
+            </Button>
           )}
-          <button
+          <Button
             type="button"
-            className="secondary"
+            variant="outline"
             aria-label="Next month"
             onClick={() => setMonth(shiftMonth(month, 1))}
           >
             Next
-          </button>
+          </Button>
         </div>
       </div>
       {error && (

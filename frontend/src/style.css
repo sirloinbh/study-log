@@ -35,15 +35,6 @@
   outline: 3px solid var(--ring);
   outline-offset: 3px;
 }
-.primary {
-  background: var(--primary);
-  color: var(--primary-foreground);
-  border: 1px solid var(--primary);
-  border-radius: calc(var(--radius) - 2px);
-  padding: 12px 17px;
-  font-size: 12px;
-  font-weight: 500;
-}
 .card {
   background: var(--card);
   border: 1px solid var(--border);
@@ -66,20 +57,6 @@
   border-radius: var(--radius);
   padding: 12px 16px;
 }
-.secondary,
-.danger {
-  background: var(--card);
-  color: var(--foreground);
-  border: 1px solid var(--border);
-  border-radius: calc(var(--radius) - 2px);
-  padding: 8px 12px;
-  min-height: 36px;
-  font-size: 12px;
-}
-.danger {
-  background: color-mix(in oklch, var(--destructive) 10%, transparent);
-  border-color: color-mix(in oklch, var(--destructive) 10%, transparent);
-}
 .study-logs,
 .textbooks,
 .keywords,
@@ -88,6 +65,7 @@
 .schedules,
 .reviews {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 20px;
   max-width: 960px;
 }
@@ -112,8 +90,6 @@
   font-size: 12px;
   font-weight: 500;
 }
-.log-form input,
-.log-form select,
 .log-form textarea {
   width: 100%;
   border: 1px solid var(--border);
@@ -121,8 +97,6 @@
   background: var(--card);
   color: var(--foreground);
   padding: 9px 10px;
-}
-.log-form textarea {
   resize: vertical;
 }
 .log-form .wide {

@@ -2,6 +2,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import React, { useEffect, useState } from 'react';
 
 import { useBusy } from './busy';
+import { Button } from './components/ui/button';
+import { Input } from './components/ui/input';
 import { Exercises } from './exercises';
 import { ImportantExercises } from './important-exercises';
 import type { RequestError } from './lib/api';
@@ -159,7 +161,7 @@ export function Textbooks() {
         <form className="log-form textbook-form" onSubmit={(event) => void save(event)}>
           <label className="title">
             Title
-            <input
+            <Input
               id="textbook-title"
               required
               maxLength={limits.title}
@@ -170,7 +172,7 @@ export function Textbooks() {
           </label>
           <label>
             Author
-            <input
+            <Input
               maxLength={limits.author}
               disabled={busy}
               value={form.author}
@@ -179,7 +181,7 @@ export function Textbooks() {
           </label>
           <label>
             Edition
-            <input
+            <Input
               maxLength={limits.edition}
               disabled={busy}
               value={form.edition}
@@ -187,14 +189,14 @@ export function Textbooks() {
             />
           </label>
           <div className="actions wide">
-            <button type="submit" className="primary" disabled={busy}>
+            <Button type="submit" disabled={busy}>
               <ButtonSpinner when={action === 'save'} />
               {editingId === undefined ? 'Register' : 'Save changes'}
-            </button>
+            </Button>
             {editingId !== undefined && (
-              <button type="button" className="secondary" disabled={busy} onClick={leaveEdit}>
+              <Button type="button" variant="outline" disabled={busy} onClick={leaveEdit}>
                 Cancel
-              </button>
+              </Button>
             )}
           </div>
         </form>
@@ -263,20 +265,20 @@ export function Textbooks() {
               <div className="log-actions">
                 {confirmingDelete ? (
                   <>
-                    <button
+                    <Button
                       type="button"
                       id="textbook-delete-confirm"
-                      className="danger"
+                      variant="destructive"
                       disabled={busy}
                       aria-label={`Confirm textbook deletion: ${selected.title}`}
                       onClick={() => void remove(selected.id)}
                     >
                       <ButtonSpinner when={action === 'delete'} />
                       Confirm delete
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
-                      className="secondary"
+                      variant="outline"
                       disabled={busy}
                       aria-label={`Cancel textbook deletion: ${selected.title}`}
                       onClick={() => {
@@ -285,23 +287,23 @@ export function Textbooks() {
                       }}
                     >
                       Cancel
-                    </button>
+                    </Button>
                   </>
                 ) : (
                   <>
-                    <button
+                    <Button
                       type="button"
-                      className="secondary"
+                      variant="outline"
                       disabled={busy}
                       aria-label={`Edit textbook: ${selected.title}`}
                       onClick={() => edit(selected)}
                     >
                       Edit
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
                       id="textbook-delete"
-                      className="secondary"
+                      variant="outline"
                       disabled={busy}
                       aria-label={`Delete textbook: ${selected.title}`}
                       onClick={() => {
@@ -310,7 +312,7 @@ export function Textbooks() {
                       }}
                     >
                       Delete
-                    </button>
+                    </Button>
                   </>
                 )}
               </div>

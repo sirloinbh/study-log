@@ -1,3 +1,5 @@
+import { Button } from './components/ui/button';
+import { Input } from './components/ui/input';
 import { type ExerciseForm, exerciseLimits } from './exercise';
 import { ButtonSpinner } from './loading';
 
@@ -26,7 +28,7 @@ export function ExerciseFormView({
       <p className="wide content-form-heading">{isNew ? 'Add problem' : 'Edit problem'}</p>
       <label>
         Problem number
-        <input
+        <Input
           maxLength={exerciseLimits.number}
           placeholder="e.g. 3"
           disabled={busy}
@@ -56,13 +58,13 @@ export function ExerciseFormView({
         />
       </label>
       <div className="actions wide">
-        <button type="submit" className="primary" disabled={busy}>
+        <Button type="submit" disabled={busy}>
           <ButtonSpinner when={action === 'save'} />
           {isNew ? 'Add' : 'Save changes'}
-        </button>
-        <button type="button" className="secondary" disabled={busy} onClick={onClose}>
+        </Button>
+        <Button type="button" variant="outline" disabled={busy} onClick={onClose}>
           {isNew ? 'Close' : 'Cancel'}
-        </button>
+        </Button>
       </div>
     </form>
   );

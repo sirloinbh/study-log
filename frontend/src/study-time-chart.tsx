@@ -1,5 +1,6 @@
 import React from 'react';
 
+import { Button } from './components/ui/button';
 import { Loading } from './loading';
 import { formatMinutes } from './study-logs-data';
 import {
@@ -43,15 +44,15 @@ export function StudyTimeChart({
         <h2 id="study-chart-heading">Study time trend</h2>
         <div className="period-filter" role="group" aria-label="Chart unit">
           {chartUnits.map((key) => (
-            <button
+            <Button
               key={key}
               type="button"
-              className={key === unit ? 'primary' : 'secondary'}
+              variant={key === unit ? 'default' : 'outline'}
               aria-pressed={key === unit}
               onClick={() => onPick(stats.period, key)}
             >
               {chartUnitLabels[key]}
-            </button>
+            </Button>
           ))}
         </div>
       </div>

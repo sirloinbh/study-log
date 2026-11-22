@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 
+import { Button } from './components/ui/button';
+import { NativeSelect } from './components/ui/native-select';
 import { Heatmap } from './heatmap';
 import { apiKey, useApiQuery } from './lib/query';
 import { Loading } from './loading';
@@ -52,34 +54,34 @@ export function Stats() {
     <div className="stats">
       <div className="period-filter" role="group" aria-label="Period">
         {statPeriods.map((key) => (
-          <button
+          <Button
             key={key}
             type="button"
-            className={key === period ? 'primary' : 'secondary'}
+            variant={key === period ? 'default' : 'outline'}
             aria-pressed={key === period}
             onClick={() => setPeriod(key)}
           >
             {periodLabels[key]}
-          </button>
+          </Button>
         ))}
       </div>
       <div className="period-filter" role="group" aria-label="Study type">
         {statStudyTypes.map((key) => (
-          <button
+          <Button
             key={key}
             type="button"
-            className={key === studyType ? 'primary' : 'secondary'}
+            variant={key === studyType ? 'default' : 'outline'}
             aria-pressed={key === studyType}
             onClick={() => setStudyType(key)}
           >
             {statStudyTypeLabels[key]}
-          </button>
+          </Button>
         ))}
       </div>
       {/* Named apart from the textbook filter of "Textbooks and schedules" below, which covers only that card. */}
       <label className="textbook-filter">
         Textbook
-        <select
+        <NativeSelect
           aria-label="Study time textbook"
           value={textbookId}
           onChange={(event) => setTextbookId(event.target.value)}
@@ -90,7 +92,7 @@ export function Stats() {
               {book.title}
             </option>
           ))}
-        </select>
+        </NativeSelect>
       </label>
       {textbooksFailed && (
         <p className="status">

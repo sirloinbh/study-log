@@ -1,3 +1,4 @@
+import { Button } from './components/ui/button';
 import { ButtonSpinner } from './loading';
 import { contentLabel, type ContentNode } from './textbook';
 
@@ -41,75 +42,75 @@ export function ContentsTree({
               <div className="log-actions">
                 {deletingId === node.id ? (
                   <>
-                    <button
+                    <Button
                       type="button"
                       id={`content-delete-confirm-${node.id}`}
-                      className="danger"
+                      variant="destructive"
                       disabled={busy}
                       aria-label={`Confirm contents entry deletion: ${label}`}
                       onClick={() => onConfirmDelete(node)}
                     >
                       <ButtonSpinner when={action === 'delete'} />
                       Confirm delete
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
-                      className="secondary"
+                      variant="outline"
                       disabled={busy}
                       aria-label={`Cancel contents entry deletion: ${label}`}
                       onClick={() => onCancelDelete(node)}
                     >
                       Cancel
-                    </button>
+                    </Button>
                   </>
                 ) : (
                   <>
-                    <button
+                    <Button
                       type="button"
-                      className="secondary"
+                      variant="outline"
                       disabled={busy || index === 0}
                       aria-label={`Move up: ${label}`}
                       onClick={() => onMove(nodes, index, -1, parentId)}
                     >
                       Up
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
-                      className="secondary"
+                      variant="outline"
                       disabled={busy || index === nodes.length - 1}
                       aria-label={`Move down: ${label}`}
                       onClick={() => onMove(nodes, index, 1, parentId)}
                     >
                       Down
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
-                      className="secondary"
+                      variant="outline"
                       disabled={busy}
                       aria-label={`Add child: ${label}`}
                       onClick={() => onAddChild(node)}
                     >
                       Add child
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
-                      className="secondary"
+                      variant="outline"
                       disabled={busy}
                       aria-label={`Edit contents entry: ${label}`}
                       onClick={() => onEdit(node)}
                     >
                       Edit
-                    </button>
-                    <button
+                    </Button>
+                    <Button
                       type="button"
-                      className="secondary"
+                      variant="outline"
                       disabled={busy}
                       id={`content-delete-${node.id}`}
                       aria-label={`Delete contents entry: ${label}`}
                       onClick={() => onAskDelete(node)}
                     >
                       Delete
-                    </button>
+                    </Button>
                   </>
                 )}
               </div>

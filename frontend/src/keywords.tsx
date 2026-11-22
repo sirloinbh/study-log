@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import React, { useEffect, useState } from 'react';
 
 import { useBusy } from './busy';
+import { Button } from './components/ui/button';
 import {
   emptyKeywordForm,
   type Keyword,
@@ -201,14 +202,14 @@ export function Keywords({ today }: { today: string }) {
           onSubmit={add}
         >
           {date !== today && (
-            <button
+            <Button
               type="button"
-              className="secondary"
+              variant="outline"
               disabled={busy}
               onClick={() => pickDate({ target: { value: today } })}
             >
               Back to today
-            </button>
+            </Button>
           )}
         </KeywordFormView>
         {/* Always mounted so screen readers announce each new message. */}
@@ -253,9 +254,9 @@ export function Keywords({ today }: { today: string }) {
                     onMemo={(value) => changeEditor('memo')({ target: { value } })}
                     onSubmit={save}
                   >
-                    <button
+                    <Button
                       type="button"
-                      className="secondary"
+                      variant="outline"
                       disabled={busy}
                       onClick={() => {
                         setEditor(undefined);
@@ -263,7 +264,7 @@ export function Keywords({ today }: { today: string }) {
                       }}
                     >
                       Cancel
-                    </button>
+                    </Button>
                   </KeywordFormView>
                 </li>
               ) : (
@@ -275,9 +276,9 @@ export function Keywords({ today }: { today: string }) {
                   <div className="log-actions">
                     {deletingId === keyword.id ? (
                       <>
-                        <button
+                        <Button
                           type="button"
-                          className="danger"
+                          variant="destructive"
                           id={`keyword-delete-confirm-${keyword.id}`}
                           disabled={busy}
                           aria-label={`${keyword.keyword} confirm deletion`}
@@ -288,10 +289,10 @@ export function Keywords({ today }: { today: string }) {
                         >
                           <ButtonSpinner when={action === 'delete'} />
                           Confirm delete
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="button"
-                          className="secondary"
+                          variant="outline"
                           disabled={busy}
                           aria-label={`${keyword.keyword} cancel deletion`}
                           onClick={() => {
@@ -300,13 +301,13 @@ export function Keywords({ today }: { today: string }) {
                           }}
                         >
                           Cancel
-                        </button>
+                        </Button>
                       </>
                     ) : (
                       <>
-                        <button
+                        <Button
                           type="button"
-                          className="secondary"
+                          variant="outline"
                           disabled={busy}
                           aria-label={`${keyword.keyword} edit`}
                           onClick={() => {
@@ -322,10 +323,10 @@ export function Keywords({ today }: { today: string }) {
                           }}
                         >
                           Edit
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="button"
-                          className="secondary"
+                          variant="outline"
                           id={`keyword-delete-${keyword.id}`}
                           disabled={busy}
                           aria-label={`${keyword.keyword} delete`}
@@ -335,7 +336,7 @@ export function Keywords({ today }: { today: string }) {
                           }}
                         >
                           Delete
-                        </button>
+                        </Button>
                       </>
                     )}
                   </div>

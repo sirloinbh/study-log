@@ -1,3 +1,4 @@
+import { Button } from './components/ui/button';
 import { ButtonSpinner, Loading } from './loading';
 import { plural } from './plural';
 import type { Schedule } from './schedule';
@@ -71,38 +72,38 @@ export function ScheduleList({
                 <div className="actions">
                   {confirming === item.id ? (
                     <>
-                      <button
+                      <Button
                         type="button"
                         id={`schedule-delete-confirm-${item.id}`}
-                        className="danger"
+                        variant="destructive"
                         aria-label={`Confirm deletion: ${item.title}`}
                         disabled={busy}
                         onClick={() => onDelete(item.id)}
                       >
                         <ButtonSpinner when={action === 'delete'} />
                         Confirm delete
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
-                        className="secondary"
+                        variant="outline"
                         aria-label={`Cancel deletion: ${item.title}`}
                         disabled={busy}
                         onClick={() => onCancelDelete(item.id)}
                       >
                         Cancel
-                      </button>
+                      </Button>
                     </>
                   ) : (
-                    <button
+                    <Button
                       type="button"
                       id={`schedule-delete-${item.id}`}
-                      className="secondary"
+                      variant="outline"
                       aria-label={`Delete schedule: ${item.title}`}
                       disabled={busy}
                       onClick={() => onAskDelete(item.id)}
                     >
                       Delete
-                    </button>
+                    </Button>
                   )}
                 </div>
               </div>

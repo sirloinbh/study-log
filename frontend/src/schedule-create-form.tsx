@@ -1,5 +1,8 @@
 import { useState } from 'react';
 
+import { Button } from './components/ui/button';
+import { Input } from './components/ui/input';
+import { NativeSelect } from './components/ui/native-select';
 import { apiKey, useApiQuery } from './lib/query';
 import { ButtonSpinner } from './loading';
 import { defaultEnd, defaultHours, hoursToMinutes } from './schedule';
@@ -117,7 +120,7 @@ export function ScheduleCreateForm({
       <form className="log-form" onSubmit={(event) => void create(event)}>
         <label className="wide">
           Schedule name
-          <input
+          <Input
             required
             maxLength={200}
             placeholder="e.g. Algorithms textbook, first pass"
@@ -128,7 +131,7 @@ export function ScheduleCreateForm({
         </label>
         <label>
           Start date
-          <input
+          <Input
             type="date"
             required
             min={today}
@@ -139,7 +142,7 @@ export function ScheduleCreateForm({
         </label>
         <label>
           End date
-          <input
+          <Input
             type="date"
             required
             min={startDate}
@@ -150,7 +153,7 @@ export function ScheduleCreateForm({
         </label>
         <label>
           Weekdays (hours)
-          <input
+          <Input
             type="number"
             required
             min={0}
@@ -163,7 +166,7 @@ export function ScheduleCreateForm({
         </label>
         <label>
           Weekends and holidays (hours)
-          <input
+          <Input
             type="number"
             required
             min={0}
@@ -176,7 +179,7 @@ export function ScheduleCreateForm({
         </label>
         <label className="half">
           Textbook (optional)
-          <select
+          <NativeSelect
             disabled={busy || !textbooks}
             value={textbookId}
             onChange={(event) => {
@@ -192,31 +195,31 @@ export function ScheduleCreateForm({
                 {book.title}
               </option>
             ))}
-          </select>
+          </NativeSelect>
         </label>
         {textbookId && (
           <>
             <label>
               First chapter
-              <select
+              <NativeSelect
                 disabled={busy || !bookChapters?.length}
                 value={fromContentId}
                 onChange={typed(setFromContentId)}
               >
                 <option value="">From the start</option>
                 {chapterOptions}
-              </select>
+              </NativeSelect>
             </label>
             <label>
               Last chapter
-              <select
+              <NativeSelect
                 disabled={busy || !bookChapters?.length}
                 value={toContentId}
                 onChange={typed(setToContentId)}
               >
                 <option value="">To the end</option>
                 {chapterOptions}
-              </select>
+              </NativeSelect>
             </label>
           </>
         )}
@@ -228,10 +231,10 @@ export function ScheduleCreateForm({
           <p className="status wide">This textbook has no chapters. Add its contents first</p>
         )}
         <div className="actions wide">
-          <button type="submit" className="primary" disabled={busy}>
+          <Button type="submit" disabled={busy}>
             <ButtonSpinner when={action === 'create'} />
             Create a schedule
-          </button>
+          </Button>
         </div>
       </form>
       {/* Always mounted so screen readers announce each new message. */}

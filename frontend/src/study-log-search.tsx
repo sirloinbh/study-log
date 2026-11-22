@@ -2,6 +2,9 @@ import { useQueryClient } from '@tanstack/react-query';
 import React, { useEffect, useRef, useState } from 'react';
 
 import { useBusy } from './busy';
+import { Button } from './components/ui/button';
+import { Input } from './components/ui/input';
+import { NativeSelect } from './components/ui/native-select';
 import { apiKey, useApiQuery } from './lib/query';
 import { ButtonSpinner } from './loading';
 import { Memo } from './memo';
@@ -90,7 +93,7 @@ export function StudyLogSearch({
       <form className="log-form" onSubmit={find}>
         <label className="wide">
           Search term
-          <input
+          <Input
             type="search"
             maxLength={50}
             placeholder="Part of a memo or difficult part"
@@ -101,7 +104,7 @@ export function StudyLogSearch({
         </label>
         <label>
           Start date
-          <input
+          <Input
             type="date"
             disabled={busy}
             max={search.to || undefined}
@@ -111,7 +114,7 @@ export function StudyLogSearch({
         </label>
         <label>
           End date
-          <input
+          <Input
             type="date"
             disabled={busy}
             min={search.from || undefined}
@@ -121,20 +124,20 @@ export function StudyLogSearch({
         </label>
         <label className="half">
           Textbook
-          <select disabled={busy} value={search.textbookId} onChange={change('textbookId')}>
+          <NativeSelect disabled={busy} value={search.textbookId} onChange={change('textbookId')}>
             <option value="">All</option>
             {textbooks.map((book) => (
               <option key={book.id} value={String(book.id)}>
                 {book.title}
               </option>
             ))}
-          </select>
+          </NativeSelect>
         </label>
         <div className="actions wide">
-          <button type="submit" className="primary" disabled={busy}>
+          <Button type="submit" disabled={busy}>
             <ButtonSpinner when={action === 'search'} />
             Search
-          </button>
+          </Button>
         </div>
       </form>
       {error && (

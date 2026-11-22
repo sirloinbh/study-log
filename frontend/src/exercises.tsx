@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 
 import { useBusy } from './busy';
+import { NativeSelect } from './components/ui/native-select';
 import {
   contentPath,
   emptyExerciseForm,
@@ -267,13 +268,13 @@ export function Exercises({
           <div className="log-form exercise-picker">
             <label className="wide">
               Section
-              <select disabled={busy} value={contentId} onChange={pick}>
+              <NativeSelect disabled={busy} value={contentId} onChange={pick}>
                 {options.map((option) => (
                   <option key={option.id} value={option.id}>
                     {option.label}
                   </option>
                 ))}
-              </select>
+              </NativeSelect>
             </label>
           </div>
           {open && (

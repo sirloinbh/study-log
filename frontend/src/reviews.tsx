@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 
 import { useBusy } from './busy';
+import { Button } from './components/ui/button';
+import { Input } from './components/ui/input';
 import type { RequestError } from './lib/api';
 import { apiKey, useApiMutation, useApiQuery } from './lib/query';
 import { ButtonSpinner, Loading } from './loading';
@@ -223,17 +225,17 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
       <section className="card" aria-label={heading}>
         <div className="log-actions" role="group" aria-label="View range">
           {(Object.keys(reviewRanges) as ReviewRange[]).map((key) => (
-            <button
+            <Button
               key={key}
               type="button"
               id={rangeId(key)}
-              className={key === range ? 'primary' : 'secondary'}
+              variant={key === range ? 'default' : 'outline'}
               aria-pressed={key === range}
               disabled={busy}
               onClick={() => pickRange(key)}
             >
               {reviewRanges[key].label}
-            </button>
+            </Button>
           ))}
         </div>
         <h2 id={headingId} className="reviews-heading" tabIndex={-1}>
@@ -283,7 +285,7 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
                     <form className="log-form" onSubmit={(event) => saveDate(event, review)}>
                       <label className="half">
                         New due date
-                        <input
+                        <Input
                           id={dateInputId}
                           type="date"
                           required
@@ -295,18 +297,18 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
                         />
                       </label>
                       <div className="actions wide">
-                        <button
+                        <Button
                           type="submit"
-                          className="primary"
+
                           disabled={busy}
                           aria-label={`Save due date: ${name}`}
                         >
                           <ButtonSpinner when={action === 'date'} />
                           Save
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="button"
-                          className="secondary"
+                          variant="outline"
                           disabled={busy}
                           aria-label={`Cancel due date change: ${name}`}
                           onClick={() => {
@@ -315,41 +317,41 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
                           }}
                         >
                           Cancel
-                        </button>
+                        </Button>
                       </div>
                     </form>
                   ) : (
                     <div className="log-actions">
-                      <button
+                      <Button
                         type="button"
-                        className="primary"
+
                         id={completeId(review)}
                         disabled={busy}
                         aria-label={`Complete review: ${name}`}
                         onClick={() => void complete(review)}
                       >
                         Complete review
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
-                        className="secondary"
+                        variant="outline"
                         id={snoozeId(review)}
                         disabled={busy}
                         aria-label={`Postpone a day: ${name}`}
                         onClick={() => void snooze(review)}
                       >
                         Postpone a day
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
-                        className="secondary"
+                        variant="outline"
                         id={editId(review)}
                         disabled={busy}
                         aria-label={`Change date: ${name}`}
                         onClick={() => openEditor(review)}
                       >
                         Change date
-                      </button>
+                      </Button>
                     </div>
                   )}
                 </li>

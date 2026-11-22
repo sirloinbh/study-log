@@ -1,3 +1,5 @@
+import { Button } from './components/ui/button';
+import { Input } from './components/ui/input';
 import { ButtonSpinner } from './loading';
 
 // The form that adds a chapter or section, or edits an entry (`isNew` tells which).
@@ -27,7 +29,7 @@ export function ContentsEntryForm({
       <p className="wide content-form-heading">{heading}</p>
       <label>
         Number
-        <input
+        <Input
           maxLength={20}
           placeholder="e.g. 1.2"
           disabled={busy}
@@ -37,7 +39,7 @@ export function ContentsEntryForm({
       </label>
       <label className="title">
         Contents title
-        <input
+        <Input
           // eslint-disable-next-line jsx-a11y-x/no-autofocus -- this field opens on a click, so focus follows that action.
           autoFocus
           required
@@ -48,13 +50,13 @@ export function ContentsEntryForm({
         />
       </label>
       <div className="actions wide">
-        <button type="submit" className="primary" disabled={busy}>
+        <Button type="submit" disabled={busy}>
           <ButtonSpinner when={action === 'save'} />
           {isNew ? 'Add' : 'Save changes'}
-        </button>
-        <button type="button" className="secondary" disabled={busy} onClick={onCancel}>
+        </Button>
+        <Button type="button" variant="outline" disabled={busy} onClick={onCancel}>
           Cancel
-        </button>
+        </Button>
       </div>
     </form>
   );

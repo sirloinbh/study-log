@@ -1,3 +1,4 @@
+import { Button } from './components/ui/button';
 import { exerciseLimits } from './exercise';
 import { ButtonSpinner, Loading } from './loading';
 import type { AnswerPanel } from './use-answer-panel';
@@ -42,13 +43,13 @@ export function ExerciseAnswerView({
           </label>
           <p className="wide status">Saving it empty clears the answer</p>
           <div className="actions wide">
-            <button type="submit" className="primary" disabled={busy}>
+            <Button type="submit" disabled={busy}>
               <ButtonSpinner when={action === 'answer'} />
               Save answer
-            </button>
-            <button type="button" className="secondary" disabled={busy} onClick={onCancelEdit}>
+            </Button>
+            <Button type="button" variant="outline" disabled={busy} onClick={onCancelEdit}>
               Cancel
-            </button>
+            </Button>
           </div>
         </form>
       ) : panel.error ? (
@@ -65,15 +66,15 @@ export function ExerciseAnswerView({
           ) : (
             <p className="exercise-body">{panel.body}</p>
           )}
-          <button
+          <Button
             type="button"
-            className="secondary"
+            variant="outline"
             disabled={busy}
             aria-label={`${label} ${panel.body === null ? 'add answer' : 'edit answer'}`}
             onClick={onStartEdit}
           >
             {panel.body === null ? 'Add answer' : 'Edit answer'}
-          </button>
+          </Button>
         </>
       )}
     </div>
