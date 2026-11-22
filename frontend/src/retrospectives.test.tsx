@@ -1,10 +1,11 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
 
 import { periodTitle, shiftDays, shiftPeriod } from './retrospective';
 import { Retrospectives } from './retrospectives';
 import { barWidth, hourLabel } from './study-stats';
 import { type Answer, fakeApi, type Sent } from './test/fake-api';
+import { render } from './test/render';
 
 const today = '2026-10-23'; // a Friday; its week is Sunday 10-18 to Saturday 10-24
 

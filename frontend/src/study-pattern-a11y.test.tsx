@@ -1,10 +1,11 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { screen, waitFor, within } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 
 import { StudyPattern } from './study-pattern';
+import { render } from './test/render';
 
 test('the hour values can be found by accessible text', async () => {
   const byHour = Array.from({ length: 24 }, (_, hour) => (hour === 9 ? 90 : 0));

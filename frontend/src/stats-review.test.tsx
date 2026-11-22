@@ -1,9 +1,10 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 
 import { Stats } from './stats';
 import { reviewBars, studyTimePath } from './study-stats';
 import { type Api, fakeApi } from './test/fake-api';
+import { render } from './test/render';
 
 // The chart library is slow to load and draws nothing without a real layout; the page is checked
 // in a browser instead.

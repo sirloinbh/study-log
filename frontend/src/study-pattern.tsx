@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 
-import { type RequestError, requestJson } from './lib/api';
+import { apiKey, useApiQuery } from './lib/query';
 import { Loading } from './loading';
 import { formatMinutes } from './study-logs-data';
 import { barWidth, hourLabel, type StudyPattern as Pattern, weekdayNames } from './study-stats';
@@ -16,30 +16,14 @@ export function StudyPattern({
   to: string;
   reloadKey?: number;
 }) {
-  // Kept per period, so a slow answer for another period never shows here.
-  const [patterns, setPatterns] = useState<Record<string, Pattern>>({});
-  const [error, setError] = useState<{ key: string; message: string }>();
-  const key = `${from}~${to}`;
-
-  useEffect(() => {
-    let current = true;
-    requestJson<Pattern>(`/api/stats/patterns?from=${from}&to=${to}`)
-      .then((data) => {
-        if (!current) return;
-        setPatterns((all) => ({ ...all, [`${from}~${to}`]: data }));
-        setError((failed) => (failed?.key === `${from}~${to}` ? undefined : failed));
-      })
-      .catch(
-        (failure: RequestError) =>
-          current && setError({ key: `${from}~${to}`, message: failure.message }),
-      );
-    return () => {
-      current = false;
-    };
-  }, [from, to, reloadKey]);
-
-  const pattern = patterns[key];
-  const failed = error?.key === key ? error.message : undefined;
+  // One cached answer per period, so a slow answer for another period never shows here. `reloadKey`
+  // changes when the retrospective is saved, so the pattern is read again.
+  const query = useApiQuery<Pattern>(
+    apiKey('/api/stats/patterns', from, to, reloadKey),
+    `/api/stats/patterns?from=${from}&to=${to}`,
+  );
+  const pattern = query.data;
+  const failed = query.error?.message;
 
   return (
     <section className="study-pattern" aria-label="Study pattern">
