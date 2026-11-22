@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 
 import { Heatmap } from './heatmap';
-import { type RequestError, requestJson } from './lib/api';
+import { apiKey, useApiQuery } from './lib/query';
 import { Loading } from './loading';
 import { plural } from './plural';
 import { ReviewRateChart } from './review-rate-chart';
@@ -31,43 +31,21 @@ export function Stats() {
   const [studyType, setStudyType] = useState<StatStudyType>('all');
   // '' for every log, or one textbook's (#180). Without the list there is only "All".
   const [textbookId, setTextbookId] = useState('');
-  const [textbooks, setTextbooks] = useState<Textbook[]>();
-  const [textbooksFailed, setTextbooksFailed] = useState(false);
-  useEffect(() => {
-    let current = true;
-    requestJson<{ textbooks: Textbook[] }>('/api/textbooks')
-      .then((data) => current && setTextbooks(data.textbooks))
-      .catch(() => current && setTextbooksFailed(true));
-    return () => {
-      current = false;
-    };
-  }, []);
-  // Kept per period and type, so a slow answer for another pick never replaces or hides this one's.
-  const [loaded, setLoaded] = useState<Partial<Record<string, StudyTimeStats>>>({});
-  const [loadError, setLoadError] = useState<{ path: string; message: string }>();
+  const textbooksQuery = useApiQuery<{ textbooks: Textbook[] }>(
+    apiKey('/api/textbooks'),
+    '/api/textbooks',
+  );
+  const textbooks = textbooksQuery.data?.textbooks;
+  const textbooksFailed = textbooksQuery.isError;
   // The chart unit picked for each period (#49).
   const [chartUnits, setChartUnits] = useState<Partial<Record<StatPeriod, ChartUnit>>>({});
 
   const path = studyTimePath(period, studyType, textbookId);
   const bookTitle = textbooks?.find((book) => String(book.id) === textbookId)?.title;
-  useEffect(() => {
-    let current = true;
-    requestJson<StudyTimeStats>(path)
-      .then((data) => {
-        if (!current) return;
-        setLoaded((all) => ({ ...all, [path]: data }));
-        setLoadError((failed) => (failed?.path === path ? undefined : failed));
-      })
-      .catch((error: RequestError) => {
-        if (current) setLoadError({ path, message: error.message });
-      });
-    return () => {
-      current = false;
-    };
-  }, [path]);
-
-  const stats = loaded[path];
-  const error = loadError?.path === path ? loadError.message : undefined;
+  // One cached answer per pick, so a slow answer for another pick never replaces or hides this one's.
+  const query = useApiQuery<StudyTimeStats>(apiKey(path), path);
+  const stats = query.data;
+  const error = query.error?.message;
   const label = periodLabels[period];
 
   return (
