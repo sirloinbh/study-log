@@ -36,7 +36,10 @@ test(
     let fail = false;
     const translator = async (source: TranslationSource) => {
       if (fail) throw new TranslationError(422, 'This content cannot be translated');
-      given.push(source);
+      // The route hands in a signal that aborts when the request is abandoned (#337).
+      assert.ok(source.signal instanceof AbortSignal);
+      const { signal: _signal, ...rest } = source;
+      given.push(rest);
       return {
         body: `번역: ${source.body}`,
         answer: source.answer === null ? null : `번역: ${source.answer}`,
