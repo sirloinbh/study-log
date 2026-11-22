@@ -1,9 +1,11 @@
+import { useQueryClient } from '@tanstack/react-query';
 import React, { useEffect, useState } from 'react';
 
 import { useBusy } from './busy';
 import { Exercises } from './exercises';
 import { ImportantExercises } from './important-exercises';
-import { type RequestError, requestJson } from './lib/api';
+import type { RequestError } from './lib/api';
+import { apiKey, type ApiRequest, useApiMutation, useApiQuery } from './lib/query';
 import { ButtonSpinner, Loading } from './loading';
 import {
   type ContentNode,
@@ -15,6 +17,8 @@ import {
 } from './textbook';
 import { TextbookContents } from './textbook-contents';
 
+const textbooksKey = apiKey('/api/textbooks');
+
 type Notice = { kind: 'status' | 'alert'; text: string } | undefined;
 
 // Same breakpoint as style.css, where the list and detail stack.
@@ -25,14 +29,11 @@ export function Textbooks() {
   const [editingId, setEditingId] = useState<number | undefined>(undefined);
   // The unsaved new textbook, restored after an edit is saved or cancelled.
   const [draft, setDraft] = useState<TextbookForm | undefined>(undefined);
-  const [books, setBooks] = useState<Textbook[] | undefined>(undefined);
-  const [loadError, setLoadError] = useState<string | undefined>(undefined);
   const [notice, setNotice] = useState<Notice>(undefined);
   // One request at a time: fields and action buttons are disabled while a save or delete is pending.
   const { busy, action, nameNext, begin, end } = useBusy();
   const [selectedId, setSelectedId] = useState<number | undefined>(undefined);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const [reload, setReload] = useState(0);
 
   // The element to focus once the delete flow has re-rendered and the buttons are enabled again:
   // the confirm button, the delete button after a cancel, or the list heading once the entry is
@@ -56,23 +57,14 @@ export function Textbooks() {
   const changed = (card: 'list' | 'important') => () =>
     setExerciseChanges((counts) => ({ ...counts, [card]: counts[card] + 1 }));
 
-  useEffect(() => {
-    // A slower, older response must not overwrite the list a newer request returned.
-    let current = true;
-    requestJson<{ textbooks: Textbook[] }>('/api/textbooks')
-      .then((data) => {
-        if (!current) return;
-        setBooks(data.textbooks);
-        setLoadError(undefined);
-      })
-      .catch((error: RequestError) => {
-        // Keep whatever list is already on screen; only report that it could not be refreshed.
-        if (current) setLoadError(error.message);
-      });
-    return () => {
-      current = false;
-    };
-  }, [reload]);
+  // The list is read again after a change (and after a failed one, which may mean it is out of date).
+  // A failed read keeps the list on screen and only reports that it could not be refreshed.
+  const client = useQueryClient();
+  const listQuery = useApiQuery<{ textbooks: Textbook[] }>(textbooksKey, '/api/textbooks');
+  const books = listQuery.data?.textbooks;
+  const loadError = listQuery.error?.message;
+  const write = useApiMutation<unknown, ApiRequest>((request) => request);
+  const reload = () => void client.invalidateQueries({ queryKey: textbooksKey });
 
   // The detail follows the list, so a textbook deleted elsewhere disappears on the next reload.
   const selected = books?.find((book) => book.id === selectedId);
@@ -93,7 +85,7 @@ export function Textbooks() {
     setNotice({ kind: 'alert', text: error.message });
     // Only a 404 on the textbook being edited ends the edit, so unsaved changes survive otherwise.
     if (error.status === 404 && id !== undefined && id === editingId) leaveEdit();
-    setReload((count) => count + 1);
+    reload();
   };
 
   const save = async (event: { preventDefault(): void }) => {
@@ -101,10 +93,11 @@ export function Textbooks() {
     nameNext('save');
     if (!begin()) return;
     try {
-      const data = await requestJson<{ textbook: Textbook }>(
-        editingId === undefined ? '/api/textbooks' : `/api/textbooks/${editingId}`,
-        { method: editingId === undefined ? 'POST' : 'PUT', body: form },
-      );
+      const data = (await write.mutateAsync({
+        path: editingId === undefined ? '/api/textbooks' : `/api/textbooks/${editingId}`,
+        method: editingId === undefined ? 'POST' : 'PUT',
+        body: form,
+      })) as { textbook: Textbook };
       setNotice({
         kind: 'status',
         text: editingId === undefined ? 'Registered' : 'Updated',
@@ -113,7 +106,7 @@ export function Textbooks() {
       else leaveEdit();
       setSelectedId(data.textbook.id);
       setConfirmingDelete(false);
-      setReload((count) => count + 1);
+      reload();
     } catch (error) {
       fail(error as RequestError, editingId);
     } finally {
@@ -143,11 +136,11 @@ export function Textbooks() {
     nameNext('delete');
     if (!begin()) return;
     try {
-      await requestJson(`/api/textbooks/${id}`, { method: 'DELETE' });
+      await write.mutateAsync({ path: `/api/textbooks/${id}`, method: 'DELETE' });
       setNotice({ kind: 'status', text: 'Deleted' });
       if (editingId === id) leaveEdit();
       setSelectedId(undefined);
-      setReload((count) => count + 1);
+      reload();
       setWantFocus('textbook-list');
     } catch (error) {
       fail(error as RequestError, id);
