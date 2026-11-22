@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 
-import { type RequestError, requestJson } from './lib/api';
+import { apiKey, useApiQuery } from './lib/query';
 import { Loading } from './loading';
 import { periodLabels, reviewBars, type ReviewStats, type StatPeriod } from './study-stats';
 import { useRecharts } from './use-recharts';
@@ -44,28 +44,13 @@ function ReviewBars({ stats }: { stats: ReviewStats }) {
 // completion rate as a headline, and the scheduled, completed and late rounds as bars. A sentence
 // gives the same numbers to those who cannot see the chart.
 export function ReviewRateChart({ period }: { period: StatPeriod }) {
-  // Kept per period, so a slow answer for another period never replaces or hides this one's.
-  const [loaded, setLoaded] = useState<Partial<Record<StatPeriod, ReviewStats>>>({});
-  const [loadError, setLoadError] = useState<{ period: StatPeriod; message: string }>();
-
-  useEffect(() => {
-    let current = true;
-    requestJson<ReviewStats>(`/api/stats/reviews?period=${period}`)
-      .then((data) => {
-        if (!current) return;
-        setLoaded((all) => ({ ...all, [period]: data }));
-        setLoadError((failed) => (failed?.period === period ? undefined : failed));
-      })
-      .catch((error: RequestError) => {
-        if (current) setLoadError({ period, message: error.message });
-      });
-    return () => {
-      current = false;
-    };
-  }, [period]);
-
-  const stats = loaded[period];
-  const error = loadError?.period === period ? loadError.message : undefined;
+  // One cached answer per period, so a slow answer for another period never replaces or hides this one's.
+  const query = useApiQuery<ReviewStats>(
+    apiKey('/api/stats/reviews', period),
+    `/api/stats/reviews?period=${period}`,
+  );
+  const stats = query.data;
+  const error = query.error?.message;
 
   return (
     <section className="card study-chart review-chart" aria-labelledby="review-chart-heading">
