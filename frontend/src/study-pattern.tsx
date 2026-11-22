@@ -76,8 +76,9 @@ export function StudyPattern({
               </div>
             ))}
           </div>
-          {/* Twenty-four thin columns, midnight first; each hour's value is in its tooltip. */}
-          <div className="pattern-hours" role="img" aria-label="Study time by hour">
+          {/* Twenty-four thin columns, midnight first. The bars are for sight; the values are in a
+              list for screen readers and touch users, who have no tooltip. */}
+          <div className="pattern-hours" aria-hidden="true">
             {pattern.byHour.map((minutes, hour) => (
               <span
                 key={hour}
@@ -87,6 +88,13 @@ export function StudyPattern({
               />
             ))}
           </div>
+          <ul className="sr-only" aria-label="Study time by hour">
+            {pattern.byHour.map((minutes, hour) => (
+              <li key={hour}>
+                {hourLabel(hour)}: {minutes ? formatMinutes(minutes) : 'no study'}
+              </li>
+            ))}
+          </ul>
           <div className="pattern-axis" aria-hidden="true">
             <span>00:00</span>
             <span>06:00</span>

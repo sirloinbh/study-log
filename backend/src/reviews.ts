@@ -4,6 +4,7 @@ import { z } from 'zod/v4';
 
 import { calendarDate, datePlusDays } from './dates.js';
 import { inTransaction } from './sql.js';
+import { parseId } from './standard/http.js';
 import { missingOrInvalid } from './validation.js';
 
 // Days from the previous round's completion (the study date for round 1) to the next round. Done
@@ -57,12 +58,6 @@ export async function syncFirstReview(
     );
   }
 }
-
-// Same rule as the other ids: plain positive integers that stay exact in JS and fit bigint.
-const idParam = z
-  .string()
-  .regex(/^[1-9]\d{0,14}$/, 'Invalid review ID')
-  .transform(Number);
 
 export const dueDateInput = z.object(
   {
@@ -161,7 +156,7 @@ export function reviewRoutes(pool: Pool, today: () => string) {
 
   // Completes a round for good and creates the next one, due from today.
   router.post('/:id/complete', async (req, res) => {
-    const id = idParam.parse(req.params.id);
+    const id = parseId(req.params.id, 'review');
     const date = today();
     const reply = await changeOpenRound(pool, id, async (client, review) => {
       await client.query('UPDATE reviews SET completed_on = $2, updated_at = now() WHERE id = $1', [
@@ -182,7 +177,7 @@ export function reviewRoutes(pool: Pool, today: () => string) {
   });
 
   router.post('/:id/snooze', async (req, res) => {
-    const id = idParam.parse(req.params.id);
+    const id = parseId(req.params.id, 'review');
     const date = today();
     const reply = await changeOpenRound(pool, id, (client, review) =>
       moveRound(client, id, snoozedDate(review.dueDate, date)),
@@ -191,7 +186,7 @@ export function reviewRoutes(pool: Pool, today: () => string) {
   });
 
   router.put('/:id/due-date', async (req, res) => {
-    const id = idParam.parse(req.params.id);
+    const id = parseId(req.params.id, 'review');
     const { dueDate } = dueDateInput.parse(req.body);
     const reply = await changeOpenRound(pool, id, (client) => moveRound(client, id, dueDate));
     res.status(reply.status).json(reply.body);

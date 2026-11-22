@@ -5,6 +5,7 @@ import { z } from 'zod/v4';
 import { calendarDate, datePlusDays, isCalendarDate } from './dates.js';
 import { dayKind, HolidayError, type HolidayFetcher, loadHolidays } from './holidays.js';
 import { inTransaction } from './sql.js';
+import { parseId } from './standard/http.js';
 import { bodyId } from './textbook-contents.js';
 import { missingOrInvalid } from './validation.js';
 
@@ -59,12 +60,6 @@ export function chapterDays(targets: number[], chapters: number): number[][] {
     return today;
   });
 }
-
-// Same rule as the other ids: plain positive integers that stay exact in JS and fit bigint.
-const idParam = z
-  .string()
-  .regex(/^[1-9]\d{0,14}$/, 'Invalid schedule ID')
-  .transform(Number);
 
 const title = z
   .string(missingOrInvalid('Enter the schedule name', 'The schedule name format is invalid'))
@@ -130,11 +125,6 @@ export const scheduleUpdateInput = z.object(
   { title },
   { error: 'Send the schedule as a JSON object' },
 );
-
-const itemIdParam = z
-  .string()
-  .regex(/^[1-9]\d{0,14}$/, 'Invalid schedule item ID')
-  .transform(Number);
 
 // Moving a day (rule section 4). `withLater` takes the open days from it onward along, keeping their gaps.
 export const moveInput = z.object(
@@ -271,8 +261,8 @@ export function scheduleRoutes(pool: Pool, today: () => string, fetcher: Holiday
       date: string,
     ) => Promise<Reply | void>,
   ) => {
-    const scheduleId = idParam.parse(params.id);
-    const itemId = itemIdParam.parse(params.itemId);
+    const scheduleId = parseId(params.id, 'schedule');
+    const itemId = parseId(params.itemId, 'schedule item');
     const date = today();
     const reply = await inTransaction<Reply>(
       pool,
@@ -386,7 +376,7 @@ export function scheduleRoutes(pool: Pool, today: () => string, fetcher: Holiday
   });
 
   router.get('/:id', async (req, res) => {
-    const id = idParam.parse(req.params.id);
+    const id = parseId(req.params.id, 'schedule');
     await catchUp(pool, today(), id);
     const found = await loadSchedule(pool, id);
     if (!found) return void res.status(404).json(notFound);
@@ -484,7 +474,7 @@ export function scheduleRoutes(pool: Pool, today: () => string, fetcher: Holiday
   });
 
   router.put('/:id', async (req, res) => {
-    const id = idParam.parse(req.params.id);
+    const id = parseId(req.params.id, 'schedule');
     const input = scheduleUpdateInput.parse(req.body);
     const { rowCount } = await pool.query(
       'UPDATE schedules SET title = $2, updated_at = now() WHERE id = $1',
@@ -501,7 +491,7 @@ export function scheduleRoutes(pool: Pool, today: () => string, fetcher: Holiday
   // Its items go with it.
   router.delete('/:id', async (req, res) => {
     const { rowCount } = await pool.query('DELETE FROM schedules WHERE id = $1', [
-      idParam.parse(req.params.id),
+      parseId(req.params.id, 'schedule'),
     ]);
     if (!rowCount) return void res.status(404).json(notFound);
     res.status(204).end();

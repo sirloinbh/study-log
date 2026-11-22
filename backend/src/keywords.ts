@@ -4,6 +4,7 @@ import { z } from 'zod/v4';
 
 import { calendarDate } from './dates.js';
 import { likePattern } from './sql.js';
+import { parseId } from './standard/http.js';
 import { missingOrInvalid } from './validation.js';
 
 const keywordDate = calendarDate(
@@ -11,7 +12,7 @@ const keywordDate = calendarDate(
   'The date must be in YYYY-MM-DD format',
 );
 
-// `date` left out means today in the service time zone; the route fills it in.
+// `date` left out means today on add, and the stored date on update; the add route fills it in.
 export const keywordInput = z.object(
   {
     date: keywordDate.optional(),
@@ -52,12 +53,6 @@ export const keywordListQuery = z
     error: 'The start date cannot be after the end date',
   });
 
-// Same rule as the other ids: plain positive integers that stay exact in JS and fit bigint.
-const idParam = z
-  .string()
-  .regex(/^[1-9]\d{0,14}$/, 'Invalid keyword ID')
-  .transform(Number);
-
 const columns = `id, keyword_date AS date, keyword, memo`;
 
 const notFound = { error: 'Keyword not found' };
@@ -97,7 +92,7 @@ export function keywordRoutes(pool: Pool, today: () => string) {
   });
 
   router.get('/:id', async (req, res) => {
-    const id = idParam.parse(req.params.id);
+    const id = parseId(req.params.id, 'keyword');
     const { rows } = await pool.query(`SELECT ${columns} FROM keywords WHERE id = $1`, [id]);
     if (rows.length === 0) return void res.status(404).json(notFound);
     res.json({ keyword: rows[0] });
@@ -118,15 +113,16 @@ export function keywordRoutes(pool: Pool, today: () => string) {
     }
   });
 
-  // Replaces date, keyword and memo; a left-out date means today, as when adding.
+  // Replaces keyword and memo; a left-out date keeps the stored one, so editing only the word does
+  // not move the keyword to today (#271).
   router.put('/:id', async (req, res) => {
-    const id = idParam.parse(req.params.id);
+    const id = parseId(req.params.id, 'keyword');
     const input = keywordInput.parse(req.body);
     try {
       const { rows } = await pool.query(
-        `UPDATE keywords SET keyword_date = $2, keyword = $3, memo = $4, updated_at = now()
+        `UPDATE keywords SET keyword_date = COALESCE($2::date, keyword_date), keyword = $3, memo = $4, updated_at = now()
          WHERE id = $1 RETURNING ${columns}`,
-        [id, input.date ?? today(), input.keyword, input.memo],
+        [id, input.date ?? null, input.keyword, input.memo],
       );
       if (rows.length === 0) return void res.status(404).json(notFound);
       res.json({ keyword: rows[0] });
@@ -137,7 +133,7 @@ export function keywordRoutes(pool: Pool, today: () => string) {
   });
 
   router.delete('/:id', async (req, res) => {
-    const id = idParam.parse(req.params.id);
+    const id = parseId(req.params.id, 'keyword');
     const { rowCount } = await pool.query('DELETE FROM keywords WHERE id = $1', [id]);
     if (!rowCount) return void res.status(404).json(notFound);
     res.status(204).end();

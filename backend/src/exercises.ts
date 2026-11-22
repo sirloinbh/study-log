@@ -6,19 +6,9 @@ import { detectFormat, receive, removeStoredFiles, storedKeys } from './exercise
 import { ExtractionError, extractionLimit, type Extractor } from './extraction.js';
 import type { FileStorage } from './file-storage.js';
 import { inTransaction } from './sql.js';
-import { requestIdOf } from './standard/http.js';
+import { parseId, requestIdOf } from './standard/http.js';
 import { TranslationError, type Translator } from './translation.js';
 import { missingOrInvalid } from './validation.js';
-
-// Same rule as the other ids: plain positive integers that stay exact in JS and fit bigint.
-const pathId = (label: string) =>
-  z
-    .string()
-    .regex(/^[1-9]\d{0,14}$/, `Invalid ${label} ID`)
-    .transform(Number);
-const textbookIdParam = pathId('textbook');
-const contentIdParam = pathId('contents entry');
-const exerciseIdParam = pathId('exercise');
 
 // The body keeps its line breaks and indentation as typed, so it is not trimmed; it only has to
 // contain something other than whitespace.
@@ -144,8 +134,8 @@ export function contentExerciseRoutes(pool: Pool, extractor: Extractor) {
       ).rowCount,
     );
   const target = (params: Record<string, string>) => ({
-    textbookId: textbookIdParam.parse(params.textbookId),
-    contentId: contentIdParam.parse(params.contentId),
+    textbookId: parseId(params.textbookId, 'textbook'),
+    contentId: parseId(params.contentId, 'contents entry'),
   });
 
   router.get('/', async (req, res) => {
@@ -311,7 +301,7 @@ export function textbookExerciseRoutes(pool: Pool) {
   const router = Router({ mergeParams: true });
 
   router.get('/', async (req, res) => {
-    const textbookId = textbookIdParam.parse((req.params as Record<string, string>).textbookId);
+    const textbookId = parseId((req.params as Record<string, string>).textbookId, 'textbook');
     const { contentId, important } = textbookListQuery.parse(req.query);
     const found = await pool.query(
       `SELECT EXISTS (SELECT 1 FROM textbooks WHERE id = $1) AS textbook,
@@ -356,7 +346,7 @@ export function exerciseRoutes(pool: Pool, translator: Translator, storage: File
   const translating = new Set<number>();
 
   router.get('/:id', async (req, res) => {
-    const id = exerciseIdParam.parse(req.params.id);
+    const id = parseId(req.params.id, 'exercise');
     const { rows } = await pool.query(`SELECT ${columns} FROM exercises WHERE id = $1`, [id]);
     if (rows.length === 0) return void res.status(404).json(notFound);
     res.json({ exercise: rows[0] });
@@ -364,7 +354,7 @@ export function exerciseRoutes(pool: Pool, translator: Translator, storage: File
 
   // Replaces number, body and the important mark; the chapter stays as it is.
   router.put('/:id', async (req, res) => {
-    const id = exerciseIdParam.parse(req.params.id);
+    const id = parseId(req.params.id, 'exercise');
     const exercise = exerciseInput.parse(req.body);
     const { rows } = await pool.query(
       `UPDATE exercises SET number = $2, body = $3, important = $4, updated_at = now()
@@ -377,7 +367,7 @@ export function exerciseRoutes(pool: Pool, translator: Translator, storage: File
 
   // Marks or unmarks the exercise as important (#27), leaving the rest as it is.
   router.patch('/:id/important', async (req, res) => {
-    const id = exerciseIdParam.parse(req.params.id);
+    const id = parseId(req.params.id, 'exercise');
     const { important } = importantInput.parse(req.body);
     const { rows } = await pool.query(
       `UPDATE exercises SET important = $2, updated_at = now() WHERE id = $1 RETURNING ${columns}`,
@@ -390,7 +380,7 @@ export function exerciseRoutes(pool: Pool, translator: Translator, storage: File
   // Its stored files go too (#209), after the row is deleted and committed (#265); a file S3 will
   // not remove is logged for a sweep and never blocks or undoes the delete.
   router.delete('/:id', async (req, res) => {
-    const id = exerciseIdParam.parse(req.params.id);
+    const id = parseId(req.params.id, 'exercise');
     let keys: string[] = [];
     const reply = await inTransaction<{ status: number; body?: unknown }>(
       pool,
@@ -410,7 +400,7 @@ export function exerciseRoutes(pool: Pool, translator: Translator, storage: File
 
   // The answer of one exercise (#26): `{ answer: null }` until one is saved.
   router.get('/:id/answer', async (req, res) => {
-    const id = exerciseIdParam.parse(req.params.id);
+    const id = parseId(req.params.id, 'exercise');
     const { rows } = await pool.query(
       `SELECT a.body FROM exercises e LEFT JOIN exercise_answers a ON a.exercise_id = e.id
        WHERE e.id = $1`,
@@ -423,7 +413,7 @@ export function exerciseRoutes(pool: Pool, translator: Translator, storage: File
 
   // Saves the answer, replacing the one already there.
   router.put('/:id/answer', async (req, res) => {
-    const id = exerciseIdParam.parse(req.params.id);
+    const id = parseId(req.params.id, 'exercise');
     const { body } = answerInput.parse(req.body);
     try {
       const { rows } = await pool.query(
@@ -443,7 +433,7 @@ export function exerciseRoutes(pool: Pool, translator: Translator, storage: File
   // The Korean translation (#31): `{ translation: null }` until one is made. `stale` says the
   // exercise or its answer changed after it was made.
   router.get('/:id/translation', async (req, res) => {
-    const id = exerciseIdParam.parse(req.params.id);
+    const id = parseId(req.params.id, 'exercise');
     const { rows } = await pool.query(
       `SELECT e.id, t.exercise_id AS "translated", ${translationColumns}
        FROM exercises e LEFT JOIN exercise_answers a ON a.exercise_id = e.id
@@ -462,7 +452,7 @@ export function exerciseRoutes(pool: Pool, translator: Translator, storage: File
     // server never allows: translating costs money, so a form or a no-cors fetch must not start it.
     if (!req.is('application/json'))
       return void res.status(415).json({ error: 'Send the translation request as JSON' });
-    const id = exerciseIdParam.parse(req.params.id);
+    const id = parseId(req.params.id, 'exercise');
     if (translating.has(id))
       return void res.status(409).json({ error: 'This problem is already being translated' });
     translating.add(id);
@@ -514,7 +504,7 @@ export function exerciseRoutes(pool: Pool, translator: Translator, storage: File
   };
 
   router.delete('/:id/answer', async (req, res) => {
-    const id = exerciseIdParam.parse(req.params.id);
+    const id = parseId(req.params.id, 'exercise');
     const { rowCount } = await pool.query('DELETE FROM exercise_answers WHERE exercise_id = $1', [
       id,
     ]);
