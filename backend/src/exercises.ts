@@ -2,7 +2,7 @@ import { type Response, Router } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod/v4';
 
-import { detectFormat, receive, removeStored, storedKeys } from './exercise-files.js';
+import { detectFormat, receive, removeStoredFiles, storedKeys } from './exercise-files.js';
 import { ExtractionError, extractionLimit, type Extractor } from './extraction.js';
 import type { FileStorage } from './file-storage.js';
 import { inTransaction } from './sql.js';
@@ -387,19 +387,23 @@ export function exerciseRoutes(pool: Pool, translator: Translator, storage: File
     res.json({ exercise: rows[0] });
   });
 
-  // Its stored files go too (#209); if S3 cannot remove them, nothing is deleted.
+  // Its stored files go too (#209), after the row is deleted and committed (#265); a file S3 will
+  // not remove is logged for a sweep and never blocks or undoes the delete.
   router.delete('/:id', async (req, res) => {
     const id = exerciseIdParam.parse(req.params.id);
+    let keys: string[] = [];
     const reply = await inTransaction<{ status: number; body?: unknown }>(
       pool,
       async (client) => {
-        const keys = await storedKeys(client, { exerciseId: id });
+        const stored = await storedKeys(client, { exerciseId: id });
         const { rowCount } = await client.query('DELETE FROM exercises WHERE id = $1', [id]);
         if (!rowCount) return { status: 404, body: notFound };
-        return (await removeStored(storage, keys)) ?? { status: 204 };
+        keys = stored;
+        return { status: 204 };
       },
       (reply) => reply.status < 400,
     );
+    if (reply.status === 204) await removeStoredFiles(storage, keys);
     if (reply.body === undefined) return void res.status(reply.status).end();
     res.status(reply.status).json(reply.body);
   });
