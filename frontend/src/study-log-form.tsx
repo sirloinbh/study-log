@@ -1,3 +1,6 @@
+import { Button } from './components/ui/button';
+import { Input } from './components/ui/input';
+import { NativeSelect } from './components/ui/native-select';
 import { ButtonSpinner } from './loading';
 import { Memo } from './memo';
 import {
@@ -43,7 +46,7 @@ export function StudyLogFormView({
     <form className="log-form" onSubmit={onSubmit}>
       <label>
         Study date
-        <input
+        <Input
           id="study-log-date"
           type="date"
           required
@@ -54,7 +57,7 @@ export function StudyLogFormView({
       </label>
       <label>
         Start
-        <input
+        <Input
           type="time"
           required
           disabled={busy}
@@ -64,7 +67,7 @@ export function StudyLogFormView({
       </label>
       <label>
         End
-        <input
+        <Input
           type="time"
           required
           disabled={busy}
@@ -74,7 +77,7 @@ export function StudyLogFormView({
       </label>
       <label>
         Status
-        <select
+        <NativeSelect
           disabled={busy}
           value={form.status}
           onChange={(event) => onPatch({ status: event.target.value as StudyStatus })}
@@ -84,11 +87,11 @@ export function StudyLogFormView({
               {statusLabels[status]}
             </option>
           ))}
-        </select>
+        </NativeSelect>
       </label>
       <label className="half">
         Textbook
-        <select
+        <NativeSelect
           disabled={busy}
           value={form.textbookId ?? ''}
           // Picking another textbook clears the chapter, which belonged to the previous one.
@@ -100,11 +103,11 @@ export function StudyLogFormView({
               {book.title}
             </option>
           ))}
-        </select>
+        </NativeSelect>
       </label>
       <label className="half">
         Chapter/section
-        <select
+        <NativeSelect
           disabled={busy || form.textbookId === null}
           value={form.contentId ?? ''}
           onChange={(event) => onPatch({ contentId: idOf(event.target.value) })}
@@ -115,11 +118,11 @@ export function StudyLogFormView({
               {chapter.label}
             </option>
           ))}
-        </select>
+        </NativeSelect>
       </label>
       <label>
         Type
-        <select
+        <NativeSelect
           disabled={busy}
           value={form.studyType}
           onChange={(event) => onPatch({ studyType: event.target.value as StudyType })}
@@ -129,11 +132,11 @@ export function StudyLogFormView({
               {studyTypeLabels[type]}
             </option>
           ))}
-        </select>
+        </NativeSelect>
       </label>
       <label>
         Understanding
-        <select
+        <NativeSelect
           disabled={busy}
           value={form.understanding ?? ''}
           onChange={(event) => onPatch({ understanding: idOf(event.target.value) })}
@@ -144,11 +147,12 @@ export function StudyLogFormView({
               {label}
             </option>
           ))}
-        </select>
+        </NativeSelect>
       </label>
+      {/* eslint-disable-next-line jsx-a11y-x/label-has-associated-control -- NativeSelect renders a select. */}
       <label className="half">
         Goal achieved
-        <select
+        <NativeSelect
           disabled={busy}
           value={form.goalAchieved === null ? '' : String(form.goalAchieved)}
           onChange={(event) =>
@@ -160,7 +164,7 @@ export function StudyLogFormView({
           <option value="">None</option>
           <option value="true">Achieved</option>
           <option value="false">Not achieved</option>
-        </select>
+        </NativeSelect>
       </label>
       <label className="wide">
         Difficult parts
@@ -197,14 +201,14 @@ export function StudyLogFormView({
         {crossesMidnight(form.startTime, form.endTime) ? ' (ends the next day)' : ''}
       </p>
       <div className="actions wide">
-        <button type="submit" className="primary" disabled={busy}>
+        <Button type="submit" disabled={busy}>
           <ButtonSpinner when={action === 'save'} />
           {editing ? 'Save changes' : 'Save'}
-        </button>
+        </Button>
         {editing && (
-          <button type="button" className="secondary" disabled={busy} onClick={onCancel}>
+          <Button type="button" variant="outline" disabled={busy} onClick={onCancel}>
             Cancel
-          </button>
+          </Button>
         )}
       </div>
     </form>

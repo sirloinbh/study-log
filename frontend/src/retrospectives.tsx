@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import React, { useEffect, useState } from 'react';
 
 import { useBusy } from './busy';
+import { Button } from './components/ui/button';
 import type { RequestError } from './lib/api';
 import { apiKey, useApiMutation, useApiQuery } from './lib/query';
 import { ButtonSpinner, Loading } from './loading';
@@ -150,47 +151,47 @@ export function Retrospectives({ today }: { today: string }) {
         <div className="calendar-head">
           <div className="period-filter" role="group" aria-label="Retrospective kind">
             {(['weekly', 'monthly'] as const).map((value) => (
-              <button
+              <Button
                 key={value}
                 type="button"
-                className={value === kind ? 'primary' : 'secondary'}
+                variant={value === kind ? 'default' : 'outline'}
                 aria-pressed={value === kind}
                 disabled={busy}
                 onClick={() => go(value, period ? switchDate(period) : date)}
               >
                 {kindLabels[value]}
-              </button>
+              </Button>
             ))}
           </div>
           <div className="actions">
-            <button
+            <Button
               type="button"
-              className="secondary"
+              variant="outline"
               aria-label={kind === 'weekly' ? 'Previous week' : 'Previous month'}
               disabled={busy || !period}
               onClick={() => period && go(kind, shiftPeriod(kind, period.from, -1))}
             >
               Previous
-            </button>
+            </Button>
             {period && !thisPeriod && (
-              <button
+              <Button
                 type="button"
-                className="secondary"
+                variant="outline"
                 disabled={busy}
                 onClick={() => go(kind, today)}
               >
                 {kind === 'weekly' ? 'This week' : 'This month'}
-              </button>
+              </Button>
             )}
-            <button
+            <Button
               type="button"
-              className="secondary"
+              variant="outline"
               aria-label={kind === 'weekly' ? 'Next week' : 'Next month'}
               disabled={busy || !period}
               onClick={() => period && go(kind, shiftPeriod(kind, period.from, 1))}
             >
               Next
-            </button>
+            </Button>
           </div>
         </div>
         {/* A failed reload keeps the period already shown (and any typing) under the error. */}
@@ -246,17 +247,17 @@ export function Retrospectives({ today }: { today: string }) {
                 />
               </label>
               <div className="actions wide">
-                <button type="submit" className="primary" disabled={busy}>
+                <Button type="submit" disabled={busy}>
                   <ButtonSpinner when={action === 'save'} />
                   {period.retrospective ? 'Save changes' : 'Save'}
-                </button>
+                </Button>
                 {period.retrospective &&
                   (confirming ? (
                     <>
-                      <button
+                      <Button
                         type="button"
                         id="retro-delete-confirm"
-                        className="danger"
+                        variant="destructive"
                         disabled={busy}
                         onClick={() => {
                           nameNext('delete');
@@ -265,10 +266,10 @@ export function Retrospectives({ today }: { today: string }) {
                       >
                         <ButtonSpinner when={action === 'delete'} />
                         Confirm delete
-                      </button>
-                      <button
+                      </Button>
+                      <Button
                         type="button"
-                        className="secondary"
+                        variant="outline"
                         disabled={busy}
                         onClick={() => {
                           setConfirming(false);
@@ -276,13 +277,13 @@ export function Retrospectives({ today }: { today: string }) {
                         }}
                       >
                         Cancel
-                      </button>
+                      </Button>
                     </>
                   ) : (
-                    <button
+                    <Button
                       type="button"
                       id="retro-delete"
-                      className="secondary"
+                      variant="outline"
                       disabled={busy}
                       onClick={() => {
                         setConfirming(true);
@@ -290,7 +291,7 @@ export function Retrospectives({ today }: { today: string }) {
                       }}
                     >
                       Delete
-                    </button>
+                    </Button>
                   ))}
               </div>
             </form>

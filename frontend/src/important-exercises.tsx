@@ -2,6 +2,8 @@ import { useQueryClient } from '@tanstack/react-query';
 import React, { useEffect, useRef, useState } from 'react';
 
 import { useBusy } from './busy';
+import { Button } from './components/ui/button';
+import { NativeSelect } from './components/ui/native-select';
 import { contentPath, type Exercise } from './exercise';
 import type { RequestError } from './lib/api';
 import { apiKey, useApiMutation, useApiQuery } from './lib/query';
@@ -102,7 +104,7 @@ export function ImportantExercises({
         <div className="log-form exercise-picker">
           <label className="wide">
             Scope
-            <select
+            <NativeSelect
               disabled={busy}
               value={scope}
               onChange={(event) => {
@@ -116,7 +118,7 @@ export function ImportantExercises({
                   {option.label}
                 </option>
               ))}
-            </select>
+            </NativeSelect>
           </label>
         </div>
       )}
@@ -152,15 +154,15 @@ export function ImportantExercises({
                   </div>
                   <p className="exercise-body">{exercise.body}</p>
                   <div className="log-actions">
-                    <button
+                    <Button
                       type="button"
-                      className="secondary"
+                      variant="outline"
                       disabled={busy}
                       aria-label={`${label} unmark important`}
                       onClick={() => void unmark(exercise, label)}
                     >
                       Unmark important
-                    </button>
+                    </Button>
                   </div>
                 </li>
               );

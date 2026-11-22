@@ -1,3 +1,5 @@
+import { Button } from './components/ui/button';
+import { Input } from './components/ui/input';
 import { type Keyword, keywordLimits, type KeywordSearch } from './keyword';
 import { ButtonSpinner } from './loading';
 
@@ -28,7 +30,7 @@ export function KeywordSearchCard({
       <form className="log-form keyword-search" onSubmit={onSubmit}>
         <label className="wide">
           Search term
-          <input
+          <Input
             type="search"
             maxLength={keywordLimits.query}
             placeholder="Part of a keyword or memo"
@@ -40,7 +42,7 @@ export function KeywordSearchCard({
         <label className="half">
           Start date
           {/* The browser refuses a start after the end before asking the server. */}
-          <input
+          <Input
             type="date"
             disabled={busy}
             max={search.to || undefined}
@@ -50,7 +52,7 @@ export function KeywordSearchCard({
         </label>
         <label className="half">
           End date
-          <input
+          <Input
             type="date"
             disabled={busy}
             min={search.from || undefined}
@@ -59,10 +61,10 @@ export function KeywordSearchCard({
           />
         </label>
         <div className="actions wide">
-          <button type="submit" className="primary" disabled={busy}>
+          <Button type="submit" disabled={busy}>
             <ButtonSpinner when={action === 'search'} />
             Search
-          </button>
+          </Button>
         </div>
       </form>
       {error && (
@@ -82,15 +84,15 @@ export function KeywordSearchCard({
                 <li key={keyword.id}>
                   <div className="log-head">
                     <span className="log-date">{keyword.keyword}</span>
-                    <button
+                    <Button
                       type="button"
-                      className="secondary"
+                      variant="outline"
                       disabled={busy}
                       aria-label={`View ${keyword.keyword} on ${keyword.date}`}
                       onClick={() => onView(keyword.date)}
                     >
                       {keyword.date}
-                    </button>
+                    </Button>
                   </div>
                   {keyword.memo && <p className="log-memo">{keyword.memo}</p>}
                 </li>

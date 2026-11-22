@@ -1,3 +1,5 @@
+import { Button } from './components/ui/button';
+import { Input } from './components/ui/input';
 import { ButtonSpinner } from './loading';
 import { dayLabel, type ScheduleDetail } from './schedule';
 import { formatMinutes } from './study-logs-data';
@@ -57,16 +59,16 @@ export function ScheduleDays({
           </span>
           <strong>{formatMinutes(item.targetMinutes)}</strong>
           {!item.completedOn && moving?.id !== item.id && (
-            <button
+            <Button
               type="button"
               id={`schedule-day-move-${item.id}`}
-              className="secondary"
+              variant="outline"
               aria-label={`Move day: ${names.get(item.id)}`}
               disabled={busy}
               onClick={() => onStartMove({ id: item.id, date: item.date, withLater: false })}
             >
               Move
-            </button>
+            </Button>
           )}
           {moving?.id === item.id && !item.completedOn && (
             <form
@@ -79,7 +81,7 @@ export function ScheduleDays({
             >
               <label>
                 Move to
-                <input
+                <Input
                   type="date"
                   id={`schedule-day-date-${item.id}`}
                   required
@@ -99,18 +101,18 @@ export function ScheduleDays({
                 Move later days too
               </label>
               <div className="actions">
-                <button type="submit" className="primary" disabled={busy}>
+                <Button type="submit" disabled={busy}>
                   <ButtonSpinner when={action === 'move'} />
                   Move
-                </button>
-                <button
+                </Button>
+                <Button
                   type="button"
-                  className="secondary"
+                  variant="outline"
                   disabled={busy}
                   onClick={() => onCancelMove(item.id)}
                 >
                   Cancel
-                </button>
+                </Button>
               </div>
             </form>
           )}

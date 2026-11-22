@@ -1,3 +1,5 @@
+import { Button } from './components/ui/button';
+import { Input } from './components/ui/input';
 import { ButtonSpinner } from './loading';
 import { plural } from './plural';
 import type { ScheduleDetail } from './schedule';
@@ -46,7 +48,7 @@ export function ScheduleDetailView({
         >
           <label>
             New schedule name
-            <input
+            <Input
               id="schedule-rename-input"
               required
               disabled={busy}
@@ -59,19 +61,19 @@ export function ScheduleDetailView({
             />
           </label>
           <div className="actions">
-            <button type="submit" className="primary" disabled={busy}>
+            <Button type="submit" disabled={busy}>
               <ButtonSpinner when={action === 'rename'} />
               Save name
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className="secondary"
+              variant="outline"
               aria-label="Cancel renaming"
               disabled={busy}
               onClick={onCancelRename}
             >
               Cancel
-            </button>
+            </Button>
           </div>
           {/* Right under the name, apart from what the days say. */}
           {renaming.error && (
@@ -85,16 +87,16 @@ export function ScheduleDetailView({
           <h2 id="schedule-heading" tabIndex={-1}>
             {schedule.title}
           </h2>
-          <button
+          <Button
             type="button"
             id="schedule-rename"
-            className="secondary"
+            variant="outline"
             aria-label={`Rename schedule: ${schedule.title}`}
             disabled={busy}
             onClick={onStartRename}
           >
             Rename
-          </button>
+          </Button>
         </div>
       )}
       {schedule.textbookTitle && <p className="status schedule-book">{schedule.textbookTitle}</p>}

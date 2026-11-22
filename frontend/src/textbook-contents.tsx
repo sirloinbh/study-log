@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import React, { useEffect, useRef, useState } from 'react';
 
 import { useBusy } from './busy';
+import { Button } from './components/ui/button';
 import { ContentsEntryForm } from './contents-entry-form';
 import { ContentsPasteForm } from './contents-paste-form';
 import { ContentsTree } from './contents-tree';
@@ -282,22 +283,22 @@ export function TextbookContents({
           Contents
         </h3>
         <div className="log-actions">
-          <button
+          <Button
             type="button"
-            className="secondary"
+            variant="outline"
             disabled={busy || tree === undefined}
             onClick={startPaste}
           >
             Paste contents
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
-            className="secondary"
+            variant="outline"
             disabled={busy || tree === undefined}
             onClick={() => startAdd()}
           >
             Add chapter
-          </button>
+          </Button>
         </div>
       </div>
       {pasting && (

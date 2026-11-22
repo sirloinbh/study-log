@@ -1,3 +1,4 @@
+import { Button } from './components/ui/button';
 import { ButtonSpinner } from './loading';
 
 // The buttons under one exercise: copy, answer, translation, important mark, edit and delete, or
@@ -41,85 +42,85 @@ export function ExerciseActions({
     <div className="log-actions">
       {confirming ? (
         <>
-          <button
+          <Button
             type="button"
             id={`exercise-delete-confirm-${id}`}
-            className="danger"
+            variant="destructive"
             disabled={busy}
             aria-label={`${label} confirm deletion`}
             onClick={onConfirmDelete}
           >
             <ButtonSpinner when={action === 'delete'} />
             Confirm delete
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
-            className="secondary"
+            variant="outline"
             disabled={busy}
             aria-label={`${label} cancel deletion`}
             onClick={onCancelDelete}
           >
             Cancel
-          </button>
+          </Button>
         </>
       ) : (
         <>
-          <button
+          <Button
             type="button"
-            className="secondary"
+            variant="outline"
             aria-label={`${label} copy question`}
             onClick={onCopy}
           >
             Copy question
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
-            className="secondary"
+            variant="outline"
             disabled={busy}
             aria-expanded={answerOpen}
             aria-label={`${label} ${answerOpen ? 'hide answer' : 'show answer'}`}
             onClick={onToggleAnswer}
           >
             {answerOpen ? 'Hide answer' : 'Show answer'}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
-            className="secondary"
+            variant="outline"
             disabled={busy}
             aria-expanded={translationOpen}
             aria-label={`${label} ${translationOpen ? 'hide translation' : 'show translation'}`}
             onClick={onToggleTranslation}
           >
             {translationOpen ? 'Hide translation' : 'Show translation'}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
-            className="secondary"
+            variant="outline"
             disabled={busy}
             aria-label={`${label} ${important ? 'unmark important' : 'mark important'}`}
             onClick={onMarkImportant}
           >
             {important ? 'Unmark important' : 'Mark important'}
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
-            className="secondary"
+            variant="outline"
             disabled={busy}
             aria-label={`${label} edit`}
             onClick={onEdit}
           >
             Edit
-          </button>
-          <button
+          </Button>
+          <Button
             type="button"
-            className="secondary"
+            variant="outline"
             disabled={busy}
             id={`exercise-delete-${id}`}
             aria-label={`${label} delete`}
             onClick={onAskDelete}
           >
             Delete
-          </button>
+          </Button>
         </>
       )}
     </div>

@@ -1,3 +1,4 @@
+import { Button } from './components/ui/button';
 import { ButtonSpinner } from './loading';
 import { Memo } from './memo';
 import {
@@ -51,48 +52,48 @@ export function StudyLogItem({
       <div className="log-actions">
         {confirming ? (
           <>
-            <button
+            <Button
               type="button"
               id={`study-log-delete-confirm-${log.id}`}
-              className="danger"
+              variant="destructive"
               disabled={busy}
               aria-label={`Confirm log deletion: ${describe(log)}`}
               onClick={onDelete}
             >
               <ButtonSpinner when={action === 'delete'} />
               Confirm delete
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className="secondary"
+              variant="outline"
               disabled={busy}
               aria-label={`Cancel log deletion: ${describe(log)}`}
               onClick={onCancelDelete}
             >
               Cancel
-            </button>
+            </Button>
           </>
         ) : (
           <>
-            <button
+            <Button
               type="button"
-              className="secondary"
+              variant="outline"
               disabled={busy}
               aria-label={`Edit log: ${describe(log)}`}
               onClick={onEdit}
             >
               Edit
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
               id={`study-log-delete-${log.id}`}
-              className="secondary"
+              variant="outline"
               disabled={busy}
               aria-label={`Delete log: ${describe(log)}`}
               onClick={onAskDelete}
             >
               Delete
-            </button>
+            </Button>
           </>
         )}
       </div>

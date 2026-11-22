@@ -1,6 +1,9 @@
 import React, { useState } from 'react';
 
 import { useBusy } from './busy';
+import { Button } from './components/ui/button';
+import { Input } from './components/ui/input';
+import { NativeSelect } from './components/ui/native-select';
 import { type Exercise, exerciseLabel, exerciseLimits, matchExercise } from './exercise';
 import { type RequestError, requestForm } from './lib/api';
 import { type ApiRequest, useApiMutation } from './lib/query';
@@ -226,13 +229,13 @@ export function ExerciseExtraction({
           </label>
         </fieldset>
         <div className="actions wide">
-          <button type="submit" className="primary" disabled={busy}>
+          <Button type="submit" disabled={busy}>
             <ButtonSpinner when={action === 'read'} />
             Read file
-          </button>
-          <button type="button" className="secondary" disabled={working} onClick={onClose}>
+          </Button>
+          <Button type="button" variant="outline" disabled={working} onClick={onClose}>
             Close
-          </button>
+          </Button>
         </div>
       </form>
       <p role="status" className="status">
@@ -271,7 +274,7 @@ export function ExerciseExtraction({
                         </label>
                         <label>
                           Problem number
-                          <input
+                          <Input
                             maxLength={exerciseLimits.number}
                             value={row.number}
                             onChange={(event) =>
@@ -311,7 +314,7 @@ export function ExerciseExtraction({
                         <legend>{label}</legend>
                         <label className="wide">
                           Save to
-                          <select
+                          <NativeSelect
                             value={row.exerciseId}
                             onChange={(event) =>
                               editAnswer(row.key, { exerciseId: event.target.value })
@@ -323,7 +326,7 @@ export function ExerciseExtraction({
                                 {exerciseLabel(exercise, place)}
                               </option>
                             ))}
-                          </select>
+                          </NativeSelect>
                         </label>
                         <label className="wide">
                           Answer
@@ -348,18 +351,18 @@ export function ExerciseExtraction({
             </ul>
           )}
           <div className="actions">
-            <button
+            <Button
               type="button"
-              className="primary"
+
               disabled={busy || !kept.length || problems.length > 0}
               onClick={() => void save()}
             >
               <ButtonSpinner when={action === 'save'} />
               {`Save ${kept.length} ${review.kind === 'problems' ? 'problem' : 'answer'}${kept.length === 1 ? '' : 's'}`}
-            </button>
-            <button
+            </Button>
+            <Button
               type="button"
-              className="secondary"
+              variant="outline"
               disabled={busy}
               onClick={() => {
                 setReview(undefined);
@@ -367,7 +370,7 @@ export function ExerciseExtraction({
               }}
             >
               Discard
-            </button>
+            </Button>
           </div>
         </div>
       )}

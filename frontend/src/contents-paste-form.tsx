@@ -1,3 +1,4 @@
+import { Button } from './components/ui/button';
 import { ButtonSpinner } from './loading';
 import { contentLabel } from './textbook';
 import { type TocEntry, tocLimits, type TocTree, tocTree } from './toc';
@@ -94,17 +95,17 @@ export function ContentsPasteForm({
         </ul>
       )}
       <div className="actions wide">
-        <button
+        <Button
           type="submit"
-          className="primary"
+
           disabled={busy || reading || !entries.length || problems.length > 0}
         >
           <ButtonSpinner when={action === 'paste'} />
           {entries.length ? `Save ${entries.length}` : 'Save'}
-        </button>
-        <button type="button" className="secondary" disabled={busy} onClick={onCancel}>
+        </Button>
+        <Button type="button" variant="outline" disabled={busy} onClick={onCancel}>
           Cancel
-        </button>
+        </Button>
       </div>
     </form>
   );

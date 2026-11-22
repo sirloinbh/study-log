@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import React, { useState } from 'react';
 
 import { useBusy } from './busy';
+import { Button } from './components/ui/button';
 import type { ExerciseTranslation as Translation } from './exercise';
 import type { RequestError } from './lib/api';
 import { apiKey, useApiMutation, useApiQuery } from './lib/query';
@@ -92,15 +93,15 @@ export function ExerciseTranslation({ exerciseId, label }: { exerciseId: number;
           </p>
         </>
       )}
-      <button
+      <Button
         type="button"
-        className="secondary"
+        variant="outline"
         disabled={busy || (translation === undefined && !error)}
         aria-label={`${label} ${translation ? 'translate again' : 'translate'}`}
         onClick={() => void translate()}
       >
         {translation ? 'Translate again' : 'Translate'}
-      </button>
+      </Button>
       {/* Always mounted so screen readers announce each new message. */}
       <p role="status" className="status">
         {shown?.kind === 'status' ? shown.text : ''}

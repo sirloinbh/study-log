@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
 
+import { Button } from './components/ui/button';
+import { Input } from './components/ui/input';
 import { keywordLimits } from './keyword';
 import { ButtonSpinner } from './loading';
 
@@ -40,7 +42,7 @@ export function KeywordFormView({
     <form className="log-form keyword-form" onSubmit={onSubmit}>
       <label>
         Date
-        <input
+        <Input
           type="date"
           required
           disabled={busy}
@@ -50,7 +52,7 @@ export function KeywordFormView({
       </label>
       <label className="keyword-field">
         Keyword
-        <input
+        <Input
           id={keywordId}
           required
           maxLength={keywordLimits.keyword}
@@ -62,7 +64,7 @@ export function KeywordFormView({
       </label>
       <label className="wide">
         {memoLabel}
-        <input
+        <Input
           maxLength={keywordLimits.memo}
           disabled={busy}
           value={memo}
@@ -70,10 +72,10 @@ export function KeywordFormView({
         />
       </label>
       <div className="actions wide">
-        <button type="submit" className="primary" disabled={busy}>
+        <Button type="submit" disabled={busy}>
           <ButtonSpinner when={spinning} />
           {submitLabel}
-        </button>
+        </Button>
         {children}
       </div>
     </form>
