@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import React, { useEffect, useState } from 'react';
 
 import { useBusy } from './busy';
@@ -11,6 +12,7 @@ import {
 import { KeywordFormView } from './keyword-form';
 import { KeywordSearchCard } from './keyword-search-card';
 import { type RequestError, requestJson } from './lib/api';
+import { apiKey, useApiMutation, useApiQuery } from './lib/query';
 import { ButtonSpinner, Loading } from './loading';
 
 type Notice = { kind: 'status' | 'alert'; text: string } | undefined;
@@ -22,10 +24,8 @@ type Editor = { id: number; date: string; form: KeywordForm };
 // with edit and delete, and a search over all dates.
 export function Keywords({ today }: { today: string }) {
   const [date, setDate] = useState(today);
+  const client = useQueryClient();
   const [form, setForm] = useState<KeywordForm>(emptyKeywordForm);
-  // Tagged with its date, so a slow answer for another day is never shown as this day's.
-  const [day, setDay] = useState<{ date: string; keywords: Keyword[] }>();
-  const [dayError, setDayError] = useState<{ date: string; message: string }>();
   const [editor, setEditor] = useState<Editor>();
   const [deletingId, setDeletingId] = useState<number>();
   const [notice, setNotice] = useState<Notice>(undefined);
@@ -38,23 +38,6 @@ export function Keywords({ today }: { today: string }) {
   const [results, setResults] = useState<{ path: string; keywords: Keyword[] }>();
   const [searchError, setSearchError] = useState<string>();
 
-  useEffect(() => {
-    if (!date) return;
-    let current = true;
-    requestJson<{ keywords: Keyword[] }>(`/api/keywords?date=${date}`)
-      .then((data) => {
-        if (!current) return;
-        setDay({ date, keywords: data.keywords });
-        setDayError(undefined);
-      })
-      .catch((error: RequestError) => {
-        if (current) setDayError({ date, message: error.message });
-      });
-    return () => {
-      current = false;
-    };
-  }, [date]);
-
   // After an add the keyword field takes focus again; after an edit or delete, whose buttons are
   // gone, the day's heading does, so keyboard users keep their place.
   useEffect(() => {
@@ -63,19 +46,15 @@ export function Keywords({ today }: { today: string }) {
     document.getElementById(wantFocus)?.focus?.();
   }, [wantFocus, busy]);
 
-  const keywords = day?.date === date ? day.keywords : undefined;
-  const error = dayError?.date === date ? dayError.message : undefined;
+  const dayQuery = useApiQuery<{ keywords: Keyword[] }>(
+    apiKey('/api/keywords', 'day', date),
+    `/api/keywords?date=${date}`,
+    { staleTime: 0 },
+  );
+  const keywords = dayQuery.data?.keywords;
+  const error = dayQuery.isFetching ? undefined : dayQuery.error?.message;
 
-  const reloadDay = async () => {
-    try {
-      const data = await requestJson<{ keywords: Keyword[] }>(`/api/keywords?date=${date}`);
-      setDay({ date, keywords: data.keywords });
-      setDayError(undefined);
-    } catch (failure) {
-      setDayError({ date, message: (failure as RequestError).message });
-    }
-  };
-
+  // A search is a one-off request, not a cached read: its results are re-run by hand after a change.
   const runSearch = async (path: string) => {
     try {
       const data = await requestJson<{ keywords: Keyword[] }>(path);
@@ -87,6 +66,18 @@ export function Keywords({ today }: { today: string }) {
       setResults(undefined);
     }
   };
+
+  const create = useApiMutation<unknown, { date: string } & KeywordForm>((body) => ({
+    path: '/api/keywords',
+    body,
+  }));
+  const update = useApiMutation<unknown, { id: number; body: { date: string } & KeywordForm }>(
+    ({ id, body }) => ({ path: `/api/keywords/${id}`, method: 'PUT', body }),
+  );
+  const destroy = useApiMutation<unknown, number>((id) => ({
+    path: `/api/keywords/${id}`,
+    method: 'DELETE',
+  }));
 
   // Runs one change, then reloads the day and the shown search results, all while busy. A 404
   // closes the editor when it is about the keyword being edited.
@@ -102,7 +93,7 @@ export function Keywords({ today }: { today: string }) {
         setWantFocus('keyword-day');
       }
     } finally {
-      await reloadDay();
+      await client.invalidateQueries({ queryKey: apiKey('/api/keywords', 'day') });
       if (results) await runSearch(results.path);
       end();
     }
@@ -121,7 +112,7 @@ export function Keywords({ today }: { today: string }) {
     event.preventDefault();
     nameNext('add');
     void run(async () => {
-      await requestJson('/api/keywords', { method: 'POST', body: { date, ...form } });
+      await create.mutateAsync({ date, ...form });
       setForm(emptyKeywordForm());
       setNotice({ kind: 'status', text: 'Added' });
       setWantFocus('keyword-input');
@@ -133,10 +124,7 @@ export function Keywords({ today }: { today: string }) {
     if (!editor) return;
     nameNext('save');
     void run(async () => {
-      await requestJson(`/api/keywords/${editor.id}`, {
-        method: 'PUT',
-        body: { date: editor.date, ...editor.form },
-      });
+      await update.mutateAsync({ id: editor.id, body: { date: editor.date, ...editor.form } });
       setEditor(undefined);
       setWantFocus('keyword-day');
       setNotice({
@@ -149,7 +137,7 @@ export function Keywords({ today }: { today: string }) {
   const remove = (keyword: Keyword) =>
     run(async () => {
       try {
-        await requestJson(`/api/keywords/${keyword.id}`, { method: 'DELETE' });
+        await destroy.mutateAsync(keyword.id);
       } catch (failure) {
         // Already gone elsewhere: like a delete. Otherwise the keyword stays with its delete
         // button (#86).

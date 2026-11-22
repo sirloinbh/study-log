@@ -1,6 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import React, { useEffect, useRef, useState } from 'react';
 
-import { type RequestError, requestJson } from './lib/api';
+import { apiKey, useApiQuery } from './lib/query';
 import { Loading } from './loading';
 import { Memo } from './memo';
 import {
@@ -19,50 +20,35 @@ const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 export function Calendar({ today, reloadKey }: { today: string; reloadKey?: number }) {
   const [month, setMonth] = useState(today.slice(0, 7));
   const [selected, setSelected] = useState(today);
-  // Kept per month and per day, so a slow answer for another one never shows here.
-  const [months, setMonths] = useState<Record<string, CalendarDay[]>>({});
-  const [dayLogs, setDayLogs] = useState<Record<string, StudyLog[]>>({});
-  // Failures, each tagged with the month or day it was for, so one never hides or clears the other.
-  const [monthError, setMonthError] = useState<{ month: string; message: string }>();
-  const [dayError, setDayError] = useState<{ date: string; message: string }>();
+  // One cached answer per month and per day, so a slow answer for another one never shows here.
+  const client = useQueryClient();
+  const monthKey = apiKey('/api/study-logs/calendar', month);
+  const dayKey = apiKey('/api/study-logs', 'date', selected);
+  const monthQuery = useApiQuery<{ month: string; days: CalendarDay[] }>(
+    monthKey,
+    `/api/study-logs/calendar?month=${month}`,
+  );
+  const dayQuery = useApiQuery<{ studyLogs: StudyLog[] }>(
+    dayKey,
+    `/api/study-logs?date=${selected}`,
+  );
 
+  // Logs saved or deleted elsewhere on the page: read what is shown again.
+  const lastReload = useRef(reloadKey);
   useEffect(() => {
-    let current = true;
-    requestJson<{ month: string; days: CalendarDay[] }>(`/api/study-logs/calendar?month=${month}`)
-      .then((data) => {
-        if (!current) return;
-        setMonths((all) => ({ ...all, [data.month]: data.days }));
-        setMonthError((failed) => (failed?.month === month ? undefined : failed));
-      })
-      .catch(
-        (failure: RequestError) => current && setMonthError({ month, message: failure.message }),
-      );
-    return () => {
-      current = false;
-    };
-  }, [month, reloadKey]);
+    if (lastReload.current === reloadKey) return;
+    lastReload.current = reloadKey;
+    void client.invalidateQueries({ queryKey: monthKey });
+    void client.invalidateQueries({ queryKey: dayKey });
+    // Only a change of reloadKey reads again.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reloadKey]);
 
-  useEffect(() => {
-    let current = true;
-    requestJson<{ studyLogs: StudyLog[] }>(`/api/study-logs?date=${selected}`)
-      .then((data) => {
-        if (!current) return;
-        setDayLogs((all) => ({ ...all, [selected]: data.studyLogs }));
-        setDayError((failed) => (failed?.date === selected ? undefined : failed));
-      })
-      .catch(
-        (failure: RequestError) =>
-          current && setDayError({ date: selected, message: failure.message }),
-      );
-    return () => {
-      current = false;
-    };
-  }, [selected, reloadKey]);
-
-  const days = months[month];
-  const logs = dayLogs[selected];
-  const error = monthError?.month === month ? monthError.message : undefined;
-  const logsError = dayError?.date === selected ? dayError.message : undefined;
+  const days = monthQuery.data?.days;
+  const logs = dayQuery.data?.studyLogs;
+  // The error is hidden while a failed read is tried again.
+  const error = monthQuery.isFetching ? undefined : monthQuery.error?.message;
+  const logsError = dayQuery.isFetching ? undefined : dayQuery.error?.message;
 
   const describe = (day: CalendarDay) =>
     `${day.date}, ${day.minutes ? `studied ${formatMinutes(day.minutes)}` : 'no study'}, ` +

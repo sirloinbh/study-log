@@ -1,10 +1,11 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { expect, test } from 'vitest';
 
 import { Calendar } from './calendar';
 import { calendarCells, monthTitle, shiftMonth, shortMinutes } from './month-calendar';
 import { StudyLogs } from './study-logs';
 import { type Api, fakeApi } from './test/fake-api';
+import { render } from './test/render';
 
 const today = '2026-10-22';
 

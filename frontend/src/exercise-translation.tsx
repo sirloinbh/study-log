@@ -1,8 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import React, { useState } from 'react';
 
 import { useBusy } from './busy';
 import type { ExerciseTranslation as Translation } from './exercise';
-import { type RequestError, requestJson } from './lib/api';
+import type { RequestError } from './lib/api';
+import { apiKey, useApiMutation, useApiQuery } from './lib/query';
 import { Loading } from './loading';
 
 type Notice = { exerciseId: number; kind: 'status' | 'alert'; text: string } | undefined;
@@ -10,30 +12,25 @@ type Notice = { exerciseId: number; kind: 'status' | 'alert'; text: string } | u
 // The Korean translation of one exercise and its answer, made by Claude on request (#31). State is
 // tagged with its exercise, so opening another exercise's translation never shows this one's.
 export function ExerciseTranslation({ exerciseId, label }: { exerciseId: number; label: string }) {
-  const [loaded, setLoaded] = useState<{ exerciseId: number; translation: Translation | null }>();
-  const [loadError, setLoadError] = useState<{ exerciseId: number; message: string }>();
   const [notice, setNotice] = useState<Notice>(undefined);
   // One translation request at a time: it can take several seconds.
   const { busy, begin, end } = useBusy();
 
-  useEffect(() => {
-    let current = true;
-    requestJson<{ translation: Translation | null }>(`/api/exercises/${exerciseId}/translation`)
-      .then((data) => {
-        if (!current) return;
-        setLoaded({ exerciseId, translation: data.translation });
-        setLoadError(undefined);
-      })
-      .catch((error: RequestError) => {
-        if (current) setLoadError({ exerciseId, message: error.message });
-      });
-    return () => {
-      current = false;
-    };
-  }, [exerciseId]);
+  const client = useQueryClient();
+  const path = `/api/exercises/${exerciseId}/translation`;
+  // The key carries the exercise, so another exercise's translation is never shown as this one's.
+  const query = useApiQuery<{ translation: Translation | null }>(apiKey(path), path, {
+    staleTime: 0,
+  });
+  const translateRequest = useApiMutation<{ translation: Translation }, number>((id) => ({
+    path: `/api/exercises/${id}/translation`,
+    // A JSON body: the API takes nothing else for this paid request.
+    method: 'POST',
+    body: {},
+  }));
 
-  const translation = loaded?.exerciseId === exerciseId ? loaded.translation : undefined;
-  const error = loadError?.exerciseId === exerciseId ? loadError.message : undefined;
+  const translation = query.data?.translation;
+  const error = query.error?.message;
   const shown = notice?.exerciseId === exerciseId ? notice : undefined;
 
   const translate = async () => {
@@ -41,13 +38,10 @@ export function ExerciseTranslation({ exerciseId, label }: { exerciseId: number;
     const id = exerciseId;
     setNotice({ exerciseId: id, kind: 'status', text: 'Translating… this can take a few seconds' });
     try {
-      const data = await requestJson<{ translation: Translation }>(
-        `/api/exercises/${id}/translation`,
-        // A JSON body: the API takes nothing else for this paid request.
-        { method: 'POST', body: {} },
-      );
-      setLoaded({ exerciseId: id, translation: data.translation });
-      setLoadError(undefined);
+      const data = await translateRequest.mutateAsync(id);
+      client.setQueryData(apiKey(`/api/exercises/${id}/translation`), {
+        translation: data.translation,
+      });
       setNotice({ exerciseId: id, kind: 'status', text: 'Translated' });
     } catch (failure) {
       setNotice({

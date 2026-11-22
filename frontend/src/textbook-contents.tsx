@@ -1,10 +1,12 @@
+import { useQueryClient } from '@tanstack/react-query';
 import React, { useEffect, useRef, useState } from 'react';
 
 import { useBusy } from './busy';
 import { ContentsEntryForm } from './contents-entry-form';
 import { ContentsPasteForm } from './contents-paste-form';
 import { ContentsTree } from './contents-tree';
-import { type RequestError, requestJson } from './lib/api';
+import type { RequestError } from './lib/api';
+import { apiKey, type ApiRequest, useApiMutation, useApiQuery } from './lib/query';
 import { Loading } from './loading';
 import { readPdfToc } from './pdf-import';
 import { pdfSizeLimit } from './pdf-toc';
@@ -38,8 +40,6 @@ export function TextbookContents({
   onTree?: (shown: { textbookId: number; tree?: ContentNode[]; failed: boolean }) => void;
   reloadKey?: number;
 }) {
-  const [loaded, setLoaded] = useState<{ textbookId: number; tree: ContentNode[] }>();
-  const [loadError, setLoadError] = useState<{ textbookId: number; message: string }>();
   const [editor, setEditor] = useState<Editor>();
   const [deleting, setDeleting] = useState<{ textbookId: number; id: number }>();
   // The pasted table of contents being previewed (#23).
@@ -65,26 +65,24 @@ export function TextbookContents({
     document.getElementById(wantFocus)?.focus?.();
   }, [wantFocus, busy]);
 
-  // The first load, and a reload asked for by another card. Reloads after a change made here
-  // happen inside that change (see `run`). The tree on screen stays until the new one arrives.
+  // The tree of this textbook, keyed by it, so another textbook's answer is never shown here. The first load, and a
+  // reload asked for by another card (`reloadKey`). Reloads after a change made here happen inside that change (see
+  // `run`). The tree on screen stays until the new one arrives, and a failed reload is shown next to it.
+  const client = useQueryClient();
+  const contentsPath = `/api/textbooks/${textbookId}/contents`;
+  const contentsKey = apiKey(contentsPath);
+  const query = useApiQuery<{ contents: ContentNode[] }>(contentsKey, contentsPath);
+  const { refetch } = query;
+  const write = useApiMutation<unknown, ApiRequest>((request) => request);
+  const lastReloadKey = useRef(reloadKey);
   useEffect(() => {
-    let current = true;
-    requestJson<{ contents: ContentNode[] }>(`/api/textbooks/${textbookId}/contents`)
-      .then((data) => {
-        if (!current) return;
-        setLoaded({ textbookId, tree: data.contents });
-        setLoadError(undefined);
-      })
-      .catch((error: RequestError) => {
-        if (current) setLoadError({ textbookId, message: error.message });
-      });
-    return () => {
-      current = false;
-    };
-  }, [textbookId, reloadKey]);
+    if (lastReloadKey.current === reloadKey) return;
+    lastReloadKey.current = reloadKey;
+    void refetch();
+  }, [reloadKey, refetch]);
 
-  const tree = loaded?.textbookId === textbookId ? loaded.tree : undefined;
-  const error = loadError?.textbookId === textbookId ? loadError.message : undefined;
+  const tree = query.data?.contents;
+  const error = query.error?.message;
   const open = editor?.textbookId === textbookId ? editor : undefined;
   const deletingId = deleting?.textbookId === textbookId ? deleting.id : undefined;
   const shown = notice?.textbookId === textbookId ? notice : undefined;
@@ -106,15 +104,7 @@ export function TextbookContents({
 
   // Loads the server's tree; a failure is shown next to the tree already on screen.
   const refresh = async () => {
-    try {
-      const data = await requestJson<{ contents: ContentNode[] }>(
-        `/api/textbooks/${textbookId}/contents`,
-      );
-      setLoaded({ textbookId, tree: data.contents });
-      setLoadError(undefined);
-    } catch (failure) {
-      setLoadError({ textbookId, message: (failure as RequestError).message });
-    }
+    await refetch();
   };
 
   // Runs one change and then reloads the tree, both while busy. On failure shows the server's
@@ -171,12 +161,14 @@ export function TextbookContents({
     void run(async () => {
       const body = { number: open.number, title: open.title };
       if (open.id === undefined)
-        await requestJson(`/api/textbooks/${textbookId}/contents`, {
+        await write.mutateAsync({
+          path: contentsPath,
           method: 'POST',
           body: { ...body, parentId: open.parentId },
         });
       else
-        await requestJson(`/api/textbooks/${textbookId}/contents/${open.id}`, {
+        await write.mutateAsync({
+          path: `${contentsPath}/${open.id}`,
           method: 'PUT',
           body,
         });
@@ -230,14 +222,12 @@ export function TextbookContents({
     if (!pasted.length || pasteProblems.length) return;
     nameNext('paste');
     void run(async () => {
-      const data = await requestJson<{ contents: ContentNode[] }>(
-        `/api/textbooks/${textbookId}/contents/bulk`,
-        {
-          method: 'POST',
-          body: { entries: pasted.map(({ level, number, title }) => ({ level, number, title })) },
-        },
-      );
-      setLoaded({ textbookId, tree: data.contents });
+      const data = (await write.mutateAsync({
+        path: `${contentsPath}/bulk`,
+        method: 'POST',
+        body: { entries: pasted.map(({ level, number, title }) => ({ level, number, title })) },
+      })) as { contents: ContentNode[] };
+      client.setQueryData(contentsKey, data);
       say('status', `Added ${pasted.length} contents entries`);
       setPaste(undefined);
       return true;
@@ -247,9 +237,7 @@ export function TextbookContents({
   const remove = (node: ContentNode) =>
     run(async () => {
       try {
-        await requestJson(`/api/textbooks/${textbookId}/contents/${node.id}`, {
-          method: 'DELETE',
-        });
+        await write.mutateAsync({ path: `${contentsPath}/${node.id}`, method: 'DELETE' });
       } catch (failure) {
         // Already gone elsewhere: like a delete. Otherwise (e.g. study logs still point at it)
         // the entry stays with its delete button.
@@ -272,11 +260,12 @@ export function TextbookContents({
     run(async () => {
       const ids = siblings.map((node) => node.id);
       [ids[index], ids[index + step]] = [ids[index + step], ids[index]];
-      const data = await requestJson<{ contents: ContentNode[] }>(
-        `/api/textbooks/${textbookId}/contents/order`,
-        { method: 'PUT', body: { parentId, ids } },
-      );
-      setLoaded({ textbookId, tree: data.contents });
+      const data = (await write.mutateAsync({
+        path: `${contentsPath}/order`,
+        method: 'PUT',
+        body: { parentId, ids },
+      })) as { contents: ContentNode[] };
+      client.setQueryData(contentsKey, data);
       setNotice(undefined);
       return true;
     });

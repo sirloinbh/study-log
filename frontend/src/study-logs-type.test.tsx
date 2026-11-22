@@ -1,8 +1,9 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { expect, test } from 'vitest';
 
 import { StudyLogs } from './study-logs';
 import { fakeApi } from './test/fake-api';
+import { render } from './test/render';
 
 const today = '2026-10-31';
 const log = {

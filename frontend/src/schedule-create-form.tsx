@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
-import { requestJson } from './lib/api';
+import { apiKey, useApiQuery } from './lib/query';
 import { ButtonSpinner } from './loading';
 import { defaultEnd, defaultHours, hoursToMinutes } from './schedule';
 import { contentLabel, type ContentNode, type Textbook } from './textbook';
@@ -44,34 +44,26 @@ export function ScheduleCreateForm({
   const [textbookId, setTextbookId] = useState('');
   const [fromContentId, setFromContentId] = useState('');
   const [toContentId, setToContentId] = useState('');
-  const [textbooks, setTextbooks] = useState<Textbook[]>();
-  const [textbooksFailed, setTextbooksFailed] = useState(false);
-  // Tagged with their book, so a slow answer for another one is never offered for this one.
-  const [chapters, setChapters] = useState<{ textbookId: string; list: ContentNode[] }>();
-  const [chaptersFailed, setChaptersFailed] = useState<string>();
+  const textbooksQuery = useApiQuery<{ textbooks: Textbook[] }>(
+    apiKey('/api/textbooks'),
+    '/api/textbooks',
+  );
+  const textbooks = textbooksQuery.data?.textbooks;
+  const textbooksFailed = textbooksQuery.isError;
+  // One cached list per book, so a slow answer for another one is never offered for this one.
+  const chaptersQuery = useApiQuery<{ contents: ContentNode[] }>(
+    apiKey('/api/textbooks', textbookId, 'contents'),
+    `/api/textbooks/${textbookId}/contents`,
+    // Always stale: choosing a book again reads its chapters again.
+    { enabled: Boolean(textbookId), staleTime: 0 },
+  );
+  const chaptersFailed = chaptersQuery.isError;
 
-  useEffect(() => {
-    let current = true;
-    requestJson<{ textbooks: Textbook[] }>('/api/textbooks')
-      .then((data) => current && setTextbooks(data.textbooks))
-      .catch(() => current && setTextbooksFailed(true));
-    return () => {
-      current = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!textbookId) return;
-    let current = true;
-    requestJson<{ contents: ContentNode[] }>(`/api/textbooks/${textbookId}/contents`)
-      .then((data) => current && setChapters({ textbookId, list: data.contents }))
-      .catch(() => current && setChaptersFailed(textbookId));
-    return () => {
-      current = false;
-    };
-  }, [textbookId]);
-
-  const bookChapters = chapters?.textbookId === textbookId ? chapters.list : undefined;
+  // Not while they are read again: what was read before does not count as read now.
+  const bookChapters =
+    textbookId && !chaptersQuery.isFetching && !chaptersQuery.isError
+      ? chaptersQuery.data?.contents
+      : undefined;
 
   const create = async (event: { preventDefault(): void }) => {
     event.preventDefault();
@@ -192,9 +184,6 @@ export function ScheduleCreateForm({
               setTextbookId(event.target.value);
               setFromContentId('');
               setToContentId('');
-              // Even for the same book again: what was read before does not count as read now.
-              setChapters(undefined);
-              setChaptersFailed(undefined);
             }}
           >
             <option value="">Time only, no textbook</option>
@@ -232,7 +221,7 @@ export function ScheduleCreateForm({
           </>
         )}
         {textbooksFailed && <p className="status wide">Could not load the textbooks</p>}
-        {chaptersFailed === textbookId && textbookId && (
+        {textbookId && chaptersFailed && (
           <p className="status wide">Could not load the contents of this textbook</p>
         )}
         {bookChapters?.length === 0 && (

@@ -1,8 +1,9 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, screen, waitFor } from '@testing-library/react';
 import { useState } from 'react';
 import { afterEach, expect, test } from 'vitest';
 
 import { fakeApi } from './test/fake-api';
+import { render } from './test/render';
 import type { ContentNode } from './textbook';
 import { TextbookContents } from './textbook-contents';
 

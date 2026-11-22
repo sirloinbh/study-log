@@ -1,8 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import React, { useEffect, useRef, useState } from 'react';
 
 import { useBusy } from './busy';
 import { contentPath, type Exercise } from './exercise';
-import { type RequestError, requestJson } from './lib/api';
+import type { RequestError } from './lib/api';
+import { apiKey, useApiMutation, useApiQuery } from './lib/query';
 import { Loading } from './loading';
 import { contentLabel, type ContentNode, contentOptions, type Textbook } from './textbook';
 
@@ -35,10 +37,9 @@ export function ImportantExercises({
 }) {
   // 0 is the whole textbook.
   const [chosen, setChosen] = useState(0);
-  const [loaded, setLoaded] = useState<{ scope: number; exercises: Exercise[] }>();
-  const [loadError, setLoadError] = useState<{ scope: number; message: string }>();
   const [notice, setNotice] = useState<Notice>(undefined);
   const { busy, begin, end } = useBusy();
+  const client = useQueryClient();
 
   const options = tree ? contentOptions(tree) : [];
   // The picked chapter, or the whole textbook when it was deleted.
@@ -46,44 +47,41 @@ export function ImportantExercises({
   const url =
     `/api/textbooks/${textbook.id}/exercises?important=true` + (scope ? `&contentId=${scope}` : '');
 
-  useEffect(() => {
-    if (!tree) return;
-    let current = true;
-    requestJson<{ exercises: Exercise[] }>(url)
-      .then((data) => {
-        if (!current) return;
-        setLoaded({ scope, exercises: data.exercises });
-        setLoadError(undefined);
-      })
-      .catch((error: RequestError) => {
-        if (current) setLoadError({ scope, message: error.message });
-      });
-    return () => {
-      current = false;
-    };
-  }, [url, scope, reloadKey, tree]);
+  // One cached list per scope, always stale so picking a scope reads it again.
+  const query = useApiQuery<{ exercises: Exercise[] }>(apiKey(url), url, {
+    enabled: tree !== undefined,
+    staleTime: 0,
+  });
+  const { refetch } = query;
+  const unmarkExercise = useApiMutation<unknown, number>((id) => ({
+    path: `/api/exercises/${id}/important`,
+    method: 'PATCH',
+    body: { important: false },
+  }));
 
-  const exercises = loaded?.scope === scope ? loaded.exercises : undefined;
-  const error = loadError?.scope === scope ? loadError.message : undefined;
+  // Exercises changed in the exercises card, or the contents reloaded: read them again, keeping
+  // what is shown.
+  const last = useRef({ reloadKey, tree });
+  useEffect(() => {
+    const before = last.current;
+    last.current = { reloadKey, tree };
+    if (!tree || (before.reloadKey === reloadKey && before.tree === tree)) return;
+    // The first tree arriving is the query's own first read.
+    if (before.tree) void refetch();
+  }, [reloadKey, tree, refetch]);
+
+  const exercises = query.data?.exercises;
+  const error = query.error?.message;
 
   const unmark = async (exercise: Exercise, label: string) => {
     if (!begin()) return;
     try {
-      await requestJson(`/api/exercises/${exercise.id}/important`, {
-        method: 'PATCH',
-        body: { important: false },
-      });
+      await unmarkExercise.mutateAsync(exercise.id);
       setNotice({ kind: 'status', text: `Removed the important mark from ${label}` });
     } catch (failure) {
       setNotice({ kind: 'alert', text: (failure as RequestError).message });
     } finally {
-      try {
-        const data = await requestJson<{ exercises: Exercise[] }>(url);
-        setLoaded({ scope, exercises: data.exercises });
-        setLoadError(undefined);
-      } catch (failure) {
-        setLoadError({ scope, message: (failure as RequestError).message });
-      }
+      await client.invalidateQueries({ queryKey: apiKey(url) });
       end();
       onChanged?.();
     }

@@ -1,9 +1,10 @@
-import { act, render, renderHook, screen } from '@testing-library/react';
+import { act, renderHook, screen } from '@testing-library/react';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import { App } from './app';
 import { msUntilMidnight, serviceDate, useServiceDate } from './date';
 import { fakeApi } from './test/fake-api';
+import { render } from './test/render';
 
 afterEach(() => {
   vi.useRealTimers();

@@ -1,9 +1,10 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
 
 import { searchPath } from './keyword';
 import { Keywords } from './keywords';
 import { type Answer, fakeApi, type Sent } from './test/fake-api';
+import { render } from './test/render';
 
 type Keyword = { id: number; date: string; keyword: string; memo: string };
 

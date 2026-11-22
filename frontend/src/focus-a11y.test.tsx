@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import { Exercises } from './exercises';
@@ -6,6 +6,7 @@ import { Keywords } from './keywords';
 import { Memo } from './memo';
 import { StudyLogs } from './study-logs';
 import { fakeApi } from './test/fake-api';
+import { render } from './test/render';
 
 afterEach(() => {
   cleanup();

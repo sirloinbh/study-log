@@ -1,8 +1,9 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import { contentPath, questionText } from './exercise';
 import { type Answer, fakeApi, type Sent } from './test/fake-api';
+import { render } from './test/render';
 import type { ContentNode } from './textbook';
 import { Textbooks } from './textbooks';
 
