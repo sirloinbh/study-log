@@ -281,7 +281,7 @@ test('entering a session previews its duration and saving adds it to the list', 
   });
   // The list is reloaded from the server after saving.
   await waitFor(() => expect(items()).toHaveLength(1));
-  expect(api.requests[2].method).toBe('GET');
+  await waitFor(() => expect(api.requests[2]?.method).toBe('GET'));
   const line = within(item());
   expect(line.getByText('23:20–00:50')).toBeInTheDocument();
   expect(line.getByText('1 h 30 min')).toBeInTheDocument();

@@ -3,31 +3,16 @@ import React, { useEffect, useState } from 'react';
 import { useBusy } from './busy';
 import { Calendar } from './calendar';
 import { type RequestError, requestJson } from './lib/api';
-import { ButtonSpinner, Loading } from './loading';
-import { Memo } from './memo';
+import { Loading } from './loading';
+import { StudyLogFormView } from './study-log-form';
+import { StudyLogItem } from './study-log-item';
 import { StudyLogSearch } from './study-log-search';
-import {
-  crossesMidnight,
-  emptyForm,
-  formatMinutes,
-  previewMinutes,
-  reflectionLabel,
-  statusLabels,
-  studiedLabel,
-  type StudyLog,
-  type StudyLogForm,
-  type StudyStatus,
-  type StudyType,
-  studyTypeLabels,
-  understandingLabels,
-} from './study-logs-data';
+import { emptyForm, type StudyLog, type StudyLogForm } from './study-logs-data';
 import { type ContentNode, contentOptions, type Textbook } from './textbook';
 
 type Notice = { kind: 'status' | 'alert'; text: string } | undefined;
 
 const recentLimit = 20;
-
-const describe = (log: StudyLog) => `${log.studyDate} ${log.startTime}–${log.endTime}`;
 
 // `onChange` hears each save or delete attempt, since either can change which reviews are due.
 export function StudyLogs({ today, onChange }: { today: string; onChange?: () => void }) {
@@ -105,31 +90,10 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
   }, [form.textbookId]);
   const chapters = loadedChapters?.textbookId === form.textbookId ? loadedChapters.options : [];
 
-  const minutes = previewMinutes(form.startTime, form.endTime);
-  const change = (field: keyof StudyLogForm) => (event: { target: { value: string } }) => {
+  // A change to the form takes back what was said about the last try.
+  const patch = (changes: Partial<StudyLogForm>) => {
     setNotice(undefined);
-    setForm((current) => ({ ...current, [field]: event.target.value }));
-  };
-
-  // The select values '', '1'…'5', 'true' and 'false' map to null, a number and a boolean.
-  const assess =
-    (field: 'understanding' | 'goalAchieved') => (event: { target: { value: string } }) => {
-      setNotice(undefined);
-      const { value } = event.target;
-      const parsed =
-        value === '' ? null : field === 'understanding' ? Number(value) : value === 'true';
-      setForm((current) => ({ ...current, [field]: parsed }));
-    };
-
-  // Picking another textbook clears the chapter, which belonged to the previous one.
-  const pick = (field: 'textbookId' | 'contentId') => (event: { target: { value: string } }) => {
-    setNotice(undefined);
-    const id = event.target.value === '' ? null : Number(event.target.value);
-    setForm((current) =>
-      field === 'textbookId'
-        ? { ...current, textbookId: id, contentId: null }
-        : { ...current, contentId: id },
-    );
+    setForm((current) => ({ ...current, ...changes }));
   };
 
   const leaveEdit = () => {
@@ -223,159 +187,17 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
     <div className="study-logs">
       <section className="card">
         <h2>{editingId === undefined ? 'Add a study log' : 'Edit the study log'}</h2>
-        <form className="log-form" onSubmit={(event) => void save(event)}>
-          <label>
-            Study date
-            <input
-              id="study-log-date"
-              type="date"
-              required
-              disabled={busy}
-              value={form.studyDate}
-              onChange={change('studyDate')}
-            />
-          </label>
-          <label>
-            Start
-            <input
-              type="time"
-              required
-              disabled={busy}
-              value={form.startTime}
-              onChange={change('startTime')}
-            />
-          </label>
-          <label>
-            End
-            <input
-              type="time"
-              required
-              disabled={busy}
-              value={form.endTime}
-              onChange={change('endTime')}
-            />
-          </label>
-          <label>
-            Status
-            <select disabled={busy} value={form.status} onChange={change('status')}>
-              {(Object.keys(statusLabels) as StudyStatus[]).map((status) => (
-                <option key={status} value={status}>
-                  {statusLabels[status]}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="half">
-            Textbook
-            <select disabled={busy} value={form.textbookId ?? ''} onChange={pick('textbookId')}>
-              <option value="">None</option>
-              {textbooks.map((book) => (
-                <option key={book.id} value={book.id}>
-                  {book.title}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="half">
-            Chapter/section
-            <select
-              disabled={busy || form.textbookId === null}
-              value={form.contentId ?? ''}
-              onChange={pick('contentId')}
-            >
-              <option value="">
-                {form.textbookId === null ? 'Choose a textbook first' : 'None'}
-              </option>
-              {chapters.map((chapter) => (
-                <option key={chapter.id} value={chapter.id}>
-                  {chapter.label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Type
-            <select disabled={busy} value={form.studyType} onChange={change('studyType')}>
-              {(Object.keys(studyTypeLabels) as StudyType[]).map((type) => (
-                <option key={type} value={type}>
-                  {studyTypeLabels[type]}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Understanding
-            <select
-              disabled={busy}
-              value={form.understanding ?? ''}
-              onChange={assess('understanding')}
-            >
-              <option value="">None</option>
-              {Object.entries(understandingLabels).map(([score, label]) => (
-                <option key={score} value={score}>
-                  {label}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="half">
-            Goal achieved
-            <select
-              disabled={busy}
-              value={form.goalAchieved === null ? '' : String(form.goalAchieved)}
-              onChange={assess('goalAchieved')}
-            >
-              <option value="">None</option>
-              <option value="true">Achieved</option>
-              <option value="false">Not achieved</option>
-            </select>
-          </label>
-          <label className="wide">
-            Difficult parts
-            <textarea
-              rows={2}
-              maxLength={2000}
-              disabled={busy}
-              value={form.difficulties}
-              onChange={change('difficulties')}
-            />
-          </label>
-          <label className="wide">
-            Memo
-            <textarea
-              rows={3}
-              maxLength={10000}
-              disabled={busy}
-              value={form.memo}
-              onChange={change('memo')}
-              aria-describedby="memo-hint"
-            />
-          </label>
-          <p id="memo-hint" className="hint wide">
-            You can use Markdown: # heading, - list, **bold**, `code`, [link](url)
-          </p>
-          {form.memo.trim() && (
-            <section className="memo-preview wide" aria-label="Memo preview">
-              <h3>Preview</h3>
-              <Memo text={form.memo} />
-            </section>
-          )}
-          <p className="duration wide" aria-live="polite">
-            Study time <strong>{minutes === undefined ? '—' : formatMinutes(minutes)}</strong>
-            {crossesMidnight(form.startTime, form.endTime) ? ' (ends the next day)' : ''}
-          </p>
-          <div className="actions wide">
-            <button type="submit" className="primary" disabled={busy}>
-              <ButtonSpinner when={action === 'save'} />
-              {editingId === undefined ? 'Save' : 'Save changes'}
-            </button>
-            {editingId !== undefined && (
-              <button type="button" className="secondary" disabled={busy} onClick={leaveEdit}>
-                Cancel
-              </button>
-            )}
-          </div>
-        </form>
+        <StudyLogFormView
+          form={form}
+          editing={editingId !== undefined}
+          textbooks={textbooks}
+          chapters={chapters}
+          busy={busy}
+          action={action}
+          onPatch={patch}
+          onSubmit={(event) => void save(event)}
+          onCancel={leaveEdit}
+        />
         {/* Always mounted so screen readers announce each new message. */}
         <p role="status" className="status">
           {notice?.kind === 'status' ? notice.text : ''}
@@ -402,77 +224,24 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
         ) : (
           <ul className="log-list">
             {logs.map((log) => (
-              <li key={log.id} className={log.id === editingId ? 'editing' : ''}>
-                <div className="log-head">
-                  <span className="log-date">{log.studyDate}</span>
-                  <span>
-                    {log.startTime}–{log.endTime}
-                  </span>
-                  <strong>{formatMinutes(log.durationMinutes)}</strong>
-                  <span className={`badge ${log.status}`}>{statusLabels[log.status]}</span>
-                  {log.studyType === 'review' && <span className="badge">Review</span>}
-                </div>
-                {log.textbookTitle !== null && <p className="log-studied">{studiedLabel(log)}</p>}
-                {reflectionLabel(log) && <p className="log-studied">{reflectionLabel(log)}</p>}
-                {log.difficulties && (
-                  <p className="log-memo">Difficult parts: {log.difficulties}</p>
-                )}
-                {log.memo && <Memo text={log.memo} clamp />}
-                <div className="log-actions">
-                  {deletingId === log.id ? (
-                    <>
-                      <button
-                        type="button"
-                        id={`study-log-delete-confirm-${log.id}`}
-                        className="danger"
-                        disabled={busy}
-                        aria-label={`Confirm log deletion: ${describe(log)}`}
-                        onClick={() => void remove(log.id)}
-                      >
-                        <ButtonSpinner when={action === 'delete'} />
-                        Confirm delete
-                      </button>
-                      <button
-                        type="button"
-                        className="secondary"
-                        disabled={busy}
-                        aria-label={`Cancel log deletion: ${describe(log)}`}
-                        onClick={() => {
-                          setDeletingId(undefined);
-                          setWantFocus(`study-log-delete-${log.id}`);
-                        }}
-                      >
-                        Cancel
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        className="secondary"
-                        disabled={busy}
-                        aria-label={`Edit log: ${describe(log)}`}
-                        onClick={() => edit(log)}
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        id={`study-log-delete-${log.id}`}
-                        className="secondary"
-                        disabled={busy}
-                        aria-label={`Delete log: ${describe(log)}`}
-                        onClick={() => {
-                          setDeletingId(log.id);
-                          setWantFocus(`study-log-delete-confirm-${log.id}`);
-                        }}
-                      >
-                        Delete
-                      </button>
-                    </>
-                  )}
-                </div>
-              </li>
+              <StudyLogItem
+                key={log.id}
+                log={log}
+                editing={log.id === editingId}
+                confirming={deletingId === log.id}
+                busy={busy}
+                action={action}
+                onEdit={() => edit(log)}
+                onAskDelete={() => {
+                  setDeletingId(log.id);
+                  setWantFocus(`study-log-delete-confirm-${log.id}`);
+                }}
+                onCancelDelete={() => {
+                  setDeletingId(undefined);
+                  setWantFocus(`study-log-delete-${log.id}`);
+                }}
+                onDelete={() => void remove(log.id)}
+              />
             ))}
           </ul>
         )}

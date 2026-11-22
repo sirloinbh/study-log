@@ -1,0 +1,212 @@
+import { ButtonSpinner } from './loading';
+import { Memo } from './memo';
+import {
+  crossesMidnight,
+  formatMinutes,
+  previewMinutes,
+  statusLabels,
+  type StudyLogForm,
+  type StudyStatus,
+  type StudyType,
+  studyTypeLabels,
+  understandingLabels,
+} from './study-logs-data';
+import type { Textbook } from './textbook';
+
+// The form that adds a study log or edits one. Each field reports a patch of the form, typed by
+// field, so a text can never land in a number or a choice. The parent owns the form and saves it.
+export function StudyLogFormView({
+  form,
+  editing,
+  textbooks,
+  chapters,
+  busy,
+  action,
+  onPatch,
+  onSubmit,
+  onCancel,
+}: {
+  form: StudyLogForm;
+  editing: boolean;
+  textbooks: Textbook[];
+  chapters: { id: number; label: string }[];
+  busy: boolean;
+  action: string | undefined;
+  onPatch: (patch: Partial<StudyLogForm>) => void;
+  onSubmit: (event: { preventDefault(): void }) => void;
+  onCancel: () => void;
+}) {
+  const minutes = previewMinutes(form.startTime, form.endTime);
+  // The select values '' and the numbers or words after it become null, a number or a boolean.
+  const idOf = (value: string) => (value === '' ? null : Number(value));
+  return (
+    <form className="log-form" onSubmit={onSubmit}>
+      <label>
+        Study date
+        <input
+          id="study-log-date"
+          type="date"
+          required
+          disabled={busy}
+          value={form.studyDate}
+          onChange={(event) => onPatch({ studyDate: event.target.value })}
+        />
+      </label>
+      <label>
+        Start
+        <input
+          type="time"
+          required
+          disabled={busy}
+          value={form.startTime}
+          onChange={(event) => onPatch({ startTime: event.target.value })}
+        />
+      </label>
+      <label>
+        End
+        <input
+          type="time"
+          required
+          disabled={busy}
+          value={form.endTime}
+          onChange={(event) => onPatch({ endTime: event.target.value })}
+        />
+      </label>
+      <label>
+        Status
+        <select
+          disabled={busy}
+          value={form.status}
+          onChange={(event) => onPatch({ status: event.target.value as StudyStatus })}
+        >
+          {(Object.keys(statusLabels) as StudyStatus[]).map((status) => (
+            <option key={status} value={status}>
+              {statusLabels[status]}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="half">
+        Textbook
+        <select
+          disabled={busy}
+          value={form.textbookId ?? ''}
+          // Picking another textbook clears the chapter, which belonged to the previous one.
+          onChange={(event) => onPatch({ textbookId: idOf(event.target.value), contentId: null })}
+        >
+          <option value="">None</option>
+          {textbooks.map((book) => (
+            <option key={book.id} value={book.id}>
+              {book.title}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="half">
+        Chapter/section
+        <select
+          disabled={busy || form.textbookId === null}
+          value={form.contentId ?? ''}
+          onChange={(event) => onPatch({ contentId: idOf(event.target.value) })}
+        >
+          <option value="">{form.textbookId === null ? 'Choose a textbook first' : 'None'}</option>
+          {chapters.map((chapter) => (
+            <option key={chapter.id} value={chapter.id}>
+              {chapter.label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Type
+        <select
+          disabled={busy}
+          value={form.studyType}
+          onChange={(event) => onPatch({ studyType: event.target.value as StudyType })}
+        >
+          {(Object.keys(studyTypeLabels) as StudyType[]).map((type) => (
+            <option key={type} value={type}>
+              {studyTypeLabels[type]}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label>
+        Understanding
+        <select
+          disabled={busy}
+          value={form.understanding ?? ''}
+          onChange={(event) => onPatch({ understanding: idOf(event.target.value) })}
+        >
+          <option value="">None</option>
+          {Object.entries(understandingLabels).map(([score, label]) => (
+            <option key={score} value={score}>
+              {label}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="half">
+        Goal achieved
+        <select
+          disabled={busy}
+          value={form.goalAchieved === null ? '' : String(form.goalAchieved)}
+          onChange={(event) =>
+            onPatch({
+              goalAchieved: event.target.value === '' ? null : event.target.value === 'true',
+            })
+          }
+        >
+          <option value="">None</option>
+          <option value="true">Achieved</option>
+          <option value="false">Not achieved</option>
+        </select>
+      </label>
+      <label className="wide">
+        Difficult parts
+        <textarea
+          rows={2}
+          maxLength={2000}
+          disabled={busy}
+          value={form.difficulties}
+          onChange={(event) => onPatch({ difficulties: event.target.value })}
+        />
+      </label>
+      <label className="wide">
+        Memo
+        <textarea
+          rows={3}
+          maxLength={10000}
+          disabled={busy}
+          value={form.memo}
+          onChange={(event) => onPatch({ memo: event.target.value })}
+          aria-describedby="memo-hint"
+        />
+      </label>
+      <p id="memo-hint" className="hint wide">
+        You can use Markdown: # heading, - list, **bold**, `code`, [link](url)
+      </p>
+      {form.memo.trim() && (
+        <section className="memo-preview wide" aria-label="Memo preview">
+          <h3>Preview</h3>
+          <Memo text={form.memo} />
+        </section>
+      )}
+      <p className="duration wide" aria-live="polite">
+        Study time <strong>{minutes === undefined ? '—' : formatMinutes(minutes)}</strong>
+        {crossesMidnight(form.startTime, form.endTime) ? ' (ends the next day)' : ''}
+      </p>
+      <div className="actions wide">
+        <button type="submit" className="primary" disabled={busy}>
+          <ButtonSpinner when={action === 'save'} />
+          {editing ? 'Save changes' : 'Save'}
+        </button>
+        {editing && (
+          <button type="button" className="secondary" disabled={busy} onClick={onCancel}>
+            Cancel
+          </button>
+        )}
+      </div>
+    </form>
+  );
+}
