@@ -1,9 +1,9 @@
 import { BellRing } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 
 import { Badge } from './components/ui/badge';
-import { requestJson } from './lib/api';
+import { apiKey, useApiQuery } from './lib/query';
 import { plural } from './plural';
 
 // The top bar link to the reviews page, shown while reviews are due (#44). It sits in the top bar
@@ -11,7 +11,6 @@ import { plural } from './plural';
 // the pages report (`version`), when the service date changes (`day`), and on returning to the tab, which may have been left overnight.
 // A failed count keeps the last one: the page itself reports server problems.
 export function ReviewBadge({ to, version, day }: { to: string; version: number; day?: string }) {
-  const [count, setCount] = useState(0);
   const [returned, setReturned] = useState(0);
   const { pathname } = useLocation();
 
@@ -21,18 +20,15 @@ export function ReviewBadge({ to, version, day }: { to: string; version: number;
     return () => window.removeEventListener('focus', onFocus);
   }, []);
 
-  useEffect(() => {
-    // A slower, older answer must not overwrite the count a newer request returned.
-    let current = true;
-    requestJson<{ count: number }>('/api/reviews/today/count')
-      .then((data) => {
-        if (current) setCount(data.count);
-      })
-      .catch(() => {});
-    return () => {
-      current = false;
-    };
-  }, [version, day, pathname, returned]);
+  // Each trigger is its own key, so it counts again, and a slower, older answer never replaces a newer one.
+  const query = useApiQuery<{ count: number }>(
+    apiKey('/api/reviews/today/count', version, day, pathname, returned),
+    '/api/reviews/today/count',
+  );
+  // A failed or pending count keeps the last one shown.
+  const last = useRef(0);
+  if (query.data) last.current = query.data.count;
+  const count = last.current;
 
   if (count === 0) return null;
   return (
