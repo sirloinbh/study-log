@@ -1,12 +1,10 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { expect, test, vi } from 'vitest';
+import { expect, test } from 'vitest';
 
 import { Calendar } from './calendar';
 import { calendarCells, monthTitle, shiftMonth, shortMinutes } from './month-calendar';
 import { StudyLogs } from './study-logs';
-import { fakeApi } from './test/fake-api';
-
-vi.setConfig({ testTimeout: 20_000 });
+import { type Api, fakeApi } from './test/fake-api';
 
 const today = '2026-10-22';
 
@@ -30,19 +28,17 @@ const log = (id: number, studyDate: string, minutes: number, status = 'done'): L
   status,
 });
 
-// The study log API with the calendar; records calendar and day requests.
+// The study log API with the calendar.
 function server(
   initial: Log[],
   options: { failCalendar?: boolean; failMonths?: string[]; failDays?: string[] } = {},
 ) {
   const logs = [...initial];
-  const calendar: string[] = [];
   const failed = { status: 500, body: { error: 'Server error' } };
-  fakeApi(({ method, path, body }) => {
+  return fakeApi(({ method, path, body }) => {
     if (path === '/api/textbooks') return { body: { textbooks: [] } };
     const month = path.match(/^\/api\/study-logs\/calendar\?month=(\d{4}-\d{2})$/);
     if (month) {
-      calendar.push(path);
       if (options.failCalendar || options.failMonths?.includes(month[1])) return failed;
       const [year, number] = month[1].split('-').map(Number);
       const last = new Date(Date.UTC(year, number, 0)).getUTCDate();
@@ -61,7 +57,6 @@ function server(
     }
     const day = path.match(/^\/api\/study-logs\?date=(.+)$/);
     if (day) {
-      calendar.push(path);
       if (options.failDays?.includes(day[1])) return failed;
       return { body: { studyLogs: logs.filter((l) => l.studyDate === day[1]) } };
     }
@@ -71,10 +66,15 @@ function server(
       logs.push(saved);
       return { status: 201, body: { studyLog: saved } };
     }
-    throw new Error(`unexpected request ${method} ${path}`);
+    return undefined;
   });
-  return calendar;
 }
+
+// The calendar and day requests, in order.
+const calendarOf = (api: Api) =>
+  api.requests
+    .filter((r) => r.path.startsWith('/api/study-logs/calendar') || r.path.includes('?date='))
+    .map((r) => r.path);
 
 const logs = [
   log(1, '2026-10-01', 45),
@@ -89,10 +89,10 @@ const dayButton = (date: string) =>
 const click = (element: HTMLElement) => fireEvent.click(element);
 
 async function open(...args: Parameters<typeof server>) {
-  const calendar = server(...args);
+  const api = server(...args);
   render(<Calendar today={today} />);
   await within(card()).findByText('Memo 2');
-  return calendar;
+  return api;
 }
 
 test('the calendar shows this month from Sunday with each day’s study time', async () => {
@@ -118,24 +118,24 @@ test('the calendar shows this month from Sunday with each day’s study time', a
 });
 
 test('picking a day lists its logs; a day without any says so', async () => {
-  const calendar = await open(logs);
+  const api = await open(logs);
   click(dayButton('2026-10-01'));
   expect(await within(card()).findByText('Memo 1')).toBeInTheDocument();
   expect(dayButton('2026-10-01')).toHaveAttribute('aria-pressed', 'true');
-  expect(calendar.at(-1)).toBe('/api/study-logs?date=2026-10-01');
+  expect(calendarOf(api).at(-1)).toBe('/api/study-logs?date=2026-10-01');
   expect(card()).toHaveTextContent(/Logs for 2026-10-01/);
   click(dayButton('2026-10-02'));
   expect(await within(card()).findByText('No logs on this date')).toBeInTheDocument();
 });
 
 test('months move back and forth and 이번 달 returns to today', async () => {
-  const calendar = await open(logs);
+  const api = await open(logs);
   click(within(card()).getByRole('button', { name: 'Previous month' }));
   expect(await within(card()).findByText('September 2026')).toBeInTheDocument();
   expect(
     await within(card()).findByRole('button', { name: '2026-09-30, studied 2 h, 1 log' }),
   ).toBeInTheDocument();
-  expect(calendar.at(-1)).toBe('/api/study-logs/calendar?month=2026-09');
+  expect(calendarOf(api).at(-1)).toBe('/api/study-logs/calendar?month=2026-09');
   click(within(card()).getByRole('button', { name: 'Next month' }));
   click(within(card()).getByRole('button', { name: 'Next month' }));
   expect(await within(card()).findByText('November 2026')).toBeInTheDocument();
@@ -148,10 +148,10 @@ test('months move back and forth and 이번 달 returns to today', async () => {
 });
 
 test('saving a log on the page reloads the calendar', async () => {
-  const calendar = server(logs);
+  const api = server(logs);
   render(<StudyLogs today={today} />);
   await within(card()).findByText('Memo 2');
-  const before = calendar.length;
+  const before = calendarOf(api).length;
   fireEvent.change(screen.getByLabelText('Start'), { target: { value: '13:00' } });
   fireEvent.change(screen.getByLabelText('End'), { target: { value: '14:00' } });
   fireEvent.submit(document.querySelector('form')!);
@@ -160,7 +160,7 @@ test('saving a log on the page reloads the calendar', async () => {
       name: '2026-10-22, studied 2 h 30 min, 3 logs',
     }),
   ).toBeInTheDocument();
-  expect(calendar.slice(before)).toEqual([
+  expect(calendarOf(api).slice(before)).toEqual([
     '/api/study-logs/calendar?month=2026-10',
     '/api/study-logs?date=2026-10-22',
   ]);

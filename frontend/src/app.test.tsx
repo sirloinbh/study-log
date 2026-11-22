@@ -1,24 +1,34 @@
 import { fireEvent, render, screen, within } from '@testing-library/react';
-import { expect, test, vi } from 'vitest';
+import { expect, test } from 'vitest';
 
 import { App } from './app';
+import { fakeApi } from './test/fake-api';
 
-// The whole app renders here and one test opens all seven pages: 1.5 s alone, but up to 9.5 s when
-// the PC ran three test runs at once (#160), close to the usual limit.
-vi.setConfig({ testTimeout: 20_000 });
+const failing = { status: 500, body: { error: 'Test server' } };
 
-// /api/health answers with the server date; other endpoints fail, so pages show their own errors.
+// /api/health answers with the server date; the pages' own endpoints fail, so pages show their
+// own errors.
 function server(health: { body: object; status?: number }) {
-  vi.stubGlobal(
-    'fetch',
-    vi.fn((url: string) =>
-      Promise.resolve(
-        url === '/api/health'
-          ? new Response(JSON.stringify(health.body), { status: health.status ?? 200 })
-          : new Response(JSON.stringify({ error: 'Test server' }), { status: 500 }),
-      ),
+  return fakeApi({
+    'GET /api/health': { body: health.body, status: health.status },
+    ...Object.fromEntries(
+      [
+        '/api/keywords',
+        '/api/retrospectives/period',
+        '/api/retrospectives',
+        '/api/reviews/today',
+        '/api/reviews/today/count',
+        '/api/schedules',
+        '/api/stats/heatmap',
+        '/api/stats/reviews',
+        '/api/stats/study-time',
+        '/api/stats/textbooks',
+        '/api/study-logs/calendar',
+        '/api/study-logs',
+        '/api/textbooks',
+      ].map((path) => [`GET ${path}`, failing]),
     ),
-  );
+  });
 }
 
 test('the study log is the first page and shows the server date', async () => {
@@ -57,42 +67,40 @@ test('each page has its own address and is marked in the main menu', async () =>
 
 test('saving a log and completing a review update the badge, and the pages stay mounted', async () => {
   let due = 1;
-  const json = (body: object) => Promise.resolve(new Response(JSON.stringify(body)));
-  vi.stubGlobal(
-    'fetch',
-    vi.fn((url: string, init?: { method?: string }) => {
-      const method = init?.method ?? 'GET';
-      if (url === '/api/health') return json({ today: '2026-10-26' });
-      if (url === '/api/reviews/today/count') return json({ count: due });
-      if (url === '/api/reviews/today')
-        return json({
-          today: '2026-10-26',
-          reviews: Array.from({ length: due }, (_, index) => ({
-            id: index + 1,
-            round: 1,
-            dueDate: '2026-10-26',
-            studyDate: '2026-10-25',
-            memo: '',
-            textbookTitle: null,
-            contentNumber: null,
-            contentTitle: null,
-          })),
-        });
-      if (method === 'POST' && url === '/api/study-logs') {
-        due = 2;
-        return json({ studyLog: {} });
-      }
-      if (method === 'POST' && url.endsWith('/complete')) {
-        due -= 1;
-        return json({ next: { round: 2, dueDate: '2026-10-28' } });
-      }
-      if (url.startsWith('/api/study-logs?')) return json({ studyLogs: [] });
-      if (url.startsWith('/api/textbooks')) return json({ textbooks: [] });
-      return Promise.resolve(
-        new Response(JSON.stringify({ error: 'Test server' }), { status: 500 }),
-      );
+  fakeApi({
+    'GET /api/health': { body: { today: '2026-10-26' } },
+    'GET /api/reviews/today/count': () => ({ body: { count: due } }),
+    'GET /api/reviews/today': () => ({
+      body: {
+        today: '2026-10-26',
+        reviews: Array.from({ length: due }, (_, index) => ({
+          id: index + 1,
+          round: 1,
+          dueDate: '2026-10-26',
+          studyDate: '2026-10-25',
+          memo: '',
+          textbookTitle: null,
+          contentNumber: null,
+          contentTitle: null,
+        })),
+      },
     }),
-  );
+    'POST /api/study-logs': () => {
+      due = 2;
+      return { body: { studyLog: {} } };
+    },
+    'POST /api/reviews/1/complete': () => {
+      due -= 1;
+      return { body: { next: { round: 2, dueDate: '2026-10-28' } } };
+    },
+    'POST /api/reviews/2/complete': () => {
+      due -= 1;
+      return { body: { next: { round: 2, dueDate: '2026-10-28' } } };
+    },
+    'GET /api/study-logs': { body: { studyLogs: [] } },
+    'GET /api/study-logs/calendar': failing,
+    'GET /api/textbooks': { body: { textbooks: [] } },
+  });
   window.history.replaceState(null, '', '/');
   render(<App />);
   await screen.findByRole('link', { name: '1 reviews today' });

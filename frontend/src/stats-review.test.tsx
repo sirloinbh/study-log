@@ -1,8 +1,9 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 
 import { Stats } from './stats';
 import { reviewBars, studyTimePath } from './study-stats';
+import { type Api, fakeApi } from './test/fake-api';
 
 // The chart library is slow to load and draws nothing without a real layout; the page is checked
 // in a browser instead.
@@ -18,10 +19,6 @@ vi.mock('recharts', () => {
     Bar: Part,
   };
 });
-
-// The whole dashboard renders here and role queries are slow, most of all on the first run after a
-// change, when these tests can take longer than the usual limit.
-vi.setConfig({ testTimeout: 20_000 });
 
 const studyTime = (totalMinutes: number) => ({
   period: 'week',
@@ -50,46 +47,33 @@ const reviews = {
 };
 
 function server(answers: { reviews?: unknown; reviewsStatus?: number } = {}) {
-  const asked: string[] = [];
-  vi.stubGlobal(
-    'fetch',
-    vi.fn((url: string) => {
-      asked.push(url);
-      if (url.startsWith('/api/stats/reviews'))
-        return Promise.resolve(
-          answers.reviewsStatus
-            ? new Response(JSON.stringify({ error: 'Server error' }), {
-                status: answers.reviewsStatus,
-              })
-            : new Response(JSON.stringify(answers.reviews ?? reviews)),
-        );
-      if (url.startsWith('/api/stats/heatmap'))
-        return Promise.resolve(
-          new Response(JSON.stringify({ from: '2026-10-25', to: '2026-10-31', daily: [] })),
-        );
-      if (url.startsWith('/api/stats/textbooks'))
-        return Promise.resolve(
-          new Response(
-            JSON.stringify({
-              textbooks: [],
-              schedule: {
-                plannedMinutes: 0,
-                achievedMinutes: 0,
-                achievementRate: null,
-                dueDays: 0,
-                onTimeDays: 0,
-                adherenceRate: null,
-              },
-            }),
-          ),
-        );
-      return Promise.resolve(
-        new Response(JSON.stringify(studyTime(url.includes('type=review') ? 40 : 100))),
-      );
+  return fakeApi({
+    'GET /api/textbooks': { body: { textbooks: [] } },
+    'GET /api/stats/reviews': answers.reviewsStatus
+      ? { status: answers.reviewsStatus, body: { error: 'Server error' } }
+      : { body: answers.reviews ?? reviews },
+    'GET /api/stats/heatmap': { body: { from: '2026-10-25', to: '2026-10-31', daily: [] } },
+    'GET /api/stats/textbooks': {
+      body: {
+        textbooks: [],
+        schedule: {
+          plannedMinutes: 0,
+          achievedMinutes: 0,
+          achievementRate: null,
+          dueDays: 0,
+          onTimeDays: 0,
+          adherenceRate: null,
+        },
+      },
+    },
+    'GET /api/stats/study-time': ({ path }) => ({
+      body: studyTime(path.includes('type=review') ? 40 : 100),
     }),
-  );
-  return asked;
+  });
 }
+
+const asks = (api: Api, prefix: string) =>
+  api.requests.filter((r) => r.path.startsWith(prefix)).length;
 
 const reviewCard = () => within(document.querySelector<HTMLElement>('.review-chart')!);
 
@@ -112,7 +96,7 @@ test('the page holds the card of textbooks and schedules', async () => {
 });
 
 test('picking a period asks for its reviews too', async () => {
-  const asked = server();
+  const api = server();
   render(<Stats />);
   await reviewCard().findByText('75%');
   fireEvent.click(
@@ -120,7 +104,7 @@ test('picking a period asks for its reviews too', async () => {
       name: 'This month',
     }),
   );
-  await waitFor(() => expect(asked).toContain('/api/stats/reviews?period=month'));
+  await api.requested((r) => r.path === '/api/stats/reviews?period=month');
 });
 
 test('a period without scheduled reviews says so instead of a rate', async () => {
@@ -138,22 +122,22 @@ test('a failed review load stays inside its card', async () => {
 });
 
 test('the study type filter narrows study time and leaves reviews alone', async () => {
-  const asked = server();
+  const api = server();
   render(<Stats />);
   const metrics = await screen.findByRole('region', { name: 'Study time metrics' });
   await within(metrics).findAllByText('1 h 40 min');
   await reviewCard().findByText('75%');
-  const reviewAsks = asked.filter((url) => url.startsWith('/api/stats/reviews')).length;
+  const reviewAsks = asks(api, '/api/stats/reviews');
 
   const types = within(screen.getByRole('group', { name: 'Study type' }));
   expect(types.getByRole('button', { name: 'All' }).getAttribute('aria-pressed')).toBe('true');
   fireEvent.click(types.getByRole('button', { name: 'Review' }));
 
-  await waitFor(() => expect(asked).toContain('/api/stats/study-time?period=week&type=review'));
+  await api.requested((r) => r.path === '/api/stats/study-time?period=week&type=review');
   const narrowed = await screen.findByRole('region', { name: 'Study time metrics' });
   expect((await within(narrowed).findAllByText('40 min')).length).toBeGreaterThan(0);
   expect(within(narrowed).getByText('Recorded so far: Review')).toBeTruthy();
-  expect(asked.filter((url) => url.startsWith('/api/stats/reviews')).length).toBe(reviewAsks);
+  expect(asks(api, '/api/stats/reviews')).toBe(reviewAsks);
   expect(reviewCard().getByText('75%')).toBeTruthy();
 });
 
