@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import Markdown from 'react-markdown';
 
 type HastNode = { type: string; tagName?: string; value?: string; children?: HastNode[] };
@@ -19,8 +19,25 @@ const singleBreaks = () => (tree: HastNode) => {
 // and react-markdown's default URL check empties javascript: and other unsafe links.
 // `clamp` keeps a list entry to its first few lines, like the plain memo before.
 export function Memo({ text, clamp = false }: { text: string; clamp?: boolean }) {
+  const box = useRef<HTMLDivElement>(null);
+  // A clamped memo hides its overflow with CSS but the links in the hidden part would stay in the
+  // tab order; they leave it while they are cut off, and come back when the box grows.
+  useEffect(() => {
+    const element = box.current;
+    if (!element || !clamp) return;
+    const update = () => {
+      const visible = element.clientHeight;
+      element.querySelectorAll('a').forEach((link) => {
+        if (visible > 0 && link.offsetTop >= visible) link.setAttribute('tabindex', '-1');
+        else link.removeAttribute('tabindex');
+      });
+    };
+    update();
+    window.addEventListener('resize', update);
+    return () => window.removeEventListener('resize', update);
+  }, [text, clamp]);
   return (
-    <div className={clamp ? 'memo clamp' : 'memo'}>
+    <div ref={box} className={clamp ? 'memo clamp' : 'memo'}>
       <Markdown
         rehypePlugins={[singleBreaks]}
         components={{
