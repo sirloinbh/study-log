@@ -2,14 +2,14 @@ import { BellRing } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 
-import { requestJson } from './api';
 import { Badge } from './components/ui/badge';
+import { requestJson } from './lib/api';
 
 // The top bar link to the reviews page, shown while reviews are due (#44). It sits in the top bar
 // because on a phone the menu is folded away. It counts again on each page change, after a change
-// the pages report (`version`), and on returning to the tab, which may have been left overnight.
+// the pages report (`version`), when the service date changes (`day`), and on returning to the tab, which may have been left overnight.
 // A failed count keeps the last one: the page itself reports server problems.
-export function ReviewBadge({ to, version }: { to: string; version: number }) {
+export function ReviewBadge({ to, version, day }: { to: string; version: number; day?: string }) {
   const [count, setCount] = useState(0);
   const [returned, setReturned] = useState(0);
   const { pathname } = useLocation();
@@ -31,7 +31,7 @@ export function ReviewBadge({ to, version }: { to: string; version: number }) {
     return () => {
       current = false;
     };
-  }, [version, pathname, returned]);
+  }, [version, day, pathname, returned]);
 
   if (count === 0) return null;
   return (

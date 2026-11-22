@@ -1,11 +1,9 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 
+import { type Answer, fakeApi } from './test/fake-api';
 import { contentLabel } from './textbook';
 import { TextbookContents } from './textbook-contents';
-
-// The whole card renders in each test and role queries are slow on the first run after a change.
-vi.setConfig({ testTimeout: 20_000 });
 
 // A stand-in for PDF.js: `pdf.doc` is the document the next read opens. Set by `fakePdfjs`.
 type PdfDoc = {
@@ -82,14 +80,12 @@ type Options = {
   rejectBulk?: { status: number; error: string };
 };
 
-// In-memory /api/textbooks/:id/contents with the API's ordering rules; records content requests.
-function fakeApi(initial: Row[] = [], options: Options = {}) {
+// In-memory /api/textbooks/:id/contents on the shared fake, with the API's ordering rules. It is a
+// handler function because the tree needs state (saved entries come back on reload).
+function serve(initial: Row[] = [], options: Options = {}) {
   const rows = [...initial];
-  const requests: { method: string; path: string; body?: unknown }[] = [];
   let nextId = 100;
   let gets = 0;
-  const reply = (status: number, body?: unknown) =>
-    new Response(status === 204 ? null : JSON.stringify(body ?? {}), { status });
   const treeOf = (textbookId: number, parentId: number | null = null): Tree[] =>
     rows
       .filter((row) => row.textbookId === textbookId && row.parentId === parentId)
@@ -100,21 +96,21 @@ function fakeApi(initial: Row[] = [], options: Options = {}) {
         title,
         children: treeOf(textbookId, id),
       }));
-  const fetch = async (path: string, init: { method?: string; body?: string } = {}) => {
-    const method = init.method ?? 'GET';
-    const body = init.body === undefined ? undefined : JSON.parse(init.body);
+  const api = fakeApi((request): Answer | undefined => {
+    const { method, path } = request;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const body = request.body as any;
     const match = path.match(/^\/api\/textbooks\/(\d+)\/contents(?:\/(\w+))?$/);
-    if (!match) throw new Error('unexpected request ' + path);
-    requests.push({ method, path, body });
+    if (!match) return undefined;
     const textbookId = Number(match[1]);
     const target = match[2];
     if (method === 'GET') {
-      if (++gets > 1) await options.holdReload;
-      return reply(200, { contents: treeOf(textbookId) });
+      const held = ++gets > 1 && options.holdReload ? { hold: options.holdReload } : {};
+      return { body: { contents: treeOf(textbookId) }, ...held };
     }
     if (method === 'POST' && target === 'bulk') {
       if (options.rejectBulk)
-        return reply(options.rejectBulk.status, { error: options.rejectBulk.error });
+        return { status: options.rejectBulk.status, body: { error: options.rejectBulk.error } };
       // Like the API: each entry goes under the latest entry one level up.
       const path: number[] = [];
       for (const entry of body.entries as { level: number; number: string; title: string }[]) {
@@ -129,7 +125,7 @@ function fakeApi(initial: Row[] = [], options: Options = {}) {
         path.length = entry.level;
         path.push(row.id);
       }
-      return reply(201, { contents: treeOf(textbookId) });
+      return { status: 201, body: { contents: treeOf(textbookId) } };
     }
     if (method === 'POST') {
       const row = {
@@ -140,32 +136,31 @@ function fakeApi(initial: Row[] = [], options: Options = {}) {
         title: body.title,
       };
       rows.push(row);
-      return reply(201, { content: row });
+      return { status: 201, body: { content: row } };
     }
     if (target === 'order') {
       if (options.rejectOrder)
-        return reply(options.rejectOrder.status, { error: options.rejectOrder.error });
+        return { status: options.rejectOrder.status, body: { error: options.rejectOrder.error } };
       // Rows are kept in sibling order, so reordering means moving them to the given order.
       const moved = body.ids.map((id: number) => rows.find((row) => row.id === id)!);
       const rest = rows.filter((row) => !body.ids.includes(row.id));
       rows.splice(0, rows.length, ...rest, ...moved);
-      return reply(200, { contents: treeOf(textbookId) });
+      return { body: { contents: treeOf(textbookId) } };
     }
     const index = rows.findIndex((row) => row.id === Number(target));
-    if (index < 0) return reply(404, { error: 'Contents entry not found' });
+    if (index < 0) return { status: 404, body: { error: 'Contents entry not found' } };
     if (method === 'PUT') {
       rows[index] = { ...rows[index], number: body.number, title: body.title };
-      return reply(200, { content: rows[index] });
+      return { body: { content: rows[index] } };
     }
     if (options.rejectDelete)
-      return reply(options.rejectDelete.status, { error: options.rejectDelete.error });
+      return { status: options.rejectDelete.status, body: { error: options.rejectDelete.error } };
     const gone = new Set([rows[index].id]);
     for (const row of rows) if (row.parentId !== null && gone.has(row.parentId)) gone.add(row.id);
     rows.splice(0, rows.length, ...rows.filter((row) => !gone.has(row.id)));
-    return reply(204);
-  };
-  vi.stubGlobal('fetch', vi.fn(fetch));
-  return { requests, rows, options };
+    return { status: 204 };
+  });
+  return { ...api, rows, options };
 }
 
 const outline: Row[] = [
@@ -237,7 +232,7 @@ const saveEditor = () => fireEvent.submit(editorForm()!);
 const statusText = () => screen.getByRole('status').textContent;
 
 test('selecting a textbook shows its contents as a tree', async () => {
-  const api = fakeApi(outline);
+  const api = serve(outline);
   const { rerender } = await openBook();
   expect(api.requests).toEqual([{ method: 'GET', path: '/api/textbooks/1/contents' }]);
   expect(treeShape()).toBe('1 벡터[1.1 덧셈|1.2 내적]|2 행렬');
@@ -247,13 +242,13 @@ test('selecting a textbook shows its contents as a tree', async () => {
 });
 
 test('a textbook without contents says so', async () => {
-  fakeApi();
+  serve();
   await openBook();
   expect(card()).toHaveTextContent(/No contents yet/);
 });
 
 test('adding a chapter and a section posts them and reloads the tree', async () => {
-  const api = fakeApi();
+  const api = serve();
   await openBook();
   fireEvent.click(screen.getByRole('button', { name: 'Add chapter' }));
   expect(editorForm()).toHaveTextContent('Add chapter');
@@ -280,7 +275,7 @@ test('adding a chapter and a section posts them and reloads the tree', async () 
 });
 
 test('editing an entry saves its number and title with PUT', async () => {
-  const api = fakeApi(outline);
+  const api = serve(outline);
   await openBook();
   await press('1.2 내적', 'edit');
   expect(card()).toHaveTextContent(/Edit contents entry/);
@@ -300,7 +295,7 @@ test('editing an entry saves its number and title with PUT', async () => {
 });
 
 test('moving an entry sends its siblings in the new order', async () => {
-  const api = fakeApi(outline);
+  const api = serve(outline);
   await openBook();
   // First and last siblings cannot move past the ends.
   expect(row('1 벡터').getByRole('button', { name: names.up })).toBeDisabled();
@@ -320,7 +315,7 @@ test('moving an entry sends its siblings in the new order', async () => {
 });
 
 test('deleting needs a confirmation and removes the entry with its sections', async () => {
-  const api = fakeApi(outline);
+  const api = serve(outline);
   await openBook();
   await press('1 벡터', 'delete');
   await press('1 벡터', 'cancel');
@@ -333,7 +328,7 @@ test('deleting needs a confirmation and removes the entry with its sections', as
 });
 
 test('a delete refused because study logs use the entry shows the server message', async () => {
-  fakeApi(outline, {
+  serve(outline, {
     rejectDelete: {
       status: 409,
       error: 'A contents entry with a study log or schedule attached cannot be deleted',
@@ -352,7 +347,7 @@ test('a delete refused because study logs use the entry shows the server message
 });
 
 test('saving an edit of an entry deleted elsewhere closes the editor and reloads', async () => {
-  const api = fakeApi(outline);
+  const api = serve(outline);
   await openBook();
   await press('2 행렬', 'edit');
   api.rows.splice(3, 1);
@@ -363,7 +358,7 @@ test('saving an edit of an entry deleted elsewhere closes the editor and reloads
 });
 
 test('switching textbooks closes an open editor of the previous one', async () => {
-  fakeApi(outline);
+  serve(outline);
   const { rerender } = await openBook();
   await press('2 행렬', 'edit');
   expect(editorForm()).not.toBeNull();
@@ -373,7 +368,7 @@ test('switching textbooks closes an open editor of the previous one', async () =
 });
 
 test('row buttons name the entry they act on', async () => {
-  fakeApi([outline[4]]);
+  serve([outline[4]]);
   await openBook(2);
   const labels = within(card())
     .getAllByRole('button')
@@ -390,7 +385,7 @@ test('row buttons name the entry they act on', async () => {
 
 test('buttons stay locked until the tree is reloaded after a change', async () => {
   let release = () => {};
-  fakeApi(outline, { holdReload: new Promise<void>((r) => (release = r)) });
+  serve(outline, { holdReload: new Promise<void>((r) => (release = r)) });
   await openBook();
   fireEvent.click(screen.getByRole('button', { name: 'Add chapter' }));
   fill('Number', '3');
@@ -410,7 +405,7 @@ test('buttons stay locked until the tree is reloaded after a change', async () =
 });
 
 test('a refused reorder shows the server message and reloads the tree', async () => {
-  const api = fakeApi(outline, {
+  const api = serve(outline, {
     rejectOrder: { status: 400, error: 'Send every entry under the same parent exactly once' },
   });
   await openBook();
@@ -429,7 +424,7 @@ test('content labels show the number before the title when there is one', () => 
 
 // #75: two submits in the same tick, before the screen re-renders with `busy`, send one request.
 test('a double submit in the same tick adds the chapter once', async () => {
-  const api = fakeApi();
+  const api = serve();
   await openBook();
   fireEvent.click(screen.getByRole('button', { name: 'Add chapter' }));
   fill('Contents title', '벡터');
@@ -445,7 +440,7 @@ test('a double submit in the same tick adds the chapter once', async () => {
 const focusedId = () => document.activeElement?.id;
 
 test('contents delete focus: confirm, back on cancel, button on failure, heading after', async () => {
-  const api = fakeApi(outline);
+  const api = serve(outline);
   await openBook();
   await press('2 행렬', 'delete');
   await waitFor(() => expect(focusedId()).toBe('content-delete-confirm-4'));
@@ -472,7 +467,7 @@ const saveButton = () => pasteForm()!.querySelector<HTMLButtonElement>('button[t
 const openPaste = () => fireEvent.click(screen.getByRole('button', { name: 'Paste contents' }));
 
 test('a pasted table of contents is previewed as a tree and saved at once (#23)', async () => {
-  const api = fakeApi(outline);
+  const api = serve(outline);
   await openBook();
   openPaste();
   expect(pasteForm()).not.toBeNull();
@@ -510,7 +505,7 @@ test('a pasted table of contents is previewed as a tree and saved at once (#23)'
 });
 
 test('pasted text that cannot be saved says why and keeps the save locked', async () => {
-  const api = fakeApi();
+  const api = serve();
   await openBook();
   openPaste();
   fill('Contents text', `1 벡터\n2 ${'가'.repeat(201)}`);
@@ -529,7 +524,7 @@ test('pasted text that cannot be saved says why and keeps the save locked', asyn
 });
 
 test('a refused paste shows the server message and keeps the text', async () => {
-  fakeApi([], { rejectBulk: { status: 400, error: 'Contents can have at most 10 levels' } });
+  serve([], { rejectBulk: { status: 400, error: 'Contents can have at most 10 levels' } });
   await openBook();
   openPaste();
   fill('Contents text', '1 벡터');
@@ -561,7 +556,7 @@ test('a PDF with bookmarks fills the paste box with them, indented by level (#23
       { title: '2 행렬', items: [] },
     ],
   });
-  fakeApi();
+  serve();
   await openBook();
   openPaste();
   fill('Contents text', '지워질 글');
@@ -587,7 +582,7 @@ test('a PDF without bookmarks gives the text of its first pages', async () => {
     outline: null,
     pages: [[piece('Contents', 50, 700)], [piece('1 벡터', 50, 700), piece('12', 300, 700)]],
   });
-  fakeApi();
+  serve();
   await openBook();
   openPaste();
   pickPdf(pdfFile());
@@ -600,7 +595,7 @@ test('a PDF without bookmarks gives the text of its first pages', async () => {
 
 test('an unreadable, empty or too large PDF says so and keeps the text', async () => {
   const broken = fakePdfjs({ outline: null, fail: 'Invalid PDF structure.' });
-  fakeApi();
+  serve();
   await openBook();
   openPaste();
   fill('Contents text', '1 벡터');
@@ -631,7 +626,7 @@ test('a PDF still being read is dropped when the box is closed or an editor open
   let release = () => {};
   const hold = new Promise<void>((resolve) => (release = resolve));
   const doc = fakePdfjs({ outline: [{ title: '1 벡터', items: [] }], hold });
-  fakeApi(outline);
+  serve(outline);
   await openBook();
   openPaste();
   pickPdf(pdfFile());
@@ -654,7 +649,7 @@ test('a PDF still being read is dropped when the box is closed or an editor open
     outline: [{ title: '2 행렬', items: [] }],
     hold: new Promise<void>((resolve) => (releaseAgain = resolve)),
   });
-  fakeApi(outline);
+  serve(outline);
   await openBook();
   openPaste();
   pickPdf(pdfFile());

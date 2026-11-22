@@ -2,6 +2,7 @@ import { type Response, Router } from 'express';
 import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod/v4';
 
+import { auditChange } from './audit-log.js';
 import { removeStoredFiles, storedKeys } from './exercise-files.js';
 import type { FileStorage } from './file-storage.js';
 import { inTransaction } from './sql.js';
@@ -179,6 +180,10 @@ export function textbookContentRoutes(pool: Pool, storage: FileStorage) {
          RETURNING ${columns}`,
         [textbookId, entry.parentId, entry.number, entry.title],
       );
+      await auditChange(req, res, client, 'create', 'textbook_content', rows[0].id, {
+        textbookId,
+        title: entry.title,
+      });
       return { status: 201, body: { content: rows[0] } };
     });
     send(res, reply);
@@ -209,6 +214,10 @@ export function textbookContentRoutes(pool: Pool, storage: FileStorage) {
         path.length = entry.level;
         path.push(inserted.rows[0].id);
       }
+      await auditChange(req, res, client, 'create', 'textbook_content', null, {
+        textbookId,
+        entries: entries.length,
+      });
       return { status: 201, body: { contents: await loadTree(client, textbookId) } };
     });
     send(res, reply);
@@ -236,6 +245,12 @@ export function textbookContentRoutes(pool: Pool, storage: FileStorage) {
          WHERE c.id = o.id AND c.position <> o.ord - 1`,
         [ids],
       );
+      await auditChange(req, res, client, 'update', 'textbook_content', null, {
+        textbookId,
+        change: 'order',
+        parentId,
+        ids,
+      });
       return { status: 200, body: { contents: await loadTree(client, textbookId) } };
     });
     send(res, reply);
@@ -245,11 +260,19 @@ export function textbookContentRoutes(pool: Pool, storage: FileStorage) {
     const textbookId = textbookOf(req.params);
     const id = parseId(req.params.id, 'contents entry');
     const entry = contentUpdateInput.parse(req.body);
-    const { rows } = await pool.query<Entry>(
-      `UPDATE textbook_contents SET number = $3, title = $4, updated_at = now()
-       WHERE id = $1 AND textbook_id = $2 RETURNING ${columns}`,
-      [id, textbookId, entry.number, entry.title],
-    );
+    const { rows } = await inTransaction(pool, async (client) => {
+      const changed = await client.query<Entry>(
+        `UPDATE textbook_contents SET number = $3, title = $4, updated_at = now()
+         WHERE id = $1 AND textbook_id = $2 RETURNING ${columns}`,
+        [id, textbookId, entry.number, entry.title],
+      );
+      if (changed.rows[0])
+        await auditChange(req, res, client, 'update', 'textbook_content', id, {
+          textbookId,
+          title: entry.title,
+        });
+      return changed;
+    });
     if (rows.length === 0) return void res.status(404).json(contentNotFound);
     res.json({ content: rows[0] });
   });
@@ -286,6 +309,7 @@ export function textbookContentRoutes(pool: Pool, storage: FileStorage) {
          WHERE textbook_id = $1 AND parent_id IS NOT DISTINCT FROM $2 AND position > $3`,
         [textbookId, rows[0].parentId, rows[0].position],
       );
+      await auditChange(req, res, client, 'delete', 'textbook_content', id, { textbookId });
       keys = stored;
       return { status: 204 };
     });

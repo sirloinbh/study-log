@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
-import { type RequestError, requestJson } from './api';
 import { useBusy } from './busy';
+import { type RequestError, requestJson } from './lib/api';
 import { ButtonSpinner } from './loading';
 import { Memo } from './memo';
 import {
@@ -31,12 +31,19 @@ export function StudyLogSearch({
   const [error, setError] = useState<string>();
   const { busy, action, nameNext, begin, end } = useBusy();
 
+  // Counts the searches started; an answer that is not for the latest one is dropped, so an older
+  // slow search never replaces the newer results.
+  const latest = useRef(0);
+
   const run = async (path: string) => {
+    const mine = ++latest.current;
     try {
       const data = await requestJson<{ studyLogs: StudyLog[] }>(path);
+      if (mine !== latest.current) return;
       setResults({ path, logs: data.studyLogs });
       setError(undefined);
     } catch (failure) {
+      if (mine !== latest.current) return;
       setError((failure as RequestError).message);
       // Not searched again later: its results no longer match the conditions in the form.
       setResults(undefined);

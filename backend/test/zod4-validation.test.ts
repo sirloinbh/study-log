@@ -12,9 +12,15 @@ const recordingPool = () => {
     params.push(values);
     return { rows: [{ id: 1 }], rowCount: 1 };
   };
+  // BEGIN and COMMIT are not queries a test cares about.
+  const clientQuery = (sql: string, values?: unknown[]) =>
+    /^(BEGIN|COMMIT|ROLLBACK)/.test(sql) ? { rows: [], rowCount: 0 } : query(sql, values);
   return {
     params,
-    pool: { query, connect: async () => ({ query, release: () => {} }) } as unknown as Pool,
+    pool: {
+      query,
+      connect: async () => ({ query: clientQuery, release: () => {} }),
+    } as unknown as Pool,
   };
 };
 

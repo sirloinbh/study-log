@@ -2,8 +2,9 @@ import { Router } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod/v4';
 
+import { auditChange } from './audit-log.js';
 import { calendarDate } from './dates.js';
-import { likePattern } from './sql.js';
+import { inTransaction, likePattern } from './sql.js';
 import { parseId } from './standard/http.js';
 import { missingOrInvalid } from './validation.js';
 
@@ -101,11 +102,18 @@ export function keywordRoutes(pool: Pool, today: () => string) {
   router.post('/', async (req, res) => {
     const input = keywordInput.parse(req.body);
     try {
-      const { rows } = await pool.query(
-        `INSERT INTO keywords (keyword_date, keyword, memo) VALUES ($1, $2, $3)
-         RETURNING ${columns}`,
-        [input.date ?? today(), input.keyword, input.memo],
-      );
+      const { rows } = await inTransaction(pool, async (client) => {
+        const added = await client.query(
+          `INSERT INTO keywords (keyword_date, keyword, memo) VALUES ($1, $2, $3)
+           RETURNING ${columns}`,
+          [input.date ?? today(), input.keyword, input.memo],
+        );
+        await auditChange(req, res, client, 'create', 'keyword', added.rows[0].id, {
+          keyword: added.rows[0].keyword,
+          date: added.rows[0].date,
+        });
+        return added;
+      });
       res.status(201).json({ keyword: rows[0] });
     } catch (error) {
       if (!isDuplicate(error)) throw error;
@@ -119,11 +127,19 @@ export function keywordRoutes(pool: Pool, today: () => string) {
     const id = parseId(req.params.id, 'keyword');
     const input = keywordInput.parse(req.body);
     try {
-      const { rows } = await pool.query(
-        `UPDATE keywords SET keyword_date = COALESCE($2::date, keyword_date), keyword = $3, memo = $4, updated_at = now()
-         WHERE id = $1 RETURNING ${columns}`,
-        [id, input.date ?? null, input.keyword, input.memo],
-      );
+      const { rows } = await inTransaction(pool, async (client) => {
+        const changed = await client.query(
+          `UPDATE keywords SET keyword_date = COALESCE($2::date, keyword_date), keyword = $3, memo = $4, updated_at = now()
+           WHERE id = $1 RETURNING ${columns}`,
+          [id, input.date ?? null, input.keyword, input.memo],
+        );
+        if (changed.rows[0])
+          await auditChange(req, res, client, 'update', 'keyword', id, {
+            keyword: changed.rows[0].keyword,
+            date: changed.rows[0].date,
+          });
+        return changed;
+      });
       if (rows.length === 0) return void res.status(404).json(notFound);
       res.json({ keyword: rows[0] });
     } catch (error) {
@@ -134,8 +150,16 @@ export function keywordRoutes(pool: Pool, today: () => string) {
 
   router.delete('/:id', async (req, res) => {
     const id = parseId(req.params.id, 'keyword');
-    const { rowCount } = await pool.query('DELETE FROM keywords WHERE id = $1', [id]);
-    if (!rowCount) return void res.status(404).json(notFound);
+    const deleted = await inTransaction(pool, async (client) => {
+      const removed = await client.query(
+        'DELETE FROM keywords WHERE id = $1 RETURNING keyword, keyword_date AS date',
+        [id],
+      );
+      if (removed.rows[0])
+        await auditChange(req, res, client, 'delete', 'keyword', id, removed.rows[0]);
+      return removed.rowCount;
+    });
+    if (!deleted) return void res.status(404).json(notFound);
     res.status(204).end();
   });
 

@@ -4,8 +4,7 @@ import { describe, expect, test, vi } from 'vitest';
 import { periodTitle, shiftDays, shiftPeriod } from './retrospective';
 import { Retrospectives } from './retrospectives';
 import { barWidth, hourLabel } from './study-stats';
-
-vi.setConfig({ testTimeout: 60_000 });
+import { type Answer, fakeApi, type Sent } from './test/fake-api';
 
 const today = '2026-10-23'; // a Friday; its week is Sunday 10-18 to Saturday 10-24
 
@@ -43,70 +42,70 @@ type Options = {
   pattern?: Record<string, unknown> | null;
 };
 
-// The retrospective API in memory; records period requests and writes.
+// The retrospective API in memory. `periods`, `patterns` and `writes` read what the screen asked.
 function server(initial: Retro[] = [], options: Options = {}) {
   const rows = initial.map((row) => ({ ...row }));
-  const periods: string[] = [];
-  const patterns: string[] = [];
-  const writes: { method: string; path: string; body?: unknown }[] = [];
   let nextId = 100;
-  const reply = (status: number, body?: unknown) =>
-    new Response(status === 204 ? null : JSON.stringify(body ?? {}), { status });
-  const handle = (path: string, init?: { method?: string; body?: string }) => {
-    const method = init?.method ?? 'GET';
+  const isPeriod = (r: Sent) => /^\/api\/retrospectives\/period\?/.test(r.path);
+  const api = fakeApi(({ method, path, body }): Answer | undefined => {
     const pattern = path.match(/^\/api\/stats\/patterns\?from=(.+)&to=(.+)$/);
     if (pattern) {
-      patterns.push(`${pattern[1]}~${pattern[2]}`);
       return options.pattern === null
-        ? reply(500, { error: 'Server error' })
-        : reply(200, { from: pattern[1], to: pattern[2], ...(options.pattern ?? emptyPattern) });
+        ? { status: 500, body: { error: 'Server error' } }
+        : { body: { from: pattern[1], to: pattern[2], ...(options.pattern ?? emptyPattern) } };
     }
     const period = path.match(/^\/api\/retrospectives\/period\?kind=(\w+)&date=(.+)$/);
     if (period) {
-      periods.push(`${period[1]}:${period[2]}`);
-      if (options.failPeriod) return reply(500, { error: 'Server error' });
-      if (options.failReload && periods.length > 1) return reply(500, { error: 'Server error' });
+      if (options.failPeriod) return { status: 500, body: { error: 'Server error' } };
+      if (options.failReload && api.requests.filter(isPeriod).length > 1)
+        return { status: 500, body: { error: 'Server error' } };
       const { from, to } = periodOf(period[1], period[2]);
-      return reply(200, {
-        kind: period[1],
-        from,
-        to,
-        retrospective: rows.find((r) => r.kind === period[1] && r.from === from) ?? null,
-        summary: { totalMinutes: 270, studyDays: 2, logs: 3, goalsAchieved: 1, goalsChecked: 2 },
-      });
+      return {
+        body: {
+          kind: period[1],
+          from,
+          to,
+          retrospective: rows.find((r) => r.kind === period[1] && r.from === from) ?? null,
+          summary: { totalMinutes: 270, studyDays: 2, logs: 3, goalsAchieved: 1, goalsChecked: 2 },
+        },
+      };
     }
     if (path.startsWith('/api/retrospectives?'))
-      return reply(200, {
-        retrospectives: [...rows].sort((a, b) => b.from.localeCompare(a.from)),
-      });
+      return { body: { retrospectives: [...rows].sort((a, b) => b.from.localeCompare(a.from)) } };
     const one = path.match(/^\/api\/retrospectives\/(\w+)\/(.+)$/);
-    if (!one) throw new Error('unexpected request ' + path);
-    const body = init?.body === undefined ? undefined : JSON.parse(init.body);
-    writes.push({ method, path, body });
+    if (!one) return undefined;
     const index = rows.findIndex((r) => r.kind === one[1] && r.from === one[2]);
     if (method === 'DELETE') {
-      if (index < 0) return reply(404, { error: 'Retrospective not found' });
+      if (index < 0) return { status: 404, body: { error: 'Retrospective not found' } };
       rows.splice(index, 1);
-      return reply(204);
+      return { status: 204 };
     }
-    const { to } = periodOf(one[1], one[2]);
     const saved = {
       id: index < 0 ? nextId++ : rows[index].id,
       kind: one[1],
       from: one[2],
-      to,
-      body: body.body,
+      to: periodOf(one[1], one[2]).to,
+      body: (body as { body: string }).body,
       updatedAt: '2026-10-23 21:00',
     };
     if (index < 0) rows.push(saved);
     else rows[index] = saved;
-    return reply(200, { retrospective: saved });
+    return { body: { retrospective: saved } };
+  });
+  return {
+    rows,
+    get periods() {
+      return api.requests.filter(isPeriod).map((r) => r.path.replace(/^.*kind=(\w+)&date=/, '$1:'));
+    },
+    get patterns() {
+      return api.requests
+        .filter((r) => r.path.startsWith('/api/stats/patterns?'))
+        .map((r) => r.path.replace(/^.*from=(.+)&to=(.+)$/, '$1~$2'));
+    },
+    get writes() {
+      return api.sent;
+    },
   };
-  vi.stubGlobal(
-    'fetch',
-    vi.fn((...args: Parameters<typeof handle>) => Promise.resolve(handle(...args))),
-  );
-  return { periods, writes, rows, patterns };
 }
 
 const writerEl = () => screen.getByRole('region', { name: 'Write a retrospective' });

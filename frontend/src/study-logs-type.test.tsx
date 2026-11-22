@@ -1,7 +1,8 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { expect, test, vi } from 'vitest';
+import { expect, test } from 'vitest';
 
 import { StudyLogs } from './study-logs';
+import { fakeApi } from './test/fake-api';
 
 const today = '2026-10-31';
 const log = {
@@ -24,30 +25,21 @@ const log = {
 };
 
 function server(logs: unknown[]) {
-  const sent: { method?: string; body: Record<string, unknown> }[] = [];
-  vi.stubGlobal(
-    'fetch',
-    vi.fn((url: string, init?: { method?: string; body?: string }) => {
-      if (init?.method && init.method !== 'GET') {
-        sent.push({ method: init.method, body: JSON.parse(init.body ?? '{}') });
-        return Promise.resolve(new Response(JSON.stringify({ studyLog: log })));
-      }
-      return Promise.resolve(
-        new Response(
-          JSON.stringify(
-            url.startsWith('/api/textbooks') ? { textbooks: [] } : { studyLogs: logs },
-          ),
-        ),
-      );
-    }),
-  );
-  return sent;
+  return fakeApi({
+    'GET /api/textbooks': { body: { textbooks: [] } },
+    'GET /api/study-logs': { body: { studyLogs: logs } },
+    'GET /api/study-logs/calendar': {
+      body: { month: today.slice(0, 7), days: [{ date: today, minutes: 60, logs: 1 }] },
+    },
+    'POST /api/study-logs': { status: 201, body: { studyLog: log } },
+    'PUT /api/study-logs/1': { body: { studyLog: log } },
+  });
 }
 
 const submit = () => fireEvent.submit(document.querySelector('form')!);
 
 test('a new log is new unless review is picked', async () => {
-  const sent = server([]);
+  const api = server([]);
   render(<StudyLogs today={today} />);
   const type = screen.getByLabelText<HTMLSelectElement>('Type');
   expect(type.value).toBe('new');
@@ -55,14 +47,14 @@ test('a new log is new unless review is picked', async () => {
   fireEvent.change(screen.getByLabelText('Start'), { target: { value: '09:00' } });
   fireEvent.change(screen.getByLabelText('End'), { target: { value: '10:00' } });
   submit();
-  await waitFor(() => expect(sent.length).toBe(1));
-  expect(sent[0].body.studyType).toBe('review');
+  const request = await api.requested((r) => r.method === 'POST');
+  expect(request.body).toMatchObject({ studyType: 'review' });
   // The form returns to the default for the next entry.
   await waitFor(() => expect(screen.getByLabelText<HTMLSelectElement>('Type').value).toBe('new'));
 });
 
 test('a review log is marked in the list and keeps its type when edited', async () => {
-  const sent = server([log]);
+  const api = server([log]);
   render(<StudyLogs today={today} />);
   const editButton = await screen.findByRole('button', { name: /edit$/ });
   const item = editButton.closest('li')!;
@@ -70,20 +62,25 @@ test('a review log is marked in the list and keeps its type when edited', async 
   fireEvent.click(editButton);
   expect(screen.getByLabelText<HTMLSelectElement>('Type').value).toBe('review');
   submit();
-  await waitFor(() => expect(sent.length).toBe(1));
-  expect(sent[0]).toMatchObject({ method: 'PUT', body: { studyType: 'review' } });
+  const request = await api.requested((r) => r.method === 'PUT');
+  expect(request).toMatchObject({ path: '/api/study-logs/1', body: { studyType: 'review' } });
 });
 
 test('search results and the calendar mark a review log too', async () => {
   server([log]);
   render(<StudyLogs today={today} />);
-  const marks = () =>
-    [...document.querySelectorAll('.badge')].filter((badge) => badge.textContent === 'Review')
-      .length;
-  // The recent list and the calendar's day.
-  await waitFor(() => expect(marks()).toBe(2));
+  // The log's row in each place it is listed: the recent list, the calendar's day and the search.
+  const row = (place: HTMLElement) => within(place).getByText('09:00–10:00').closest('li')!;
+  const recent = document.getElementById('study-log-list')!.closest('section')!;
+  await within(recent).findByText('09:00–10:00');
+  expect(within(row(recent)).getByText('Review')).toBeTruthy();
+  const calendar = screen.getByRole('region', { name: 'Study calendar' });
+  await within(calendar).findByText('09:00–10:00');
+  expect(within(row(calendar)).getByText('Review')).toBeTruthy();
   fireEvent.click(screen.getByRole('button', { name: 'Search' }));
-  await waitFor(() => expect(marks()).toBe(3));
+  const search = await screen.findByRole('region', { name: 'Study log search' });
+  await within(search).findByText('Found 1');
+  expect(within(row(search)).getByText('Review')).toBeTruthy();
 });
 
 test('a new log has no mark', async () => {

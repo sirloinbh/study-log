@@ -2,11 +2,9 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import { contentPath, questionText } from './exercise';
+import { type Answer, fakeApi, type Sent } from './test/fake-api';
 import type { ContentNode } from './textbook';
 import { Textbooks } from './textbooks';
-
-// The whole Textbooks page renders in each test and role queries are slow on the first run.
-vi.setConfig({ testTimeout: 30_000 });
 
 type Exercise = {
   id: number;
@@ -58,7 +56,8 @@ type Options = {
   failTranslate?: { status: number; error: string };
 };
 
-// In-memory exercises API with the textbook list and contents; records exercise requests.
+// In-memory exercises API with the textbook list and contents. `requests` holds the exercise
+// card's requests only, apart from the textbook list, the contents tree and the important card.
 function fakeServer(
   initial: Exercise[] = [],
   options: Options = {},
@@ -70,27 +69,18 @@ function fakeServer(
   const translations = new Map(
     Object.entries(options.translations ?? {}).map(([id, t]) => [Number(id), { ...t }]),
   );
-  const requests: { method: string; path: string; body?: unknown }[] = [];
-  // Loads of the important card, kept apart so `requests` stays the exercises card's.
-  const importantLoads: string[] = [];
-  let treeLoads = 0;
+  const isTree = (r: Sent) => /^\/api\/textbooks\/\d+\/contents$/.test(r.path);
+  const isImportant = (r: Sent) => /^\/api\/textbooks\/\d+\/exercises\?/.test(r.path);
   let nextId = 100;
-  const reply = (status: number, body?: unknown) =>
-    new Response(status === 204 ? null : JSON.stringify(body ?? {}), { status });
+  const reply = (status: number, body?: unknown): Answer => ({ status, body });
   const flat = (nodes: Tree[]): Tree[] => nodes.flatMap((n) => [n, ...flat(n.children)]);
 
-  const handle = async (
-    path: string,
-    init: { method?: string; body?: string } = {},
-  ): Promise<Response> => {
-    const method = init.method ?? 'GET';
-    const body =
-      init.body === undefined ? undefined : (JSON.parse(init.body) as Record<string, unknown>);
+  const handle = async ({ method, path, body: sent }: Sent): Promise<Answer | undefined> => {
+    const body = sent as Record<string, unknown> | undefined;
     if (path === '/api/textbooks') return reply(200, { textbooks: books });
     const tree = path.match(/^\/api\/textbooks\/(\d+)\/contents$/);
     if (tree) {
       if (method === 'POST') return reply(201, {});
-      treeLoads++;
       return options.failContents
         ? reply(500, { error: 'Server error' })
         : // A copy, as from the server: a chapter removed later stays in the tree on screen.
@@ -98,7 +88,6 @@ function fakeServer(
     }
     const across = path.match(/^\/api\/textbooks\/(\d+)\/exercises\?(.*)$/);
     if (across) {
-      importantLoads.push(path);
       if (options.failImportant) return reply(500, { error: 'Server error' });
       const query = new URLSearchParams(across[2]);
       // The picked chapter and its sections, in contents order.
@@ -113,7 +102,6 @@ function fakeServer(
         ),
       });
     }
-    requests.push({ method, path, body });
     if (method !== 'GET') await options.holdChange;
     if (options.reject?.method === method)
       return reply(options.reject.status, { error: options.reject.error });
@@ -171,7 +159,7 @@ function fakeServer(
       return reply(200, { exercise: row });
     }
     const one = path.match(/^\/api\/exercises\/(\d+)$/);
-    if (!one) throw new Error('unexpected request ' + path);
+    if (!one) return undefined;
     const index = rows.findIndex((r) => r.id === Number(one[1]));
     if (index < 0) return reply(404, { error: 'Exercise not found' });
     if (method === 'PUT') {
@@ -182,8 +170,20 @@ function fakeServer(
     return reply(204);
   };
 
-  vi.stubGlobal('fetch', vi.fn(handle));
-  return { requests, rows, answers, importantLoads, treeLoads: () => treeLoads };
+  const api = fakeApi(handle);
+  return {
+    rows,
+    answers,
+    get requests() {
+      return api.requests.filter(
+        (r) => r.path !== '/api/textbooks' && !isTree(r) && !isImportant(r),
+      );
+    },
+    get importantLoads() {
+      return api.requests.filter(isImportant).map((r) => r.path);
+    },
+    treeLoads: () => api.requests.filter((r) => isTree(r) && r.method !== 'POST').length,
+  };
 }
 type Api = ReturnType<typeof fakeServer>;
 

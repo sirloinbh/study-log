@@ -1,11 +1,14 @@
 import { randomUUID } from 'node:crypto';
+import { pipeline } from 'node:stream/promises';
 
 import { type Request, type Response, Router } from 'express';
 import multer from 'multer';
 import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod/v4';
 
+import { auditChange } from './audit-log.js';
 import { type FileStorage, FileStorageError } from './file-storage.js';
+import { inTransaction } from './sql.js';
 import { parseId } from './standard/http.js';
 
 // The files a delete of an exercise, a chapter (with its sections) or a textbook takes with it
@@ -76,6 +79,30 @@ export async function removeStoredFiles(storage: FileStorage, keys: string[]) {
   return failed;
 }
 
+// What one exercise may keep (#266): a few dozen photos and PDFs, not an archive.
+export const maxFilesPerExercise = 20;
+export const maxBytesPerExercise = 100 * 1024 * 1024;
+
+// How many uploads may be in flight at once (#266). An upload holds up to 20 MiB in memory until
+// it is stored, so a burst of them must be turned away instead of exhausting the container.
+export const maxConcurrentUploads = 4;
+
+// A counter that hands out a fixed number of slots without waiting: `enter` says no when none is
+// free, and the caller answers 503 so the person can try again.
+export function createGate(slots: number) {
+  let used = 0;
+  return {
+    enter() {
+      if (used >= slots) return false;
+      used += 1;
+      return true;
+    },
+    leave() {
+      used -= 1;
+    },
+  };
+}
+
 // Original files of exercises and answers (#28): PDFs and photos, kept in S3 with a row each in
 // exercise_files. Same bound as the table.
 export const maxFileBytes = 20 * 1024 * 1024;
@@ -122,6 +149,20 @@ const columns = `id, exercise_id AS "exerciseId", role, original_name AS name,
   to_char(created_at AT TIME ZONE 'Asia/Seoul', 'YYYY-MM-DD HH24:MI') AS "createdAt"`;
 
 const notFound = { error: 'Exercise not found' };
+const tooManyFiles = { error: `An exercise can hold at most ${maxFilesPerExercise} files` };
+const tooManyBytes = {
+  error: `The files of one exercise must total at most ${maxBytesPerExercise / 1024 / 1024} MB`,
+};
+
+// How many files an exercise holds and how many bytes they take.
+async function usage(db: Pick<Pool, 'query'>, exerciseId: number) {
+  const { rows } = await db.query<{ files: number; bytes: number }>(
+    `SELECT count(*)::int AS files, COALESCE(sum(size_bytes), 0)::float8 AS bytes
+     FROM exercise_files WHERE exercise_id = $1`,
+    [exerciseId],
+  );
+  return rows[0];
+}
 const fileNotFound = { error: 'File not found' };
 
 // One file per request, in the form field `file`, with `role` beside it. Held in memory: the files
@@ -163,8 +204,13 @@ const storageFailed = (error: unknown, res: Response) => {
 };
 
 // Uploading and listing the files of one exercise: /api/exercises/:id/files
-export function exerciseFileRoutes(pool: Pool, storage: FileStorage) {
+export function exerciseFileRoutes(
+  pool: Pool,
+  storage: FileStorage,
+  uploadSlots = maxConcurrentUploads,
+) {
   const router = Router({ mergeParams: true });
+  const uploads = createGate(uploadSlots);
 
   router.get('/', async (req, res) => {
     const id = parseId((req.params as Record<string, string>).id, 'exercise');
@@ -185,42 +231,76 @@ export function exerciseFileRoutes(pool: Pool, storage: FileStorage) {
     if (!req.is('multipart/form-data'))
       return void res.status(415).json({ error: 'Send the file as multipart/form-data' });
     const id = parseId((req.params as Record<string, string>).id, 'exercise');
-    // Before reading the body, so a request for an exercise that does not exist never holds up to
-    // 20 MB in memory. The insert below still catches one deleted in the meantime.
+    // Before reading the body, so a request for an exercise that does not exist, or one that is
+    // already full, never holds up to 20 MB in memory. The insert below checks again under a lock.
     const exercise = await pool.query('SELECT 1 FROM exercises WHERE id = $1', [id]);
     if (!exercise.rowCount) return void res.status(404).json(notFound);
-    if (!(await receive(req, res))) return;
-    const role = roleInput.parse((req.body as Record<string, unknown> | undefined)?.role);
-    const file = req.file;
-    if (!file || file.size === 0) return void res.status(400).json({ error: 'Choose a file' });
-    const format = detectFormat(file.buffer);
-    if (!format)
-      return void res.status(415).json({ error: 'Only PDF, JPEG and PNG files can be uploaded' });
-    const name = displayName(file.originalname);
-    if (name.length > 255)
-      return void res.status(400).json({ error: 'The file name must be at most 255 characters' });
-
-    const key = `exercises/${id}/${randomUUID()}.${format.extension}`;
-    try {
-      await storage.put(key, file.buffer, format.type);
-    } catch (error) {
-      return void storageFailed(error, res);
+    const before = await usage(pool, id);
+    if (before.files >= maxFilesPerExercise) return void res.status(409).json(tooManyFiles);
+    // A burst of uploads must not exhaust memory: past the slots, ask the person to retry.
+    if (!uploads.enter()) {
+      res.set('retry-after', '5');
+      return void res.status(503).json({ error: 'Too many uploads at once. Try again shortly' });
     }
     try {
-      const { rows } = await pool.query(
-        `INSERT INTO exercise_files
-           (exercise_id, role, storage_key, original_name, content_type, size_bytes)
-         VALUES ($1, $2, $3, $4, $5, $6) RETURNING ${columns}`,
-        [id, role, key, name, format.type, file.size],
-      );
-      res.status(201).json({ file: rows[0] });
-    } catch (error) {
-      // No row points at the stored copy now, so it goes; if that fails too, the copy is left over
-      // in the bucket, which costs storage but breaks nothing.
-      await storage.remove(key).catch(() => undefined);
-      // The exercise was deleted while the file was being stored.
-      if ((error as { code?: string }).code !== '23503') throw error;
-      res.status(404).json(notFound);
+      if (!(await receive(req, res))) return;
+      const role = roleInput.parse((req.body as Record<string, unknown> | undefined)?.role);
+      const file = req.file;
+      if (!file || file.size === 0) return void res.status(400).json({ error: 'Choose a file' });
+      const format = detectFormat(file.buffer);
+      if (!format)
+        return void res.status(415).json({ error: 'Only PDF, JPEG and PNG files can be uploaded' });
+      const name = displayName(file.originalname);
+      if (name.length > 255)
+        return void res.status(400).json({ error: 'The file name must be at most 255 characters' });
+      if (before.bytes + file.size > maxBytesPerExercise)
+        return void res.status(413).json(tooManyBytes);
+
+      const key = `exercises/${id}/${randomUUID()}.${format.extension}`;
+      try {
+        await storage.put(key, file.buffer, format.type);
+      } catch (error) {
+        return void storageFailed(error, res);
+      }
+      try {
+        const reply = await inTransaction<{ status: number; body: unknown }>(
+          pool,
+          async (client) => {
+            // The same lock a delete takes, so two uploads cannot both pass the limits.
+            const locked = await client.query('SELECT 1 FROM exercises WHERE id = $1 FOR UPDATE', [
+              id,
+            ]);
+            // The exercise was deleted while the file was being stored.
+            if (!locked.rowCount) return { status: 404, body: notFound };
+            const now = await usage(client, id);
+            if (now.files >= maxFilesPerExercise) return { status: 409, body: tooManyFiles };
+            if (now.bytes + file.size > maxBytesPerExercise)
+              return { status: 413, body: tooManyBytes };
+            const { rows } = await client.query(
+              `INSERT INTO exercise_files
+                 (exercise_id, role, storage_key, original_name, content_type, size_bytes)
+               VALUES ($1, $2, $3, $4, $5, $6) RETURNING ${columns}`,
+              [id, role, key, name, format.type, file.size],
+            );
+            await auditChange(req, res, client, 'create', 'exercise_file', rows[0].id, {
+              exerciseId: id,
+              role,
+              name,
+            });
+            return { status: 201, body: { file: rows[0] } };
+          },
+          (reply) => reply.status < 400,
+        );
+        // No row points at the stored copy when refused, so it goes; if that fails too, the copy is
+        // left over in the bucket, which costs storage but breaks nothing.
+        if (reply.status >= 400) await storage.remove(key).catch(() => undefined);
+        res.status(reply.status).json(reply.body);
+      } catch (error) {
+        await storage.remove(key).catch(() => undefined);
+        throw error;
+      }
+    } finally {
+      uploads.leave();
     }
   });
 
@@ -240,16 +320,18 @@ export function fileRoutes(pool: Pool, storage: FileStorage) {
     res.json({ file: rows[0] });
   });
 
-  // The file itself, shown in the browser (a PDF in its viewer, a photo as an image).
+  // The file itself, shown in the browser (a PDF in its viewer, a photo as an image). It is streamed
+  // from S3, never held whole in memory (#266). `sandbox` stops a PDF or an image served from the
+  // app's own origin from running scripts or reading the app's data if a browser opens it as a page.
   router.get('/:fileId/content', async (req, res) => {
     const fileId = parseId(req.params.fileId, 'file');
-    const { rows } = await pool.query<{ key: string; name: string; type: string }>(
-      `SELECT storage_key AS key, original_name AS name, content_type AS type
+    const { rows } = await pool.query<{ key: string; name: string; type: string; size: number }>(
+      `SELECT storage_key AS key, original_name AS name, content_type AS type, size_bytes::float8 AS size
        FROM exercise_files WHERE id = $1`,
       [fileId],
     );
     if (rows.length === 0) return void res.status(404).json(fileNotFound);
-    const { key, name, type } = rows[0];
+    const { key, name, type, size } = rows[0];
     let body;
     try {
       body = await storage.get(key);
@@ -258,11 +340,27 @@ export function fileRoutes(pool: Pool, storage: FileStorage) {
     }
     res.set({
       'content-type': type,
+      'content-length': String(size),
       'content-disposition': `inline; filename*=UTF-8''${encodeName(name)}`,
+      'content-security-policy': 'sandbox',
       'x-content-type-options': 'nosniff',
       'cache-control': 'private, no-cache',
     });
-    res.send(body);
+    // Once the headers are out a failure cannot become a status; cut the connection instead.
+    await pipeline(body, res).catch((error: unknown) => {
+      // A person who closes the tab mid-download is not a fault; pipeline already freed the S3 body.
+      if ((error as { code?: string } | null)?.code === 'ERR_STREAM_PREMATURE_CLOSE')
+        return void res.destroy();
+      console.error(
+        JSON.stringify({
+          time: new Date().toISOString(),
+          level: 'error',
+          event: 'file_stream_failed',
+          error_name: error instanceof Error ? error.name : typeof error,
+        }),
+      );
+      res.destroy();
+    });
   });
 
   // Removes the stored copy first: if that fails, nothing changes and the request can be repeated.
@@ -279,7 +377,11 @@ export function fileRoutes(pool: Pool, storage: FileStorage) {
     } catch (error) {
       return void storageFailed(error, res);
     }
-    await pool.query('DELETE FROM exercise_files WHERE id = $1', [fileId]);
+    await inTransaction(pool, async (client) => {
+      const removed = await client.query('DELETE FROM exercise_files WHERE id = $1', [fileId]);
+      if (removed.rowCount)
+        await auditChange(req, res, client, 'delete', 'exercise_file', fileId, {});
+    });
     res.status(204).end();
   });
 

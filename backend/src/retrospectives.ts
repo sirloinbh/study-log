@@ -2,8 +2,10 @@ import { Router } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod/v4';
 
+import { auditChange } from './audit-log.js';
 import { monthRange } from './calendar.js';
 import { calendarDate } from './dates.js';
+import { inTransaction } from './sql.js';
 import { addDays, weekStart } from './stats.js';
 import { missingOrInvalid } from './validation.js';
 
@@ -135,23 +137,47 @@ export function retrospectiveRoutes(pool: Pool, today: () => string) {
   router.put('/:kind/:start', async (req, res) => {
     const period = periodPath(req.params);
     const { body } = bodyInput.parse(req.body);
-    const { rows } = await pool.query(
-      `INSERT INTO retrospectives (kind, period_start, period_end, body) VALUES ($1, $2, $3, $4)
-       ON CONFLICT (kind, period_start)
-       DO UPDATE SET body = EXCLUDED.body, updated_at = now()
-       RETURNING ${columns}`,
-      [period.kind, period.from, period.to, body],
-    );
-    res.json({ retrospective: rows[0] });
+    const { created: _created, ...retrospective } = await inTransaction(pool, async (client) => {
+      // xmax is 0 only on a row this statement inserted, so a replaced one is told from a new one.
+      const { rows } = await client.query(
+        `INSERT INTO retrospectives (kind, period_start, period_end, body) VALUES ($1, $2, $3, $4)
+         ON CONFLICT (kind, period_start)
+         DO UPDATE SET body = EXCLUDED.body, updated_at = now()
+         RETURNING ${columns}, (xmax = 0) AS created`,
+        [period.kind, period.from, period.to, body],
+      );
+      await auditChange(
+        req,
+        res,
+        client,
+        rows[0].created ? 'create' : 'update',
+        'retrospective',
+        rows[0].id,
+        {
+          kind: period.kind,
+          from: period.from,
+        },
+      );
+      return rows[0];
+    });
+    res.json({ retrospective });
   });
 
   router.delete('/:kind/:start', async (req, res) => {
     const period = periodPath(req.params);
-    const { rowCount } = await pool.query(
-      'DELETE FROM retrospectives WHERE kind = $1 AND period_start = $2',
-      [period.kind, period.from],
-    );
-    if (!rowCount) return void res.status(404).json(notFound);
+    const deleted = await inTransaction(pool, async (client) => {
+      const removed = await client.query(
+        'DELETE FROM retrospectives WHERE kind = $1 AND period_start = $2 RETURNING id',
+        [period.kind, period.from],
+      );
+      if (removed.rows[0])
+        await auditChange(req, res, client, 'delete', 'retrospective', removed.rows[0].id, {
+          kind: period.kind,
+          from: period.from,
+        });
+      return removed.rowCount;
+    });
+    if (!deleted) return void res.status(404).json(notFound);
     res.status(204).end();
   });
 

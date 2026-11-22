@@ -2,6 +2,7 @@ import { Router } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod/v4';
 
+import { auditChange } from './audit-log.js';
 import { calendarDate } from './dates.js';
 import { syncFirstReview } from './reviews.js';
 import { inTransaction, likePattern } from './sql.js';
@@ -218,6 +219,11 @@ export function studyLogRoutes(pool: Pool) {
           ],
         );
         await syncFirstReview(client, rows[0].id, undefined, log);
+        await auditChange(req, res, client, 'create', 'study_log', rows[0].id, {
+          studyDate: log.studyDate,
+          status: log.status,
+          textbookId: log.textbookId,
+        });
         return rows[0];
       }),
     );
@@ -262,6 +268,11 @@ export function studyLogRoutes(pool: Pool) {
           ],
         );
         await syncFirstReview(client, id, previous, log);
+        await auditChange(req, res, client, 'update', 'study_log', id, {
+          studyDate: log.studyDate,
+          status: log.status,
+          textbookId: log.textbookId,
+        });
         return rows[0];
       }),
     );
@@ -272,8 +283,16 @@ export function studyLogRoutes(pool: Pool) {
 
   router.delete('/:id', async (req, res) => {
     const id = parseId(req.params.id, 'study log');
-    const { rowCount } = await pool.query('DELETE FROM study_logs WHERE id = $1', [id]);
-    if (!rowCount) return void res.status(404).json(notFound);
+    const deleted = await inTransaction(pool, async (client) => {
+      const removed = await client.query(
+        'DELETE FROM study_logs WHERE id = $1 RETURNING study_date AS "studyDate", status',
+        [id],
+      );
+      if (removed.rows[0])
+        await auditChange(req, res, client, 'delete', 'study_log', id, removed.rows[0]);
+      return removed.rowCount;
+    });
+    if (!deleted) return void res.status(404).json(notFound);
     res.status(204).end();
   });
 
