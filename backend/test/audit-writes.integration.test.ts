@@ -358,6 +358,9 @@ test('each change through the API leaves one audit row', { skip: !url }, async (
         await change('schedule', 'delete', `/api/schedules/${schedule}`, { method: 'DELETE' }, 204);
       });
     },
-    { today: () => '8053-03-01', holidayFetcher: async () => [] },
+    {
+      today: () => '8053-03-01',
+      holidayFetcher: async (year) => [{ date: `${year}-01-01`, name: '1월1일' }],
+    },
   );
 });
