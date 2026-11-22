@@ -349,6 +349,9 @@ export function fileRoutes(pool: Pool, storage: FileStorage) {
     });
     // Once the headers are out a failure cannot become a status; cut the connection instead.
     await pipeline(body, res).catch((error: unknown) => {
+      // A person who closes the tab mid-download is not a fault; pipeline already freed the S3 body.
+      if ((error as { code?: string } | null)?.code === 'ERR_STREAM_PREMATURE_CLOSE')
+        return void res.destroy();
       console.error(
         JSON.stringify({
           time: new Date().toISOString(),
