@@ -235,8 +235,9 @@ describe('keywords', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/Keyword not found/);
     await expectListed(['고유값:Ax = λx']);
     expect(dayEl().querySelector('li.editing')).toBeNull();
-    // The closed editor's buttons are gone; focus goes to the day heading.
-    await waitFor(() => expect(focused).toEqual(['keyword-day']));
+    // Edit focused the form (#280); the closed editor's buttons are gone, so focus goes to the day
+    // heading.
+    await waitFor(() => expect(focused).toEqual(['keyword-edit-keyword', 'keyword-day']));
   });
 
   test('search lists matches across dates and a date opens that day', async () => {
@@ -358,17 +359,27 @@ describe('keywords', () => {
     await expectListed(['고유값:Ax = λx', '대각화:']);
     fireEvent.click(item('대각화').getByRole('button', { name: '대각화 edit' }));
     fireEvent.submit(editingForm());
-    await waitFor(() => expect(focused).toEqual(['keyword-day']));
+    // Each Edit puts focus in the form (#280), then save or cancel moves it to the heading.
+    await waitFor(() => expect(focused).toEqual(['keyword-edit-keyword', 'keyword-day']));
     await waitFor(() => expect(dayEl().querySelector('li.editing')).toBeNull());
     fireEvent.click(await screen.findByRole('button', { name: '대각화 edit' }));
     fireEvent.click(editing().getByRole('button', { name: 'Cancel' }));
-    await waitFor(() => expect(focused).toEqual(['keyword-day', 'keyword-day']));
+    await waitFor(() =>
+      expect(focused).toEqual([
+        'keyword-edit-keyword',
+        'keyword-day',
+        'keyword-edit-keyword',
+        'keyword-day',
+      ]),
+    );
     fireEvent.click(await screen.findByRole('button', { name: '대각화 delete' }));
     fireEvent.click(await screen.findByRole('button', { name: '대각화 confirm deletion' }));
     // Save, cancel, then the delete flow: its confirm button and the heading after (#86).
     await waitFor(() =>
       expect(focused).toEqual([
+        'keyword-edit-keyword',
         'keyword-day',
+        'keyword-edit-keyword',
         'keyword-day',
         'keyword-delete-confirm-2',
         'keyword-day',

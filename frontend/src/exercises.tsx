@@ -460,7 +460,11 @@ export function Exercises({
                   return Promise.resolve();
                 });
               }}
-              onClose={() => setReading(undefined)}
+              onClose={() => {
+                setReading(undefined);
+                // The panel and its focused Close button are gone; focus goes back to its button.
+                setWantFocus('exercise-read');
+              }}
             />
           )}
         </>
