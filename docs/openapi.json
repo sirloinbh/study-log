@@ -694,7 +694,7 @@
         }
       },
       "put": {
-        "summary": "Replace a keyword; a left-out date means today",
+        "summary": "Replace a keyword; a left-out date keeps the stored date",
         "parameters": [
           {
             "name": "id",
