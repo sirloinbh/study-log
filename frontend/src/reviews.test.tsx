@@ -1,9 +1,10 @@
-import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 
 import { overdueDays, type Review, reviewTitle } from './review';
 import { Reviews } from './reviews';
 import { fakeApi } from './test/fake-api';
+import { render } from './test/render';
 
 const today = '2026-10-31';
 
@@ -690,6 +691,8 @@ test('returning to the tab while a change runs adds no request', async () => {
   );
   render(<Reviews />);
   fireEvent.click(await screen.findByRole('button', { name: /Postpone a day/ }));
+  // The change is on its way (held), so what is counted next is only what the tab return adds.
+  await api.requested((request) => request.method === 'POST');
   const before = api.requests.length;
   fireEvent.focus(window);
   await act(async () => {});
