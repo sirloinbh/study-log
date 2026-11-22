@@ -15,7 +15,8 @@ import { ExerciseExtraction } from './exercise-extraction';
 import { ExerciseFormView } from './exercise-form';
 import { ExerciseToolbar } from './exercise-toolbar';
 import { ExerciseTranslation } from './exercise-translation';
-import { type RequestError, requestJson } from './lib/api';
+import type { RequestError } from './lib/api';
+import { type ApiRequest, useApiMutation } from './lib/query';
 import { Loading } from './loading';
 import { type ContentNode, contentOptions, type Textbook } from './textbook';
 import { useAnswerPanel } from './use-answer-panel';
@@ -64,6 +65,9 @@ export function Exercises({
   const options = tree ? contentOptions(tree) : [];
   // The picked chapter, or the first one when nothing is picked or it was deleted.
   const contentId = options.some((option) => option.id === chosen) ? chosen : options[0]?.id;
+
+  // A plain JSON write; `run` reloads the list after it, while busy.
+  const send = useApiMutation<unknown, ApiRequest>((request) => request);
 
   const { loaded, loadError, lost, setLost, noteMissing, refresh, url } = useExerciseData({
     textbookId: textbook.id,
@@ -157,13 +161,17 @@ export function Exercises({
     nameNext('save');
     void run(async () => {
       if (open.id === undefined) {
-        await requestJson(url, { method: 'POST', body: open.form });
+        await send.mutateAsync({ path: url, method: 'POST', body: open.form });
         say('status', 'Added');
         // Stays open, empty, for typing the next exercise.
         setEditor({ ...open, form: emptyExerciseForm() });
         setWantFocus('exercise-body');
       } else {
-        await requestJson(`/api/exercises/${open.id}`, { method: 'PUT', body: open.form });
+        await send.mutateAsync({
+          path: `/api/exercises/${open.id}`,
+          method: 'PUT',
+          body: open.form,
+        });
         say('status', 'Updated');
         setEditor(undefined);
       }
@@ -173,7 +181,7 @@ export function Exercises({
   const remove = (exercise: Exercise) =>
     run(async () => {
       try {
-        await requestJson(`/api/exercises/${exercise.id}`, { method: 'DELETE' });
+        await send.mutateAsync({ path: `/api/exercises/${exercise.id}`, method: 'DELETE' });
       } catch (failure) {
         // Already gone elsewhere: like a delete. Otherwise the exercise stays with its button.
         setWantFocus(
@@ -195,7 +203,8 @@ export function Exercises({
   const markImportant = (exercise: Exercise) =>
     run(async () => {
       const important = !exercise.important;
-      await requestJson(`/api/exercises/${exercise.id}/important`, {
+      await send.mutateAsync({
+        path: `/api/exercises/${exercise.id}/important`,
         method: 'PATCH',
         body: { important },
       });

@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
 
 import { type ExerciseAnswer } from './exercise';
-import { type RequestError, requestJson } from './lib/api';
+import type { RequestError } from './lib/api';
+import { apiKey, type ApiRequest, useApiMutation, useApiQuery } from './lib/query';
 
 // The one exercise whose answer is shown. `body` is undefined while loading and null when no
 // answer is saved; `draft` is set while the answer is being typed.
@@ -29,27 +31,32 @@ export function useAnswerPanel({
   nameNext: (name: string) => void;
   clearNotice: () => void;
 }) {
+  const client = useQueryClient();
   const [answer, setAnswer] = useState<AnswerPanel>();
-  const shown = mine(answer);
+  const send = useApiMutation<{ answer: ExerciseAnswer } | undefined, ApiRequest>((r) => r);
+  const answerKey = (id: number) => apiKey(`/api/exercises/${id}/answer`);
 
-  // Loads the answer when its panel opens.
+  // Loads the answer when its panel opens. The key carries the exercise, so only the panel it
+  // was loaded for shows it.
   const answerId = answer?.id;
-  useEffect(() => {
-    if (answerId === undefined) return;
-    let current = true;
-    const update = (change: Partial<AnswerPanel>) =>
-      current && setAnswer((panel) => (panel?.id === answerId ? { ...panel, ...change } : panel));
-    requestJson<{ answer: ExerciseAnswer | null }>(`/api/exercises/${answerId}/answer`)
-      .then((data) => update({ body: data.answer?.body ?? null, error: undefined }))
-      .catch((failure: RequestError) => update({ error: failure.message }));
-    return () => {
-      current = false;
-    };
-  }, [answerId]);
+  const query = useApiQuery<{ answer: ExerciseAnswer | null }>(
+    answerKey(answerId ?? 0),
+    `/api/exercises/${answerId}/answer`,
+    { enabled: answerId !== undefined, staleTime: 0 },
+  );
+  const shown = mine(
+    answer && {
+      ...answer,
+      body: query.data ? (query.data.answer?.body ?? null) : undefined,
+      error: query.error?.message,
+    },
+  );
 
   // Opens the answer of an exercise, closing any other one, or closes it when it is open.
   const toggle = (exercise: { id: number; contentId: number }) => {
     clearNotice();
+    // Reading it again from scratch: no old copy shows while it loads.
+    client.removeQueries({ queryKey: answerKey(exercise.id) });
     setAnswer(
       shown?.id === exercise.id ? undefined : { contentId: exercise.contentId, id: exercise.id },
     );
@@ -69,34 +76,31 @@ export function useAnswerPanel({
     const path = `/api/exercises/${panel.id}/answer`;
     nameNext('answer');
     void run(async () => {
-      let body: string | null;
       if (draft.trim()) {
-        const data = await requestJson<{ answer: ExerciseAnswer }>(path, {
-          method: 'PUT',
-          body: { body: draft },
-        });
-        body = data.answer.body;
+        const data = await send.mutateAsync({ path, method: 'PUT', body: { body: draft } });
+        client.setQueryData(answerKey(panel.id), { answer: data?.answer ?? null });
         say('status', 'Saved the answer');
       } else if (panel.body) {
         try {
-          await requestJson(path, { method: 'DELETE' });
+          await send.mutateAsync({ path, method: 'DELETE' });
         } catch (failure) {
           // Already deleted elsewhere: the answer is gone as asked. A missing exercise still fails.
           if ((failure as RequestError).message !== 'Answer not found') throw failure;
         }
-        body = null;
+        client.setQueryData(answerKey(panel.id), { answer: null });
         say('status', 'Cleared the answer');
-      } else {
-        body = null;
       }
       setAnswer((current) =>
-        current?.id === panel.id ? { ...current, body, draft: undefined } : current,
+        current?.id === panel.id ? { ...current, draft: undefined } : current,
       );
     });
   };
 
-  const close = () => setAnswer(undefined);
-  const startEdit = () => setAnswer((panel) => panel && { ...panel, draft: panel.body ?? '' });
+  const close = () => {
+    if (answerId !== undefined) client.removeQueries({ queryKey: answerKey(answerId) });
+    setAnswer(undefined);
+  };
+  const startEdit = () => setAnswer((panel) => panel && { ...panel, draft: shown?.body ?? '' });
   const cancelEdit = () => setAnswer((panel) => panel && { ...panel, draft: undefined });
   return { shown, toggle, change, save, close, startEdit, cancelEdit };
 }

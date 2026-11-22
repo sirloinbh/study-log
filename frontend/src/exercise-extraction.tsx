@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 
 import { useBusy } from './busy';
 import { type Exercise, exerciseLabel, exerciseLimits, matchExercise } from './exercise';
-import { type RequestError, requestForm, requestJson } from './lib/api';
+import { type RequestError, requestForm } from './lib/api';
+import { type ApiRequest, useApiMutation } from './lib/query';
 import { ButtonSpinner } from './loading';
 
 type Kind = 'problems' | 'answers';
@@ -41,6 +42,8 @@ export function ExerciseExtraction({
   const [review, setReview] = useState<Review>();
   const [notice, setNotice] = useState<{ kind: 'status' | 'alert'; text: string }>();
   const { busy: working, action, nameNext, begin, end } = useBusy();
+  // Saving is a plain JSON write; the screen above reloads its list after onSaved.
+  const saveRows = useApiMutation<unknown, ApiRequest>((request) => request);
   const busy = disabled || working;
 
   const read = async (event: { preventDefault(): void }) => {
@@ -167,9 +170,11 @@ export function ExerciseExtraction({
     nameNext('save');
     if (!begin()) return;
     try {
-      await (review.kind === 'problems'
-        ? requestJson(`${url}/bulk`, { method: 'POST', body })
-        : requestJson(`${url}/answers`, { method: 'PUT', body }));
+      await saveRows.mutateAsync({
+        path: review.kind === 'problems' ? `${url}/bulk` : `${url}/answers`,
+        method: review.kind === 'problems' ? 'POST' : 'PUT',
+        body,
+      });
       end();
       onSaved(
         `Saved ${kept.length} ${review.kind === 'problems' ? 'problem' : 'answer'}${kept.length === 1 ? '' : 's'}`,
