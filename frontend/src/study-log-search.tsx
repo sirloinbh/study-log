@@ -1,7 +1,8 @@
+import { useQueryClient } from '@tanstack/react-query';
 import React, { useEffect, useRef, useState } from 'react';
 
 import { useBusy } from './busy';
-import { type RequestError, requestJson } from './lib/api';
+import { apiKey, useApiQuery } from './lib/query';
 import { ButtonSpinner } from './loading';
 import { Memo } from './memo';
 import {
@@ -26,35 +27,45 @@ export function StudyLogSearch({
   reloadKey?: number;
 }) {
   const [search, setSearch] = useState<Search>(emptySearch);
-  // The last search run and its results, kept until the next one.
-  const [results, setResults] = useState<{ path: string; logs: StudyLog[] }>();
-  const [error, setError] = useState<string>();
+  // The search submitted last, as its request path. Its answer is cached under that path, so a slow
+  // answer for an older search never replaces the newer results.
+  const [submitted, setSubmitted] = useState<string>();
+  const [pending, setPending] = useState(false);
   const { busy, action, nameNext, begin, end } = useBusy();
+  const client = useQueryClient();
+  const query = useApiQuery<{ studyLogs: StudyLog[] }>(
+    apiKey('/api/study-logs', 'search', submitted),
+    submitted ?? '',
+    { enabled: submitted !== undefined, staleTime: 0 },
+  );
+  const { refetch } = query;
 
-  // Counts the searches started; an answer that is not for the latest one is dropped, so an older
-  // slow search never replaces the newer results.
-  const latest = useRef(0);
+  // The results shown until the next search answers. A failed search drops them: they no longer
+  // match the conditions in the form, and they are not searched again later.
+  const lastShown = useRef<StudyLog[] | undefined>(undefined);
+  if (query.isError || submitted === undefined) lastShown.current = undefined;
+  else if (query.data) lastShown.current = query.data.studyLogs;
+  const logs =
+    submitted === undefined || query.isError
+      ? undefined
+      : (query.data?.studyLogs ?? lastShown.current);
+  const error = query.isFetching ? undefined : query.error?.message;
 
-  const run = async (path: string) => {
-    const mine = ++latest.current;
-    try {
-      const data = await requestJson<{ studyLogs: StudyLog[] }>(path);
-      if (mine !== latest.current) return;
-      setResults({ path, logs: data.studyLogs });
-      setError(undefined);
-    } catch (failure) {
-      if (mine !== latest.current) return;
-      setError((failure as RequestError).message);
-      // Not searched again later: its results no longer match the conditions in the form.
-      setResults(undefined);
-    }
-  };
-
-  const shownPath = results?.path;
+  // A new search ends its busy state once the answer, or the failure, is in.
   useEffect(() => {
-    if (shownPath === undefined || reloadKey === undefined) return;
-    void run(shownPath);
-    // Only a change elsewhere (reloadKey) searches the shown results again.
+    if (!pending || query.isFetching) return;
+    setPending(false);
+    end();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pending, query.isFetching]);
+
+  // Only a change elsewhere (reloadKey) searches the shown results again.
+  const lastReload = useRef(reloadKey);
+  useEffect(() => {
+    if (lastReload.current === reloadKey) return;
+    lastReload.current = reloadKey;
+    if (submitted === undefined || reloadKey === undefined) return;
+    void client.invalidateQueries({ queryKey: apiKey('/api/study-logs', 'search', submitted) });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reloadKey]);
 
@@ -62,7 +73,12 @@ export function StudyLogSearch({
     event.preventDefault();
     nameNext('search');
     if (!begin()) return;
-    void run(studyLogSearchPath(search)).finally(end);
+    const path = studyLogSearchPath(search);
+    if (path === submitted) void refetch().finally(end);
+    else {
+      setPending(true);
+      setSubmitted(path);
+    }
   };
 
   const change = (field: keyof Search) => (event: { target: { value: string } }) =>
@@ -126,20 +142,18 @@ export function StudyLogSearch({
           Could not search: {error}
         </p>
       )}
-      {results &&
-        (results.logs.length === 0 ? (
+      {logs &&
+        (logs.length === 0 ? (
           <p role="status" className="status">
             No results
           </p>
         ) : (
           <>
             <p role="status" className="status">
-              {results.logs.length === 100
-                ? 'Showing the latest 100'
-                : `Found ${results.logs.length}`}
+              {logs.length === 100 ? 'Showing the latest 100' : `Found ${logs.length}`}
             </p>
             <ul className="log-list search-results">
-              {results.logs.map((log) => (
+              {logs.map((log) => (
                 <li key={log.id}>
                   <div className="log-head">
                     <span className="log-date">{log.studyDate}</span>

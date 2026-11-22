@@ -1,8 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import React, { useEffect, useMemo, useState } from 'react';
 
 import { useBusy } from './busy';
 import { Calendar } from './calendar';
-import { type RequestError, requestJson } from './lib/api';
+import type { RequestError } from './lib/api';
+import { apiKey, useApiMutation, useApiQuery } from './lib/query';
 import { Loading } from './loading';
 import { StudyLogFormView } from './study-log-form';
 import { StudyLogItem } from './study-log-item';
@@ -20,8 +22,6 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
   const [editingId, setEditingId] = useState<number | undefined>(undefined);
   // The unsaved new entry, restored after an edit is saved or cancelled.
   const [draft, setDraft] = useState<StudyLogForm | undefined>(undefined);
-  const [logs, setLogs] = useState<StudyLog[] | undefined>(undefined);
-  const [loadError, setLoadError] = useState<string | undefined>(undefined);
   const [notice, setNotice] = useState<Notice>(undefined);
   // One request at a time: fields and action buttons are disabled while a save or delete is pending.
   const { busy, action, nameNext, begin, end } = useBusy();
@@ -38,57 +38,54 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
     document.getElementById(wantFocus)?.focus?.();
   }, [wantFocus, busy]);
 
-  useEffect(() => {
-    // A slower, older response must not overwrite the list a newer request returned.
-    let current = true;
-    requestJson<{ studyLogs: StudyLog[] }>(`/api/study-logs?limit=${recentLimit}`)
-      .then((data) => {
-        if (!current) return;
-        setLogs(data.studyLogs);
-        setLoadError(undefined);
-      })
-      .catch((error: RequestError) => {
-        // Keep whatever list is already on screen; only report that it could not be refreshed.
-        if (current) setLoadError(error.message);
-      });
-    return () => {
-      current = false;
-    };
-  }, [reload]);
+  // The recent list. A failed refresh keeps whatever list is on screen and only reports that it could not
+  // be refreshed; the error is hidden while a retry runs.
+  const client = useQueryClient();
+  const recentKey = apiKey('/api/study-logs', 'recent');
+  const recent = useApiQuery<{ studyLogs: StudyLog[] }>(
+    recentKey,
+    `/api/study-logs?limit=${recentLimit}`,
+  );
+  const logs = recent.data?.studyLogs;
+  const loadError = recent.isFetching ? undefined : recent.error?.message;
 
   // Textbooks to link a log to. Without them the log is simply saved unlinked.
-  const [textbooks, setTextbooks] = useState<Textbook[]>([]);
-  useEffect(() => {
-    let current = true;
-    requestJson<{ textbooks: Textbook[] }>('/api/textbooks')
-      .then((data) => current && setTextbooks(data.textbooks))
-      .catch(() => current && setTextbooks([]));
-    return () => {
-      current = false;
-    };
-  }, []);
+  const textbooksQuery = useApiQuery<{ textbooks: Textbook[] }>(
+    apiKey('/api/textbooks'),
+    '/api/textbooks',
+  );
+  const textbooks = useMemo(() => textbooksQuery.data?.textbooks ?? [], [textbooksQuery.data]);
 
-  // Chapters of the selected textbook, flattened for the select. Kept with the textbook they
-  // belong to, so a previous textbook's chapters never show while the new ones load.
-  const [loadedChapters, setLoadedChapters] = useState<{
-    textbookId: number;
-    options: { id: number; label: string }[];
-  }>();
-  useEffect(() => {
-    const textbookId = form.textbookId;
-    if (textbookId === null) return;
-    let current = true;
-    requestJson<{ contents: ContentNode[] }>(`/api/textbooks/${textbookId}/contents`)
-      .then(
-        (data) =>
-          current && setLoadedChapters({ textbookId, options: contentOptions(data.contents) }),
-      )
-      .catch(() => current && setLoadedChapters({ textbookId, options: [] }));
-    return () => {
-      current = false;
-    };
-  }, [form.textbookId]);
-  const chapters = loadedChapters?.textbookId === form.textbookId ? loadedChapters.options : [];
+  // Chapters of the selected textbook, flattened for the select. One cached list per textbook, so a
+  // previous textbook's chapters never show while the new ones load.
+  const chaptersQuery = useApiQuery<{ contents: ContentNode[] }>(
+    apiKey('/api/textbooks', String(form.textbookId), 'contents'),
+    `/api/textbooks/${form.textbookId}/contents`,
+    { enabled: form.textbookId !== null },
+  );
+  const chapters = useMemo(
+    () =>
+      form.textbookId !== null && chaptersQuery.data
+        ? contentOptions(chaptersQuery.data.contents)
+        : [],
+    [form.textbookId, chaptersQuery.data],
+  );
+
+  // Reads the list again and tells the calendar and the search to do the same.
+  const reloadAll = () => {
+    void client.invalidateQueries({ queryKey: recentKey });
+    setReload((count) => count + 1);
+  };
+
+  const saveLog = useApiMutation<unknown, { id?: number; body: StudyLogForm }>(({ id, body }) => ({
+    path: id === undefined ? '/api/study-logs' : `/api/study-logs/${id}`,
+    method: id === undefined ? 'POST' : 'PUT',
+    body,
+  }));
+  const deleteLog = useApiMutation<unknown, number>((id) => ({
+    path: `/api/study-logs/${id}`,
+    method: 'DELETE',
+  }));
 
   // A change to the form takes back what was said about the last try.
   const patch = (changes: Partial<StudyLogForm>) => {
@@ -108,7 +105,7 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
     // The log may have been deleted elsewhere; show the server's current list. Only a 404 on the
     // log being edited ends the edit, so unsaved changes to another log survive.
     if (error.status === 404 && id !== undefined && id === editingId) leaveEdit();
-    setReload((count) => count + 1);
+    reloadAll();
   };
 
   const save = async (event: { preventDefault(): void }) => {
@@ -116,13 +113,7 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
     nameNext('save');
     if (!begin()) return;
     try {
-      await requestJson(
-        editingId === undefined ? '/api/study-logs' : `/api/study-logs/${editingId}`,
-        {
-          method: editingId === undefined ? 'POST' : 'PUT',
-          body: form,
-        },
-      );
+      await saveLog.mutateAsync({ id: editingId, body: form });
       setNotice({
         kind: 'status',
         text: editingId === undefined ? 'Saved' : 'Updated',
@@ -130,7 +121,7 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
       // A new entry keeps its date for the next session of the same day.
       if (editingId === undefined) setForm(emptyForm(form.studyDate));
       else leaveEdit();
-      setReload((count) => count + 1);
+      reloadAll();
     } catch (error) {
       fail(error as RequestError, editingId);
     } finally {
@@ -165,10 +156,10 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
     nameNext('delete');
     if (!begin()) return;
     try {
-      await requestJson(`/api/study-logs/${id}`, { method: 'DELETE' });
+      await deleteLog.mutateAsync(id);
       setNotice({ kind: 'status', text: 'Deleted' });
       if (editingId === id) leaveEdit();
-      setReload((count) => count + 1);
+      reloadAll();
       setWantFocus('study-log-list');
     } catch (error) {
       fail(error as RequestError, id);
