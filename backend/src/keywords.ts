@@ -12,7 +12,7 @@ const keywordDate = calendarDate(
   'The date must be in YYYY-MM-DD format',
 );
 
-// `date` left out means today in the service time zone; the route fills it in.
+// `date` left out means today on add, and the stored date on update; the add route fills it in.
 export const keywordInput = z.object(
   {
     date: keywordDate.optional(),
@@ -113,15 +113,16 @@ export function keywordRoutes(pool: Pool, today: () => string) {
     }
   });
 
-  // Replaces date, keyword and memo; a left-out date means today, as when adding.
+  // Replaces keyword and memo; a left-out date keeps the stored one, so editing only the word does
+  // not move the keyword to today (#271).
   router.put('/:id', async (req, res) => {
     const id = parseId(req.params.id, 'keyword');
     const input = keywordInput.parse(req.body);
     try {
       const { rows } = await pool.query(
-        `UPDATE keywords SET keyword_date = $2, keyword = $3, memo = $4, updated_at = now()
+        `UPDATE keywords SET keyword_date = COALESCE($2::date, keyword_date), keyword = $3, memo = $4, updated_at = now()
          WHERE id = $1 RETURNING ${columns}`,
-        [id, input.date ?? today(), input.keyword, input.memo],
+        [id, input.date ?? null, input.keyword, input.memo],
       );
       if (rows.length === 0) return void res.status(404).json(notFound);
       res.json({ keyword: rows[0] });

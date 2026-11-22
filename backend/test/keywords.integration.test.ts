@@ -74,6 +74,18 @@ test(
           keyword: '고유벡터',
           memo: '',
         });
+        // A left-out date keeps the stored one (#271).
+        const kept = await call(`/api/keywords/${first.id}`, {
+          method: 'PUT',
+          body: { keyword: '고유벡터2', memo: '메모' },
+        });
+        assert.equal(kept.status, 200);
+        assert.deepEqual((await call(`/api/keywords/${first.id}`)).data.keyword, {
+          id: first.id,
+          date: days[0],
+          keyword: '고유벡터2',
+          memo: '메모',
+        });
         // Moving onto a day that already has the keyword is refused too.
         const clash = await call(`/api/keywords/${first.id}`, {
           method: 'PUT',
