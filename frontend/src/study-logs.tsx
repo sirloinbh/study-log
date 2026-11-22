@@ -194,7 +194,7 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
       studyType: log.studyType,
     });
     // On a phone the form sits above the list; bring it into view.
-    document.getElementById('study-log-date')?.focus?.();
+    setWantFocus('study-log-date');
   };
 
   const remove = async (id: number) => {

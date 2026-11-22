@@ -281,6 +281,7 @@ export function Keywords({ today }: { today: string }) {
                     <label className="keyword-field">
                       Keyword
                       <input
+                        id="keyword-edit-keyword"
                         required
                         maxLength={keywordLimits.keyword}
                         disabled={busy}
@@ -362,6 +363,8 @@ export function Keywords({ today }: { today: string }) {
                           onClick={() => {
                             setDeletingId(undefined);
                             setNotice(undefined);
+                            // The Edit button is replaced by the form; focus goes to its first field.
+                            setWantFocus('keyword-edit-keyword');
                             setEditor({
                               id: keyword.id,
                               date: keyword.date,
