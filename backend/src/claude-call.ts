@@ -7,6 +7,7 @@ import {
   logClaudeSuccess,
   startClaudeCall,
 } from './claude-usage.js';
+import { createGate } from './gate.js';
 
 // The one place a Claude call is made for translation and extraction (#268): the time it may take,
 // the usage log line, the stop reasons that mean failure, and the mapping of API failures to a
@@ -20,6 +21,12 @@ export const claudeBudgetMs = 240_000;
 // One retry on a failed attempt (the SDK default is two). Each attempt may use up to `attemptMs`.
 export const claudeMaxRetries = 1;
 export const claudeAttemptMs = 110_000;
+
+// How many paid calls may run at once across extraction and translation (#267). The same-chapter
+// and same-exercise locks stop a repeat, not a crowd; past this many the route answers 503 before it
+// reads the body, so a burst cannot run up the bill or hold files in memory.
+export const maxConcurrentClaudeCalls = 3;
+export const claudeSlots = createGate(maxConcurrentClaudeCalls);
 
 export type ClaudeRequestOptions = { signal: AbortSignal; timeout: number; maxRetries: number };
 
