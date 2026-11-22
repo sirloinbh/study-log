@@ -139,7 +139,8 @@ test('registering a textbook posts it, clears the form and shows its detail', as
     body: { title: '확률과 통계', author: '홍길동', edition: '2판' },
   });
   // The list is reloaded from the server after saving.
-  expect(api.requests[2].method).toBe('GET');
+  // Waited for: the reload may not have been sent yet when the machine is busy (#336).
+  await waitFor(() => expect(api.requests[2]?.method).toBe('GET'));
   await waitFor(() => expect(items()[0]).toHaveTextContent(/확률과 통계홍길동 · 2판/));
   expect(field('Title')).toBe('');
   expect(field('Author')).toBe('');
