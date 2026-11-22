@@ -5,6 +5,7 @@ import { z } from 'zod/v4';
 import { calendarDate } from './dates.js';
 import { syncFirstReview } from './reviews.js';
 import { inTransaction, likePattern } from './sql.js';
+import { parseId } from './standard/http.js';
 import { missingOrInvalid } from './validation.js';
 
 export const studyStatuses = ['planned', 'in_progress', 'done', 'stopped'] as const;
@@ -87,13 +88,6 @@ export const studyLogInput = z
     error: 'Choose a textbook before choosing a contents entry',
     path: ['contentId'],
   });
-
-// Only plain positive integers that stay exact in JS and fit the bigint column; "1e3", "0x10"
-// or 20-digit ids would otherwise reach Postgres and fail as a 500.
-const idParam = z
-  .string()
-  .regex(/^[1-9]\d{0,14}$/, 'Invalid study log ID')
-  .transform(Number);
 
 // ?date for one day in time order; otherwise the most recent logs, narrowed by ?textbookId, ?q
 // (memo or difficulties, any case) and ?from/?to (#18). Every given condition applies.
@@ -192,7 +186,7 @@ export function studyLogRoutes(pool: Pool) {
   });
 
   router.get('/:id', async (req, res) => {
-    const id = idParam.parse(req.params.id);
+    const id = parseId(req.params.id, 'study log');
     const { rows } = await pool.query(`${select('study_logs')} WHERE l.id = $1`, [id]);
     if (rows.length === 0) return void res.status(404).json(notFound);
     res.json({ studyLog: rows[0] });
@@ -232,7 +226,7 @@ export function studyLogRoutes(pool: Pool) {
   });
 
   router.put('/:id', async (req, res) => {
-    const id = idParam.parse(req.params.id);
+    const id = parseId(req.params.id, 'study log');
     const log = studyLogInput.parse(req.body);
     const result = await write(() =>
       inTransaction(pool, async (client) => {
@@ -277,7 +271,7 @@ export function studyLogRoutes(pool: Pool) {
   });
 
   router.delete('/:id', async (req, res) => {
-    const id = idParam.parse(req.params.id);
+    const id = parseId(req.params.id, 'study log');
     const { rowCount } = await pool.query('DELETE FROM study_logs WHERE id = $1', [id]);
     if (!rowCount) return void res.status(404).json(notFound);
     res.status(204).end();
