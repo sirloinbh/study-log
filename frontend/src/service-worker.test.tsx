@@ -1,11 +1,10 @@
 // Managed file. Edit it in sirloinbh/project-standards templates/ui/frontend/src/
-import { act, fireEvent, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import swSource from '../public/sw.js?raw';
 import { toast, Toaster } from './components/ui/sonner';
 import { registerServiceWorker, showUpdateNotice } from './service-worker';
-import { render } from './test/render';
 
 afterEach(() => {
   act(() => {
