@@ -38,8 +38,8 @@ test('a chapter of another textbook cannot be put on a schedule day', { skip: !u
     [mine.id],
   );
   const { rows: item } = await pool.query<{ id: number }>(
-    `INSERT INTO schedule_items (schedule_id, item_date, target_minutes)
-       VALUES ($1, '8051-03-07', 60) RETURNING id`,
+    `INSERT INTO schedule_items (schedule_id, item_date, original_date, target_minutes)
+       VALUES ($1, '8051-03-07', '8051-03-07', 60) RETURNING id`,
     [schedule[0].id],
   );
   const put = (book: { id: number; chapterId: number }) =>
