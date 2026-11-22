@@ -275,7 +275,7 @@ export function Textbooks() {
                       id="textbook-delete-confirm"
                       className="danger"
                       disabled={busy}
-                      aria-label={`${selected.title} textbook confirm deletion`}
+                      aria-label={`Confirm textbook deletion: ${selected.title}`}
                       onClick={() => void remove(selected.id)}
                     >
                       <ButtonSpinner when={action === 'delete'} />
@@ -285,7 +285,7 @@ export function Textbooks() {
                       type="button"
                       className="secondary"
                       disabled={busy}
-                      aria-label={`${selected.title} textbook cancel deletion`}
+                      aria-label={`Cancel textbook deletion: ${selected.title}`}
                       onClick={() => {
                         setConfirmingDelete(false);
                         setWantFocus('textbook-delete');
@@ -300,7 +300,7 @@ export function Textbooks() {
                       type="button"
                       className="secondary"
                       disabled={busy}
-                      aria-label={`${selected.title} textbook edit`}
+                      aria-label={`Edit textbook: ${selected.title}`}
                       onClick={() => edit(selected)}
                     >
                       Edit
@@ -310,7 +310,7 @@ export function Textbooks() {
                       id="textbook-delete"
                       className="secondary"
                       disabled={busy}
-                      aria-label={`${selected.title} textbook delete`}
+                      aria-label={`Delete textbook: ${selected.title}`}
                       onClick={() => {
                         setConfirmingDelete(true);
                         setWantFocus('textbook-delete-confirm');

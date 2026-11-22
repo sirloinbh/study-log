@@ -61,7 +61,7 @@ describe('study logs', () => {
   test('the list shows each log with its time, length and status', async () => {
     server([log]);
     render(<StudyLogs today={today} />);
-    await screen.findByRole('button', { name: /log delete$/ });
+    await screen.findByRole('button', { name: /Delete log/ });
     expect(recent().getByText('09:00–10:30')).toBeInTheDocument();
     expect(recent().getByText('1 h 30 min')).toBeInTheDocument();
     expect(recent().getByText('Done')).toBeInTheDocument();
@@ -89,9 +89,9 @@ describe('study logs', () => {
   test('deleting asks first, then the log leaves the list', async () => {
     const { sent } = server([log]);
     render(<StudyLogs today={today} />);
-    fireEvent.click(await screen.findByRole('button', { name: /log delete$/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /Delete log/ }));
     expect(sent).toEqual([]);
-    fireEvent.click(await screen.findByRole('button', { name: /log confirm deletion$/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /Confirm log deletion/ }));
     expect(await screen.findByText('No study logs yet')).toBeInTheDocument();
     expect(sent).toEqual([{ method: 'DELETE', path: '/api/study-logs/1' }]);
   });
@@ -184,7 +184,7 @@ describe('textbook contents', () => {
       'PUT /api/textbooks/7/contents/order': { body: { contents: [second, first] } },
     });
     render(<TextbookContents textbookId={7} />);
-    fireEvent.click(await screen.findByRole('button', { name: /행렬 move up$/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /Move up: .*행렬$/ }));
     await waitFor(() => expect(sent.length).toBe(1));
     expect(sent[0]).toEqual({
       method: 'PUT',
@@ -194,12 +194,12 @@ describe('textbook contents', () => {
     // The answered order is shown. Checked after the buttons are back: they are all disabled while
     // the save runs.
     await waitFor(() =>
-      expect(screen.getByRole('button', { name: /벡터 move up$/ })).toBeEnabled(),
+      expect(screen.getByRole('button', { name: /Move up: .*벡터$/ })).toBeEnabled(),
     );
     expect(
       [...document.querySelectorAll('.content-label')].map((label) => label.textContent),
     ).toEqual(['2 행렬', '1 벡터']);
-    expect(screen.getByRole('button', { name: /행렬 move up$/ })).toBeDisabled();
+    expect(screen.getByRole('button', { name: /Move up: .*행렬$/ })).toBeDisabled();
   });
 
   test('a refused move shows the server message', async () => {
@@ -210,7 +210,7 @@ describe('textbook contents', () => {
       'PUT /api/textbooks/7/contents/order': serverError,
     });
     render(<TextbookContents textbookId={7} />);
-    fireEvent.click(await screen.findByRole('button', { name: /행렬 move up$/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /Move up: .*행렬$/ }));
     expect(await screen.findByRole('alert')).toHaveTextContent('A server error occurred');
   });
 });

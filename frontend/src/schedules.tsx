@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useBusy } from './busy';
 import { type RequestError, requestJson } from './lib/api';
 import { ButtonSpinner, Loading } from './loading';
+import { plural } from './plural';
 import {
   dayLabel,
   dayNames,
@@ -531,7 +532,7 @@ export function Schedules({ today }: { today: string }) {
                           type="button"
                           id={`schedule-delete-confirm-${item.id}`}
                           className="danger"
-                          aria-label={`${item.title} confirm deletion`}
+                          aria-label={`Confirm deletion: ${item.title}`}
                           disabled={busy}
                           onClick={() => void remove(item.id)}
                         >
@@ -541,7 +542,7 @@ export function Schedules({ today }: { today: string }) {
                         <button
                           type="button"
                           className="secondary"
-                          aria-label={`${item.title} cancel deletion`}
+                          aria-label={`Cancel deletion: ${item.title}`}
                           disabled={busy}
                           onClick={() => {
                             setConfirming(undefined);
@@ -556,7 +557,7 @@ export function Schedules({ today }: { today: string }) {
                         type="button"
                         id={`schedule-delete-${item.id}`}
                         className="secondary"
-                        aria-label={`${item.title} delete`}
+                        aria-label={`Delete schedule: ${item.title}`}
                         disabled={busy}
                         onClick={() => {
                           setConfirming(item.id);
@@ -571,9 +572,9 @@ export function Schedules({ today }: { today: string }) {
                 <p className="status">
                   {item.textbookTitle && `${item.textbookTitle} · `}
                   {item.startDate} ~ {item.endDate}
-                  {item.delayDays > 0 && ` (${item.delayDays} days late)`} · progress{' '}
+                  {item.delayDays > 0 && ` (${plural(item.delayDays, 'day')} late)`} · progress{' '}
                   {item.progressPercent}% · goal {formatMinutes(item.totalMinutes)} ·{' '}
-                  {item.itemCount} days
+                  {plural(item.itemCount, 'day')}
                 </p>
               </li>
             ))}
@@ -645,7 +646,7 @@ export function Schedules({ today }: { today: string }) {
                     type="button"
                     id="schedule-rename"
                     className="secondary"
-                    aria-label={`${shownDetail.schedule.title} rename`}
+                    aria-label={`Rename schedule: ${shownDetail.schedule.title}`}
                     disabled={busy}
                     onClick={() => {
                       setDayNotice(undefined);
@@ -669,7 +670,8 @@ export function Schedules({ today }: { today: string }) {
                   <span className="status">
                     {formatMinutes(shownDetail.schedule.completedMinutes)} /{' '}
                     {formatMinutes(shownDetail.schedule.totalMinutes)} ·{' '}
-                    {shownDetail.schedule.completedCount} / {shownDetail.schedule.itemCount} days
+                    {shownDetail.schedule.completedCount} /{' '}
+                    {plural(shownDetail.schedule.itemCount, 'day')}
                   </span>
                 </p>
                 <div
@@ -702,8 +704,9 @@ export function Schedules({ today }: { today: string }) {
               </dl>
               {shownDetail.schedule.delayDays > 0 && (
                 <p className="status">
-                  Ends on {shownDetail.schedule.currentEndDate}, {shownDetail.schedule.delayDays}{' '}
-                  days after the originally planned end date {shownDetail.schedule.endDate}
+                  Ends on {shownDetail.schedule.currentEndDate},{' '}
+                  {plural(shownDetail.schedule.delayDays, 'day')} after the originally planned end
+                  date {shownDetail.schedule.endDate}
                 </p>
               )}
               <p role="status" className="status">
@@ -724,7 +727,7 @@ export function Schedules({ today }: { today: string }) {
                     <input
                       type="checkbox"
                       id={`schedule-day-check-${item.id}`}
-                      aria-label={`${names.get(item.id)} complete`}
+                      aria-label={`Complete day: ${names.get(item.id)}`}
                       checked={item.completedOn !== null}
                       disabled={busy}
                       onChange={() =>
@@ -745,7 +748,7 @@ export function Schedules({ today }: { today: string }) {
                         type="button"
                         id={`schedule-day-move-${item.id}`}
                         className="secondary"
-                        aria-label={`${names.get(item.id)} move`}
+                        aria-label={`Move day: ${names.get(item.id)}`}
                         disabled={busy}
                         onClick={() => {
                           setDayNotice(undefined);
@@ -759,7 +762,7 @@ export function Schedules({ today }: { today: string }) {
                     {moving?.id === item.id && !item.completedOn && (
                       <form
                         className="schedule-move"
-                        aria-label={`${names.get(item.id)} move`}
+                        aria-label={`Move day: ${names.get(item.id)}`}
                         onSubmit={(event) => {
                           event.preventDefault();
                           void moveDay(shownDetail.schedule.id, moving);

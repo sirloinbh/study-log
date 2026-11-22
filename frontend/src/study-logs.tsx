@@ -426,7 +426,7 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
                         id={`study-log-delete-confirm-${log.id}`}
                         className="danger"
                         disabled={busy}
-                        aria-label={`${describe(log)} log confirm deletion`}
+                        aria-label={`Confirm log deletion: ${describe(log)}`}
                         onClick={() => void remove(log.id)}
                       >
                         <ButtonSpinner when={action === 'delete'} />
@@ -436,7 +436,7 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
                         type="button"
                         className="secondary"
                         disabled={busy}
-                        aria-label={`${describe(log)} log cancel deletion`}
+                        aria-label={`Cancel log deletion: ${describe(log)}`}
                         onClick={() => {
                           setDeletingId(undefined);
                           setWantFocus(`study-log-delete-${log.id}`);
@@ -451,7 +451,7 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
                         type="button"
                         className="secondary"
                         disabled={busy}
-                        aria-label={`${describe(log)} log edit`}
+                        aria-label={`Edit log: ${describe(log)}`}
                         onClick={() => edit(log)}
                       >
                         Edit
@@ -461,7 +461,7 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
                         id={`study-log-delete-${log.id}`}
                         className="secondary"
                         disabled={busy}
-                        aria-label={`${describe(log)} log delete`}
+                        aria-label={`Delete log: ${describe(log)}`}
                         onClick={() => {
                           setDeletingId(log.id);
                           setWantFocus(`study-log-delete-confirm-${log.id}`);

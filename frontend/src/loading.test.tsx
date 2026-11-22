@@ -71,7 +71,7 @@ const spinners = () => document.querySelectorAll('[data-slot="spinner"]');
 test('saving spins on the save button only, and stops when done', async () => {
   const release = heldServer([log]);
   render(<StudyLogs today={today} />);
-  await screen.findByRole('button', { name: /delete$/ });
+  await screen.findByRole('button', { name: /Delete log/ });
   fireEvent.submit(document.querySelector('form')!);
   const save = document.querySelector<HTMLButtonElement>('form button[type="submit"]')!;
   await waitFor(() => expect(save.disabled).toBe(true));
@@ -84,8 +84,8 @@ test('saving spins on the save button only, and stops when done', async () => {
 test('deleting spins on the confirm button, not on save', async () => {
   const release = heldServer([log]);
   render(<StudyLogs today={today} />);
-  fireEvent.click(await screen.findByRole('button', { name: /delete$/ }));
-  const confirm = await screen.findByRole('button', { name: /confirm deletion$/ });
+  fireEvent.click(await screen.findByRole('button', { name: /Delete log/ }));
+  const confirm = await screen.findByRole('button', { name: /Confirm log deletion/ });
   fireEvent.click(confirm);
   await waitFor(() => expect(spinners().length).toBe(1));
   expect(confirm.contains(spinners()[0])).toBe(true);

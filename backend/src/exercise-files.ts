@@ -278,10 +278,10 @@ export function exerciseFileRoutes(
         );
         // No row points at the stored copy when refused, so it goes; if that fails too, the copy is
         // left over in the bucket, which costs storage but breaks nothing.
-        if (reply.status >= 400) await storage.remove(key).catch(() => undefined);
+        if (reply.status >= 400) await removeStoredFiles(storage, [key]);
         res.status(reply.status).json(reply.body);
       } catch (error) {
-        await storage.remove(key).catch(() => undefined);
+        await removeStoredFiles(storage, [key]);
         throw error;
       }
     } finally {
@@ -348,25 +348,22 @@ export function fileRoutes(pool: Pool, storage: FileStorage) {
     });
   });
 
-  // Removes the stored copy first: if that fails, nothing changes and the request can be repeated.
-  // Removing a copy that is already gone succeeds in S3.
+  // Deletes the row and commits, then removes the stored copy, as the other deletes do (#265, #335):
+  // a failed removal is logged as `orphaned_files` for the sweep and never leaves a row pointing at
+  // a missing file.
   router.delete('/:fileId', async (req, res) => {
     const fileId = parseId(req.params.fileId, 'file');
-    const { rows } = await pool.query<{ key: string }>(
-      'SELECT storage_key AS key FROM exercise_files WHERE id = $1',
-      [fileId],
-    );
-    if (rows.length === 0) return void res.status(404).json(fileNotFound);
-    try {
-      await storage.remove(rows[0].key);
-    } catch (error) {
-      return void storageFailed(error, res);
-    }
-    await inTransaction(pool, async (client) => {
-      const removed = await client.query('DELETE FROM exercise_files WHERE id = $1', [fileId]);
-      if (removed.rowCount)
-        await auditChange(req, res, client, 'delete', 'exercise_file', fileId, {});
+    const key = await inTransaction<string | undefined>(pool, async (client) => {
+      const removed = await client.query<{ key: string }>(
+        'DELETE FROM exercise_files WHERE id = $1 RETURNING storage_key AS key',
+        [fileId],
+      );
+      if (!removed.rowCount) return undefined;
+      await auditChange(req, res, client, 'delete', 'exercise_file', fileId, {});
+      return removed.rows[0].key;
     });
+    if (key === undefined) return void res.status(404).json(fileNotFound);
+    await removeStoredFiles(storage, [key]);
     res.status(204).end();
   });
 

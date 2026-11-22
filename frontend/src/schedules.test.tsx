@@ -347,44 +347,44 @@ describe('adjusting the days', () => {
   test('a day is completed and reopened, and focus stays on it', async () => {
     const { sent } = adjustable();
     await opened();
-    const check = days().getByRole('checkbox', { name: 'Mon, Mar 2 complete' });
+    const check = days().getByRole('checkbox', { name: 'Complete day: Mon, Mar 2' });
     expect(check).not.toBeChecked();
     fireEvent.click(check);
     await dayCard().findByText('Marked as done');
     expect(sent).toEqual([{ method: 'POST', path: '/api/schedules/1/items/10/complete' }]);
-    expect(days().getByRole('checkbox', { name: 'Mon, Mar 2 complete' })).toBeChecked();
+    expect(days().getByRole('checkbox', { name: 'Complete day: Mon, Mar 2' })).toBeChecked();
     expect(days().getByText('Mon, Mar 2').closest('li')).toHaveClass('done');
     await waitFor(() =>
-      expect(days().getByRole('checkbox', { name: 'Mon, Mar 2 complete' })).toHaveFocus(),
+      expect(days().getByRole('checkbox', { name: 'Complete day: Mon, Mar 2' })).toHaveFocus(),
     );
     // A completed day cannot be moved.
-    expect(days().queryByRole('button', { name: 'Mon, Mar 2 move' })).toBeNull();
+    expect(days().queryByRole('button', { name: 'Move day: Mon, Mar 2' })).toBeNull();
 
-    fireEvent.click(days().getByRole('checkbox', { name: 'Mon, Mar 2 complete' }));
+    fireEvent.click(days().getByRole('checkbox', { name: 'Complete day: Mon, Mar 2' }));
     await dayCard().findByText('Completion undone');
     expect(sent[1]).toEqual({ method: 'POST', path: '/api/schedules/1/items/10/reopen' });
-    expect(days().getByRole('button', { name: 'Mon, Mar 2 move' })).toBeInTheDocument();
+    expect(days().getByRole('button', { name: 'Move day: Mon, Mar 2' })).toBeInTheDocument();
   });
 
   test('a day moves alone unless asked, and can be cancelled', async () => {
     const { sent } = adjustable();
     await opened();
-    fireEvent.click(days().getByRole('button', { name: 'Sat, Mar 7 move' }));
+    fireEvent.click(days().getByRole('button', { name: 'Move day: Sat, Mar 7' }));
     expect(days().getByLabelText('Move to')).toHaveValue('2026-03-07');
     await waitFor(() => expect(days().getByLabelText('Move to')).toHaveFocus());
     fireEvent.click(days().getByRole('button', { name: 'Cancel' }));
     expect(days().queryByLabelText('Move to')).toBeNull();
     await waitFor(() =>
-      expect(days().getByRole('button', { name: 'Sat, Mar 7 move' })).toHaveFocus(),
+      expect(days().getByRole('button', { name: 'Move day: Sat, Mar 7' })).toHaveFocus(),
     );
     expect(sent).toEqual([]);
 
-    fireEvent.click(days().getByRole('button', { name: 'Sat, Mar 7 move' }));
+    fireEvent.click(days().getByRole('button', { name: 'Move day: Sat, Mar 7' }));
     fireEvent.change(days().getByLabelText('Move to'), { target: { value: '2026-03-10' } });
     fireEvent.submit(days().getByLabelText('Move to').closest('form')!);
     await dayCard().findByText('Moved the day');
     await waitFor(() =>
-      expect(days().getByRole('button', { name: 'Tue, Mar 10 move' })).toHaveFocus(),
+      expect(days().getByRole('button', { name: 'Move day: Tue, Mar 10' })).toHaveFocus(),
     );
     expect(sent).toEqual([
       {
@@ -400,7 +400,7 @@ describe('adjusting the days', () => {
   test('later days are taken along when asked', async () => {
     const { sent } = adjustable();
     await opened();
-    fireEvent.click(days().getByRole('button', { name: 'Mon, Mar 2 move' }));
+    fireEvent.click(days().getByRole('button', { name: 'Move day: Mon, Mar 2' }));
     fireEvent.change(days().getByLabelText('Move to'), { target: { value: '2026-03-04' } });
     fireEvent.click(days().getByLabelText('Move later days too'));
     fireEvent.submit(days().getByLabelText('Move to').closest('form')!);
@@ -416,7 +416,7 @@ describe('adjusting the days', () => {
       return { status: 400, body: { error: 'The date must be today or later' } };
     });
     await opened();
-    fireEvent.click(days().getByRole('button', { name: 'Mon, Mar 2 move' }));
+    fireEvent.click(days().getByRole('button', { name: 'Move day: Mon, Mar 2' }));
     fireEvent.submit(days().getByLabelText('Move to').closest('form')!);
     expect(await dayCard().findByRole('alert')).toHaveTextContent(
       'The date must be today or later',
@@ -444,10 +444,10 @@ describe('adjusting the days', () => {
     });
     render(<Schedules today={today} />);
     await screen.findByRole('heading', { level: 2, name: '새 일정' });
-    fireEvent.click(days().getByRole('checkbox', { name: 'Mon, Mar 2 complete' }));
+    fireEvent.click(days().getByRole('checkbox', { name: 'Complete day: Mon, Mar 2' }));
     await dayCard().findByText('Marked as done');
-    fireEvent.click(list().getByRole('button', { name: '새 일정 delete' }));
-    fireEvent.click(list().getByRole('button', { name: '새 일정 confirm deletion' }));
+    fireEvent.click(list().getByRole('button', { name: 'Delete schedule: 새 일정' }));
+    fireEvent.click(list().getByRole('button', { name: 'Confirm deletion: 새 일정' }));
     await screen.findByRole('heading', { level: 2, name: '지난 일정' });
     expect(dayCard().queryByText('Marked as done')).toBeNull();
   });
@@ -466,7 +466,7 @@ describe('adjusting the days', () => {
     });
     render(<Schedules today={today} />);
     await screen.findByRole('heading', { level: 2, name: '새 일정' });
-    fireEvent.click(days().getByRole('checkbox', { name: 'Mon, Mar 2 complete' }));
+    fireEvent.click(days().getByRole('checkbox', { name: 'Complete day: Mon, Mar 2' }));
     expect(await list().findByRole('alert')).toHaveTextContent('Schedule not found');
     // The next one opens, with nothing said about the one that is gone.
     await screen.findByRole('heading', { level: 2, name: '지난 일정' });
@@ -489,14 +489,14 @@ describe('adjusting the days', () => {
       return { status: 409, body: { error: 'A completed item cannot be moved' } };
     });
     await opened();
-    fireEvent.click(days().getByRole('button', { name: 'Mon, Mar 2 move' }));
+    fireEvent.click(days().getByRole('button', { name: 'Move day: Mon, Mar 2' }));
     fireEvent.submit(days().getByLabelText('Move to').closest('form')!);
     expect(await dayCard().findByRole('alert')).toHaveTextContent(
       'A completed item cannot be moved',
     );
     expect(days().queryByLabelText('Move to')).toBeNull();
     await waitFor(() =>
-      expect(days().getByRole('checkbox', { name: 'Mon, Mar 2 complete' })).toHaveFocus(),
+      expect(days().getByRole('checkbox', { name: 'Complete day: Mon, Mar 2' })).toHaveFocus(),
     );
   });
 
@@ -548,7 +548,7 @@ describe('adjusting the days', () => {
       return { body: detailOf(after) };
     });
     await opened();
-    fireEvent.click(days().getByRole('checkbox', { name: 'Mon, Mar 2 complete' }));
+    fireEvent.click(days().getByRole('checkbox', { name: 'Complete day: Mon, Mar 2' }));
     await waitFor(() =>
       expect(dayCard().getByRole('progressbar', { name: 'Schedule progress' })).toHaveAttribute(
         'aria-valuenow',
@@ -697,16 +697,18 @@ test('deleting asks first, and the next schedule opens', async () => {
   render(<Schedules today={today} />);
   await screen.findByRole('heading', { level: 2, name: '새 일정' });
 
-  fireEvent.click(list().getByRole('button', { name: '새 일정 delete' }));
+  fireEvent.click(list().getByRole('button', { name: 'Delete schedule: 새 일정' }));
   await waitFor(() =>
-    expect(list().getByRole('button', { name: '새 일정 confirm deletion' })).toHaveFocus(),
+    expect(list().getByRole('button', { name: 'Confirm deletion: 새 일정' })).toHaveFocus(),
   );
-  fireEvent.click(list().getByRole('button', { name: '새 일정 cancel deletion' }));
-  await waitFor(() => expect(list().getByRole('button', { name: '새 일정 delete' })).toHaveFocus());
+  fireEvent.click(list().getByRole('button', { name: 'Cancel deletion: 새 일정' }));
+  await waitFor(() =>
+    expect(list().getByRole('button', { name: 'Delete schedule: 새 일정' })).toHaveFocus(),
+  );
   expect(sent).toEqual([]);
 
-  fireEvent.click(list().getByRole('button', { name: '새 일정 delete' }));
-  fireEvent.click(list().getByRole('button', { name: '새 일정 confirm deletion' }));
+  fireEvent.click(list().getByRole('button', { name: 'Delete schedule: 새 일정' }));
+  fireEvent.click(list().getByRole('button', { name: 'Confirm deletion: 새 일정' }));
   await screen.findByRole('heading', { level: 2, name: '지난 일정' });
   expect(sent).toEqual([{ method: 'DELETE', path: '/api/schedules/2' }]);
   expect(list().queryByRole('button', { name: '새 일정' })).toBeNull();
@@ -719,12 +721,12 @@ test('a failed delete says why and leaves the schedule', async () => {
   server([schedule(1, '지난 일정')], { status: 500, body: { error: 'A server error occurred' } });
   render(<Schedules today={today} />);
   await screen.findByRole('heading', { level: 2, name: '지난 일정' });
-  fireEvent.click(list().getByRole('button', { name: '지난 일정 delete' }));
-  fireEvent.click(list().getByRole('button', { name: '지난 일정 confirm deletion' }));
+  fireEvent.click(list().getByRole('button', { name: 'Delete schedule: 지난 일정' }));
+  fireEvent.click(list().getByRole('button', { name: 'Confirm deletion: 지난 일정' }));
   expect(await list().findByRole('alert')).toHaveTextContent('A server error occurred');
   expect(list().getByRole('button', { name: '지난 일정' })).toBeInTheDocument();
   await waitFor(() =>
-    expect(list().getByRole('button', { name: '지난 일정 delete' })).toHaveFocus(),
+    expect(list().getByRole('button', { name: 'Delete schedule: 지난 일정' })).toHaveFocus(),
   );
 });
 
@@ -732,8 +734,8 @@ test('a schedule deleted elsewhere says so and focus goes to the list heading', 
   server([schedule(1, '지난 일정')], { status: 404, body: { error: 'Schedule not found' } });
   render(<Schedules today={today} />);
   await screen.findByRole('heading', { level: 2, name: '지난 일정' });
-  fireEvent.click(list().getByRole('button', { name: '지난 일정 delete' }));
-  fireEvent.click(list().getByRole('button', { name: '지난 일정 confirm deletion' }));
+  fireEvent.click(list().getByRole('button', { name: 'Delete schedule: 지난 일정' }));
+  fireEvent.click(list().getByRole('button', { name: 'Confirm deletion: 지난 일정' }));
   expect(await list().findByRole('alert')).toHaveTextContent('Schedule not found');
   await waitFor(() => expect(screen.getByRole('heading', { name: 'My schedules' })).toHaveFocus());
 });
@@ -752,8 +754,8 @@ test('a deleted schedule leaves at once, even when the list cannot be read again
   });
   render(<Schedules today={today} />);
   await screen.findByRole('heading', { level: 2, name: '새 일정' });
-  fireEvent.click(list().getByRole('button', { name: '새 일정 delete' }));
-  fireEvent.click(list().getByRole('button', { name: '새 일정 confirm deletion' }));
+  fireEvent.click(list().getByRole('button', { name: 'Delete schedule: 새 일정' }));
+  fireEvent.click(list().getByRole('button', { name: 'Confirm deletion: 새 일정' }));
   await list().findByText('Schedule deleted');
   expect(list().queryByRole('button', { name: '새 일정' })).toBeNull();
   expect(list().getByRole('button', { name: '지난 일정' })).toBeInTheDocument();
@@ -803,7 +805,7 @@ test('days already read stay when reading them again fails, and focus stays', as
   expect(days().getByText('Mon, Mar 2')).toBeInTheDocument();
 });
 
-test('typing takes back the last complaint, and a new schedule ends a pending delete', async () => {
+test('Delete schedule: typing takes back the last complaint, and a new schedule ends a pending', async () => {
   server([schedule(1, '지난 일정')]);
   render(<Schedules today={today} />);
   await screen.findByRole('heading', { level: 2, name: '지난 일정' });
@@ -814,10 +816,10 @@ test('typing takes back the last complaint, and a new schedule ends a pending de
   fill('Weekdays (hours)', '2');
   expect(form().queryByRole('alert')).toBeNull();
 
-  fireEvent.click(list().getByRole('button', { name: '지난 일정 delete' }));
+  fireEvent.click(list().getByRole('button', { name: 'Delete schedule: 지난 일정' }));
   submit();
   await screen.findByRole('heading', { level: 2, name: '알고리즘' });
-  expect(list().queryByRole('button', { name: '지난 일정 confirm deletion' })).toBeNull();
+  expect(list().queryByRole('button', { name: 'Confirm deletion: 지난 일정' })).toBeNull();
 });
 
 test('two submits at once make one schedule', async () => {
@@ -909,7 +911,7 @@ describe('renaming a schedule (#179)', () => {
   };
   const dayCard = () => within(screen.getByRole('region', { name: 'Schedule by date' }));
   const startRenaming = async () => {
-    fireEvent.click(dayCard().getByRole('button', { name: '지난 일정 rename' }));
+    fireEvent.click(dayCard().getByRole('button', { name: 'Rename schedule: 지난 일정' }));
     const input = dayCard().getByLabelText('New schedule name');
     await waitFor(() => expect(input).toHaveFocus());
     return input;
@@ -953,7 +955,7 @@ describe('renaming a schedule (#179)', () => {
     expect(dayCard().queryByLabelText('New schedule name')).toBeNull();
     expect(screen.getByRole('heading', { level: 2, name: '지난 일정' })).toBeInTheDocument();
     await waitFor(() =>
-      expect(dayCard().getByRole('button', { name: '지난 일정 rename' })).toHaveFocus(),
+      expect(dayCard().getByRole('button', { name: 'Rename schedule: 지난 일정' })).toHaveFocus(),
     );
     expect(sent).toEqual([]);
   });
@@ -1033,7 +1035,7 @@ describe('renaming a schedule (#179)', () => {
     fireEvent.change(input, { target: { value: '   ' } });
     save();
     await renameForm().findByRole('alert');
-    fireEvent.click(days().getByRole('button', { name: 'Sat, Mar 7 move' }));
+    fireEvent.click(days().getByRole('button', { name: 'Move day: Sat, Mar 7' }));
     // What was said about the name stays with it.
     expect(renameForm().getByRole('alert')).toHaveTextContent('Enter the schedule name');
     expect(dayCard().getAllByRole('button', { name: 'Cancel' })).toHaveLength(1);
