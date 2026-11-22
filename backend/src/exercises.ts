@@ -529,13 +529,26 @@ export function exerciseRoutes(pool: Pool, translator: Translator, storage: File
     );
     if (rows.length === 0) return void res.status(404).json(notFound);
     const source = rows[0];
+    // A request the person gave up on (tab closed) stops the paid call too, as for extraction, and
+    // frees its slot at once (#337).
+    const stop = new AbortController();
+    res.on('close', () => {
+      if (!res.writableFinished) stop.abort();
+    });
     let translated;
     try {
-      translated = await translator({ ...source, requestId: requestIdOf(res) });
+      translated = await translator({
+        ...source,
+        signal: stop.signal,
+        requestId: requestIdOf(res),
+      });
     } catch (error) {
+      if (stop.signal.aborted) return;
       if (!(error instanceof TranslationError)) throw error;
       return void res.status(error.status).json({ error: error.message });
     }
+    // Nothing is saved for a request that is gone.
+    if (stop.signal.aborted) return;
     try {
       await inTransaction(pool, async (client) => {
         await client.query(

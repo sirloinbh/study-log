@@ -8,6 +8,8 @@ import { callClaude } from './claude-call.js';
 export type TranslationSource = {
   body: string;
   answer: string | null;
+  // Aborts the call when the request that asked for it is gone (#337).
+  signal?: AbortSignal;
   // Written to the usage log line (#245) when the caller has it.
   requestId?: string;
 };
@@ -79,6 +81,7 @@ export function claudeTranslator(client?: Anthropic): Translator {
         feature: 'translation',
         model: translationModel,
         requestId: source.requestId,
+        signal: source.signal,
         fail: (status, message) => new TranslationError(status, message),
         refusal: 'This content cannot be translated',
         tooLong: 'The translation was too long to receive in full',
