@@ -16,6 +16,22 @@ import {
 } from '../src/stats.js';
 import { withApi } from './helpers.js';
 
+// A pool whose connections run `query`, and that records the transaction statements (#269).
+const statements: string[] = [];
+const snapshotPool = (query: (sql: string, params: never) => Promise<unknown>) => {
+  const client = {
+    query: async (sql: string, params?: never) => {
+      if (/^(BEGIN|COMMIT|ROLLBACK|SET TRANSACTION)/.test(sql)) {
+        statements.push(sql);
+        return { rows: [] };
+      }
+      return query(sql, params as never);
+    },
+    release: () => {},
+  };
+  return { connect: async () => client, query: client.query } as unknown as Pool;
+};
+
 test('the completion rate is a whole percent, and none without anything scheduled', () => {
   assert.equal(completionRate(0, 0), null);
   assert.equal(completionRate(0, 4), 0);
@@ -97,12 +113,11 @@ test('an unknown period is an English 400 before touching the DB', async () => {
 });
 
 test('without any logs the totals are zero and averages do not divide by zero', async () => {
-  const pool = {
-    query: async (sql: string, params: string[]) =>
-      sql.includes('generate_series')
-        ? { rows: [{ date: params[0], minutes: 0 }] }
-        : { rows: [{ first: null, cumulative: 0 }] },
-  } as unknown as Pool;
+  const pool = snapshotPool(async (sql: string, params: string[]) =>
+    sql.includes('generate_series')
+      ? { rows: [{ date: params[0], minutes: 0 }] }
+      : { rows: [{ first: null, cumulative: 0 }] },
+  );
   await withApi(
     pool,
     async (call) => {
@@ -119,14 +134,12 @@ test('without any logs the totals are zero and averages do not divide by zero', 
 
 test('all time of a study type without logs is just today, and the type reaches the queries (#52)', async () => {
   const sent: unknown[][] = [];
-  const pool = {
-    query: async (sql: string, params: unknown[]) => {
-      sent.push(params);
-      return sql.includes('generate_series')
-        ? { rows: [{ date: params[0], minutes: 0 }] }
-        : { rows: [{ first: null, cumulative: 0 }] };
-    },
-  } as unknown as Pool;
+  const pool = snapshotPool(async (sql: string, params: unknown[]) => {
+    sent.push(params);
+    return sql.includes('generate_series')
+      ? { rows: [{ date: params[0], minutes: 0 }] }
+      : { rows: [{ first: null, cumulative: 0 }] };
+  });
   await withApi(
     pool,
     async (call) => {
@@ -225,4 +238,48 @@ test('without dates the pattern covers the last 3 months', async () => {
     },
     { today: () => '2026-10-23' },
   );
+});
+
+test('study-time reads every query of one response on one REPEATABLE READ snapshot (#269)', async () => {
+  statements.length = 0;
+  const pool = snapshotPool(async (sql, params: unknown[]) =>
+    sql.includes('generate_series')
+      ? { rows: [{ date: params[0], minutes: 0 }] }
+      : { rows: [{ first: null, cumulative: 0 }] },
+  );
+  await withApi(
+    pool,
+    async (call) => {
+      assert.equal((await call('/api/stats/study-time?period=all')).status, 200);
+    },
+    { today: () => '2026-10-23' },
+  );
+  assert.deepEqual(statements, [
+    'BEGIN',
+    'SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY',
+    'COMMIT',
+  ]);
+});
+
+test('the textbook stats read today once and on one snapshot (#269)', async () => {
+  statements.length = 0;
+  const dates: unknown[] = [];
+  let calls = 0;
+  const pool = snapshotPool(async (sql, params: unknown[]) => {
+    dates.push(params[1]);
+    return sql.includes('FROM textbooks b')
+      ? { rows: [] }
+      : { rows: [{ plannedMinutes: 0, achievedMinutes: 0, dueDays: 0, onTimeDays: 0 }] };
+  });
+  await withApi(
+    pool,
+    async (call) => {
+      assert.equal((await call('/api/stats/textbooks')).status, 200);
+    },
+    {
+      today: () => ['2026-10-23', '2026-10-24'][calls++ % 2],
+    },
+  );
+  assert.deepEqual(dates, ['2026-10-23', '2026-10-23']);
+  assert.equal(statements[1], 'SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY');
 });

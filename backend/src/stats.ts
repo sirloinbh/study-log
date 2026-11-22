@@ -1,8 +1,9 @@
 import { Router } from 'express';
-import type { Pool } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod/v4';
 
 import { calendarDate } from './dates.js';
+import { inSnapshot } from './sql.js';
 import { studyTypes } from './study-logs.js';
 
 export const statPeriods = ['week', 'month', '3months', 'all'] as const;
@@ -83,7 +84,7 @@ const counted = `status <> 'planned' AND study_date <= $1`;
 // Minutes studied on every day from `from` to `to`, a day without study as 0; only one kind of
 // study when `studyType` is given, and only one textbook's logs when `textbookId` is.
 const dailyMinutes = async (
-  pool: Pool,
+  pool: Pick<Pool | PoolClient, 'query'>,
   from: string,
   to: string,
   studyType: string | null = null,
@@ -175,21 +176,25 @@ export function statsRoutes(pool: Pool, today: () => string) {
     const { period, type, textbookId } = studyTimeQuery.parse(req.query);
     const studyType = type === 'all' ? null : type;
     const bookId = textbookId ?? null;
-    // A book with no logs shows zeros; one that does not exist is not that.
-    if (bookId !== null) {
-      const book = await pool.query('SELECT 1 FROM textbooks WHERE id = $1', [bookId]);
-      if (!book.rowCount) return void res.status(404).json({ error: 'Textbook not found' });
-    }
     const to = today();
-    const totals = await pool.query<{ first: string | null; cumulative: number }>(
-      `SELECT min(study_date) AS first, COALESCE(sum(duration_minutes), 0)::int AS cumulative
-       FROM study_logs WHERE ${counted} AND ($2::text IS NULL OR study_type = $2)
-         AND ($3::bigint IS NULL OR textbook_id = $3)`,
-      [to, studyType, bookId],
-    );
-    const { first, cumulative } = totals.rows[0];
-    const from = periodStart(period, to, first ?? undefined);
-    const daily = await dailyMinutes(pool, from, to, studyType, bookId);
+    const result = await inSnapshot(pool, async (db) => {
+      // A book with no logs shows zeros; one that does not exist is not that.
+      if (bookId !== null) {
+        const book = await db.query('SELECT 1 FROM textbooks WHERE id = $1', [bookId]);
+        if (!book.rowCount) return null;
+      }
+      const totals = await db.query<{ first: string | null; cumulative: number }>(
+        `SELECT min(study_date) AS first, COALESCE(sum(duration_minutes), 0)::int AS cumulative
+         FROM study_logs WHERE ${counted} AND ($2::text IS NULL OR study_type = $2)
+           AND ($3::bigint IS NULL OR textbook_id = $3)`,
+        [to, studyType, bookId],
+      );
+      const { first, cumulative } = totals.rows[0];
+      const from = periodStart(period, to, first ?? undefined);
+      return { from, cumulative, daily: await dailyMinutes(db, from, to, studyType, bookId) };
+    });
+    if (!result) return void res.status(404).json({ error: 'Textbook not found' });
+    const { from, cumulative, daily } = result;
     const totalMinutes = daily.reduce((sum, day) => sum + day.minutes, 0);
     const studyDays = daily.filter((day) => day.minutes > 0).length;
     res.json({
@@ -263,8 +268,10 @@ export function statsRoutes(pool: Pool, today: () => string) {
   router.get('/textbooks', async (req, res) => {
     const { textbookId } = textbookQuery.parse(req.query);
     const id = textbookId ?? null;
-    const { rows: textbooks } = await pool.query(
-      `WITH RECURSIVE tree AS (
+    const day = today();
+    const found = await inSnapshot(pool, async (db) => {
+      const { rows: textbooks } = await db.query(
+        `WITH RECURSIVE tree AS (
          SELECT textbook_id, id, id AS chapter_id FROM textbook_contents WHERE parent_id IS NULL
          UNION ALL
          SELECT c.textbook_id, c.id, t.chapter_id
@@ -279,17 +286,16 @@ export function statsRoutes(pool: Pool, today: () => string) {
            AS "completedChapters"
        FROM textbooks b WHERE ($1::bigint IS NULL OR b.id = $1)
        ORDER BY b.title, b.id`,
-      [id, today()],
-    );
-    if (id !== null && textbooks.length === 0)
-      return void res.status(404).json({ error: 'Textbook not found' });
-    const { rows } = await pool.query<{
-      plannedMinutes: number;
-      achievedMinutes: number;
-      dueDays: number;
-      onTimeDays: number;
-    }>(
-      `SELECT COALESCE(sum(i.target_minutes), 0)::int AS "plannedMinutes",
+        [id, day],
+      );
+      if (id !== null && textbooks.length === 0) return null;
+      const { rows } = await db.query<{
+        plannedMinutes: number;
+        achievedMinutes: number;
+        dueDays: number;
+        onTimeDays: number;
+      }>(
+        `SELECT COALESCE(sum(i.target_minutes), 0)::int AS "plannedMinutes",
          COALESCE(sum(i.target_minutes) FILTER (WHERE i.completed_on IS NOT NULL), 0)::int
            AS "achievedMinutes",
          count(*)::int AS "dueDays",
@@ -298,8 +304,12 @@ export function statsRoutes(pool: Pool, today: () => string) {
        WHERE ($1::bigint IS NULL OR s.textbook_id = $1)
          AND (i.original_date < $2::date
            OR (i.original_date = $2::date AND i.completed_on IS NOT NULL))`,
-      [id, today()],
-    );
+        [id, day],
+      );
+      return { textbooks, rows };
+    });
+    if (!found) return void res.status(404).json({ error: 'Textbook not found' });
+    const { textbooks, rows } = found;
     const { plannedMinutes, achievedMinutes, dueDays, onTimeDays } = rows[0];
     res.json({
       textbooks,

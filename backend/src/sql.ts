@@ -27,3 +27,11 @@ export async function inTransaction<T>(
     throw error;
   }
 }
+
+// Runs read-only `run` on one snapshot (REPEATABLE READ), so the several queries of one response
+// all see the same rows (#269).
+export const inSnapshot = <T>(pool: Pool, run: (client: PoolClient) => Promise<T>) =>
+  inTransaction(pool, async (client) => {
+    await client.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY');
+    return run(client);
+  });
