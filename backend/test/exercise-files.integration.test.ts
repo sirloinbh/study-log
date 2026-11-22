@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { Readable } from 'node:stream';
 import { test } from 'node:test';
 
 import { Pool } from 'pg';
@@ -31,7 +32,7 @@ function memoryStorage() {
     get: async (key) => {
       const object = objects.get(key);
       if (!object) throw new FileStorageError(404, 'The stored file is missing');
-      return object.body;
+      return Readable.from([object.body]);
     },
     remove: async (key) => {
       if (failing.remove) throw new FileStorageError(502, 'File storage error');
