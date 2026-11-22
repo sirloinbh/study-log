@@ -4,9 +4,13 @@
 // The module is loaded at run time, so this file compiles in an app whose openapi.ts does not export `document` yet.
 import { writeFile } from 'node:fs/promises';
 
-const { document } = (await import('../openapi.js')) as { document?: { paths: Record<string, unknown> } };
+const { document } = (await import('../openapi.js')) as {
+  document?: { paths: Record<string, unknown> };
+};
 if (!document) {
-  console.error('backend/src/openapi.ts must export `document` (buildOpenApi from ./standard/openapi.js).');
+  console.error(
+    'backend/src/openapi.ts must export `document` (buildOpenApi from ./standard/openapi.js).',
+  );
   process.exit(1);
 }
 

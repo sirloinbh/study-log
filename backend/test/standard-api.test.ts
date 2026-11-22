@@ -25,7 +25,10 @@ test('a test server listens again when it is given a port that fetch refuses', a
 
 test('fetch still refuses the ports the helper stays away from', async () => {
   assert.ok(fetchBlockedPorts.has(6000));
-  await assert.rejects(fetch('http://127.0.0.1:6000/'), (error: TypeError) => (error.cause as Error).message === 'bad port');
+  await assert.rejects(
+    fetch('http://127.0.0.1:6000/'),
+    (error: TypeError) => (error.cause as Error).message === 'bad port',
+  );
 });
 
 test('withApi sends JSON, returns status, data, headers and bytes, and treats 204 and non-JSON as no data', async () => {
@@ -35,7 +38,14 @@ test('withApi sends JSON, returns status, data, headers and bytes, and treats 20
       req.on('data', (chunk: Buffer) => (raw += chunk.toString()));
       req.on('end', () => {
         res.setHeader('content-type', 'application/json');
-        res.end(JSON.stringify({ method: req.method, type: req.headers['content-type'], raw, trace: req.headers['x-trace'] }));
+        res.end(
+          JSON.stringify({
+            method: req.method,
+            type: req.headers['content-type'],
+            raw,
+            trace: req.headers['x-trace'],
+          }),
+        );
       });
     } else if (req.url === '/empty') {
       res.statusCode = 204;
@@ -45,12 +55,25 @@ test('withApi sends JSON, returns status, data, headers and bytes, and treats 20
     }
   };
   await withApi(app, async (call) => {
-    const echoed = await call('/echo', { method: 'POST', body: { a: 1 }, headers: { 'x-trace': 't1' } });
+    const echoed = await call('/echo', {
+      method: 'POST',
+      body: { a: 1 },
+      headers: { 'x-trace': 't1' },
+    });
     assert.equal(echoed.status, 200);
-    assert.deepEqual(echoed.data, { method: 'POST', type: 'application/json', raw: '{"a":1}', trace: 't1' });
+    assert.deepEqual(echoed.data, {
+      method: 'POST',
+      type: 'application/json',
+      raw: '{"a":1}',
+      trace: 't1',
+    });
     assert.equal(echoed.headers.get('content-type'), 'application/json');
 
-    const raw = await call('/echo', { method: 'PUT', rawBody: '{bad', contentType: 'application/json' });
+    const raw = await call('/echo', {
+      method: 'PUT',
+      rawBody: '{bad',
+      contentType: 'application/json',
+    });
     assert.equal(raw.data.raw, '{bad');
 
     const empty = await call('/empty', { method: 'DELETE' });

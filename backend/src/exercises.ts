@@ -1,7 +1,8 @@
-import { type Response, Router } from 'express';
+import { type Request, type Response, Router } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod/v4';
 
+import { auditChange } from './audit-log.js';
 import { detectFormat, receive, removeStoredFiles, storedKeys } from './exercise-files.js';
 import { ExtractionError, extractionLimit, type Extractor } from './extraction.js';
 import type { FileStorage } from './file-storage.js';
@@ -156,11 +157,19 @@ export function contentExerciseRoutes(pool: Pool, extractor: Extractor) {
     const { textbookId, contentId } = target(req.params);
     const exercise = exerciseInput.parse(req.body);
     try {
-      const { rows } = await pool.query(
-        `INSERT INTO exercises (textbook_id, content_id, number, body, important)
-         VALUES ($1, $2, $3, $4, $5) RETURNING ${columns}`,
-        [textbookId, contentId, exercise.number, exercise.body, exercise.important],
-      );
+      const { rows } = await inTransaction(pool, async (client) => {
+        const added = await client.query(
+          `INSERT INTO exercises (textbook_id, content_id, number, body, important)
+           VALUES ($1, $2, $3, $4, $5) RETURNING ${columns}`,
+          [textbookId, contentId, exercise.number, exercise.body, exercise.important],
+        );
+        await auditChange(req, res, client, 'create', 'exercise', added.rows[0].id, {
+          textbookId,
+          contentId,
+          number: exercise.number,
+        });
+        return added;
+      });
       res.status(201).json({ exercise: rows[0] });
     } catch (error) {
       // A chapter that does not exist, or belongs to another textbook, fails the foreign key.
@@ -245,6 +254,11 @@ export function contentExerciseRoutes(pool: Pool, extractor: Extractor) {
           `SELECT ${columns} FROM exercises WHERE textbook_id = $1 AND content_id = $2 ORDER BY id`,
           [textbookId, contentId],
         );
+        await auditChange(req, res, client, 'create', 'exercise', null, {
+          textbookId,
+          contentId,
+          saved: exercises.length,
+        });
         return { status: 201, body: { exercises: rows } };
       },
       (reply) => reply.status < 400,
@@ -285,6 +299,11 @@ export function contentExerciseRoutes(pool: Pool, extractor: Extractor) {
            ON CONFLICT (exercise_id) DO UPDATE SET body = EXCLUDED.body, updated_at = now()`,
           [ids, answers.map((answer) => answer.body)],
         );
+        await auditChange(req, res, client, 'update', 'exercise_answer', null, {
+          textbookId,
+          contentId,
+          exerciseIds: ids,
+        });
         return { status: 200, body: { saved: answers.length } };
       },
       (reply) => reply.status < 400,
@@ -356,11 +375,16 @@ export function exerciseRoutes(pool: Pool, translator: Translator, storage: File
   router.put('/:id', async (req, res) => {
     const id = parseId(req.params.id, 'exercise');
     const exercise = exerciseInput.parse(req.body);
-    const { rows } = await pool.query(
-      `UPDATE exercises SET number = $2, body = $3, important = $4, updated_at = now()
-       WHERE id = $1 RETURNING ${columns}`,
-      [id, exercise.number, exercise.body, exercise.important],
-    );
+    const { rows } = await inTransaction(pool, async (client) => {
+      const changed = await client.query(
+        `UPDATE exercises SET number = $2, body = $3, important = $4, updated_at = now()
+         WHERE id = $1 RETURNING ${columns}`,
+        [id, exercise.number, exercise.body, exercise.important],
+      );
+      if (changed.rows[0])
+        await auditChange(req, res, client, 'update', 'exercise', id, { number: exercise.number });
+      return changed;
+    });
     if (rows.length === 0) return void res.status(404).json(notFound);
     res.json({ exercise: rows[0] });
   });
@@ -369,10 +393,15 @@ export function exerciseRoutes(pool: Pool, translator: Translator, storage: File
   router.patch('/:id/important', async (req, res) => {
     const id = parseId(req.params.id, 'exercise');
     const { important } = importantInput.parse(req.body);
-    const { rows } = await pool.query(
-      `UPDATE exercises SET important = $2, updated_at = now() WHERE id = $1 RETURNING ${columns}`,
-      [id, important],
-    );
+    const { rows } = await inTransaction(pool, async (client) => {
+      const changed = await client.query(
+        `UPDATE exercises SET important = $2, updated_at = now() WHERE id = $1 RETURNING ${columns}`,
+        [id, important],
+      );
+      if (changed.rows[0])
+        await auditChange(req, res, client, 'update', 'exercise', id, { important });
+      return changed;
+    });
     if (rows.length === 0) return void res.status(404).json(notFound);
     res.json({ exercise: rows[0] });
   });
@@ -388,6 +417,7 @@ export function exerciseRoutes(pool: Pool, translator: Translator, storage: File
         const stored = await storedKeys(client, { exerciseId: id });
         const { rowCount } = await client.query('DELETE FROM exercises WHERE id = $1', [id]);
         if (!rowCount) return { status: 404, body: notFound };
+        await auditChange(req, res, client, 'delete', 'exercise', id, {});
         keys = stored;
         return { status: 204 };
       },
@@ -416,12 +446,16 @@ export function exerciseRoutes(pool: Pool, translator: Translator, storage: File
     const id = parseId(req.params.id, 'exercise');
     const { body } = answerInput.parse(req.body);
     try {
-      const { rows } = await pool.query(
-        `INSERT INTO exercise_answers (exercise_id, body) VALUES ($1, $2)
-         ON CONFLICT (exercise_id) DO UPDATE SET body = EXCLUDED.body, updated_at = now()
-         RETURNING exercise_id AS "exerciseId", body`,
-        [id, body],
-      );
+      const { rows } = await inTransaction(pool, async (client) => {
+        const saved = await client.query(
+          `INSERT INTO exercise_answers (exercise_id, body) VALUES ($1, $2)
+           ON CONFLICT (exercise_id) DO UPDATE SET body = EXCLUDED.body, updated_at = now()
+           RETURNING exercise_id AS "exerciseId", body`,
+          [id, body],
+        );
+        await auditChange(req, res, client, 'update', 'exercise_answer', id, { exerciseId: id });
+        return saved;
+      });
       res.json({ answer: rows[0] });
     } catch (error) {
       // The exercise does not exist (or was just deleted): its foreign key fails.
@@ -457,13 +491,13 @@ export function exerciseRoutes(pool: Pool, translator: Translator, storage: File
       return void res.status(409).json({ error: 'This problem is already being translated' });
     translating.add(id);
     try {
-      await translate(id, res);
+      await translate(id, req, res);
     } finally {
       translating.delete(id);
     }
   });
 
-  const translate = async (id: number, res: Response) => {
+  const translate = async (id: number, req: Request, res: Response) => {
     const { rows } = await pool.query<{ body: string; answer: string | null }>(
       `SELECT e.body, a.body AS answer FROM exercises e
        LEFT JOIN exercise_answers a ON a.exercise_id = e.id WHERE e.id = $1`,
@@ -479,15 +513,21 @@ export function exerciseRoutes(pool: Pool, translator: Translator, storage: File
       return void res.status(error.status).json({ error: error.message });
     }
     try {
-      await pool.query(
-        `INSERT INTO exercise_translations
-           (exercise_id, body, answer, source_body, source_answer, model)
-         VALUES ($1, $2, $3, $4, $5, $6)
-         ON CONFLICT (exercise_id) DO UPDATE SET body = EXCLUDED.body, answer = EXCLUDED.answer,
-           source_body = EXCLUDED.source_body, source_answer = EXCLUDED.source_answer,
-           model = EXCLUDED.model, updated_at = now()`,
-        [id, translated.body, translated.answer, source.body, source.answer, translated.model],
-      );
+      await inTransaction(pool, async (client) => {
+        await client.query(
+          `INSERT INTO exercise_translations
+             (exercise_id, body, answer, source_body, source_answer, model)
+           VALUES ($1, $2, $3, $4, $5, $6)
+           ON CONFLICT (exercise_id) DO UPDATE SET body = EXCLUDED.body, answer = EXCLUDED.answer,
+             source_body = EXCLUDED.source_body, source_answer = EXCLUDED.source_answer,
+             model = EXCLUDED.model, updated_at = now()`,
+          [id, translated.body, translated.answer, source.body, source.answer, translated.model],
+        );
+        await auditChange(req, res, client, 'update', 'exercise_translation', id, {
+          exerciseId: id,
+          model: translated.model,
+        });
+      });
     } catch (error) {
       // The exercise was deleted while it was being translated.
       if ((error as { code?: string }).code !== '23503') throw error;
@@ -505,9 +545,14 @@ export function exerciseRoutes(pool: Pool, translator: Translator, storage: File
 
   router.delete('/:id/answer', async (req, res) => {
     const id = parseId(req.params.id, 'exercise');
-    const { rowCount } = await pool.query('DELETE FROM exercise_answers WHERE exercise_id = $1', [
-      id,
-    ]);
+    const rowCount = await inTransaction(pool, async (client) => {
+      const removed = await client.query('DELETE FROM exercise_answers WHERE exercise_id = $1', [
+        id,
+      ]);
+      if (removed.rowCount)
+        await auditChange(req, res, client, 'delete', 'exercise_answer', id, { exerciseId: id });
+      return removed.rowCount;
+    });
     if (rowCount) return void res.status(204).end();
     // Nothing deleted: say whether the exercise or only its answer is missing.
     const exercise = await pool.query('SELECT 1 FROM exercises WHERE id = $1', [id]);

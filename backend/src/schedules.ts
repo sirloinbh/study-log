@@ -1,7 +1,8 @@
-import { type Response, Router } from 'express';
+import { type Request, type Response, Router } from 'express';
 import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod/v4';
 
+import { auditChange } from './audit-log.js';
 import { calendarDate, datePlusDays, isCalendarDate } from './dates.js';
 import { dayKind, HolidayError, type HolidayFetcher, loadHolidays } from './holidays.js';
 import { inTransaction } from './sql.js';
@@ -252,8 +253,9 @@ export function scheduleRoutes(pool: Pool, today: () => string, fetcher: Holiday
   // dates being shown. A reply of 4xx changes nothing.
   type ItemState = { date: string; completedOn: string | null };
   const changeItem = async (
-    params: Record<string, string>,
+    req: Request,
     res: Response,
+    what: string,
     change: (
       client: PoolClient,
       id: number,
@@ -261,8 +263,8 @@ export function scheduleRoutes(pool: Pool, today: () => string, fetcher: Holiday
       date: string,
     ) => Promise<Reply | void>,
   ) => {
-    const scheduleId = parseId(params.id, 'schedule');
-    const itemId = parseId(params.itemId, 'schedule item');
+    const scheduleId = parseId(req.params.id, 'schedule');
+    const itemId = parseId(req.params.itemId, 'schedule item');
     const date = today();
     const reply = await inTransaction<Reply>(
       pool,
@@ -280,6 +282,10 @@ export function scheduleRoutes(pool: Pool, today: () => string, fetcher: Holiday
         if (!found.rows[0]) return { status: 404, body: itemNotFound };
         const refused = await change(client, itemId, found.rows[0], date);
         if (refused) return refused;
+        await auditChange(req, res, client, 'update', 'schedule_item', itemId, {
+          scheduleId,
+          change: what,
+        });
         return { status: 200, body: await loadSchedule(client, scheduleId) };
       },
       (result) => result.status < 400,
@@ -288,7 +294,7 @@ export function scheduleRoutes(pool: Pool, today: () => string, fetcher: Holiday
   };
 
   router.post('/:id/items/:itemId/complete', (req, res) =>
-    changeItem(req.params, res, async (client, id, item, date) => {
+    changeItem(req, res, 'complete', async (client, id, item, date) => {
       if (item.completedOn)
         return { status: 409, body: { error: 'This item is already completed' } };
       // A day reopened from the past goes back to its date and the day it was done, as if never
@@ -305,7 +311,7 @@ export function scheduleRoutes(pool: Pool, today: () => string, fetcher: Holiday
   );
 
   router.post('/:id/items/:itemId/reopen', (req, res) =>
-    changeItem(req.params, res, async (client, id, item, date) => {
+    changeItem(req, res, 'reopen', async (client, id, item, date) => {
       if (!item.completedOn) return { status: 409, body: { error: 'This item is not completed' } };
       // A day already past comes to today by itself: one mistaken click must not push the whole
       // schedule by however long ago it was done. Where it was is kept, so completing it again
@@ -323,7 +329,7 @@ export function scheduleRoutes(pool: Pool, today: () => string, fetcher: Holiday
 
   router.put('/:id/items/:itemId/date', async (req, res) => {
     const input = moveInput.parse(req.body);
-    await changeItem(req.params, res, async (client, id, item, today) => {
+    await changeItem(req, res, 'move', async (client, id, item, today) => {
       if (item.completedOn)
         return { status: 409, body: { error: 'A completed item cannot be moved' } };
       if (input.date < today)
@@ -468,6 +474,11 @@ export function scheduleRoutes(pool: Pool, today: () => string, fetcher: Holiday
           ],
         );
       }
+      await auditChange(req, res, client, 'create', 'schedule', rows[0].id, {
+        title: input.title,
+        startDate: input.startDate,
+        endDate: input.endDate,
+      });
       return { status: 201, body: await loadSchedule(client, rows[0].id) };
     });
     res.status(reply.status).json(reply.body);
@@ -476,11 +487,16 @@ export function scheduleRoutes(pool: Pool, today: () => string, fetcher: Holiday
   router.put('/:id', async (req, res) => {
     const id = parseId(req.params.id, 'schedule');
     const input = scheduleUpdateInput.parse(req.body);
-    const { rowCount } = await pool.query(
-      'UPDATE schedules SET title = $2, updated_at = now() WHERE id = $1',
-      [id, input.title],
-    );
-    if (!rowCount) return void res.status(404).json(notFound);
+    const updated = await inTransaction(pool, async (client) => {
+      const changed = await client.query(
+        'UPDATE schedules SET title = $2, updated_at = now() WHERE id = $1',
+        [id, input.title],
+      );
+      if (changed.rowCount)
+        await auditChange(req, res, client, 'update', 'schedule', id, { title: input.title });
+      return changed.rowCount;
+    });
+    if (!updated) return void res.status(404).json(notFound);
     await catchUp(pool, today(), id);
     // Deleted right after the update, by another tab.
     const found = await loadSchedule(pool, id);
@@ -490,10 +506,16 @@ export function scheduleRoutes(pool: Pool, today: () => string, fetcher: Holiday
 
   // Its items go with it.
   router.delete('/:id', async (req, res) => {
-    const { rowCount } = await pool.query('DELETE FROM schedules WHERE id = $1', [
-      parseId(req.params.id, 'schedule'),
-    ]);
-    if (!rowCount) return void res.status(404).json(notFound);
+    const id = parseId(req.params.id, 'schedule');
+    const deleted = await inTransaction(pool, async (client) => {
+      const removed = await client.query('DELETE FROM schedules WHERE id = $1 RETURNING title', [
+        id,
+      ]);
+      if (removed.rows[0])
+        await auditChange(req, res, client, 'delete', 'schedule', id, removed.rows[0]);
+      return removed.rowCount;
+    });
+    if (!deleted) return void res.status(404).json(notFound);
     res.status(204).end();
   });
 

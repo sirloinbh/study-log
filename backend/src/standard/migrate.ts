@@ -31,7 +31,8 @@ try {
   if (flags.includes('--status')) {
     const status = await migrationStatus(client, files);
     const done = new Set(status.applied.map((row) => row.name));
-    for (const file of files) console.log(`${done.has(file.name) ? 'applied' : 'pending'}  ${file.name}`);
+    for (const file of files)
+      console.log(`${done.has(file.name) ? 'applied' : 'pending'}  ${file.name}`);
     for (const error of status.errors) console.error(`error  ${error}`);
     process.exitCode = status.errors.length ? 1 : 0;
   } else {

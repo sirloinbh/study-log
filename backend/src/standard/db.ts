@@ -38,7 +38,9 @@ export function createPool<P extends PoolEvents>(
   log: (message: string, err: Error) => void = (message, err) => console.error(message, err),
 ): P {
   pool.on('error', () => undefined);
-  pool.on('connect', (client) => client.on('error', (err) => log('Database connection failed', err)));
+  pool.on('connect', (client) =>
+    client.on('error', (err) => log('Database connection failed', err)),
+  );
   return pool;
 }
 
@@ -48,7 +50,10 @@ export function createPool<P extends PoolEvents>(
  * it instead of putting it back in the pool.
  */
 export function withTransaction<T>(pool: Pool, fn: (client: PoolClient) => Promise<T>): Promise<T>;
-export function withTransaction<T, C extends TxClient>(pool: Pick<PoolLike<C>, 'connect'>, fn: (client: C) => Promise<T>): Promise<T>;
+export function withTransaction<T, C extends TxClient>(
+  pool: Pick<PoolLike<C>, 'connect'>,
+  fn: (client: C) => Promise<T>,
+): Promise<T>;
 export async function withTransaction<T, C extends TxClient>(
   pool: Pick<PoolLike<C>, 'connect'>,
   fn: (client: C) => Promise<T>,
@@ -86,7 +91,8 @@ export const INT8_OID = 20;
 export function setInt8Parser(types: PgTypes): void {
   types.setTypeParser(INT8_OID, (text) => {
     const value = Number(text);
-    if (!Number.isSafeInteger(value)) throw new Error(`int8 value ${text} is outside the safe integer range`);
+    if (!Number.isSafeInteger(value))
+      throw new Error(`int8 value ${text} is outside the safe integer range`);
     return value;
   });
 }

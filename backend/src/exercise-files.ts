@@ -5,7 +5,9 @@ import multer from 'multer';
 import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod/v4';
 
+import { auditChange } from './audit-log.js';
 import { type FileStorage, FileStorageError } from './file-storage.js';
+import { inTransaction } from './sql.js';
 import { parseId } from './standard/http.js';
 
 // The files a delete of an exercise, a chapter (with its sections) or a textbook takes with it
@@ -207,12 +209,20 @@ export function exerciseFileRoutes(pool: Pool, storage: FileStorage) {
       return void storageFailed(error, res);
     }
     try {
-      const { rows } = await pool.query(
-        `INSERT INTO exercise_files
-           (exercise_id, role, storage_key, original_name, content_type, size_bytes)
-         VALUES ($1, $2, $3, $4, $5, $6) RETURNING ${columns}`,
-        [id, role, key, name, format.type, file.size],
-      );
+      const { rows } = await inTransaction(pool, async (client) => {
+        const added = await client.query(
+          `INSERT INTO exercise_files
+             (exercise_id, role, storage_key, original_name, content_type, size_bytes)
+           VALUES ($1, $2, $3, $4, $5, $6) RETURNING ${columns}`,
+          [id, role, key, name, format.type, file.size],
+        );
+        await auditChange(req, res, client, 'create', 'exercise_file', added.rows[0].id, {
+          exerciseId: id,
+          role,
+          name,
+        });
+        return added;
+      });
       res.status(201).json({ file: rows[0] });
     } catch (error) {
       // No row points at the stored copy now, so it goes; if that fails too, the copy is left over
@@ -279,7 +289,11 @@ export function fileRoutes(pool: Pool, storage: FileStorage) {
     } catch (error) {
       return void storageFailed(error, res);
     }
-    await pool.query('DELETE FROM exercise_files WHERE id = $1', [fileId]);
+    await inTransaction(pool, async (client) => {
+      const removed = await client.query('DELETE FROM exercise_files WHERE id = $1', [fileId]);
+      if (removed.rowCount)
+        await auditChange(req, res, client, 'delete', 'exercise_file', fileId, {});
+    });
     res.status(204).end();
   });
 

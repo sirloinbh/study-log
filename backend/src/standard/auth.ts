@@ -18,12 +18,15 @@ export function sharedAuth(
 ) {
   const authUrl = env.AUTH_INTERNAL_URL;
   if (authUrl) return createAuthMiddleware({ authUrl });
-  const local = env.NODE_ENV === 'development' || env.NODE_ENV === 'test' || env.AUTH_DISABLED === '1';
+  const local =
+    env.NODE_ENV === 'development' || env.NODE_ENV === 'test' || env.AUTH_DISABLED === '1';
   if (!local)
     throw new Error(
       'AUTH_INTERNAL_URL is required (the shared sign-in service). For local development set NODE_ENV=development or AUTH_DISABLED=1',
     );
-  warn('WARNING: AUTH_INTERNAL_URL is not set, so the API runs WITHOUT sign-in (local development only)');
+  warn(
+    'WARNING: AUTH_INTERNAL_URL is not set, so the API runs WITHOUT sign-in (local development only)',
+  );
   return undefined;
 }
 
@@ -34,7 +37,10 @@ export function sharedAuth(
  *   const auth = sharedAuth();
  *   const host = listenHost(auth !== undefined);   // server.ts
  */
-export function listenHost(authEnabled: boolean, env: Record<string, string | undefined> = process.env) {
+export function listenHost(
+  authEnabled: boolean,
+  env: Record<string, string | undefined> = process.env,
+) {
   if (env.HOST) return env.HOST;
   return authEnabled ? '0.0.0.0' : '127.0.0.1';
 }
