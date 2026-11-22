@@ -53,3 +53,8 @@ Each Claude call, from extraction and from translation, writes one JSON line (#2
 ## 5. Time budget and retries
 
 Translation and extraction share one call helper, `backend/src/claude-call.ts` (#268). One request may take 240 seconds in all (`claudeBudgetMs`), enforced with an abort signal that also covers the streamed extraction reply; each attempt is limited to 110 seconds and there is one retry (the SDK default of two retries and unlimited streams could run for many minutes). The budget has to stay under the time the proxy in front waits for a reply. A call that runs out of time answers 504. Translation also refuses a problem or answer over 40,000 characters before calling Claude, and escapes a closing `</problem>` or `</answer>` tag inside the text so it cannot end the fence around the material.
+
+## 6. Limits before a paid call (#267)
+
+- **Pages.** A PDF with more than 30 pages (`maxExtractionPages` in `backend/src/exercises.ts`) is refused with 400 before Claude is called; a reply that hits the token limit or the 200-item limit is paid for and then discarded, so the check comes first. No PDF library is installed, so `backend/src/pdf-pages.ts` counts the `/Type /Page` objects in the file and in its compressed object streams. A file it cannot read that way (for example an encrypted one) is not page-checked, and the 20 MB and 200-item limits still apply. Photos are one page each.
+- **Concurrency.** At most 3 paid calls run at once across extraction and translation (`maxConcurrentClaudeCalls` in `backend/src/claude-call.ts`). The next request gets 503 with `Retry-After`, before its body is read. A repeat request for the same chapter, or the same exercise's translation, is still answered 409.
