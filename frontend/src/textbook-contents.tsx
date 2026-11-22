@@ -1,12 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
 
 import { useBusy } from './busy';
+import { ContentsEntryForm } from './contents-entry-form';
+import { ContentsPasteForm } from './contents-paste-form';
+import { ContentsTree } from './contents-tree';
 import { type RequestError, requestJson } from './lib/api';
-import { ButtonSpinner, Loading } from './loading';
+import { Loading } from './loading';
 import { readPdfToc } from './pdf-import';
 import { pdfSizeLimit } from './pdf-toc';
 import { contentLabel, type ContentNode } from './textbook';
-import { parseToc, tocLimits, tocProblems, type TocTree, tocTree } from './toc';
+import { parseToc, tocLimits, tocProblems } from './toc';
 
 type Notice = { kind: 'status' | 'alert'; text: string; textbookId: number } | undefined;
 
@@ -23,8 +26,8 @@ type Editor = {
 // State is tagged with its textbook, so switching textbooks never shows or edits the previous
 // textbook's contents, even before the new ones arrive. `onTree` hears each tree shown (undefined
 // while loading, with `failed` when the first load failed), so the exercises card picks from the
-// same contents. It must be a stable function such as a state setter: a new function on every
-// render would rerun the effect below and, with a state update in it, render forever.
+// same contents. It may change on every render: it is called through a ref, only when the tree,
+// the error or the textbook changes.
 // `reloadKey` changes when another card learned the tree is out of date (#74).
 export function TextbookContents({
   textbookId,
@@ -90,9 +93,14 @@ export function TextbookContents({
   const pasted = pasting ? parseToc(pasting.text) : [];
   const pasteProblems = tocProblems(pasted);
 
+  // Read through a ref, so a new function on each render of the parent cannot rerun the effect.
+  const onTreeRef = useRef(onTree);
   useEffect(() => {
-    onTree?.({ textbookId, tree, failed: tree === undefined && error !== undefined });
-  }, [onTree, textbookId, tree, error]);
+    onTreeRef.current = onTree;
+  });
+  useEffect(() => {
+    onTreeRef.current?.({ textbookId, tree, failed: tree === undefined && error !== undefined });
+  }, [textbookId, tree, error]);
 
   const say = (kind: 'status' | 'alert', text: string) => setNotice({ kind, text, textbookId });
 
@@ -236,19 +244,6 @@ export function TextbookContents({
     });
   };
 
-  const renderPreview = (nodes: TocTree[]) => (
-    <ul className="content-tree">
-      {nodes.map((node) => (
-        <li key={node.line}>
-          <div className="content-row">
-            <span className="content-label">{contentLabel(node)}</span>
-          </div>
-          {node.children.length > 0 && renderPreview(node.children)}
-        </li>
-      ))}
-    </ul>
-  );
-
   const remove = (node: ContentNode) =>
     run(async () => {
       try {
@@ -291,106 +286,6 @@ export function TextbookContents({
     setEditor((current) => current && { ...current, [field]: event.target.value });
   };
 
-  const renderNodes = (nodes: ContentNode[], parentId: number | null) => (
-    <ul className="content-tree">
-      {nodes.map((node, index) => {
-        const label = contentLabel(node);
-        return (
-          <li key={node.id}>
-            <div className={open?.id === node.id ? 'content-row editing' : 'content-row'}>
-              <span className="content-label">{label}</span>
-              <div className="log-actions">
-                {deletingId === node.id ? (
-                  <>
-                    <button
-                      type="button"
-                      id={`content-delete-confirm-${node.id}`}
-                      className="danger"
-                      disabled={busy}
-                      aria-label={`Confirm contents entry deletion: ${label}`}
-                      onClick={() => {
-                        nameNext('delete');
-                        void remove(node);
-                      }}
-                    >
-                      <ButtonSpinner when={action === 'delete'} />
-                      Confirm delete
-                    </button>
-                    <button
-                      type="button"
-                      className="secondary"
-                      disabled={busy}
-                      aria-label={`Cancel contents entry deletion: ${label}`}
-                      onClick={() => {
-                        setDeleting(undefined);
-                        setWantFocus(`content-delete-${node.id}`);
-                      }}
-                    >
-                      Cancel
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      type="button"
-                      className="secondary"
-                      disabled={busy || index === 0}
-                      aria-label={`Move up: ${label}`}
-                      onClick={() => void move(nodes, index, -1, parentId)}
-                    >
-                      Up
-                    </button>
-                    <button
-                      type="button"
-                      className="secondary"
-                      disabled={busy || index === nodes.length - 1}
-                      aria-label={`Move down: ${label}`}
-                      onClick={() => void move(nodes, index, 1, parentId)}
-                    >
-                      Down
-                    </button>
-                    <button
-                      type="button"
-                      className="secondary"
-                      disabled={busy}
-                      aria-label={`Add child: ${label}`}
-                      onClick={() => startAdd(node)}
-                    >
-                      Add child
-                    </button>
-                    <button
-                      type="button"
-                      className="secondary"
-                      disabled={busy}
-                      aria-label={`Edit contents entry: ${label}`}
-                      onClick={() => startEdit(node)}
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      className="secondary"
-                      disabled={busy}
-                      id={`content-delete-${node.id}`}
-                      aria-label={`Delete contents entry: ${label}`}
-                      onClick={() => {
-                        setDeleting({ textbookId, id: node.id });
-                        setWantFocus(`content-delete-confirm-${node.id}`);
-                      }}
-                    >
-                      Delete
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-            {node.children.length > 0 && renderNodes(node.children, node.id)}
-          </li>
-        );
-      })}
-    </ul>
-  );
-
   return (
     <div className="contents">
       <div className="contents-head">
@@ -417,125 +312,38 @@ export function TextbookContents({
         </div>
       </div>
       {pasting && (
-        <form className="log-form content-form toc-paste" onSubmit={savePaste}>
-          <label className="wide">
-            Contents text
-            <textarea
-              // eslint-disable-next-line jsx-a11y-x/no-autofocus -- this field opens on a click, so focus follows that action.
-              autoFocus
-              rows={8}
-              maxLength={tocLimits.text}
-              disabled={busy || reading}
-              value={pasting.text}
-              aria-describedby="toc-paste-hint"
-              onChange={(event) => setPaste({ textbookId, text: event.target.value })}
-            />
-          </label>
-          <label className="wide">
-            Import from PDF
-            <input
-              type="file"
-              accept="application/pdf,.pdf"
-              disabled={busy || reading}
-              onChange={(event) => {
-                const file = event.target.files?.[0];
-                // Cleared so picking the same file again reads it again.
-                event.target.value = '';
-                if (file) void importPdf(file);
-              }}
-            />
-          </label>
-          <p id="toc-paste-hint" className="hint wide">
-            Paste one entry per line or import from a PDF (its bookmarks if it has them, otherwise
-            the text of the first 20 pages). Levels are split by numbers such as 1, 1.1, Chapter 1,
-            or 제1장 (Korean chapter); lines without a number follow their indentation. Page numbers
-            are dropped. If the preview is wrong, fix the text.
-          </p>
-          {pasted.length > 0 && (
-            <section className="toc-preview wide" aria-label="Contents preview">
-              <h4>
-                Preview · {pasted.length}
-                {tree?.length ? ' (added after the existing contents)' : ''}
-              </h4>
-              {renderPreview(tocTree(pasted))}
-            </section>
-          )}
-          {pasteProblems.length > 0 && (
-            <ul className="error wide" role="alert">
-              {pasteProblems.map((problem) => (
-                <li key={problem}>{problem}</li>
-              ))}
-            </ul>
-          )}
-          <div className="actions wide">
-            <button
-              type="submit"
-              className="primary"
-              disabled={busy || reading || !pasted.length || pasteProblems.length > 0}
-            >
-              <ButtonSpinner when={action === 'paste'} />
-              {pasted.length ? `Save ${pasted.length}` : 'Save'}
-            </button>
-            <button
-              type="button"
-              className="secondary"
-              disabled={busy}
-              onClick={() => {
-                dropRead();
-                setNotice(undefined);
-                setPaste(undefined);
-              }}
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
+        <ContentsPasteForm
+          text={pasting.text}
+          entries={pasted}
+          problems={pasteProblems}
+          hasContents={!!tree?.length}
+          busy={busy}
+          reading={reading}
+          action={action}
+          onText={(text) => setPaste({ textbookId, text })}
+          onPdf={(file) => void importPdf(file)}
+          onSubmit={savePaste}
+          onCancel={() => {
+            dropRead();
+            setNotice(undefined);
+            setPaste(undefined);
+          }}
+        />
       )}
       {open && (
         // Keyed by its target so the title field takes focus again for each new add or edit.
-        <form
+        <ContentsEntryForm
           key={open.id ?? `under-${open.parentId}`}
-          className="log-form content-form"
+          heading={open.heading}
+          number={open.number}
+          title={open.title}
+          isNew={open.id === undefined}
+          busy={busy}
+          action={action}
           onSubmit={save}
-        >
-          <p className="wide content-form-heading">{open.heading}</p>
-          <label>
-            Number
-            <input
-              maxLength={20}
-              placeholder="e.g. 1.2"
-              disabled={busy}
-              value={open.number}
-              onChange={change('number')}
-            />
-          </label>
-          <label className="title">
-            Contents title
-            <input
-              // eslint-disable-next-line jsx-a11y-x/no-autofocus -- this field opens on a click, so focus follows that action.
-              autoFocus
-              required
-              maxLength={200}
-              disabled={busy}
-              value={open.title}
-              onChange={change('title')}
-            />
-          </label>
-          <div className="actions wide">
-            <button type="submit" className="primary" disabled={busy}>
-              <ButtonSpinner when={action === 'save'} />
-              {open.id === undefined ? 'Add' : 'Save changes'}
-            </button>
-            <button
-              type="button"
-              className="secondary"
-              disabled={busy}
-              onClick={() => setEditor(undefined)}
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
+          onChange={change}
+          onCancel={() => setEditor(undefined)}
+        />
       )}
       {/* Always mounted so screen readers announce each new message. */}
       <p role="status" className="status">
@@ -556,7 +364,29 @@ export function TextbookContents({
       ) : tree.length === 0 ? (
         <p className="status">No contents yet</p>
       ) : (
-        renderNodes(tree, null)
+        <ContentsTree
+          nodes={tree}
+          parentId={null}
+          openId={open?.id}
+          deletingId={deletingId}
+          busy={busy}
+          action={action}
+          onMove={(siblings, index, step, parentId) => void move(siblings, index, step, parentId)}
+          onAddChild={startAdd}
+          onEdit={startEdit}
+          onAskDelete={(node) => {
+            setDeleting({ textbookId, id: node.id });
+            setWantFocus(`content-delete-confirm-${node.id}`);
+          }}
+          onConfirmDelete={(node) => {
+            nameNext('delete');
+            void remove(node);
+          }}
+          onCancelDelete={(node) => {
+            setDeleting(undefined);
+            setWantFocus(`content-delete-${node.id}`);
+          }}
+        />
       )}
     </div>
   );

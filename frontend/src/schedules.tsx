@@ -2,43 +2,18 @@ import { useEffect, useState } from 'react';
 
 import { useBusy } from './busy';
 import { type RequestError, requestJson } from './lib/api';
-import { ButtonSpinner, Loading } from './loading';
-import { plural } from './plural';
-import {
-  dayLabel,
-  dayNames,
-  defaultEnd,
-  defaultHours,
-  hoursToMinutes,
-  type Schedule,
-  type ScheduleDetail,
-} from './schedule';
-import { formatMinutes } from './study-logs-data';
-import { contentLabel, type ContentNode, type Textbook } from './textbook';
-
-type Notice = { kind: 'status' | 'alert'; text: string } | undefined;
+import { Loading } from './loading';
+import { dayNames, type Schedule, type ScheduleDetail } from './schedule';
+import { type NewSchedule, type Notice, ScheduleCreateForm } from './schedule-create-form';
+import { type Moving, ScheduleDays } from './schedule-days';
+import { type Renaming, ScheduleDetailView } from './schedule-detail';
+import { ScheduleList } from './schedule-list';
 
 // Study schedules (#35): a form that makes one from a period and daily hours, the schedules there
 // are, and the days of the one picked. A schedule's period and hours do not change once it is made
 // (docs/decisions/schedule-rules.md section 6), so this offers deleting rather than editing them.
-type Renaming = { id: number; title: string; error?: string };
-
+// This file holds the state and the requests; what is on screen is in the schedule-*.tsx files.
 export function Schedules({ today }: { today: string }) {
-  const [title, setTitle] = useState('');
-  const [startDate, setStartDate] = useState(today);
-  const [endDate, setEndDate] = useState(defaultEnd(today));
-  const [weekdayHours, setWeekdayHours] = useState(defaultHours.weekday);
-  const [restDayHours, setRestDayHours] = useState(defaultHours.restDay);
-  // A book is optional, and without a chapter picked its range runs to that end of the book.
-  const [textbookId, setTextbookId] = useState('');
-  const [fromContentId, setFromContentId] = useState('');
-  const [toContentId, setToContentId] = useState('');
-  const [textbooks, setTextbooks] = useState<Textbook[]>();
-  const [textbooksFailed, setTextbooksFailed] = useState(false);
-  // Tagged with their book, so a slow answer for another one is never offered for this one.
-  const [chapters, setChapters] = useState<{ textbookId: string; list: ContentNode[] }>();
-  const [chaptersFailed, setChaptersFailed] = useState<string>();
-
   const [schedules, setSchedules] = useState<Schedule[]>();
   const [listError, setListError] = useState<string>();
   const [reload, setReload] = useState(0);
@@ -47,12 +22,10 @@ export function Schedules({ today }: { today: string }) {
   const [detail, setDetail] = useState<ScheduleDetail>();
   const [detailError, setDetailError] = useState<{ id: number; message: string }>();
   const [confirming, setConfirming] = useState<number>();
-  // The day being moved, and where to.
-  const [moving, setMoving] = useState<{ id: number; date: string; withLater: boolean }>();
-  // The schedule whose name is being changed, the name typed and why it was refused (#179).
+  const [moving, setMoving] = useState<Moving>();
   const [renaming, setRenaming] = useState<Renaming>();
-  const [dayNotice, setDayNotice] = useState<Notice>(undefined);
   // Each next to the buttons that lead to it: the list can be scrolled far below the form.
+  const [dayNotice, setDayNotice] = useState<Notice>(undefined);
   const [notice, setNotice] = useState<Notice>(undefined);
   const [listNotice, setListNotice] = useState<Notice>(undefined);
   const { busy, action, nameNext, begin, end } = useBusy();
@@ -76,29 +49,6 @@ export function Schedules({ today }: { today: string }) {
       current = false;
     };
   }, [reload]);
-
-  useEffect(() => {
-    let current = true;
-    requestJson<{ textbooks: Textbook[] }>('/api/textbooks')
-      .then((data) => current && setTextbooks(data.textbooks))
-      .catch(() => current && setTextbooksFailed(true));
-    return () => {
-      current = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!textbookId) return;
-    let current = true;
-    requestJson<{ contents: ContentNode[] }>(`/api/textbooks/${textbookId}/contents`)
-      .then((data) => current && setChapters({ textbookId, list: data.contents }))
-      .catch(() => current && setChaptersFailed(textbookId));
-    return () => {
-      current = false;
-    };
-  }, [textbookId]);
-
-  const bookChapters = chapters?.textbookId === textbookId ? chapters.list : undefined;
 
   // The one picked, or the first in the list (the latest start); a picked one that is gone falls
   // back too.
@@ -126,58 +76,35 @@ export function Schedules({ today }: { today: string }) {
   const shownDetail = detail?.schedule.id === shownId ? detail : undefined;
   const shownError = detailError && detailError.id === shownId ? detailError.message : undefined;
 
-  const create = async (event: { preventDefault(): void }) => {
-    event.preventDefault();
-    const weekdayMinutes = hoursToMinutes(weekdayHours);
-    const restDayMinutes = hoursToMinutes(restDayHours);
-    if (weekdayMinutes === undefined || restDayMinutes === undefined) {
-      setNotice({ kind: 'alert', text: 'Enter a daily amount between 0 and 24 hours' });
-      return;
-    }
-    // Without its chapters read there was no chance to pick a range, and a whole book cannot be
-    // narrowed afterwards (docs/decisions/schedule-rules.md section 6).
-    if (textbookId && !bookChapters) {
-      setNotice({
-        kind: 'alert',
-        text: 'The textbook contents have not been loaded yet. Try again in a moment or choose the textbook again',
-      });
-      return;
-    }
-    nameNext('create');
-    if (!begin()) return;
+  // A new action takes back what was said about the last one, beside all three buttons.
+  const clearNotices = () => {
     setNotice(undefined);
     setListNotice(undefined);
     setDayNotice(undefined);
+  };
+
+  const create = async (schedule: NewSchedule) => {
+    nameNext('create');
+    if (!begin()) return false;
+    clearNotices();
     setMoving(undefined);
     setRenaming(undefined);
     setConfirming(undefined);
     try {
       const data = await requestJson<ScheduleDetail>('/api/schedules', {
         method: 'POST',
-        body: {
-          title,
-          startDate,
-          endDate,
-          weekdayMinutes,
-          restDayMinutes,
-          ...(textbookId && {
-            chapters: {
-              textbookId: Number(textbookId),
-              fromContentId: fromContentId ? Number(fromContentId) : null,
-              toContentId: toContentId ? Number(toContentId) : null,
-            },
-          }),
-        },
+        body: schedule,
       });
       setDetail(data);
       setPickedId(data.schedule.id);
       setSchedules((all) => [data.schedule, ...(all ?? [])]);
-      setTitle('');
       setNotice({ kind: 'status', text: 'Schedule created' });
       setWantFocus('schedule-heading');
       setReload((count) => count + 1);
+      return true;
     } catch (failure) {
       setNotice({ kind: 'alert', text: (failure as RequestError).message });
+      return false;
     } finally {
       end();
     }
@@ -194,9 +121,7 @@ export function Schedules({ today }: { today: string }) {
   ) => {
     nameNext(name);
     if (!begin()) return;
-    setNotice(undefined);
-    setListNotice(undefined);
-    setDayNotice(undefined);
+    clearNotices();
     try {
       setDetail(await request());
       if (name === 'move') setMoving(undefined);
@@ -238,7 +163,7 @@ export function Schedules({ today }: { today: string }) {
       `schedule-day-check-${id}`,
     );
 
-  const moveDay = (scheduleId: number, target: { id: number; date: string; withLater: boolean }) =>
+  const moveDay = (scheduleId: number, target: Moving) =>
     changeDay(
       'move',
       target.id,
@@ -255,9 +180,7 @@ export function Schedules({ today }: { today: string }) {
   const remove = async (id: number) => {
     nameNext('delete');
     if (!begin()) return;
-    setNotice(undefined);
-    setListNotice(undefined);
-    setDayNotice(undefined);
+    clearNotices();
     setMoving(undefined);
     setRenaming(undefined);
     try {
@@ -290,9 +213,7 @@ export function Schedules({ today }: { today: string }) {
     if (trimmed.length > 200) return refuse('The schedule name must be at most 200 characters');
     nameNext('rename');
     if (!begin()) return;
-    setNotice(undefined);
-    setListNotice(undefined);
-    setDayNotice(undefined);
+    clearNotices();
     setRenaming({ ...target, error: undefined });
     try {
       const data = await requestJson<ScheduleDetail>(`/api/schedules/${target.id}`, {
@@ -323,502 +244,102 @@ export function Schedules({ today }: { today: string }) {
     }
   };
 
-  const names = dayNames(shownDetail?.items ?? [], shownDetail?.schedule.startDate ?? '');
-
-  // Typing takes back what was said about the last try.
-  const typed = (set: (value: string) => void) => (event: { target: { value: string } }) => {
-    setNotice(undefined);
-    set(event.target.value);
+  const pick = (id: number) => {
+    setPickedId(id);
+    setConfirming(undefined);
+    clearNotices();
+    setMoving(undefined);
+    setRenaming(undefined);
+    // Also the way to try again after its days could not be read: the error leaves first, so a
+    // second failure is shown and announced anew.
+    setDetailError(undefined);
+    setReload((count) => count + 1);
   };
+
+  const names = dayNames(shownDetail?.items ?? [], shownDetail?.schedule.startDate ?? '');
 
   return (
     <div className="schedules">
-      <section className="card" aria-label="Create a schedule">
-        <h2>Create a schedule</h2>
-        <form className="log-form" onSubmit={(event) => void create(event)}>
-          <label className="wide">
-            Schedule name
-            <input
-              required
-              maxLength={200}
-              placeholder="e.g. Algorithms textbook, first pass"
-              disabled={busy}
-              value={title}
-              onChange={typed(setTitle)}
-            />
-          </label>
-          <label>
-            Start date
-            <input
-              type="date"
-              required
-              min={today}
-              disabled={busy}
-              value={startDate}
-              onChange={typed(setStartDate)}
-            />
-          </label>
-          <label>
-            End date
-            <input
-              type="date"
-              required
-              min={startDate}
-              disabled={busy}
-              value={endDate}
-              onChange={typed(setEndDate)}
-            />
-          </label>
-          <label>
-            Weekdays (hours)
-            <input
-              type="number"
-              required
-              min={0}
-              max={24}
-              step={0.5}
-              disabled={busy}
-              value={weekdayHours}
-              onChange={typed(setWeekdayHours)}
-            />
-          </label>
-          <label>
-            Weekends and holidays (hours)
-            <input
-              type="number"
-              required
-              min={0}
-              max={24}
-              step={0.5}
-              disabled={busy}
-              value={restDayHours}
-              onChange={typed(setRestDayHours)}
-            />
-          </label>
-          <label className="half">
-            Textbook (optional)
-            <select
-              disabled={busy || !textbooks}
-              value={textbookId}
-              onChange={(event) => {
-                setNotice(undefined);
-                setTextbookId(event.target.value);
-                setFromContentId('');
-                setToContentId('');
-                // Even for the same book again: what was read before does not count as read now.
-                setChapters(undefined);
-                setChaptersFailed(undefined);
-              }}
-            >
-              <option value="">Time only, no textbook</option>
-              {textbooks?.map((book) => (
-                <option key={book.id} value={book.id}>
-                  {book.title}
-                </option>
-              ))}
-            </select>
-          </label>
-          {textbookId && (
-            <>
-              <label>
-                First chapter
-                <select
-                  disabled={busy || !bookChapters?.length}
-                  value={fromContentId}
-                  onChange={typed(setFromContentId)}
-                >
-                  <option value="">From the start</option>
-                  {bookChapters?.map((chapter) => (
-                    <option key={chapter.id} value={chapter.id}>
-                      {contentLabel(chapter)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Last chapter
-                <select
-                  disabled={busy || !bookChapters?.length}
-                  value={toContentId}
-                  onChange={typed(setToContentId)}
-                >
-                  <option value="">To the end</option>
-                  {bookChapters?.map((chapter) => (
-                    <option key={chapter.id} value={chapter.id}>
-                      {contentLabel(chapter)}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </>
-          )}
-          {textbooksFailed && <p className="status wide">Could not load the textbooks</p>}
-          {chaptersFailed === textbookId && textbookId && (
-            <p className="status wide">Could not load the contents of this textbook</p>
-          )}
-          {bookChapters?.length === 0 && (
-            <p className="status wide">This textbook has no chapters. Add its contents first</p>
-          )}
-          <div className="actions wide">
-            <button type="submit" className="primary" disabled={busy}>
-              <ButtonSpinner when={action === 'create'} />
-              Create a schedule
-            </button>
-          </div>
-        </form>
-        {/* Always mounted so screen readers announce each new message. */}
-        <p role="status" className="status">
-          {notice?.kind === 'status' ? notice.text : ''}
-        </p>
-        {notice?.kind === 'alert' && (
-          <p role="alert" className="error">
-            {notice.text}
-          </p>
-        )}
-      </section>
+      <ScheduleCreateForm
+        today={today}
+        busy={busy}
+        action={action}
+        notice={notice}
+        setNotice={setNotice}
+        onCreate={create}
+      />
 
-      <section className="card" aria-label="My schedules">
-        <h2 id="schedules-heading" tabIndex={-1}>
-          My schedules
-        </h2>
-        {/* Above the rows: a long list would put it out of sight. */}
-        <p role="status" className="status">
-          {listNotice?.kind === 'status' ? listNotice.text : ''}
-        </p>
-        {listNotice?.kind === 'alert' && (
-          <p role="alert" className="error">
-            {listNotice.text}
-          </p>
-        )}
-        {listError && (
-          <p role="alert" className="error">
-            Could not load the schedules: {listError}
-          </p>
-        )}
-        {schedules === undefined ? (
-          !listError && <Loading label="Loading the schedules" />
-        ) : schedules.length === 0 ? (
-          <p className="status">No schedules yet</p>
-        ) : (
-          <ul className="log-list">
-            {schedules.map((item) => (
-              <li key={item.id}>
-                <div className="log-head">
-                  <button
-                    type="button"
-                    className="book-title"
-                    disabled={busy}
-                    aria-current={item.id === shownId ? 'true' : undefined}
-                    onClick={() => {
-                      setPickedId(item.id);
-                      setConfirming(undefined);
-                      setNotice(undefined);
-                      setListNotice(undefined);
-                      setDayNotice(undefined);
-                      setMoving(undefined);
-                      setRenaming(undefined);
-                      // Also the way to try again after its days could not be read: the
-                      // error leaves first, so a second failure is shown and announced anew.
-                      setDetailError(undefined);
-                      setReload((count) => count + 1);
-                    }}
-                  >
-                    {item.title}
-                  </button>
-                  <div className="actions">
-                    {confirming === item.id ? (
-                      <>
-                        <button
-                          type="button"
-                          id={`schedule-delete-confirm-${item.id}`}
-                          className="danger"
-                          aria-label={`Confirm deletion: ${item.title}`}
-                          disabled={busy}
-                          onClick={() => void remove(item.id)}
-                        >
-                          <ButtonSpinner when={action === 'delete'} />
-                          Confirm delete
-                        </button>
-                        <button
-                          type="button"
-                          className="secondary"
-                          aria-label={`Cancel deletion: ${item.title}`}
-                          disabled={busy}
-                          onClick={() => {
-                            setConfirming(undefined);
-                            setWantFocus(`schedule-delete-${item.id}`);
-                          }}
-                        >
-                          Cancel
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        type="button"
-                        id={`schedule-delete-${item.id}`}
-                        className="secondary"
-                        aria-label={`Delete schedule: ${item.title}`}
-                        disabled={busy}
-                        onClick={() => {
-                          setConfirming(item.id);
-                          setWantFocus(`schedule-delete-confirm-${item.id}`);
-                        }}
-                      >
-                        Delete
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <p className="status">
-                  {item.textbookTitle && `${item.textbookTitle} · `}
-                  {item.startDate} ~ {item.endDate}
-                  {item.delayDays > 0 && ` (${plural(item.delayDays, 'day')} late)`} · progress{' '}
-                  {item.progressPercent}% · goal {formatMinutes(item.totalMinutes)} ·{' '}
-                  {plural(item.itemCount, 'day')}
-                </p>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      <ScheduleList
+        schedules={schedules}
+        listError={listError}
+        listNotice={listNotice}
+        shownId={shownId}
+        confirming={confirming}
+        busy={busy}
+        action={action}
+        onPick={pick}
+        onAskDelete={(id) => {
+          setConfirming(id);
+          setWantFocus(`schedule-delete-confirm-${id}`);
+        }}
+        onCancelDelete={(id) => {
+          setConfirming(undefined);
+          setWantFocus(`schedule-delete-${id}`);
+        }}
+        onDelete={(id) => void remove(id)}
+      />
 
       {shown && (
         <section className="card" aria-label="Schedule by date">
           {/* Days already read stay if reading them again fails. */}
           {shownDetail ? (
-            <>
-              {renaming?.id === shownDetail.schedule.id ? (
-                <form
-                  className="schedule-rename"
-                  aria-label="Edit schedule name"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    void rename(renaming);
-                  }}
-                >
-                  <label>
-                    New schedule name
-                    <input
-                      id="schedule-rename-input"
-                      required
-                      disabled={busy}
-                      value={renaming.title}
-                      aria-invalid={renaming.error ? 'true' : undefined}
-                      aria-describedby={renaming.error ? 'schedule-rename-error' : undefined}
-                      onChange={(event) => {
-                        setDayNotice(undefined);
-                        setRenaming({ ...renaming, title: event.target.value, error: undefined });
-                      }}
-                    />
-                  </label>
-                  <div className="actions">
-                    <button type="submit" className="primary" disabled={busy}>
-                      <ButtonSpinner when={action === 'rename'} />
-                      Save name
-                    </button>
-                    <button
-                      type="button"
-                      className="secondary"
-                      aria-label="Cancel renaming"
-                      disabled={busy}
-                      onClick={() => {
-                        setDayNotice(undefined);
-                        setRenaming(undefined);
-                        setWantFocus('schedule-rename');
-                      }}
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                  {/* Right under the name, apart from what the days say. */}
-                  {renaming.error && (
-                    <p id="schedule-rename-error" role="alert" className="error">
-                      {renaming.error}
-                    </p>
-                  )}
-                </form>
-              ) : (
-                <div className="log-head">
-                  <h2 id="schedule-heading" tabIndex={-1}>
-                    {shownDetail.schedule.title}
-                  </h2>
-                  <button
-                    type="button"
-                    id="schedule-rename"
-                    className="secondary"
-                    aria-label={`Rename schedule: ${shownDetail.schedule.title}`}
-                    disabled={busy}
-                    onClick={() => {
-                      setDayNotice(undefined);
-                      setRenaming({
-                        id: shownDetail.schedule.id,
-                        title: shownDetail.schedule.title,
-                      });
-                      setWantFocus('schedule-rename-input');
-                    }}
-                  >
-                    Rename
-                  </button>
-                </div>
-              )}
-              {shownDetail.schedule.textbookTitle && (
-                <p className="status schedule-book">{shownDetail.schedule.textbookTitle}</p>
-              )}
-              <div className="schedule-progress">
-                <p>
-                  Progress <strong>{shownDetail.schedule.progressPercent}%</strong>
-                  <span className="status">
-                    {formatMinutes(shownDetail.schedule.completedMinutes)} /{' '}
-                    {formatMinutes(shownDetail.schedule.totalMinutes)} ·{' '}
-                    {shownDetail.schedule.completedCount} /{' '}
-                    {plural(shownDetail.schedule.itemCount, 'day')}
-                  </span>
-                </p>
-                <div
-                  role="progressbar"
-                  aria-label="Schedule progress"
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-valuenow={shownDetail.schedule.progressPercent}
-                >
-                  <div style={{ width: `${shownDetail.schedule.progressPercent}%` }} />
-                </div>
-              </div>
-              <dl className="retro-summary" aria-label="Schedule summary">
-                <div>
-                  <dt>Weekdays</dt>
-                  <dd>{formatMinutes(shownDetail.schedule.weekdayMinutes)}</dd>
-                </div>
-                <div>
-                  <dt>Weekends and holidays</dt>
-                  <dd>{formatMinutes(shownDetail.schedule.restDayMinutes)}</dd>
-                </div>
-                <div>
-                  <dt>Total goal</dt>
-                  <dd>{formatMinutes(shownDetail.schedule.totalMinutes)}</dd>
-                </div>
-                <div>
-                  <dt>Study days</dt>
-                  <dd>{shownDetail.schedule.itemCount}</dd>
-                </div>
-              </dl>
-              {shownDetail.schedule.delayDays > 0 && (
-                <p className="status">
-                  Ends on {shownDetail.schedule.currentEndDate},{' '}
-                  {plural(shownDetail.schedule.delayDays, 'day')} after the originally planned end
-                  date {shownDetail.schedule.endDate}
-                </p>
-              )}
-              <p role="status" className="status">
-                {dayNotice?.kind === 'status' ? dayNotice.text : ''}
-              </p>
-              {dayNotice?.kind === 'alert' && (
-                <p role="alert" className="error">
-                  {dayNotice.text}
-                </p>
-              )}
-              <ul className="schedule-days" aria-label="Target time by date">
-                {shownDetail.items.map((item) => (
-                  <li
-                    key={item.id}
-                    aria-current={item.date === today ? 'date' : undefined}
-                    className={item.completedOn ? 'done' : undefined}
-                  >
-                    <input
-                      type="checkbox"
-                      id={`schedule-day-check-${item.id}`}
-                      aria-label={`Complete day: ${names.get(item.id)}`}
-                      checked={item.completedOn !== null}
-                      disabled={busy}
-                      onChange={() =>
-                        void toggleDay(shownDetail.schedule.id, item.id, item.completedOn !== null)
-                      }
-                    />
-                    <span className="schedule-day">
-                      <span>{dayLabel(item.date, shownDetail.schedule.startDate)}</span>
-                      {item.contents.length > 0 && (
-                        <span className="status">
-                          {item.contents.map(contentLabel).join(' · ')}
-                        </span>
-                      )}
-                    </span>
-                    <strong>{formatMinutes(item.targetMinutes)}</strong>
-                    {!item.completedOn && moving?.id !== item.id && (
-                      <button
-                        type="button"
-                        id={`schedule-day-move-${item.id}`}
-                        className="secondary"
-                        aria-label={`Move day: ${names.get(item.id)}`}
-                        disabled={busy}
-                        onClick={() => {
-                          setDayNotice(undefined);
-                          setMoving({ id: item.id, date: item.date, withLater: false });
-                          setWantFocus(`schedule-day-date-${item.id}`);
-                        }}
-                      >
-                        Move
-                      </button>
-                    )}
-                    {moving?.id === item.id && !item.completedOn && (
-                      <form
-                        className="schedule-move"
-                        aria-label={`Move day: ${names.get(item.id)}`}
-                        onSubmit={(event) => {
-                          event.preventDefault();
-                          void moveDay(shownDetail.schedule.id, moving);
-                        }}
-                      >
-                        <label>
-                          Move to
-                          <input
-                            type="date"
-                            id={`schedule-day-date-${item.id}`}
-                            required
-                            min={today}
-                            disabled={busy}
-                            value={moving.date}
-                            onChange={(event) => {
-                              setDayNotice(undefined);
-                              setMoving({ ...moving, date: event.target.value });
-                            }}
-                          />
-                        </label>
-                        <label className="schedule-later">
-                          <input
-                            type="checkbox"
-                            disabled={busy}
-                            checked={moving.withLater}
-                            onChange={(event) => {
-                              setDayNotice(undefined);
-                              setMoving({ ...moving, withLater: event.target.checked });
-                            }}
-                          />
-                          Move later days too
-                        </label>
-                        <div className="actions">
-                          <button type="submit" className="primary" disabled={busy}>
-                            <ButtonSpinner when={action === 'move'} />
-                            Move
-                          </button>
-                          <button
-                            type="button"
-                            className="secondary"
-                            disabled={busy}
-                            onClick={() => {
-                              setDayNotice(undefined);
-                              setMoving(undefined);
-                              setWantFocus(`schedule-day-move-${item.id}`);
-                            }}
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      </form>
-                    )}
-                  </li>
-                ))}
-              </ul>
-            </>
+            <ScheduleDetailView
+              detail={shownDetail}
+              renaming={renaming}
+              dayNotice={dayNotice}
+              busy={busy}
+              action={action}
+              onStartRename={() => {
+                setDayNotice(undefined);
+                setRenaming({ id: shownDetail.schedule.id, title: shownDetail.schedule.title });
+                setWantFocus('schedule-rename-input');
+              }}
+              onChangeRename={(next) => {
+                setDayNotice(undefined);
+                setRenaming(next);
+              }}
+              onCancelRename={() => {
+                setDayNotice(undefined);
+                setRenaming(undefined);
+                setWantFocus('schedule-rename');
+              }}
+              onRename={(target) => void rename(target)}
+            >
+              <ScheduleDays
+                detail={shownDetail}
+                names={names}
+                today={today}
+                moving={moving}
+                busy={busy}
+                action={action}
+                onToggle={(id, done) => void toggleDay(shownDetail.schedule.id, id, done)}
+                onStartMove={(target) => {
+                  setDayNotice(undefined);
+                  setMoving(target);
+                  setWantFocus(`schedule-day-date-${target.id}`);
+                }}
+                onChangeMove={(target) => {
+                  setDayNotice(undefined);
+                  setMoving(target);
+                }}
+                onCancelMove={(id) => {
+                  setDayNotice(undefined);
+                  setMoving(undefined);
+                  setWantFocus(`schedule-day-move-${id}`);
+                }}
+                onMove={(target) => void moveDay(shownDetail.schedule.id, target)}
+              />
+            </ScheduleDetailView>
           ) : shownError ? (
             <p role="alert" className="error">
               Could not load the schedule days: {shownError}

@@ -5,10 +5,11 @@ import {
   emptyKeywordForm,
   type Keyword,
   type KeywordForm,
-  keywordLimits,
   type KeywordSearch,
   searchPath,
 } from './keyword';
+import { KeywordFormView } from './keyword-form';
+import { KeywordSearchCard } from './keyword-search-card';
 import { type RequestError, requestJson } from './lib/api';
 import { ButtonSpinner, Loading } from './loading';
 
@@ -196,49 +197,32 @@ export function Keywords({ today }: { today: string }) {
     <div className="keywords">
       <section className="card" aria-label="Keyword entry">
         <h2>Today's keyword</h2>
-        <form className="log-form keyword-form" onSubmit={add}>
-          <label>
-            Date
-            <input type="date" required disabled={busy} value={date} onChange={pickDate} />
-          </label>
-          <label className="keyword-field">
-            Keyword
-            <input
-              id="keyword-input"
-              required
-              maxLength={keywordLimits.keyword}
-              placeholder="e.g. eigenvalue"
+        <KeywordFormView
+          date={date}
+          keyword={form.keyword}
+          memo={form.memo}
+          keywordId="keyword-input"
+          placeholder="e.g. eigenvalue"
+          memoLabel="Memo (optional)"
+          submitLabel="Add"
+          spinning={action === 'add'}
+          busy={busy}
+          onDate={(value) => pickDate({ target: { value } })}
+          onKeyword={(value) => changeForm('keyword')({ target: { value } })}
+          onMemo={(value) => changeForm('memo')({ target: { value } })}
+          onSubmit={add}
+        >
+          {date !== today && (
+            <button
+              type="button"
+              className="secondary"
               disabled={busy}
-              value={form.keyword}
-              onChange={changeForm('keyword')}
-            />
-          </label>
-          <label className="wide">
-            Memo (optional)
-            <input
-              maxLength={keywordLimits.memo}
-              disabled={busy}
-              value={form.memo}
-              onChange={changeForm('memo')}
-            />
-          </label>
-          <div className="actions wide">
-            <button type="submit" className="primary" disabled={busy}>
-              <ButtonSpinner when={action === 'add'} />
-              Add
+              onClick={() => pickDate({ target: { value: today } })}
+            >
+              Back to today
             </button>
-            {date !== today && (
-              <button
-                type="button"
-                className="secondary"
-                disabled={busy}
-                onClick={() => pickDate({ target: { value: today } })}
-              >
-                Back to today
-              </button>
-            )}
-          </div>
-        </form>
+          )}
+        </KeywordFormView>
         {/* Always mounted so screen readers announce each new message. */}
         <p role="status" className="status">
           {notice?.kind === 'status' ? notice.text : ''}
@@ -267,55 +251,32 @@ export function Keywords({ today }: { today: string }) {
             {keywords.map((keyword) =>
               editor?.id === keyword.id ? (
                 <li key={keyword.id} className="editing">
-                  <form className="log-form keyword-form" onSubmit={save}>
-                    <label>
-                      Date
-                      <input
-                        type="date"
-                        required
-                        disabled={busy}
-                        value={editor.date}
-                        onChange={changeEditor('date')}
-                      />
-                    </label>
-                    <label className="keyword-field">
-                      Keyword
-                      <input
-                        id="keyword-edit-keyword"
-                        required
-                        maxLength={keywordLimits.keyword}
-                        disabled={busy}
-                        value={editor.form.keyword}
-                        onChange={changeEditor('keyword')}
-                      />
-                    </label>
-                    <label className="wide">
-                      Memo
-                      <input
-                        maxLength={keywordLimits.memo}
-                        disabled={busy}
-                        value={editor.form.memo}
-                        onChange={changeEditor('memo')}
-                      />
-                    </label>
-                    <div className="actions wide">
-                      <button type="submit" className="primary" disabled={busy}>
-                        <ButtonSpinner when={action === 'save'} />
-                        Save changes
-                      </button>
-                      <button
-                        type="button"
-                        className="secondary"
-                        disabled={busy}
-                        onClick={() => {
-                          setEditor(undefined);
-                          setWantFocus('keyword-day');
-                        }}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  </form>
+                  <KeywordFormView
+                    date={editor.date}
+                    keyword={editor.form.keyword}
+                    memo={editor.form.memo}
+                    keywordId="keyword-edit-keyword"
+                    memoLabel="Memo"
+                    submitLabel="Save changes"
+                    spinning={action === 'save'}
+                    busy={busy}
+                    onDate={(value) => changeEditor('date')({ target: { value } })}
+                    onKeyword={(value) => changeEditor('keyword')({ target: { value } })}
+                    onMemo={(value) => changeEditor('memo')({ target: { value } })}
+                    onSubmit={save}
+                  >
+                    <button
+                      type="button"
+                      className="secondary"
+                      disabled={busy}
+                      onClick={() => {
+                        setEditor(undefined);
+                        setWantFocus('keyword-day');
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  </KeywordFormView>
                 </li>
               ) : (
                 <li key={keyword.id}>
@@ -397,82 +358,16 @@ export function Keywords({ today }: { today: string }) {
         )}
       </section>
 
-      <section className="card" aria-label="Keyword search">
-        <h2>Keyword search</h2>
-        <form className="log-form keyword-search" onSubmit={find}>
-          <label className="wide">
-            Search term
-            <input
-              type="search"
-              maxLength={keywordLimits.query}
-              placeholder="Part of a keyword or memo"
-              disabled={busy}
-              value={search.q}
-              onChange={changeSearch('q')}
-            />
-          </label>
-          <label className="half">
-            Start date
-            {/* The browser refuses a start after the end before asking the server. */}
-            <input
-              type="date"
-              disabled={busy}
-              max={search.to || undefined}
-              value={search.from}
-              onChange={changeSearch('from')}
-            />
-          </label>
-          <label className="half">
-            End date
-            <input
-              type="date"
-              disabled={busy}
-              min={search.from || undefined}
-              value={search.to}
-              onChange={changeSearch('to')}
-            />
-          </label>
-          <div className="actions wide">
-            <button type="submit" className="primary" disabled={busy}>
-              <ButtonSpinner when={action === 'search'} />
-              Search
-            </button>
-          </div>
-        </form>
-        {searchError && (
-          <p role="alert" className="error">
-            Could not search: {searchError}
-          </p>
-        )}
-        {results &&
-          !searchError &&
-          (results.keywords.length === 0 ? (
-            <p className="status">No results</p>
-          ) : (
-            <>
-              <p className="status">Found {results.keywords.length}</p>
-              <ul className="log-list keyword-results">
-                {results.keywords.map((keyword) => (
-                  <li key={keyword.id}>
-                    <div className="log-head">
-                      <span className="log-date">{keyword.keyword}</span>
-                      <button
-                        type="button"
-                        className="secondary"
-                        disabled={busy}
-                        aria-label={`View ${keyword.keyword} on ${keyword.date}`}
-                        onClick={() => pickDate({ target: { value: keyword.date } })}
-                      >
-                        {keyword.date}
-                      </button>
-                    </div>
-                    {keyword.memo && <p className="log-memo">{keyword.memo}</p>}
-                  </li>
-                ))}
-              </ul>
-            </>
-          ))}
-      </section>
+      <KeywordSearchCard
+        search={search}
+        results={results}
+        error={searchError}
+        busy={busy}
+        action={action}
+        onChange={changeSearch}
+        onSubmit={find}
+        onView={(value) => pickDate({ target: { value } })}
+      />
     </div>
   );
 }
