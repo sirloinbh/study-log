@@ -52,6 +52,12 @@ test('pages are counted in plain and in compressed PDFs (#267)', () => {
   );
 });
 
+test('a crafted file full of object-stream markers is read quickly (#267)', () => {
+  const started = performance.now();
+  assert.equal(countPdfPages(Buffer.from('<</Type/ObjStm'.repeat(200_000), 'latin1')), undefined);
+  assert.ok(performance.now() - started < 2000);
+});
+
 const chapterPool = {
   query: async () => ({ rows: [{}], rowCount: 1 }),
 } as unknown as Pool;
