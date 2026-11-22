@@ -3,7 +3,7 @@ import { test } from 'node:test';
 
 import type { Pool } from 'pg';
 
-import { serviceDate } from '../src/app.js';
+import { serviceDate } from '../src/standard/http.js';
 import { withApi } from './helpers.js';
 
 const pool = (query: () => Promise<unknown>) => ({ query }) as unknown as Pool;
@@ -53,4 +53,60 @@ test('unknown API paths return an English 404 JSON body', async () => {
 test('service date follows Asia/Seoul across the UTC day boundary', () => {
   assert.equal(serviceDate(new Date('2026-10-18T14:59:59Z')), '2026-10-18');
   assert.equal(serviceDate(new Date('2026-10-18T15:00:00Z')), '2026-10-19');
+});
+
+test('a 500 log line carries the request ID, time and level (#260)', async () => {
+  const lines: string[] = [];
+  const original = console.error;
+  console.error = (line: string) => void lines.push(line);
+  try {
+    await withApi(
+      pool(async () => {
+        throw new Error('boom');
+      }),
+      async (call) => {
+        const { status, headers } = await call('/api/health', {
+          headers: { 'x-request-id': 'req-260' },
+        });
+        assert.equal(status, 500);
+        assert.equal(headers.get('x-request-id'), 'req-260');
+      },
+    );
+  } finally {
+    console.error = original;
+  }
+  const entry = lines
+    .map((line) => JSON.parse(line) as Record<string, unknown>)
+    .find((line) => line.event === 'request_error');
+  assert.ok(entry);
+  assert.equal(entry.requestId, 'req-260');
+  assert.equal(entry.level, 'error');
+  assert.equal(typeof entry.time, 'string');
+});
+
+test('a malformed path ID is a 400 naming the ID (#260)', async () => {
+  await withApi(
+    pool(async () => ({ rows: [] })),
+    async (call) => {
+      const { status, data } = await call('/api/textbooks/abc');
+      assert.equal(status, 400);
+      assert.deepEqual(data, { error: 'Invalid textbook ID' });
+    },
+  );
+});
+
+test('200 invalid items (the bulk maximum) give a capped validation message (#260)', async () => {
+  await withApi(
+    pool(async () => ({ rows: [] })),
+    async (call) => {
+      const exercises = Array.from({ length: 200 }, () => ({ number: '', body: '' }));
+      const { status, data } = await call('/api/textbooks/1/contents/1/exercises/bulk', {
+        method: 'POST',
+        body: { exercises },
+      });
+      assert.equal(status, 400);
+      assert.match(String(data.error), /and \d+ more$/);
+      assert.ok(String(data.error).length < 2000);
+    },
+  );
 });

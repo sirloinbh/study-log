@@ -5,16 +5,8 @@ import { z } from 'zod/v4';
 import { removeStored, storedKeys } from './exercise-files.js';
 import type { FileStorage } from './file-storage.js';
 import { inTransaction } from './sql.js';
+import { parseId } from './standard/http.js';
 import { missingOrInvalid } from './validation.js';
-
-// Same rule as the textbook id: plain positive integers that stay exact in JS and fit bigint.
-const pathId = (label: string) =>
-  z
-    .string()
-    .regex(/^[1-9]\d{0,14}$/, `Invalid ${label} ID`)
-    .transform(Number);
-const textbookIdParam = pathId('textbook');
-const contentIdParam = pathId('contents entry');
 
 export const bodyId = (label: string) => {
   const message = `Invalid ${label} ID`;
@@ -159,7 +151,7 @@ const send = (res: Response, reply: Reply) =>
 
 export function textbookContentRoutes(pool: Pool, storage: FileStorage) {
   const router = Router({ mergeParams: true });
-  const textbookOf = (params: Record<string, string>) => textbookIdParam.parse(params.textbookId);
+  const textbookOf = (params: Record<string, string>) => parseId(params.textbookId, 'textbook');
 
   router.get('/', async (req, res) => {
     const textbookId = textbookOf(req.params);
@@ -251,7 +243,7 @@ export function textbookContentRoutes(pool: Pool, storage: FileStorage) {
 
   router.put('/:id', async (req, res) => {
     const textbookId = textbookOf(req.params);
-    const id = contentIdParam.parse(req.params.id);
+    const id = parseId(req.params.id, 'contents entry');
     const entry = contentUpdateInput.parse(req.body);
     const { rows } = await pool.query<Entry>(
       `UPDATE textbook_contents SET number = $3, title = $4, updated_at = now()
@@ -266,7 +258,7 @@ export function textbookContentRoutes(pool: Pool, storage: FileStorage) {
   // and schedules that point to the entry or anything below it block the deletion.
   router.delete('/:id', async (req, res) => {
     const textbookId = textbookOf(req.params);
-    const id = contentIdParam.parse(req.params.id);
+    const id = parseId(req.params.id, 'contents entry');
     const reply = await writeContents(pool, textbookId, async (client) => {
       // The stored files of its exercises and its sections' go too (#209); if S3 cannot remove
       // them, nothing is deleted.

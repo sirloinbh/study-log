@@ -6,6 +6,7 @@ import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod/v4';
 
 import { type FileStorage, FileStorageError } from './file-storage.js';
+import { parseId } from './standard/http.js';
 
 // The files a delete of an exercise, a chapter (with its sections) or a textbook takes with it
 // (#209). Read before the delete, which cascades the rows away.
@@ -76,14 +77,6 @@ const formats = [
 
 export const detectFormat = (bytes: Buffer) =>
   formats.find(({ magic }) => magic.every((byte, i) => bytes[i] === byte));
-
-const pathId = (label: string) =>
-  z
-    .string()
-    .regex(/^[1-9]\d{0,14}$/, `Invalid ${label} ID`)
-    .transform(Number);
-const exerciseIdParam = pathId('exercise');
-const fileIdParam = pathId('file');
 
 const roleInput = z.enum(['problem', 'answer'], {
   error: (issue) =>
@@ -161,7 +154,7 @@ export function exerciseFileRoutes(pool: Pool, storage: FileStorage) {
   const router = Router({ mergeParams: true });
 
   router.get('/', async (req, res) => {
-    const id = exerciseIdParam.parse((req.params as Record<string, string>).id);
+    const id = parseId((req.params as Record<string, string>).id, 'exercise');
     const exercise = await pool.query('SELECT 1 FROM exercises WHERE id = $1', [id]);
     if (!exercise.rowCount) return void res.status(404).json(notFound);
     const { rows } = await pool.query(
@@ -178,7 +171,7 @@ export function exerciseFileRoutes(pool: Pool, storage: FileStorage) {
       return void res.status(403).json({ error: 'Upload files from the study log app' });
     if (!req.is('multipart/form-data'))
       return void res.status(415).json({ error: 'Send the file as multipart/form-data' });
-    const id = exerciseIdParam.parse((req.params as Record<string, string>).id);
+    const id = parseId((req.params as Record<string, string>).id, 'exercise');
     // Before reading the body, so a request for an exercise that does not exist never holds up to
     // 20 MB in memory. The insert below still catches one deleted in the meantime.
     const exercise = await pool.query('SELECT 1 FROM exercises WHERE id = $1', [id]);
@@ -226,7 +219,7 @@ export function fileRoutes(pool: Pool, storage: FileStorage) {
   const router = Router();
 
   router.get('/:fileId', async (req, res) => {
-    const fileId = fileIdParam.parse(req.params.fileId);
+    const fileId = parseId(req.params.fileId, 'file');
     const { rows } = await pool.query(`SELECT ${columns} FROM exercise_files WHERE id = $1`, [
       fileId,
     ]);
@@ -236,7 +229,7 @@ export function fileRoutes(pool: Pool, storage: FileStorage) {
 
   // The file itself, shown in the browser (a PDF in its viewer, a photo as an image).
   router.get('/:fileId/content', async (req, res) => {
-    const fileId = fileIdParam.parse(req.params.fileId);
+    const fileId = parseId(req.params.fileId, 'file');
     const { rows } = await pool.query<{ key: string; name: string; type: string }>(
       `SELECT storage_key AS key, original_name AS name, content_type AS type
        FROM exercise_files WHERE id = $1`,
@@ -262,7 +255,7 @@ export function fileRoutes(pool: Pool, storage: FileStorage) {
   // Removes the stored copy first: if that fails, nothing changes and the request can be repeated.
   // Removing a copy that is already gone succeeds in S3.
   router.delete('/:fileId', async (req, res) => {
-    const fileId = fileIdParam.parse(req.params.fileId);
+    const fileId = parseId(req.params.fileId, 'file');
     const { rows } = await pool.query<{ key: string }>(
       'SELECT storage_key AS key FROM exercise_files WHERE id = $1',
       [fileId],

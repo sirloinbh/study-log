@@ -5,6 +5,7 @@ import { z } from 'zod/v4';
 import { removeStored, storedKeys } from './exercise-files.js';
 import type { FileStorage } from './file-storage.js';
 import { inTransaction } from './sql.js';
+import { parseId } from './standard/http.js';
 import { missingOrInvalid } from './validation.js';
 
 const text = (label: string, max: number) =>
@@ -26,13 +27,6 @@ export const textbookInput = z.object(
   { error: 'Send the textbook as a JSON object' },
 );
 
-// Only plain positive integers that stay exact in JS and fit the bigint column; "1e3", "0x10"
-// or 20-digit ids would otherwise reach Postgres and fail as a 500.
-const idParam = z
-  .string()
-  .regex(/^[1-9]\d{0,14}$/, 'Invalid textbook ID')
-  .transform(Number);
-
 const columns = 'id, title, author, edition';
 
 const notFound = { error: 'Textbook not found' };
@@ -46,7 +40,7 @@ export function textbookRoutes(pool: Pool, storage: FileStorage) {
   });
 
   router.get('/:id', async (req, res) => {
-    const id = idParam.parse(req.params.id);
+    const id = parseId(req.params.id, 'textbook');
     const { rows } = await pool.query(`SELECT ${columns} FROM textbooks WHERE id = $1`, [id]);
     if (rows.length === 0) return void res.status(404).json(notFound);
     res.json({ textbook: rows[0] });
@@ -62,7 +56,7 @@ export function textbookRoutes(pool: Pool, storage: FileStorage) {
   });
 
   router.put('/:id', async (req, res) => {
-    const id = idParam.parse(req.params.id);
+    const id = parseId(req.params.id, 'textbook');
     const book = textbookInput.parse(req.body);
     const { rows } = await pool.query(
       `UPDATE textbooks SET title = $2, author = $3, edition = $4, updated_at = now()
@@ -77,7 +71,7 @@ export function textbookRoutes(pool: Pool, storage: FileStorage) {
   // its chapters block the deletion (foreign keys with RESTRICT). The stored files of its exercises
   // go too (#209); if S3 cannot remove them, nothing is deleted.
   router.delete('/:id', async (req, res) => {
-    const id = idParam.parse(req.params.id);
+    const id = parseId(req.params.id, 'textbook');
     const reply = await inTransaction<{ status: number; body?: unknown }>(
       pool,
       async (client) => {
