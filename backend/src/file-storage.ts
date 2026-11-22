@@ -1,3 +1,5 @@
+import { Readable } from 'node:stream';
+
 import {
   DeleteObjectCommand,
   GetObjectCommand,
@@ -9,7 +11,8 @@ import {
 // routes take a `FileStorage`, so tests hand in an in-memory stand-in and never call AWS.
 export type FileStorage = {
   put: (key: string, body: Buffer, contentType: string) => Promise<void>;
-  get: (key: string) => Promise<Buffer>;
+  // The stored file as a stream, so a download never holds the whole file in memory (#266).
+  get: (key: string) => Promise<Readable>;
   remove: (key: string) => Promise<void>;
 };
 
@@ -108,7 +111,9 @@ export function s3Storage(
       try {
         const object = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
         if (!object.Body) throw new FileStorageError(404, 'The stored file is missing');
-        return Buffer.from(await object.Body.transformToByteArray());
+        if (!(object.Body instanceof Readable))
+          throw new FileStorageError(502, 'File storage error');
+        return object.Body;
       } catch (error) {
         explain(error);
       }

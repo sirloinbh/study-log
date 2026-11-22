@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { Readable } from 'node:stream';
 import { test } from 'node:test';
 
 import type { Pool } from 'pg';
@@ -7,7 +8,10 @@ import {
   detectFormat,
   displayName,
   encodeName,
+  maxBytesPerExercise,
+  maxConcurrentUploads,
   maxFileBytes,
+  maxFilesPerExercise,
   removeStoredFiles,
 } from '../src/exercise-files.js';
 import { FileStorageError, s3Storage } from '../src/file-storage.js';
@@ -15,9 +19,12 @@ import { withApi } from './helpers.js';
 
 // Validation must reject an upload before it is stored (#28): the only query allowed is the check
 // that the exercise exists, and S3 is never called (the helper's storage refuses).
+// What the count of an exercise's files answers when it has none.
+const empty = { rows: [{ files: 0, bytes: 0 }], rowCount: 1 };
 const exercisePool = {
   query: async (sql: string) => {
     if (sql.startsWith('SELECT 1 FROM exercises')) return { rows: [{}], rowCount: 1 };
+    if (sql.includes('FROM exercise_files WHERE exercise_id')) return empty;
     throw new Error('DB must not be queried for invalid input');
   },
 } as unknown as Pool;
@@ -155,7 +162,7 @@ test('S3 storage sends to the configured bucket and explains SDK failures (#28)'
     send: async (command: { constructor: { name: string }; input: Record<string, unknown> }) => {
       sent.push({ name: command.constructor.name, input: command.input });
       if (failWith) throw Object.assign(new Error(failWith), { name: failWith });
-      return { Body: { transformToByteArray: async () => new Uint8Array(png) } };
+      return { Body: Readable.from([png]) };
     },
   };
   const storage = s3Storage(
@@ -164,7 +171,7 @@ test('S3 storage sends to the configured bucket and explains SDK failures (#28)'
   );
 
   await storage.put('exercises/1/a.pdf', pdf, 'application/pdf');
-  assert.deepEqual(await storage.get('exercises/1/a.png'), png);
+  assert.deepEqual(await Readable.from(await storage.get('exercises/1/a.png')).toArray(), [png]);
   await storage.remove('exercises/1/a.pdf');
   assert.deepEqual(
     sent.map(({ name, input }) => [name, input.Bucket, input.Key, input.ContentType]),
@@ -232,7 +239,7 @@ test('files that S3 will not remove are logged by key and never throw (#265)', a
   const removed: string[] = [];
   const storage = {
     put: async () => {},
-    get: async () => Buffer.alloc(0),
+    get: async () => Readable.from([]),
     // The second batch of ten fails as a whole; the first and third succeed.
     remove: async (key: string) => {
       const index = keys.indexOf(key);
@@ -257,4 +264,111 @@ test('files that S3 will not remove are logged by key and never throw (#265)', a
   assert.equal(entry.count, 10);
   assert.deepEqual(entry.keys, keys.slice(10, 20));
   assert.deepEqual(await removeStoredFiles(storage, []), []);
+});
+
+// A pool for the upload route: the exercise exists, it holds `held` files of `heldBytes`, and an
+// insert succeeds. Transactions run on a client that answers from the same function.
+function uploadPool(held = { files: 0, bytes: 0 }) {
+  const answer = async (sql: string) => {
+    if (sql.startsWith('SELECT 1 FROM exercises')) return { rows: [{}], rowCount: 1 };
+    if (sql.includes('FROM exercise_files WHERE exercise_id')) return { rows: [held], rowCount: 1 };
+    if (sql.startsWith('INSERT INTO exercise_files')) return { rows: [{ id: 1 }], rowCount: 1 };
+    return { rows: [], rowCount: 0 }; // BEGIN, COMMIT, ROLLBACK
+  };
+  return {
+    query: answer,
+    connect: async () => ({ query: answer, release: () => undefined }),
+  } as unknown as Pool;
+}
+
+test('an exercise is limited in file count and in total size (#266)', async () => {
+  const stored: string[] = [];
+  const storage = {
+    put: async (key: string) => void stored.push(key),
+    get: async () => Readable.from([]),
+    remove: async () => undefined,
+  };
+  const upload = async (pool: Pool) => {
+    let outcome: readonly [number, unknown] = [0, undefined];
+    await withApi(
+      pool,
+      async (call) => {
+        const result = await call('/api/exercises/1/files', {
+          method: 'POST',
+          form: form(pdf),
+          headers: app,
+        });
+        outcome = [result.status, result.data.error];
+      },
+      { fileStorage: storage },
+    );
+    return outcome;
+  };
+
+  const full = await upload(uploadPool({ files: maxFilesPerExercise, bytes: 10 }));
+  assert.deepEqual(full, [409, `An exercise can hold at most ${maxFilesPerExercise} files`]);
+  const heavy = await upload(uploadPool({ files: 1, bytes: maxBytesPerExercise - 1 }));
+  assert.deepEqual(heavy, [413, 'The files of one exercise must total at most 100 MB']);
+  assert.deepEqual(stored, [], 'nothing was stored for a refused upload');
+  const fine = await upload(uploadPool({ files: maxFilesPerExercise - 1, bytes: 10 }));
+  assert.deepEqual(fine, [201, undefined]);
+  assert.equal(stored.length, 1);
+});
+
+test('one upload too many at once gets a 503 and the others go through (#266)', async () => {
+  let started = 0;
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => (release = resolve));
+  const storage = {
+    put: async () => {
+      started += 1;
+      await held;
+    },
+    get: async () => Readable.from([]),
+    remove: async () => undefined,
+  };
+  await withApi(
+    uploadPool(),
+    async (call) => {
+      const send = () =>
+        call('/api/exercises/1/files', { method: 'POST', form: form(pdf), headers: app });
+      const inFlight = Array.from({ length: maxConcurrentUploads }, send);
+      while (started < maxConcurrentUploads) await new Promise((r) => setTimeout(r, 5));
+      // Every slot is busy with a stored file waiting: the next one is turned away at once.
+      const extra = await send();
+      assert.equal(extra.status, 503);
+      assert.match(String(extra.data.error), /Too many uploads/);
+      release();
+      const statuses = (await Promise.all(inFlight)).map((r) => r.status);
+      assert.deepEqual(statuses, Array(maxConcurrentUploads).fill(201));
+      // The slots are free again.
+      assert.equal((await send()).status, 201);
+    },
+    { fileStorage: storage },
+  );
+});
+
+test('a stored file is streamed with a sandbox policy (#266)', async () => {
+  const pool = {
+    query: async () => ({
+      rows: [{ key: 'k', name: 'a.pdf', type: 'application/pdf', size: pdf.length }],
+      rowCount: 1,
+    }),
+  } as unknown as Pool;
+  const storage = {
+    put: async () => undefined,
+    get: async () => Readable.from([pdf.subarray(0, 10), pdf.subarray(10)]),
+    remove: async () => undefined,
+  };
+  await withApi(
+    pool,
+    async (call) => {
+      const response = await call('/api/exercise-files/1/content');
+      assert.equal(response.status, 200);
+      assert.equal(response.headers.get('content-security-policy'), 'sandbox');
+      assert.equal(response.headers.get('x-content-type-options'), 'nosniff');
+      assert.deepEqual(response.bytes, pdf);
+    },
+    { fileStorage: storage },
+  );
 });
