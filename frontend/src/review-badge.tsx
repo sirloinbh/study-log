@@ -2,8 +2,8 @@ import { BellRing } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 
-import { requestJson } from './api';
 import { Badge } from './components/ui/badge';
+import { requestJson } from './lib/api';
 
 // The top bar link to the reviews page, shown while reviews are due (#44). It sits in the top bar
 // because on a phone the menu is folded away. It counts again on each page change, after a change

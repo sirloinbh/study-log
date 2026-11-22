@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 
-import { type RequestError, requestJson } from './api';
+import { type RequestError, requestJson } from './lib/api';
 import { Loading } from './loading';
 import { periodLabels, reviewBars, type ReviewStats, type StatPeriod } from './study-stats';
 import { useRecharts } from './use-recharts';
