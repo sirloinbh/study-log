@@ -2,6 +2,7 @@ import { Router } from 'express';
 import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod/v4';
 
+import { auditChange } from './audit-log.js';
 import { calendarDate, datePlusDays } from './dates.js';
 import { inTransaction } from './sql.js';
 import { parseId } from './standard/http.js';
@@ -163,6 +164,11 @@ export function reviewRoutes(pool: Pool, today: () => string) {
         id,
         date,
       ]);
+      await auditChange(req, res, client, 'update', 'review', id, {
+        change: 'complete',
+        studyLogId: review.studyLogId,
+        round: review.round,
+      });
       if (review.round === reviewGaps.length)
         return { status: 200, body: { completedOn: date, next: null } };
       const next = { round: review.round + 1, dueDate: reviewDueDate(date, review.round + 1) };
@@ -179,16 +185,31 @@ export function reviewRoutes(pool: Pool, today: () => string) {
   router.post('/:id/snooze', async (req, res) => {
     const id = parseId(req.params.id, 'review');
     const date = today();
-    const reply = await changeOpenRound(pool, id, (client, review) =>
-      moveRound(client, id, snoozedDate(review.dueDate, date)),
-    );
+    const reply = await changeOpenRound(pool, id, async (client, review) => {
+      const moved = await moveRound(client, id, snoozedDate(review.dueDate, date));
+      await auditChange(req, res, client, 'update', 'review', id, {
+        change: 'snooze',
+        studyLogId: review.studyLogId,
+        round: review.round,
+      });
+      return moved;
+    });
     res.status(reply.status).json(reply.body);
   });
 
   router.put('/:id/due-date', async (req, res) => {
     const id = parseId(req.params.id, 'review');
     const { dueDate } = dueDateInput.parse(req.body);
-    const reply = await changeOpenRound(pool, id, (client) => moveRound(client, id, dueDate));
+    const reply = await changeOpenRound(pool, id, async (client, review) => {
+      const moved = await moveRound(client, id, dueDate);
+      await auditChange(req, res, client, 'update', 'review', id, {
+        change: 'due-date',
+        studyLogId: review.studyLogId,
+        round: review.round,
+        dueDate,
+      });
+      return moved;
+    });
     res.status(reply.status).json(reply.body);
   });
 

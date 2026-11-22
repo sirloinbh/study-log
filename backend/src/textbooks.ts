@@ -2,6 +2,7 @@ import { Router } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod/v4';
 
+import { auditChange } from './audit-log.js';
 import { removeStoredFiles, storedKeys } from './exercise-files.js';
 import type { FileStorage } from './file-storage.js';
 import { inTransaction } from './sql.js';
@@ -48,21 +49,32 @@ export function textbookRoutes(pool: Pool, storage: FileStorage) {
 
   router.post('/', async (req, res) => {
     const book = textbookInput.parse(req.body);
-    const { rows } = await pool.query(
-      `INSERT INTO textbooks (title, author, edition) VALUES ($1, $2, $3) RETURNING ${columns}`,
-      [book.title, book.author, book.edition],
-    );
+    const { rows } = await inTransaction(pool, async (client) => {
+      const added = await client.query(
+        `INSERT INTO textbooks (title, author, edition) VALUES ($1, $2, $3) RETURNING ${columns}`,
+        [book.title, book.author, book.edition],
+      );
+      await auditChange(req, res, client, 'create', 'textbook', added.rows[0].id, {
+        title: book.title,
+      });
+      return added;
+    });
     res.status(201).json({ textbook: rows[0] });
   });
 
   router.put('/:id', async (req, res) => {
     const id = parseId(req.params.id, 'textbook');
     const book = textbookInput.parse(req.body);
-    const { rows } = await pool.query(
-      `UPDATE textbooks SET title = $2, author = $3, edition = $4, updated_at = now()
-       WHERE id = $1 RETURNING ${columns}`,
-      [id, book.title, book.author, book.edition],
-    );
+    const { rows } = await inTransaction(pool, async (client) => {
+      const changed = await client.query(
+        `UPDATE textbooks SET title = $2, author = $3, edition = $4, updated_at = now()
+         WHERE id = $1 RETURNING ${columns}`,
+        [id, book.title, book.author, book.edition],
+      );
+      if (changed.rows[0])
+        await auditChange(req, res, client, 'update', 'textbook', id, { title: book.title });
+      return changed;
+    });
     if (rows.length === 0) return void res.status(404).json(notFound);
     res.json({ textbook: rows[0] });
   });
@@ -83,9 +95,12 @@ export function textbookRoutes(pool: Pool, storage: FileStorage) {
         const book = await client.query('SELECT 1 FROM textbooks WHERE id = $1 FOR UPDATE', [id]);
         if (!book.rowCount) return { status: 404, body: notFound };
         const stored = await storedKeys(client, { textbookId: id });
-        let rowCount: number | null;
+        let deleted: { rows: { title: string }[]; rowCount: number | null };
         try {
-          ({ rowCount } = await client.query('DELETE FROM textbooks WHERE id = $1', [id]));
+          deleted = await client.query<{ title: string }>(
+            'DELETE FROM textbooks WHERE id = $1 RETURNING title',
+            [id],
+          );
         } catch (error) {
           if ((error as { code?: string }).code !== '23503') throw error;
           return {
@@ -93,7 +108,10 @@ export function textbookRoutes(pool: Pool, storage: FileStorage) {
             body: { error: 'A textbook with a study log or schedule attached cannot be deleted' },
           };
         }
-        if (!rowCount) return { status: 404, body: notFound };
+        if (!deleted.rowCount) return { status: 404, body: notFound };
+        await auditChange(req, res, client, 'delete', 'textbook', id, {
+          title: deleted.rows[0].title,
+        });
         keys = stored;
         return { status: 204 };
       },

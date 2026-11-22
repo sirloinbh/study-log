@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 
-import { type RequestError, requestJson } from './api';
 import { useBusy } from './busy';
 import { Calendar } from './calendar';
+import { type RequestError, requestJson } from './lib/api';
 import { ButtonSpinner, Loading } from './loading';
 import { Memo } from './memo';
 import { StudyLogSearch } from './study-log-search';
@@ -194,7 +194,7 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
       studyType: log.studyType,
     });
     // On a phone the form sits above the list; bring it into view.
-    document.getElementById('study-log-date')?.focus?.();
+    setWantFocus('study-log-date');
   };
 
   const remove = async (id: number) => {

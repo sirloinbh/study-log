@@ -1,7 +1,7 @@
 import type { Server } from 'node:http';
 
 import type express from 'express';
-import { Client, type Pool } from 'pg';
+import { Client, type Pool, Pool as RealPool } from 'pg';
 
 import { createApp } from '../src/app.js';
 import type { Extractor } from '../src/extraction.js';
@@ -57,6 +57,39 @@ const closeServer = (server: Server) =>
   new Promise<void>((resolve, reject) =>
     server.close((error) => (error ? reject(error) : resolve())),
   );
+
+// A hand-made pool (not a real pg Pool) is changed in two ways, because the routes write in
+// transactions and every change leaves an audit row (#263): one with only `query` gets a `connect`,
+// and the clients it hands out answer the audit insert (and, for a pool with only `query`, BEGIN,
+// COMMIT and ROLLBACK) on their own, so a test sees only the statements it cares about. A real Pool
+// is used as it is: the integration tests read the audit rows.
+const isAudit = (text: string) => /INSERT INTO audit_log/.test(text);
+const isTransactionStatement = (text: string) => /^\s*(BEGIN|COMMIT|ROLLBACK)\b/.test(text);
+type Query = (text: string, values?: unknown[]) => Promise<unknown>;
+export function withTransactions(pool: Pool): Pool {
+  if (pool instanceof RealPool) return pool;
+  type Client = { query: Query; release: () => void };
+  const fake = pool as unknown as { query: Query; connect?: () => Promise<Client> };
+  const connect = fake.connect;
+  const quiet =
+    (query: Query, onlyAudit: boolean): Query =>
+    (text, values) =>
+      isAudit(text) || (!onlyAudit && isTransactionStatement(text))
+        ? Promise.resolve({ rows: [], rowCount: 0 })
+        : query(text, values);
+  const poolQuery: Query = (text, values) => (fake.query as Query).call(pool, text, values);
+  return Object.assign(Object.create(pool) as Pool, {
+    connect: async () => {
+      if (connect) {
+        const client: Client = await connect.call(pool);
+        return Object.assign(Object.create(client), {
+          query: quiet(client.query.bind(client), true),
+        });
+      }
+      return { query: quiet(poolQuery, false), release: () => undefined };
+    },
+  });
+}
 
 export async function withApi(
   pool: Pool,
@@ -116,7 +149,7 @@ export async function withApi(
       get: refuse,
       remove: refuse,
     };
-    const server = createApp(pool, {
+    const server = createApp(withTransactions(pool), {
       ...options,
       translator,
       extractor,

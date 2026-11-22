@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 
-import { type RequestError, requestJson } from './api';
+import { type RequestError, requestJson } from './lib/api';
 import { Loading } from './loading';
 import { formatMinutes } from './study-logs-data';
 import { chapterPercent, type TextbookStats as Stats, textbookStatsPath } from './study-stats';

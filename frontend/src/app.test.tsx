@@ -38,11 +38,15 @@ test('the study log is the first page and shows the server date', async () => {
   expect(await screen.findByText('Server connected · 2026-10-26')).toBeInTheDocument();
 });
 
-test('reports a server error as an alert and does not open the page body', async () => {
+test('reports a server error as an alert and still opens the page body', async () => {
   server({ body: { error: 'Cannot connect to the database' }, status: 503 });
   render(<App />);
-  expect(await screen.findByRole('alert')).toHaveTextContent('Cannot connect to the database');
-  expect(document.querySelector('.legacy')).toBeNull();
+  expect(await screen.findByText('Cannot connect to the database')).toHaveAttribute(
+    'role',
+    'alert',
+  );
+  // The pages use the client's own date, so they do not wait for the health check.
+  expect(document.querySelector('.legacy')).not.toBeNull();
 });
 
 test('each page has its own address and is marked in the main menu', async () => {

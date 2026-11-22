@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 
-import { type RequestError, requestJson } from './api';
+import { type RequestError, requestJson } from './lib/api';
 import { Loading } from './loading';
 import { formatMinutes } from './study-logs-data';
 import { barWidth, hourLabel, type StudyPattern as Pattern, weekdayNames } from './study-stats';

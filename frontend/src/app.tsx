@@ -8,13 +8,14 @@ import {
   Settings2,
   Tags,
 } from 'lucide-react';
-import { type ReactNode, useEffect, useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
 
 import { AppShell, type NavItem } from './components/layout/app-shell';
 import { EmptyState } from './components/ui/empty-state';
 import { Toaster } from './components/ui/sonner';
-import { type Health, healthText } from './health';
+import { useServiceDate } from './date';
+import { type Health, healthText, useHealth } from './health';
 import { Keywords } from './keywords';
 import { Retrospectives } from './retrospectives';
 import { ReviewBadge } from './review-badge';
@@ -49,34 +50,20 @@ const nav: NavItem[] = [
   { to: pages.settings, label: 'Settings', icon: Settings2 },
 ];
 
-function useHealth() {
-  const [health, setHealth] = useState<Health>({ state: 'loading' });
-  useEffect(() => {
-    fetch('/api/health')
-      .then(async (response) => {
-        const data = (await response.json()) as { today?: string; error?: string };
-        setHealth(
-          response.ok && data.today
-            ? { state: 'ok', today: data.today }
-            : { state: 'error', message: data.error ?? 'Cannot check the server status' },
-        );
-      })
-      .catch(() => setHealth({ state: 'error', message: 'Cannot reach the server' }));
-  }, []);
-  return health;
-}
-
-// Page heading and server status. The page body needs the server date, so it waits for /api/health.
+// Page heading and server status. The body does not wait for /api/health: the service date comes
+// from the client (date.ts), and the server status line retries by itself while the server is down.
 // The body keeps the app's own styles (style.css, scoped to .legacy).
 function Page({
   title,
   description,
   health,
+  today,
   children,
 }: {
   title: string;
   description: string;
   health: Health;
+  today: string;
   children: (today: string) => ReactNode;
 }) {
   return (
@@ -94,13 +81,14 @@ function Page({
           </p>
         )}
       </header>
-      {health.state === 'ok' && <div className="legacy">{children(health.today)}</div>}
+      <div className="legacy">{children(today)}</div>
     </section>
   );
 }
 
 export function App() {
   const health = useHealth();
+  const today = useServiceDate();
   // Pages that can change what is due bump this, so the badge counts again without a page change.
   const [reviewVersion, setReviewVersion] = useState(0);
   const reviewsChanged = () => setReviewVersion((version) => version + 1);
@@ -112,7 +100,7 @@ export function App() {
           nav={nav}
           actions={
             <>
-              <ReviewBadge to={pages.reviews} version={reviewVersion} />
+              <ReviewBadge to={pages.reviews} version={reviewVersion} day={today} />
               <AccountActions />
             </>
           }
@@ -125,6 +113,7 @@ export function App() {
                   title="Study log"
                   description="Record the time and topics you studied today and review recent logs"
                   health={health}
+                  today={today}
                 >
                   {(today) => <StudyLogs today={today} onChange={reviewsChanged} />}
                 </Page>
@@ -137,6 +126,7 @@ export function App() {
                   title="Schedules"
                   description="Set a period and a daily amount to make a study goal for each day"
                   health={health}
+                  today={today}
                 >
                   {(today) => <Schedules today={today} />}
                 </Page>
@@ -149,6 +139,7 @@ export function App() {
                   title="Reviews"
                   description="Check what to review by period, then mark it done or change its date"
                   health={health}
+                  today={today}
                 >
                   {() => <Reviews onChange={reviewsChanged} />}
                 </Page>
@@ -161,6 +152,7 @@ export function App() {
                   title="Textbooks"
                   description="Register textbooks and manage the title, author, and edition"
                   health={health}
+                  today={today}
                 >
                   {() => <Textbooks />}
                 </Page>
@@ -173,6 +165,7 @@ export function App() {
                   title="Keywords"
                   description="Save important keywords you meet while studying by date and find them again"
                   health={health}
+                  today={today}
                 >
                   {(today) => <Keywords today={today} />}
                 </Page>
@@ -185,6 +178,7 @@ export function App() {
                   title="Stats"
                   description="See study time by period and the daily average at a glance"
                   health={health}
+                  today={today}
                 >
                   {() => <Stats />}
                 </Page>
@@ -197,6 +191,7 @@ export function App() {
                   title="Retrospectives"
                   description="Look back on a week or a month of study and write a retrospective"
                   health={health}
+                  today={today}
                 >
                   {(today) => <Retrospectives today={today} />}
                 </Page>
@@ -209,6 +204,7 @@ export function App() {
                   title="Settings"
                   description="App settings and data management"
                   health={health}
+                  today={today}
                 >
                   {() => (
                     <EmptyState

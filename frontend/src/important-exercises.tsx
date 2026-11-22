@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 
-import { type RequestError, requestJson } from './api';
 import { useBusy } from './busy';
 import { contentPath, type Exercise } from './exercise';
+import { type RequestError, requestJson } from './lib/api';
 import { Loading } from './loading';
 import { contentLabel, type ContentNode, contentOptions, type Textbook } from './textbook';
 

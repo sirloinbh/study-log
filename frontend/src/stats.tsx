@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 
-import { type RequestError, requestJson } from './api';
 import { Heatmap } from './heatmap';
+import { type RequestError, requestJson } from './lib/api';
 import { Loading } from './loading';
 import { ReviewRateChart } from './review-rate-chart';
 import { formatMinutes } from './study-logs-data';
