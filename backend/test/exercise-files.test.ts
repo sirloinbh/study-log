@@ -186,3 +186,37 @@ test('S3 storage sends to the configured bucket and explains SDK failures (#28)'
     });
   }
 });
+
+test('an S3 failure is logged once with its name and request ID, and no key (#262)', async () => {
+  const client = {
+    send: async () => {
+      throw Object.assign(new Error('Slow down'), {
+        name: 'SlowDown',
+        $metadata: { requestId: 'REQ123', httpStatusCode: 503 },
+      });
+    },
+  };
+  const storage = s3Storage(
+    { bucket: 'study-files', region: 'ap-northeast-2' },
+    client as unknown as Parameters<typeof s3Storage>[1],
+  );
+  const lines: string[] = [];
+  const original = console.error;
+  console.error = (line: string) => void lines.push(line);
+  try {
+    await assert.rejects(storage.get('exercises/1/secret-name.pdf'), (error: unknown) => {
+      assert.ok(error instanceof FileStorageError);
+      assert.equal(error.status, 502);
+      return true;
+    });
+  } finally {
+    console.error = original;
+  }
+  assert.equal(lines.length, 1);
+  const entry = JSON.parse(lines[0]);
+  assert.equal(entry.event, 'file_storage_failed');
+  assert.equal(entry.error_name, 'SlowDown');
+  assert.equal(entry.aws_request_id, 'REQ123');
+  assert.equal(entry.http_status, 503);
+  assert.doesNotMatch(lines[0], /secret-name|study-files/);
+});

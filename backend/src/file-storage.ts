@@ -25,10 +25,31 @@ export class FileStorageError extends Error {
 
 type S3Settings = { bucket?: string; region?: string };
 
+// Logs the SDK failure before it is mapped, so a 502 can be traced: the error name, its message, and
+// the AWS request ID. The line carries no bucket, key, or credentials (the SDK messages do not
+// include them), and the object key is never passed in.
+function logStorageFailure(error: unknown) {
+  const metadata = (
+    error as { $metadata?: { requestId?: unknown; httpStatusCode?: unknown } } | null
+  )?.$metadata;
+  console.error(
+    JSON.stringify({
+      time: new Date().toISOString(),
+      level: 'error',
+      event: 'file_storage_failed',
+      error_name: error instanceof Error ? error.name : typeof error,
+      error_message: error instanceof Error ? error.message : String(error),
+      aws_request_id: typeof metadata?.requestId === 'string' ? metadata.requestId : null,
+      http_status: typeof metadata?.httpStatusCode === 'number' ? metadata.httpStatusCode : null,
+    }),
+  );
+}
+
 // Turns SDK failures into what the person can act on. The SDK names its errors; the classes are
 // spread over several packages, so the name is what is compared.
 function explain(error: unknown): never {
   if (error instanceof FileStorageError) throw error;
+  logStorageFailure(error);
   const name = error instanceof Error ? error.name : '';
   if (name === 'NoSuchKey' || name === 'NotFound')
     throw new FileStorageError(404, 'The stored file is missing');
