@@ -1,7 +1,9 @@
+import { useQueryClient } from '@tanstack/react-query';
 import React, { useEffect, useState } from 'react';
 
 import { useBusy } from './busy';
-import { type RequestError, requestJson } from './lib/api';
+import type { RequestError } from './lib/api';
+import { apiKey, useApiMutation, useApiQuery } from './lib/query';
 import { ButtonSpinner, Loading } from './loading';
 import {
   kindLabels,
@@ -16,6 +18,9 @@ import {
 import { formatMinutes } from './study-logs-data';
 import { StudyPattern } from './study-pattern';
 
+const periodPath = '/api/retrospectives/period';
+const recentPath = '/api/retrospectives';
+
 type Notice = { kind: 'status' | 'alert'; text: string } | undefined;
 
 // Weekly and monthly retrospectives (#19): one per period, written next to a summary of that
@@ -24,17 +29,11 @@ export function Retrospectives({ today }: { today: string }) {
   const [kind, setKind] = useState<RetrospectiveKind>('weekly');
   // Any date inside the shown period.
   const [date, setDate] = useState(today);
-  // Kept per kind and date, so a slow answer for another period is never shown as this one's.
-  const [periods, setPeriods] = useState<Record<string, RetrospectivePeriod>>({});
-  const [loadError, setLoadError] = useState<{ key: string; message: string }>();
   // Unsaved text, tagged with its period (kind and first day) so another period never shows it
   // and coming back to this one does.
   const [draft, setDraft] = useState<{ key: string; text: string }>();
   const [confirming, setConfirming] = useState(false);
-  const [recent, setRecent] = useState<Retrospective[]>();
-  // The recent list failing to load is shown as an error with a retry, never as an empty list.
-  const [recentError, setRecentError] = useState<string>();
-  const [recentTry, setRecentTry] = useState(0);
+  // Bumped after each change so the study pattern reads again.
   const [reload, setReload] = useState(0);
   const [notice, setNotice] = useState<Notice>(undefined);
   const { busy, action, nameNext, begin, end } = useBusy();
@@ -47,41 +46,35 @@ export function Retrospectives({ today }: { today: string }) {
     document.getElementById(wantFocus)?.focus?.();
   }, [wantFocus, busy]);
 
-  const key = `${kind}:${date}`;
-
-  useEffect(() => {
-    let current = true;
-    requestJson<RetrospectivePeriod>(`/api/retrospectives/period?kind=${kind}&date=${date}`)
-      .then((data) => {
-        if (!current) return;
-        setPeriods((all) => ({ ...all, [`${kind}:${date}`]: data }));
-        setLoadError((failed) => (failed?.key === `${kind}:${date}` ? undefined : failed));
-      })
-      .catch(
-        (failure: RequestError) =>
-          current && setLoadError({ key: `${kind}:${date}`, message: failure.message }),
-      );
-    return () => {
-      current = false;
-    };
-  }, [kind, date, reload]);
-
-  useEffect(() => {
-    let current = true;
-    requestJson<{ retrospectives: Retrospective[] }>('/api/retrospectives?limit=20')
-      .then((data) => {
-        if (!current) return;
-        setRecent(data.retrospectives);
-        setRecentError(undefined);
-      })
-      .catch((failure: RequestError) => current && setRecentError(failure.message));
-    return () => {
-      current = false;
-    };
-  }, [reload, recentTry]);
-
-  const period = periods[key];
-  const error = loadError?.key === key ? loadError.message : undefined;
+  const client = useQueryClient();
+  // One cached answer per kind and date, so a slow answer for another period is never shown as this one's.
+  const periodQuery = useApiQuery<RetrospectivePeriod>(
+    apiKey(periodPath, kind, date),
+    `${periodPath}?kind=${kind}&date=${date}`,
+  );
+  // The recent list failing to load is shown as an error with a retry, never as an empty list.
+  const recentQuery = useApiQuery<{ retrospectives: Retrospective[] }>(
+    apiKey(recentPath),
+    `${recentPath}?limit=20`,
+  );
+  const period = periodQuery.data;
+  const error = periodQuery.error?.message;
+  const recent = recentQuery.data?.retrospectives;
+  const recentError = recentQuery.error?.message;
+  const save = useApiMutation<
+    { retrospective: Retrospective },
+    { kind: RetrospectiveKind; from: string; body: string }
+  >(({ kind: saved, from, body }) => ({
+    path: `/api/retrospectives/${saved}/${from}`,
+    method: 'PUT',
+    body: { body },
+  }));
+  const del = useApiMutation<unknown, { kind: RetrospectiveKind; from: string }>(
+    ({ kind: removed, from }) => ({
+      path: `/api/retrospectives/${removed}/${from}`,
+      method: 'DELETE',
+    }),
+  );
   const draftKey = period && `${period.kind}:${period.from}`;
   const text = draft && draft.key === draftKey ? draft.text : (period?.retrospective?.body ?? '');
   const thisPeriod = period && today >= period.from && today <= period.to;
@@ -110,22 +103,27 @@ export function Retrospectives({ today }: { today: string }) {
       setNotice({ kind: 'alert', text: (failure as RequestError).message });
     } finally {
       setConfirming(false);
+      // The period and the recent list are read again before the controls come back.
+      await Promise.all([
+        client.invalidateQueries({ queryKey: apiKey(periodPath) }),
+        client.invalidateQueries({ queryKey: apiKey(recentPath) }),
+      ]);
       setReload((count) => count + 1);
       end();
     }
   };
 
-  const save = (event: { preventDefault(): void }) => {
+  const submit = (event: { preventDefault(): void }) => {
     event.preventDefault();
     if (!period) return;
     nameNext('save');
     void change(async () => {
-      const data = await requestJson<{ retrospective: Retrospective }>(
-        `/api/retrospectives/${period.kind}/${period.from}`,
-        { method: 'PUT', body: { body: text } },
-      );
+      const data = await save.mutateAsync({ kind: period.kind, from: period.from, body: text });
       // Show the saved text at once, not the old one until the reload comes back.
-      setPeriods((all) => ({ ...all, [key]: { ...period, retrospective: data.retrospective } }));
+      client.setQueryData(apiKey(periodPath, kind, date), {
+        ...period,
+        retrospective: data.retrospective,
+      });
       setDraft(undefined);
       setNotice({ kind: 'status', text: 'Saved' });
     });
@@ -135,15 +133,13 @@ export function Retrospectives({ today }: { today: string }) {
     period &&
     change(async () => {
       try {
-        await requestJson(`/api/retrospectives/${period.kind}/${period.from}`, {
-          method: 'DELETE',
-        });
+        await del.mutateAsync({ kind: period.kind, from: period.from });
       } catch (failure) {
         setWantFocus((failure as RequestError).status === 404 ? 'retro-heading' : 'retro-delete');
         throw failure;
       }
       setWantFocus('retro-heading');
-      setPeriods((all) => ({ ...all, [key]: { ...period, retrospective: null } }));
+      client.setQueryData(apiKey(periodPath, kind, date), { ...period, retrospective: null });
       setDraft(undefined);
       setNotice({ kind: 'status', text: 'Deleted' });
     });
@@ -233,7 +229,7 @@ export function Retrospectives({ today }: { today: string }) {
                 </dd>
               </div>
             </dl>
-            <form className="log-form" onSubmit={save}>
+            <form className="log-form" onSubmit={submit}>
               <label className="wide">
                 Retrospective
                 <textarea
@@ -320,13 +316,7 @@ export function Retrospectives({ today }: { today: string }) {
         {recentError !== undefined && (
           <div role="alert" className="error">
             <p>Could not load the past retrospectives: {recentError}</p>
-            <button
-              type="button"
-              onClick={() => {
-                setRecentError(undefined);
-                setRecentTry((n) => n + 1);
-              }}
-            >
+            <button type="button" onClick={() => void recentQuery.refetch()}>
               Retry loading the past retrospectives
             </button>
           </div>

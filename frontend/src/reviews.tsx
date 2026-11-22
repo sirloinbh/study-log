@@ -1,7 +1,8 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 
 import { useBusy } from './busy';
-import { type RequestError, requestJson } from './lib/api';
+import type { RequestError } from './lib/api';
+import { apiKey, useApiMutation, useApiQuery } from './lib/query';
 import { ButtonSpinner, Loading } from './loading';
 import { Memo } from './memo';
 import { plural } from './plural';
@@ -22,16 +23,14 @@ const completeId = (review: Review) => `review-complete-${review.id}`;
 const snoozeId = (review: Review) => `review-snooze-${review.id}`;
 const editId = (review: Review) => `review-edit-${review.id}`;
 const rangeId = (range: ReviewRange) => `review-range-${range}`;
-const listPath = (range: ReviewRange) => `/api/reviews/${range}`;
+const reviewsPath = '/api/reviews';
+const listPath = (range: ReviewRange) => `${reviewsPath}/${range}`;
 
 // Reviews (#43, #45): rounds not yet completed, up to today, this week or all of them. Overdue ones
 // stay until they are completed. Completing cannot be undone (docs/decisions/review-rules.md), so
 // the next round's date is shown right after, and can be changed like any other.
 export function Reviews({ onChange }: { onChange?: () => void }) {
   const [range, setRange] = useState<ReviewRange>('today');
-  // Tagged with its range, so a slow answer for another range is never shown as this one's.
-  const [loaded, setLoaded] = useState<Listed & { range: ReviewRange }>();
-  const [loadError, setLoadError] = useState<{ range: ReviewRange; message: string }>();
   const [editor, setEditor] = useState<Editor>();
   const [notice, setNotice] = useState<Notice>(undefined);
   // One change at a time, including the reload after it.
@@ -39,26 +38,30 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
   // The element to focus once the change is done and the controls are enabled again.
   const [wantFocus, setWantFocus] = useState<string>();
 
-  // Only the newest load counts, so a slower, older answer never brings back a review just changed.
-  const newestLoad = useRef(0);
-  const load = useRef(async (target: ReviewRange) => {
-    const request = ++newestLoad.current;
-    try {
-      const data = await requestJson<Listed>(listPath(target));
-      if (request !== newestLoad.current) return;
-      setLoaded({ ...data, range: target });
-      setLoadError(undefined);
-      return data.reviews;
-    } catch (failure) {
-      if (request !== newestLoad.current) return;
-      // A failure keeps the list on screen and reports that it could not be refreshed.
-      setLoadError({ range: target, message: (failure as RequestError).message });
-    }
-  }).current;
-
-  useEffect(() => {
-    void load(range);
-  }, [load, range]);
+  // One cached list per range, so a slow answer for another range is never shown as this one's. Always
+  // stale, so picking a range reads it again as it did before the query layer. While a failed list loads
+  // again its error is hidden, so the same error coming back is announced again.
+  const query = useApiQuery<Listed>(apiKey(reviewsPath, range), listPath(range), {
+    staleTime: 0,
+  });
+  const { refetch } = query;
+  const completeReview = useApiMutation<Completed, number>((id) => ({
+    path: `${reviewsPath}/${id}/complete`,
+  }));
+  const snoozeReview = useApiMutation<Moved, number>((id) => ({
+    path: `${reviewsPath}/${id}/snooze`,
+  }));
+  const moveReview = useApiMutation<Moved, { id: number; dueDate: string }>(({ id, dueDate }) => ({
+    path: `${reviewsPath}/${id}/due-date`,
+    method: 'PUT',
+    body: { dueDate },
+  }));
+  // Reads the shown range again. Only the newest read counts, so a slower, older answer never brings
+  // back a review just changed. Resolves with the reviews, or nothing when the read failed.
+  const load = useCallback(async () => {
+    const result = await refetch();
+    return result.isError ? undefined : result.data?.reviews;
+  }, [refetch]);
 
   // Back on the tab, which may have been left overnight or changed elsewhere (#142), the list matches
   // the badge again. While a change runs nothing is added: its own reload comes after it.
@@ -67,8 +70,8 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
     const onFocus = () => {
       // A review that leaves the list takes the focused control with it.
       const item = document.activeElement?.closest<HTMLElement>('[data-review-id]');
-      if (!item) return void load(range);
-      void load(range).then((reviews) => {
+      if (!item) return void load();
+      void load().then((reviews) => {
         const gone = reviews?.every((review) => String(review.id) !== item.dataset.reviewId);
         // Unless focus has moved on to another control meanwhile. Nothing focused is not that: the
         // list may have rendered already and removed the control.
@@ -79,7 +82,7 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
     };
     window.addEventListener('focus', onFocus);
     return () => window.removeEventListener('focus', onFocus);
-  }, [busy, load, range]);
+  }, [busy, load]);
 
   useEffect(() => {
     if (!wantFocus || busy) return;
@@ -88,8 +91,8 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
     (document.getElementById(wantFocus) ?? document.getElementById(headingId))?.focus?.();
   }, [wantFocus, busy]);
 
-  const shown = loaded?.range === range ? loaded : undefined;
-  const error = loadError?.range === range ? loadError.message : undefined;
+  const shown = query.data;
+  const error = query.isFetching ? undefined : query.error?.message;
   const { heading, empty } = reviewRanges[range];
 
   // The review being given a new date left the list, changed elsewhere. Its form closes for good, or
@@ -134,7 +137,7 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
       if (gone) setEditor(undefined);
       setWantFocus(gone ? headingId : failed);
     } finally {
-      await load(range);
+      await load();
       end();
       onChange?.();
     }
@@ -144,10 +147,9 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
   // again, and an earlier change's error goes unless a date form it belongs to is still open.
   const retry = async () => {
     if (!begin()) return;
-    setLoadError(undefined);
     if (!editor) setNotice(undefined);
     setWantFocus(rangeId(range));
-    await load(range);
+    await load();
     end();
   };
 
@@ -155,9 +157,7 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
     run(
       review.id,
       async () => {
-        const { next } = await requestJson<Completed>(`/api/reviews/${review.id}/complete`, {
-          method: 'POST',
-        });
+        const { next } = await completeReview.mutateAsync(review.id);
         setEditor(undefined);
         setNotice({
           kind: 'status',
@@ -174,9 +174,7 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
     run(
       review.id,
       async () => {
-        const { dueDate } = await requestJson<Moved>(`/api/reviews/${review.id}/snooze`, {
-          method: 'POST',
-        });
+        const { dueDate } = await snoozeReview.mutateAsync(review.id);
         setEditor(undefined);
         setNotice({ kind: 'status', text: `Postponed by a day. The new due date is ${dueDate}` });
       },
@@ -191,9 +189,9 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
     void run(
       review.id,
       async () => {
-        const { dueDate } = await requestJson<Moved>(`/api/reviews/${review.id}/due-date`, {
-          method: 'PUT',
-          body: { dueDate: editor.dueDate },
+        const { dueDate } = await moveReview.mutateAsync({
+          id: review.id,
+          dueDate: editor.dueDate,
         });
         setEditor(undefined);
         setNotice({ kind: 'status', text: `Changed the due date to ${dueDate}` });

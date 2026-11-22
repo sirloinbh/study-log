@@ -1,9 +1,10 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, fireEvent, screen, waitFor } from '@testing-library/react';
 import { Link, MemoryRouter } from 'react-router';
 import { expect, test } from 'vitest';
 
 import { ReviewBadge } from './review-badge';
 import { fakeApi } from './test/fake-api';
+import { render } from './test/render';
 
 // Answers each count with the next value; the last one repeats.
 function counts(...values: (number | 'fail')[]) {

@@ -1,8 +1,9 @@
-import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, screen, within } from '@testing-library/react';
 import { expect, test } from 'vitest';
 
 import { chapterPercent, type TextbookStats as Stats, textbookStatsPath } from './study-stats';
 import { fakeApi } from './test/fake-api';
+import { render } from './test/render';
 import { TextbookStats } from './textbook-stats';
 
 const algebra = { id: 7, title: '선형대수', completedChapters: 1, totalChapters: 4 };
