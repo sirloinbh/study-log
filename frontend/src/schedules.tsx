@@ -1,7 +1,9 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 
 import { useBusy } from './busy';
-import { type RequestError, requestJson } from './lib/api';
+import type { RequestError } from './lib/api';
+import { apiKey, type ApiRequest, useApiMutation, useApiQuery } from './lib/query';
 import { Loading } from './loading';
 import { dayNames, type Schedule, type ScheduleDetail } from './schedule';
 import { type NewSchedule, type Notice, ScheduleCreateForm } from './schedule-create-form';
@@ -13,14 +15,11 @@ import { ScheduleList } from './schedule-list';
 // are, and the days of the one picked. A schedule's period and hours do not change once it is made
 // (docs/decisions/schedule-rules.md section 6), so this offers deleting rather than editing them.
 // This file holds the state and the requests; what is on screen is in the schedule-*.tsx files.
+const listKey = apiKey('/api/schedules');
+
 export function Schedules({ today }: { today: string }) {
-  const [schedules, setSchedules] = useState<Schedule[]>();
-  const [listError, setListError] = useState<string>();
-  const [reload, setReload] = useState(0);
+  const client = useQueryClient();
   const [pickedId, setPickedId] = useState<number>();
-  // Tagged with their schedule, so a slow answer for another one is never shown as this one's.
-  const [detail, setDetail] = useState<ScheduleDetail>();
-  const [detailError, setDetailError] = useState<{ id: number; message: string }>();
   const [confirming, setConfirming] = useState<number>();
   const [moving, setMoving] = useState<Moving>();
   const [renaming, setRenaming] = useState<Renaming>();
@@ -36,45 +35,43 @@ export function Schedules({ today }: { today: string }) {
     document.getElementById(wantFocus)?.focus?.();
   }, [wantFocus, busy]);
 
-  useEffect(() => {
-    let current = true;
-    requestJson<{ schedules: Schedule[] }>('/api/schedules')
-      .then((data) => {
-        if (!current) return;
-        setSchedules(data.schedules);
-        setListError(undefined);
-      })
-      .catch((failure: RequestError) => current && setListError(failure.message));
-    return () => {
-      current = false;
-    };
-  }, [reload]);
+  // Always stale, so picking or changing something reads the list and the days again as before.
+  const listQuery = useApiQuery<{ schedules: Schedule[] }>(listKey, '/api/schedules', {
+    staleTime: 0,
+  });
+  const schedules = listQuery.data?.schedules;
+  const listError = listQuery.error?.message;
 
   // The one picked, or the first in the list (the latest start); a picked one that is gone falls
   // back too.
   const shown = schedules?.find((item) => item.id === pickedId) ?? schedules?.[0];
   const shownId = shown?.id;
 
-  useEffect(() => {
-    if (shownId === undefined) return;
-    let current = true;
-    requestJson<ScheduleDetail>(`/api/schedules/${shownId}`)
-      .then((data) => {
-        if (!current) return;
-        setDetail(data);
-        setDetailError(undefined);
-      })
-      .catch(
-        (failure: RequestError) =>
-          current && setDetailError({ id: shownId, message: failure.message }),
-      );
-    return () => {
-      current = false;
-    };
-  }, [shownId, reload]);
+  // One cached answer per schedule, so a slow answer for another one is never shown as this one's.
+  const detailQuery = useApiQuery<ScheduleDetail>(
+    apiKey('/api/schedules', shownId),
+    `/api/schedules/${shownId}`,
+    { enabled: shownId !== undefined, staleTime: 0 },
+  );
+  const shownDetail = detailQuery.data;
+  // While the days are read again the error is hidden, so a second failure is announced anew.
+  const shownError = detailQuery.isFetching ? undefined : detailQuery.error?.message;
 
-  const shownDetail = detail?.schedule.id === shownId ? detail : undefined;
-  const shownError = detailError && detailError.id === shownId ? detailError.message : undefined;
+  const sendRequest = useApiMutation<ScheduleDetail, ApiRequest>((request) => request);
+  const deleteRequest = useApiMutation<unknown, number>((id) => ({
+    path: `/api/schedules/${id}`,
+    method: 'DELETE',
+  }));
+
+  // Shows a schedule's days at once, and even if reading them again fails.
+  const showDetail = (data: ScheduleDetail) =>
+    client.setQueryData(apiKey('/api/schedules', data.schedule.id), data);
+  // Reads the list and the days shown again, once what was just changed has been drawn.
+  const [reloads, setReloads] = useState(0);
+  const reload = () => setReloads((count) => count + 1);
+  useEffect(() => {
+    if (reloads > 0) void client.invalidateQueries({ queryKey: listKey });
+  }, [reloads, client]);
 
   // A new action takes back what was said about the last one, beside all three buttons.
   const clearNotices = () => {
@@ -91,16 +88,19 @@ export function Schedules({ today }: { today: string }) {
     setRenaming(undefined);
     setConfirming(undefined);
     try {
-      const data = await requestJson<ScheduleDetail>('/api/schedules', {
+      const data = await sendRequest.mutateAsync({
+        path: '/api/schedules',
         method: 'POST',
         body: schedule,
       });
-      setDetail(data);
+      showDetail(data);
       setPickedId(data.schedule.id);
-      setSchedules((all) => [data.schedule, ...(all ?? [])]);
+      client.setQueryData<{ schedules: Schedule[] }>(listKey, (old) => ({
+        schedules: [data.schedule, ...(old?.schedules ?? [])],
+      }));
       setNotice({ kind: 'status', text: 'Schedule created' });
       setWantFocus('schedule-heading');
-      setReload((count) => count + 1);
+      reload();
       return true;
     } catch (failure) {
       setNotice({ kind: 'alert', text: (failure as RequestError).message });
@@ -114,7 +114,7 @@ export function Schedules({ today }: { today: string }) {
   const changeDay = async (
     name: string,
     dayId: number,
-    request: () => Promise<ScheduleDetail>,
+    request: ApiRequest,
     success: string,
     focus: string,
     focusIfRefused: string = focus,
@@ -123,7 +123,7 @@ export function Schedules({ today }: { today: string }) {
     if (!begin()) return;
     clearNotices();
     try {
-      setDetail(await request());
+      showDetail(await sendRequest.mutateAsync(request));
       if (name === 'move') setMoving(undefined);
       setDayNotice({ kind: 'status', text: success });
       setWantFocus(focus);
@@ -145,7 +145,7 @@ export function Schedules({ today }: { today: string }) {
       }
     } finally {
       // The list's end date follows, and after a refusal the days are read again.
-      setReload((count) => count + 1);
+      reload();
       end();
     }
   };
@@ -154,11 +154,7 @@ export function Schedules({ today }: { today: string }) {
     changeDay(
       'toggle',
       id,
-      () =>
-        requestJson<ScheduleDetail>(
-          `/api/schedules/${scheduleId}/items/${id}/${done ? 'reopen' : 'complete'}`,
-          { method: 'POST' },
-        ),
+      { path: `/api/schedules/${scheduleId}/items/${id}/${done ? 'reopen' : 'complete'}` },
       done ? 'Completion undone' : 'Marked as done',
       `schedule-day-check-${id}`,
     );
@@ -167,11 +163,11 @@ export function Schedules({ today }: { today: string }) {
     changeDay(
       'move',
       target.id,
-      () =>
-        requestJson<ScheduleDetail>(`/api/schedules/${scheduleId}/items/${target.id}/date`, {
-          method: 'PUT',
-          body: { date: target.date, withLater: target.withLater },
-        }),
+      {
+        path: `/api/schedules/${scheduleId}/items/${target.id}/date`,
+        method: 'PUT',
+        body: { date: target.date, withLater: target.withLater },
+      },
       target.withLater ? 'Moved along with the later days' : 'Moved the day',
       `schedule-day-move-${target.id}`,
       `schedule-day-date-${target.id}`,
@@ -184,9 +180,12 @@ export function Schedules({ today }: { today: string }) {
     setMoving(undefined);
     setRenaming(undefined);
     try {
-      await requestJson(`/api/schedules/${id}`, { method: 'DELETE' });
+      await deleteRequest.mutateAsync(id);
       // At once, and even if reading the list again fails.
-      setSchedules((all) => all?.filter((item) => item.id !== id));
+      client.setQueryData<{ schedules: Schedule[] }>(
+        listKey,
+        (old) => old && { schedules: old.schedules.filter((item) => item.id !== id) },
+      );
       setListNotice({ kind: 'status', text: 'Schedule deleted' });
       setWantFocus('schedules-heading');
     } catch (failure) {
@@ -196,7 +195,7 @@ export function Schedules({ today }: { today: string }) {
       setWantFocus(status === 404 ? 'schedules-heading' : `schedule-delete-${id}`);
     } finally {
       setConfirming(undefined);
-      setReload((count) => count + 1);
+      reload();
       end();
     }
   };
@@ -216,16 +215,21 @@ export function Schedules({ today }: { today: string }) {
     clearNotices();
     setRenaming({ ...target, error: undefined });
     try {
-      const data = await requestJson<ScheduleDetail>(`/api/schedules/${target.id}`, {
+      const data = await sendRequest.mutateAsync({
+        path: `/api/schedules/${target.id}`,
         method: 'PUT',
         body: { title: target.title },
       });
-      setDetail(data);
+      showDetail(data);
       // At once, and even if reading the list again fails.
-      setSchedules((all) =>
-        all?.map((item) =>
-          item.id === target.id ? { ...item, title: data.schedule.title } : item,
-        ),
+      client.setQueryData<{ schedules: Schedule[] }>(
+        listKey,
+        (old) =>
+          old && {
+            schedules: old.schedules.map((item) =>
+              item.id === target.id ? { ...item, title: data.schedule.title } : item,
+            ),
+          },
       );
       setRenaming(undefined);
       setDayNotice({ kind: 'status', text: 'Schedule renamed' });
@@ -239,7 +243,7 @@ export function Schedules({ today }: { today: string }) {
         setWantFocus('schedules-heading');
       } else refuse(message);
     } finally {
-      setReload((count) => count + 1);
+      reload();
       end();
     }
   };
@@ -250,10 +254,11 @@ export function Schedules({ today }: { today: string }) {
     clearNotices();
     setMoving(undefined);
     setRenaming(undefined);
-    // Also the way to try again after its days could not be read: the error leaves first, so a
-    // second failure is shown and announced anew.
-    setDetailError(undefined);
-    setReload((count) => count + 1);
+    // Also the way to try again after its days could not be read: the shown error leaves while
+    // they are read, so a second failure is announced anew. A schedule newly picked reads its own
+    // days as it is shown.
+    if (id === shownId) void client.invalidateQueries({ queryKey: listKey });
+    else void client.invalidateQueries({ queryKey: listKey, exact: true });
   };
 
   const names = dayNames(shownDetail?.items ?? [], shownDetail?.schedule.startDate ?? '');

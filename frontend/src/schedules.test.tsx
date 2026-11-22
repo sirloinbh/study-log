@@ -101,33 +101,36 @@ describe('a textbook', () => {
   function bookServer(
     answerContents: { status?: number; body?: unknown } = { body: { contents } },
   ) {
+    // What the server holds once the schedule is made, so reading the list and the days again
+    // after it (as the screen does) answers with it.
+    let made: { schedule: ReturnType<typeof schedule>; items: unknown[] } | undefined;
     return fakeApi(({ method, path, body }) => {
       if (path === '/api/textbooks') return { body: { textbooks: [book] } };
       if (path === '/api/textbooks/7/contents') return answerContents;
-      if (method === 'GET' && path === '/api/schedules') return { body: { schedules: [] } };
-      const made = {
+      if (method === 'GET' && path === '/api/schedules')
+        return { body: { schedules: made ? [made.schedule] : [] } };
+      if (method === 'GET' && made) return { body: made };
+      const schedulePart = {
         ...schedule(9, (body as { title: string }).title),
         textbookId: 7,
         textbookTitle: '선형대수',
       };
-      return {
-        status: 201,
-        body: {
-          schedule: made,
-          items: [
-            {
-              id: 90,
-              date: '2026-03-02',
-              targetMinutes: 120,
-              completedOn: null,
-              contents: [
-                { id: 71, number: '1', title: '벡터' },
-                { id: 72, number: '2', title: '행렬' },
-              ],
-            },
-          ],
-        },
+      made = {
+        schedule: schedulePart,
+        items: [
+          {
+            id: 90,
+            date: '2026-03-02',
+            targetMinutes: 120,
+            completedOn: null,
+            contents: [
+              { id: 71, number: '1', title: '벡터' },
+              { id: 72, number: '2', title: '행렬' },
+            ],
+          },
+        ],
       };
+      return { status: 201, body: made };
     });
   }
 
