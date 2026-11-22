@@ -127,3 +127,23 @@ test('search wildcards are matched as plain characters', async () => {
     assert.deepEqual(sent[0], ['%50\\%\\_\\\\%', 50]);
   });
 });
+
+test('an update without a date sends no date, so the stored one stays (#271)', async () => {
+  const calls: { sql: string; params: unknown[] }[] = [];
+  const recordingPool = {
+    query: async (sql: string, params: unknown[]) => {
+      calls.push({ sql, params });
+      return { rows: [{ id: 1, date: '2026-10-01', keyword: '행렬', memo: '' }], rowCount: 1 };
+    },
+  } as unknown as Pool;
+  await withApi(recordingPool, async (call) => {
+    const { status } = await call('/api/keywords/1', {
+      method: 'PUT',
+      body: { keyword: '행렬' },
+    });
+    assert.equal(status, 200);
+  });
+  assert.equal(calls.length, 1);
+  assert.match(calls[0].sql, /COALESCE\(\$2::date, keyword_date\)/);
+  assert.equal(calls[0].params[1], null);
+});
