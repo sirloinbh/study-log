@@ -5,35 +5,26 @@ import {
   contentPath,
   emptyExerciseForm,
   type Exercise,
-  type ExerciseAnswer,
   type ExerciseForm,
   exerciseLabel,
-  exerciseLimits,
   questionText,
 } from './exercise';
+import { ExerciseActions } from './exercise-actions';
+import { ExerciseAnswerView } from './exercise-answer';
 import { ExerciseExtraction } from './exercise-extraction';
+import { ExerciseFormView } from './exercise-form';
+import { ExerciseToolbar } from './exercise-toolbar';
 import { ExerciseTranslation } from './exercise-translation';
 import { type RequestError, requestJson } from './lib/api';
-import { ButtonSpinner, Loading } from './loading';
+import { Loading } from './loading';
 import { type ContentNode, contentOptions, type Textbook } from './textbook';
-
-// The API's answer for a chapter that does not exist (or belongs to another textbook).
-const contentMissing = 'Contents entry not found';
+import { useAnswerPanel } from './use-answer-panel';
+import { useExerciseData } from './use-exercise-data';
 
 type Notice = { kind: 'status' | 'alert'; text: string; contentId: number } | undefined;
 
 // The open editor: a new exercise (`id` undefined) or an edit of `id`.
 type Editor = { contentId: number; id?: number; form: ExerciseForm };
-
-// The one exercise whose answer is shown. `body` is undefined while loading and null when no
-// answer is saved; `draft` is set while the answer is being typed.
-type AnswerPanel = {
-  contentId: number;
-  id: number;
-  body?: string | null;
-  error?: string;
-  draft?: string;
-};
 
 // Exercises of one chapter or section, picked from the textbook's contents. State is tagged with
 // its chapter, so picking another one never shows or edits the previous chapter's exercises.
@@ -57,11 +48,8 @@ export function Exercises({
   onContentMissing?: () => void;
 }) {
   const [chosen, setChosen] = useState<number>();
-  const [loaded, setLoaded] = useState<{ contentId: number; exercises: Exercise[] }>();
-  const [loadError, setLoadError] = useState<{ contentId: number; message: string }>();
   const [editor, setEditor] = useState<Editor>();
   const [deleting, setDeleting] = useState<{ contentId: number; id: number }>();
-  const [answer, setAnswer] = useState<AnswerPanel>();
   // The one exercise whose Korean translation is shown (#31).
   const [translating, setTranslating] = useState<{ contentId: number; id: number }>();
   // The chapter whose "read from a file" panel is open (#30).
@@ -72,45 +60,17 @@ export function Exercises({
   // The element to focus once the controls are enabled again: the body after an add, or along
   // the delete flow the confirm button, the delete button, or the card heading (#86).
   const [wantFocus, setWantFocus] = useState<string>();
-  // The chapter the server reported missing; once the reloaded tree no longer has it, the card
-  // says so next to the first chapter it fell back to.
-  const [lost, setLost] = useState<number>();
 
   const options = tree ? contentOptions(tree) : [];
   // The picked chapter, or the first one when nothing is picked or it was deleted.
   const contentId = options.some((option) => option.id === chosen) ? chosen : options[0]?.id;
 
-  const url = `/api/textbooks/${textbook.id}/contents/${contentId}/exercises`;
-
-  // A 404 about the chapter itself, not about one exercise.
-  const noteMissing = (failure: RequestError, id: number) => {
-    if (failure.status !== 404 || failure.message !== contentMissing) return;
-    setLost(id);
-    onContentMissing?.();
-  };
-
-  useEffect(() => {
-    if (contentId === undefined) return;
-    let current = true;
-    requestJson<{ exercises: Exercise[] }>(
-      `/api/textbooks/${textbook.id}/contents/${contentId}/exercises`,
-    )
-      .then((data) => {
-        if (!current) return;
-        setLoaded({ contentId, exercises: data.exercises });
-        setLoadError(undefined);
-      })
-      .catch((error: RequestError) => {
-        if (!current) return;
-        setLoadError({ contentId, message: error.message });
-        noteMissing(error, contentId);
-      });
-    return () => {
-      current = false;
-    };
-    // noteMissing only reads props and setters; the load reruns for chapter and reload changes.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [textbook.id, contentId, reloadKey]);
+  const { loaded, loadError, lost, setLost, noteMissing, refresh, url } = useExerciseData({
+    textbookId: textbook.id,
+    contentId,
+    reloadKey,
+    onContentMissing,
+  });
 
   // `contentId` is undefined when there are no contents yet; nothing tagged matches it then.
   const mine = <T extends { contentId: number }>(state: T | undefined) =>
@@ -120,27 +80,11 @@ export function Exercises({
   const open = mine(editor);
   const deletingId = mine(deleting)?.id;
   const shown = mine(notice);
-  const answerShown = mine(answer);
   const translationShown = mine(translating)?.id;
   const readingShown = contentId !== undefined && reading === contentId;
   // The reported chapter is gone from the reloaded tree.
   const chapterGone =
     lost !== undefined && tree !== undefined && !options.some((option) => option.id === lost);
-
-  // Loads the answer when its panel opens. Updates only the panel it was loaded for.
-  const answerId = answer?.id;
-  useEffect(() => {
-    if (answerId === undefined) return;
-    let current = true;
-    const update = (change: Partial<AnswerPanel>) =>
-      current && setAnswer((panel) => (panel?.id === answerId ? { ...panel, ...change } : panel));
-    requestJson<{ answer: ExerciseAnswer | null }>(`/api/exercises/${answerId}/answer`)
-      .then((data) => update({ body: data.answer?.body ?? null, error: undefined }))
-      .catch((failure: RequestError) => update({ error: failure.message }));
-    return () => {
-      current = false;
-    };
-  }, [answerId]);
 
   // Not `autoFocus`: after an add the field is still disabled until the reload finishes, and a
   // disabled field cannot take focus.
@@ -152,17 +96,6 @@ export function Exercises({
 
   const say = (kind: 'status' | 'alert', text: string) =>
     contentId !== undefined && setNotice({ kind, text, contentId });
-
-  const refresh = async () => {
-    if (contentId === undefined) return;
-    try {
-      const data = await requestJson<{ exercises: Exercise[] }>(url);
-      setLoaded({ contentId, exercises: data.exercises });
-      setLoadError(undefined);
-    } catch (failure) {
-      setLoadError({ contentId, message: (failure as RequestError).message });
-    }
-  };
 
   // Runs one change and then reloads the list, both while busy. A 404 closes the editor only when
   // it is about the exercise being edited (`targetId`), so other unsaved input survives.
@@ -182,12 +115,21 @@ export function Exercises({
     }
   };
 
+  const answerPanel = useAnswerPanel({
+    mine,
+    run,
+    say,
+    nameNext,
+    clearNotice: () => setNotice(undefined),
+  });
+  const answerShown = answerPanel.shown;
+
   const pick = (event: { target: { value: string } }) => {
     setChosen(Number(event.target.value));
     setNotice(undefined);
     setLost(undefined);
     // Closed rather than hidden, so coming back loads the answer again instead of an old copy.
-    setAnswer(undefined);
+    answerPanel.close();
   };
 
   const startAdd = () => {
@@ -267,56 +209,6 @@ export function Exercises({
       );
     }, exercise.id);
 
-  // Opens the answer of `exercise`, closing any other one, or closes it when it is open.
-  const toggleAnswer = (exercise: Exercise) => {
-    setNotice(undefined);
-    setAnswer(
-      answerShown?.id === exercise.id
-        ? undefined
-        : { contentId: exercise.contentId, id: exercise.id },
-    );
-  };
-
-  const changeAnswer = (event: { target: { value: string } }) => {
-    setNotice(undefined);
-    setAnswer((panel) => panel && { ...panel, draft: event.target.value });
-  };
-
-  // Saves the typed answer. Saving it blank deletes the saved answer instead.
-  const saveAnswer = (event: { preventDefault(): void }) => {
-    event.preventDefault();
-    const panel = answerShown;
-    if (panel?.draft === undefined) return;
-    const draft = panel.draft;
-    const path = `/api/exercises/${panel.id}/answer`;
-    nameNext('answer');
-    void run(async () => {
-      let body: string | null;
-      if (draft.trim()) {
-        const data = await requestJson<{ answer: ExerciseAnswer }>(path, {
-          method: 'PUT',
-          body: { body: draft },
-        });
-        body = data.answer.body;
-        say('status', 'Saved the answer');
-      } else if (panel.body) {
-        try {
-          await requestJson(path, { method: 'DELETE' });
-        } catch (failure) {
-          // Already deleted elsewhere: the answer is gone as asked. A missing exercise still fails.
-          if ((failure as RequestError).message !== 'Answer not found') throw failure;
-        }
-        body = null;
-        say('status', 'Cleared the answer');
-      } else {
-        body = null;
-      }
-      setAnswer((current) =>
-        current?.id === panel.id ? { ...current, body, draft: undefined } : current,
-      );
-    });
-  };
-
   // Copies the problem as a question for an AI. Without clipboard access (an older browser, or
   // permission refused) it says so, and the body stays on screen to select by hand.
   const copy = async (exercise: Exercise, label: string) => {
@@ -349,29 +241,12 @@ export function Exercises({
 
   return (
     <div className="exercises">
-      <div className="contents-head">
-        <h3 id="exercise-heading" tabIndex={-1}>
-          Exercises
-        </h3>
-        <button
-          type="button"
-          className="secondary"
-          disabled={busy || exercises === undefined}
-          onClick={startAdd}
-        >
-          Add problem
-        </button>
-        <button
-          type="button"
-          className="secondary"
-          disabled={busy || exercises === undefined}
-          id="exercise-read"
-          aria-expanded={readingShown}
-          onClick={() => setReading(readingShown ? undefined : contentId)}
-        >
-          Read from file
-        </button>
-      </div>
+      <ExerciseToolbar
+        disabled={busy || exercises === undefined}
+        readingOpen={readingShown}
+        onAdd={startAdd}
+        onToggleReading={() => setReading(readingShown ? undefined : contentId)}
+      />
       {treeFailed ? (
         <p className="status">Could not load the contents, so a section cannot be chosen</p>
       ) : tree === undefined ? (
@@ -393,56 +268,17 @@ export function Exercises({
             </label>
           </div>
           {open && (
-            <form key={open.id ?? 'new'} className="log-form exercise-form" onSubmit={save}>
-              <p className="wide content-form-heading">
-                {open.id === undefined ? 'Add problem' : 'Edit problem'}
-              </p>
-              <label>
-                Problem number
-                <input
-                  maxLength={exerciseLimits.number}
-                  placeholder="e.g. 3"
-                  disabled={busy}
-                  value={open.form.number}
-                  onChange={change('number')}
-                />
-              </label>
-              <label className="check">
-                <input
-                  type="checkbox"
-                  disabled={busy}
-                  checked={open.form.important}
-                  onChange={toggleImportant}
-                />
-                Mark as important
-              </label>
-              <label className="wide">
-                Problem text
-                <textarea
-                  id="exercise-body"
-                  required
-                  rows={6}
-                  maxLength={exerciseLimits.body}
-                  disabled={busy}
-                  value={open.form.body}
-                  onChange={change('body')}
-                />
-              </label>
-              <div className="actions wide">
-                <button type="submit" className="primary" disabled={busy}>
-                  <ButtonSpinner when={action === 'save'} />
-                  {open.id === undefined ? 'Add' : 'Save changes'}
-                </button>
-                <button
-                  type="button"
-                  className="secondary"
-                  disabled={busy}
-                  onClick={() => setEditor(undefined)}
-                >
-                  {open.id === undefined ? 'Close' : 'Cancel'}
-                </button>
-              </div>
-            </form>
+            <ExerciseFormView
+              key={open.id ?? 'new'}
+              form={open.form}
+              isNew={open.id === undefined}
+              busy={busy}
+              action={action}
+              onSubmit={save}
+              onChange={change}
+              onToggleImportant={toggleImportant}
+              onClose={() => setEditor(undefined)}
+            />
           )}
           {readingShown && exercises && (
             <ExerciseExtraction
@@ -507,171 +343,50 @@ export function Exercises({
                     <ExerciseTranslation exerciseId={exercise.id} label={label} />
                   )}
                   {answerShown?.id === exercise.id && (
-                    <div className="exercise-answer">
-                      {answerShown.draft !== undefined ? (
-                        <form className="log-form answer-form" onSubmit={saveAnswer}>
-                          <label className="wide">
-                            Answer
-                            <textarea
-                              id="answer-body"
-                              // eslint-disable-next-line jsx-a11y-x/no-autofocus -- this field opens on a click, so focus follows that action.
-                              autoFocus
-                              rows={4}
-                              maxLength={exerciseLimits.answer}
-                              disabled={busy}
-                              value={answerShown.draft}
-                              onChange={changeAnswer}
-                            />
-                          </label>
-                          <p className="wide status">Saving it empty clears the answer</p>
-                          <div className="actions wide">
-                            <button type="submit" className="primary" disabled={busy}>
-                              <ButtonSpinner when={action === 'answer'} />
-                              Save answer
-                            </button>
-                            <button
-                              type="button"
-                              className="secondary"
-                              disabled={busy}
-                              onClick={() =>
-                                setAnswer((panel) => panel && { ...panel, draft: undefined })
-                              }
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        </form>
-                      ) : answerShown.error ? (
-                        <p role="alert" className="error">
-                          Could not load the answer: {answerShown.error}
-                        </p>
-                      ) : answerShown.body === undefined ? (
-                        <Loading label="Loading the answer" kind="text" />
-                      ) : (
-                        <>
-                          <p className="answer-label">Answer</p>
-                          {answerShown.body === null ? (
-                            <p className="status">No answer entered</p>
-                          ) : (
-                            <p className="exercise-body">{answerShown.body}</p>
-                          )}
-                          <button
-                            type="button"
-                            className="secondary"
-                            disabled={busy}
-                            aria-label={`${label} ${answerShown.body === null ? 'add answer' : 'edit answer'}`}
-                            onClick={() =>
-                              setAnswer((panel) => panel && { ...panel, draft: panel.body ?? '' })
-                            }
-                          >
-                            {answerShown.body === null ? 'Add answer' : 'Edit answer'}
-                          </button>
-                        </>
-                      )}
-                    </div>
+                    <ExerciseAnswerView
+                      panel={answerShown}
+                      label={label}
+                      busy={busy}
+                      action={action}
+                      onChange={answerPanel.change}
+                      onSave={answerPanel.save}
+                      onStartEdit={answerPanel.startEdit}
+                      onCancelEdit={answerPanel.cancelEdit}
+                    />
                   )}
-                  <div className="log-actions">
-                    {deletingId === exercise.id ? (
-                      <>
-                        <button
-                          type="button"
-                          id={`exercise-delete-confirm-${exercise.id}`}
-                          className="danger"
-                          disabled={busy}
-                          aria-label={`${label} confirm deletion`}
-                          onClick={() => {
-                            nameNext('delete');
-                            void remove(exercise);
-                          }}
-                        >
-                          <ButtonSpinner when={action === 'delete'} />
-                          Confirm delete
-                        </button>
-                        <button
-                          type="button"
-                          className="secondary"
-                          disabled={busy}
-                          aria-label={`${label} cancel deletion`}
-                          onClick={() => {
-                            setDeleting(undefined);
-                            setWantFocus(`exercise-delete-${exercise.id}`);
-                          }}
-                        >
-                          Cancel
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button
-                          type="button"
-                          className="secondary"
-                          aria-label={`${label} copy question`}
-                          onClick={() => void copy(exercise, label)}
-                        >
-                          Copy question
-                        </button>
-                        <button
-                          type="button"
-                          className="secondary"
-                          disabled={busy}
-                          aria-expanded={answerShown?.id === exercise.id}
-                          aria-label={`${label} ${answerShown?.id === exercise.id ? 'hide answer' : 'show answer'}`}
-                          onClick={() => toggleAnswer(exercise)}
-                        >
-                          {answerShown?.id === exercise.id ? 'Hide answer' : 'Show answer'}
-                        </button>
-                        <button
-                          type="button"
-                          className="secondary"
-                          disabled={busy}
-                          aria-expanded={translationShown === exercise.id}
-                          aria-label={`${label} ${translationShown === exercise.id ? 'hide translation' : 'show translation'}`}
-                          onClick={() =>
-                            setTranslating(
-                              translationShown === exercise.id
-                                ? undefined
-                                : { contentId: exercise.contentId, id: exercise.id },
-                            )
-                          }
-                        >
-                          {translationShown === exercise.id
-                            ? 'Hide translation'
-                            : 'Show translation'}
-                        </button>
-                        <button
-                          type="button"
-                          className="secondary"
-                          disabled={busy}
-                          aria-label={`${label} ${exercise.important ? 'unmark important' : 'mark important'}`}
-                          onClick={() => void markImportant(exercise)}
-                        >
-                          {exercise.important ? 'Unmark important' : 'Mark important'}
-                        </button>
-                        <button
-                          type="button"
-                          className="secondary"
-                          disabled={busy}
-                          aria-label={`${label} edit`}
-                          onClick={() => startEdit(exercise)}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          type="button"
-                          className="secondary"
-                          disabled={busy}
-                          id={`exercise-delete-${exercise.id}`}
-                          aria-label={`${label} delete`}
-                          onClick={() => {
-                            setDeleting({ contentId: exercise.contentId, id: exercise.id });
-                            setWantFocus(`exercise-delete-confirm-${exercise.id}`);
-                          }}
-                        >
-                          Delete
-                        </button>
-                      </>
-                    )}
-                  </div>
+                  <ExerciseActions
+                    id={exercise.id}
+                    label={label}
+                    important={exercise.important}
+                    confirming={deletingId === exercise.id}
+                    answerOpen={answerShown?.id === exercise.id}
+                    translationOpen={translationShown === exercise.id}
+                    busy={busy}
+                    action={action}
+                    onConfirmDelete={() => {
+                      nameNext('delete');
+                      void remove(exercise);
+                    }}
+                    onCancelDelete={() => {
+                      setDeleting(undefined);
+                      setWantFocus(`exercise-delete-${exercise.id}`);
+                    }}
+                    onCopy={() => void copy(exercise, label)}
+                    onToggleAnswer={() => answerPanel.toggle(exercise)}
+                    onToggleTranslation={() =>
+                      setTranslating(
+                        translationShown === exercise.id
+                          ? undefined
+                          : { contentId: exercise.contentId, id: exercise.id },
+                      )
+                    }
+                    onMarkImportant={() => void markImportant(exercise)}
+                    onEdit={() => startEdit(exercise)}
+                    onAskDelete={() => {
+                      setDeleting({ contentId: exercise.contentId, id: exercise.id });
+                      setWantFocus(`exercise-delete-confirm-${exercise.id}`);
+                    }}
+                  />
                 </li>
               );
             })}
