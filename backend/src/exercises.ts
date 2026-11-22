@@ -2,9 +2,11 @@ import { type Response, Router } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod/v4';
 
+import { claudeSlots } from './claude-call.js';
 import { detectFormat, receive, removeStoredFiles, storedKeys } from './exercise-files.js';
 import { ExtractionError, extractionLimit, type Extractor } from './extraction.js';
 import type { FileStorage } from './file-storage.js';
+import { countPdfPages } from './pdf-pages.js';
 import { inTransaction } from './sql.js';
 import { parseId, requestIdOf } from './standard/http.js';
 import { TranslationError, type Translator } from './translation.js';
@@ -116,13 +118,24 @@ const columns = `id, textbook_id AS "textbookId", content_id AS "contentId",
 
 const contentNotFound = { error: 'Contents entry not found' };
 const notFound = { error: 'Exercise not found' };
+
+// Most pages of one PDF that extraction reads at once (#267): about a chapter of exercises. More
+// would be paid for and then refused as too much to read.
+export const maxExtractionPages = 30;
+
+// The answer when every paid-call slot is taken: try again shortly.
+const busy = (res: Response) => {
+  res.set('retry-after', '5');
+  res.status(503).json({ error: 'Too many files are being read or translated. Try again shortly' });
+};
 const answerNotFound = { error: 'Answer not found' };
 
 // Listing and adding the exercises of one chapter: /api/textbooks/:textbookId/contents/:contentId/exercises
 // Also reading problems or answers out of a file and saving them at once (#30).
 export function contentExerciseRoutes(pool: Pool, extractor: Extractor) {
   const router = Router({ mergeParams: true });
-  // Chapters being read right now: a second request waits for the first instead of paying twice.
+  // Chapters being read right now: a second request for one is answered 409 instead of paying
+  // twice.
   const extracting = new Set<number>();
   const chapterExists = async (textbookId: number, contentId: number) =>
     Boolean(
@@ -183,6 +196,8 @@ export function contentExerciseRoutes(pool: Pool, extractor: Extractor) {
       return void res.status(404).json(contentNotFound);
     if (extracting.has(contentId))
       return void res.status(409).json({ error: 'A file is already being read for this section' });
+    // At most a few paid calls at once, counted before the body is read (#267).
+    if (!claudeSlots.enter()) return void busy(res);
     extracting.add(contentId);
     try {
       if (!(await receive(req, res))) return;
@@ -192,6 +207,12 @@ export function contentExerciseRoutes(pool: Pool, extractor: Extractor) {
       const format = detectFormat(file.buffer);
       if (!format)
         return void res.status(415).json({ error: 'Only PDF, JPEG and PNG files can be read' });
+      // Too many pages would be paid for and then refused as too much to read (#267).
+      const pages = format.type === 'application/pdf' ? countPdfPages(file.buffer) : undefined;
+      if (pages !== undefined && pages > maxExtractionPages)
+        return void res.status(400).json({
+          error: `The PDF has ${pages} pages. Read at most ${maxExtractionPages} pages at once`,
+        });
       // A request the person gave up on (tab closed) stops the paid call too.
       const stop = new AbortController();
       res.on('close', () => {
@@ -212,6 +233,7 @@ export function contentExerciseRoutes(pool: Pool, extractor: Extractor) {
         res.status(error.status).json({ error: error.message });
       }
     } finally {
+      claudeSlots.leave();
       extracting.delete(contentId);
     }
   });
@@ -341,7 +363,7 @@ const translationColumns = `t.body, t.answer, t.model,
 // /api/exercises/:id(/answer|/translation)
 export function exerciseRoutes(pool: Pool, translator: Translator, storage: FileStorage) {
   const router = Router();
-  // Exercises being translated right now: a second request for one waits for the first instead of
+  // Exercises being translated right now: a second request for one is answered 409 instead of
   // paying for the same translation twice.
   const translating = new Set<number>();
 
@@ -455,10 +477,12 @@ export function exerciseRoutes(pool: Pool, translator: Translator, storage: File
     const id = parseId(req.params.id, 'exercise');
     if (translating.has(id))
       return void res.status(409).json({ error: 'This problem is already being translated' });
+    if (!claudeSlots.enter()) return void busy(res);
     translating.add(id);
     try {
       await translate(id, res);
     } finally {
+      claudeSlots.leave();
       translating.delete(id);
     }
   });

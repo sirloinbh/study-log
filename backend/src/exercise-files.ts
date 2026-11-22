@@ -7,6 +7,7 @@ import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod/v4';
 
 import { type FileStorage, FileStorageError } from './file-storage.js';
+import { createGate } from './gate.js';
 import { inTransaction } from './sql.js';
 import { parseId } from './standard/http.js';
 
@@ -85,22 +86,6 @@ export const maxBytesPerExercise = 100 * 1024 * 1024;
 // How many uploads may be in flight at once (#266). An upload holds up to 20 MiB in memory until
 // it is stored, so a burst of them must be turned away instead of exhausting the container.
 export const maxConcurrentUploads = 4;
-
-// A counter that hands out a fixed number of slots without waiting: `enter` says no when none is
-// free, and the caller answers 503 so the person can try again.
-export function createGate(slots: number) {
-  let used = 0;
-  return {
-    enter() {
-      if (used >= slots) return false;
-      used += 1;
-      return true;
-    },
-    leave() {
-      used -= 1;
-    },
-  };
-}
 
 // Original files of exercises and answers (#28): PDFs and photos, kept in S3 with a row each in
 // exercise_files. Same bound as the table.
