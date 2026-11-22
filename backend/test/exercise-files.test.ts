@@ -3,7 +3,13 @@ import { test } from 'node:test';
 
 import type { Pool } from 'pg';
 
-import { detectFormat, displayName, encodeName, maxFileBytes } from '../src/exercise-files.js';
+import {
+  detectFormat,
+  displayName,
+  encodeName,
+  maxFileBytes,
+  removeStoredFiles,
+} from '../src/exercise-files.js';
 import { FileStorageError, s3Storage } from '../src/file-storage.js';
 import { withApi } from './helpers.js';
 
@@ -219,4 +225,36 @@ test('an S3 failure is logged once with its name and request ID, and no key (#26
   assert.equal(entry.aws_request_id, 'REQ123');
   assert.equal(entry.http_status, 503);
   assert.doesNotMatch(lines[0], /secret-name|study-files/);
+});
+
+test('files that S3 will not remove are logged by key and never throw (#265)', async () => {
+  const keys = Array.from({ length: 25 }, (_, i) => `exercises/${i}/a.pdf`);
+  const removed: string[] = [];
+  const storage = {
+    put: async () => {},
+    get: async () => Buffer.alloc(0),
+    // The second batch of ten fails as a whole; the first and third succeed.
+    remove: async (key: string) => {
+      const index = keys.indexOf(key);
+      if (index >= 10 && index < 20) throw new FileStorageError(502, 'File storage error');
+      removed.push(key);
+    },
+  };
+  const lines: string[] = [];
+  const original = console.error;
+  console.error = (line: string) => void lines.push(line);
+  let failed: string[];
+  try {
+    failed = await removeStoredFiles(storage, keys);
+  } finally {
+    console.error = original;
+  }
+  assert.deepEqual(failed, keys.slice(10, 20));
+  assert.equal(removed.length, 15);
+  assert.equal(lines.length, 1);
+  const entry = JSON.parse(lines[0]);
+  assert.equal(entry.event, 'orphaned_files');
+  assert.equal(entry.count, 10);
+  assert.deepEqual(entry.keys, keys.slice(10, 20));
+  assert.deepEqual(await removeStoredFiles(storage, []), []);
 });

@@ -244,27 +244,28 @@ test(
             ).rows[0].n,
           );
 
-        // S3 refuses: every kind of delete is refused with its error and nothing changes.
+        // S3 refuses to remove: the delete still stands (the rows are committed first, #265), no
+        // row points at a missing file, and the key that stayed behind is logged for a sweep.
         failing.remove = true;
-        for (const path of [
-          `/api/exercises/${lone.id}`,
-          `${contents}/${section}`,
-          `${contents}/${chapter}`,
-          `/api/textbooks/${book}`,
-        ]) {
-          const refused = await call(path, { method: 'DELETE' });
-          assert.deepEqual([refused.status, refused.data.error], [502, 'File storage error'], path);
+        const logged: string[] = [];
+        const original = console.error;
+        console.error = (line: string) => void logged.push(line);
+        try {
+          assert.equal((await call(`/api/exercises/${lone.id}`, { method: 'DELETE' })).status, 204);
+        } finally {
+          console.error = original;
+          failing.remove = false;
         }
-        failing.remove = false;
-        assert.equal(objects.size, 4);
-        assert.equal(await rows(), 4);
-        assert.equal((await call(`/api/exercises/${lone.id}`)).status, 200);
-        assert.equal((await call(`${contents}`)).status, 200);
-
-        // One exercise: only its file goes.
-        assert.equal((await call(`/api/exercises/${lone.id}`, { method: 'DELETE' })).status, 204);
-        assert.equal(objects.has(lone.key), false);
+        assert.equal((await call(`/api/exercises/${lone.id}`)).status, 404);
+        assert.equal(await rows(), 3);
+        assert.equal(objects.has(lone.key), true);
+        const orphaned = logged
+          .map((line) => JSON.parse(line))
+          .find((l) => l.event === 'orphaned_files');
+        assert.deepEqual(orphaned?.keys, [lone.key]);
+        objects.delete(lone.key); // the later sweep
         assert.equal(objects.size, 3);
+        assert.equal((await call(`${contents}`)).status, 200);
 
         // A chapter takes its sections' files with it, and no other chapter's.
         assert.equal((await call(`${contents}/${chapter}`, { method: 'DELETE' })).status, 204);
