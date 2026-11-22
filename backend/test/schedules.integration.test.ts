@@ -37,7 +37,7 @@ test(
         "DELETE FROM holidays WHERE holiday_date BETWEEN '8034-01-01' AND '8038-12-31'",
       );
     };
-    // Reading the list moves every schedule behind by its "today", and each test has its own.
+    // The catch-up moves every schedule behind by its "today", and each test has its own.
     await holdExactTotalsLock(url, t, async () => {
       await cleanup();
       await pool.end();
@@ -255,7 +255,7 @@ test(
           }
         });
       },
-      { today: () => today, holidayFetcher },
+      { today: () => today, scheduleCatchUp: false, holidayFetcher },
     );
 
     // A pool of its own, whose connection fails on the items, shows the schedule does not stay alone.
@@ -280,7 +280,7 @@ test(
           });
           assert.equal(status, 500);
         },
-        { today: () => '8034-03-01', holidayFetcher },
+        { today: () => '8034-03-01', scheduleCatchUp: false, holidayFetcher },
       );
       assert.equal(await rowsOf('schedules', 'start_date = $1', '8034-08-03'), 0);
     });

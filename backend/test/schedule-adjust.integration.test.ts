@@ -3,6 +3,7 @@ import { test } from 'node:test';
 
 import { Pool } from 'pg';
 
+import { catchUp } from '../src/schedules.js';
 import { holdExactTotalsLock, withApi } from './helpers.js';
 
 const url = process.env.TEST_DATABASE_URL;
@@ -26,7 +27,7 @@ test('a schedule follows what was done and what fell behind', { skip: !url }, as
       "DELETE FROM holidays WHERE holiday_date BETWEEN '8041-01-01' AND '8042-12-31'",
     );
   };
-  // Reading the list moves every schedule behind by its "today", and each test has its own.
+  // The catch-up moves every schedule behind by its "today", and each test has its own.
   await holdExactTotalsLock(url, t, async () => {
     await cleanup();
     await pool.end();
@@ -45,10 +46,17 @@ test('a schedule follows what was done and what fell behind', { skip: !url }, as
         assert.equal(made.status, 201, JSON.stringify(made.data));
         return made.data as unknown as Detail;
       };
+      // Reading never moves days (#270): the daily catch-up is run here, by hand, at the test's
+      // "today", before each read.
       const read = async (id: number) => {
+        await catchUp(pool, today);
         const answer = await call(`/api/schedules/${id}`);
         assert.equal(answer.status, 200);
         return answer.data as unknown as Detail;
+      };
+      const list = async () => {
+        await catchUp(pool, today);
+        return call('/api/schedules');
       };
       const complete = (id: number, item: number) =>
         call(`/api/schedules/${id}/items/${item}/complete`, { method: 'POST' });
@@ -93,8 +101,8 @@ test('a schedule follows what was done and what fell behind', { skip: !url }, as
         // Moved by hand: 05-01, 05-02, then a gap to 05-10.
         assert.equal((await move(schedule.id, items[2].id, '8041-05-10')).status, 200);
         today = '8041-05-04';
-        const list = await call('/api/schedules');
-        const row = (list.data.schedules as Summary[]).find((item) => item.id === schedule.id);
+        const listed = await list();
+        const row = (listed.data.schedules as Summary[]).find((item) => item.id === schedule.id);
         assert.equal(row?.delayDays, 3 + 7);
         // Three days behind: 05-01 → 05-04, 05-02 → 05-05, 05-10 → 05-13.
         assert.equal(row?.currentEndDate, '8041-05-13');
@@ -111,7 +119,7 @@ test('a schedule follows what was done and what fell behind', { skip: !url }, as
         const { schedule, items } = await make('8042-02-10', '8042-02-11');
         // Neither reading nor changing a day pulls them to today.
         assert.deepEqual(dates(await read(schedule.id)), ['8042-02-10', '8042-02-11']);
-        await call('/api/schedules');
+        await list();
         const done = await complete(schedule.id, items[1].id);
         assert.deepEqual(dates(done.data as unknown as Detail), ['8042-02-10', '8042-02-11']);
       });
@@ -120,7 +128,7 @@ test('a schedule follows what was done and what fell behind', { skip: !url }, as
         today = '8041-06-01';
         const { schedule } = await make('8041-06-01', '8041-06-02');
         today = '8041-06-05';
-        await Promise.all([read(schedule.id), read(schedule.id), call('/api/schedules')]);
+        await Promise.all([read(schedule.id), read(schedule.id), list()]);
         assert.deepEqual(dates(await read(schedule.id)), ['8041-06-05', '8041-06-06']);
       });
 
@@ -143,7 +151,7 @@ test('a schedule follows what was done and what fell behind', { skip: !url }, as
             const { rowCount } = await pool.query(
               `SELECT 1 FROM pg_stat_activity
                WHERE datname = current_database() AND wait_event_type = 'Lock'
-                 AND (query LIKE '%schedules WHERE id = $1 FOR UPDATE%'
+                 AND (query LIKE '%schedules WHERE id = ANY%FOR UPDATE%'
                    OR query LIKE '%UPDATE schedule_items i%')`,
             );
             if (rowCount) break;
@@ -379,8 +387,8 @@ test('a schedule follows what was done and what fell behind', { skip: !url }, as
         assert.equal(summary.progressPercent, 100);
         assert.equal(summary.completedCount, 7);
         // The list says the same.
-        const list = await call('/api/schedules');
-        const row = (list.data.schedules as Progress[]).find((item) => item.id === schedule.id);
+        const listed = await list();
+        const row = (listed.data.schedules as Progress[]).find((item) => item.id === schedule.id);
         assert.equal(row?.progressPercent, 100);
         assert.equal(row?.completedMinutes, 1200);
       });
@@ -517,6 +525,7 @@ test('a schedule follows what was done and what fell behind', { skip: !url }, as
     },
     {
       today: () => today,
+      scheduleCatchUp: false,
       holidayFetcher: async (year) => [{ date: `${year}-12-25`, name: '기독탄신일' }],
     },
   );

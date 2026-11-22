@@ -64,7 +64,7 @@ Detailed rules (implemented in #37):
 - Push all incomplete items back by the number of delay days. The gaps between items are kept, so the gaps from dates moved by hand do not disappear, and no item is pulled earlier.
 - Completed items do not move. A pushed item can land on the same date as a completed item, so there is no unique constraint on the combination of schedule and date.
 - The target time of an item and its chapter assignment stay as they are. Even if the day it moves to is a weekday, nothing is recalculated, so the schedule's total target time and the time-proportional allocation are kept.
-- There is no separate scheduler; the server applies it in a transaction when it reads the schedule.
+- Reading a schedule never changes it (user decision, #270). There is no separate scheduler: the server applies the delay once per service day, in one batched statement in one transaction, right after it answers the first schedule request of that day. If that fails, the next request tries again. Every change to a schedule or one of its days also applies it first, under the schedule's lock. So a list or detail read can show the days as of the last catch-up, up to one request behind on the first request of a new day.
 - The end date is the later of the originally set end date and the date of the last item. The screen shows the originally set end date together with the number of days it slipped, so you can see that it slipped.
 - Pulling items earlier and moving individual items by hand are also in the scope of #37.
 - An item can be moved only to today or later. If you move it to a past date, it would be pushed right away when read. The moved item and the items moved with it must be within 730 days of today.
