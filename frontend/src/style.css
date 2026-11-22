@@ -525,7 +525,7 @@
   outline-offset: -1px;
 }
 .heat-cell.level-1 {
-  background: color-mix(in oklch, var(--foreground) 18%, transparent);
+  background: color-mix(in oklch, var(--foreground) 9%, transparent);
 }
 .heat-cell.level-2 {
   background: color-mix(in oklch, var(--foreground) 18%, transparent);
