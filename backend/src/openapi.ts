@@ -108,7 +108,7 @@ export const operations: Record<string, Operation> = {
     status: [201, 400, 409],
   },
   'PUT /api/keywords/:id': {
-    summary: 'Replace a keyword; a left-out date means today',
+    summary: 'Replace a keyword; a left-out date keeps the stored date',
     body: ['Keyword', keywordInput],
     status: [200, 400, 404, 409],
   },
