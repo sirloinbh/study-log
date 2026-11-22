@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, test } from 'vitest';
 
 import {
@@ -11,6 +11,7 @@ import {
 } from './schedule';
 import { Schedules } from './schedules';
 import { fakeApi } from './test/fake-api';
+import { render } from './test/render';
 
 const today = '2026-03-02';
 

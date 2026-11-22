@@ -1,4 +1,4 @@
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { expect, test } from 'vitest';
 
 import { StudyLogs } from './study-logs';
@@ -11,6 +11,7 @@ import {
   type StudyLog,
 } from './study-logs-data';
 import { type Answer, fakeApi } from './test/fake-api';
+import { render } from './test/render';
 
 type Log = {
   id: number;

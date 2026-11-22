@@ -1,9 +1,10 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, test } from 'vitest';
 
 import { Exercises } from './exercises';
 import { StudyLogs } from './study-logs';
 import { fakeApi } from './test/fake-api';
+import { render } from './test/render';
 import { TextbookContents } from './textbook-contents';
 import { Textbooks } from './textbooks';
 

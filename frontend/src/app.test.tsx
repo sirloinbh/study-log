@@ -1,8 +1,9 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, screen, within } from '@testing-library/react';
 import { expect, test } from 'vitest';
 
 import { App } from './app';
 import { fakeApi } from './test/fake-api';
+import { render } from './test/render';
 
 const failing = { status: 500, body: { error: 'Test server' } };
 

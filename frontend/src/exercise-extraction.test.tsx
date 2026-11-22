@@ -1,10 +1,11 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 
 import type { Exercise } from './exercise';
 import { matchExercise } from './exercise';
 import { ExerciseExtraction } from './exercise-extraction';
 import { type Answer, fakeApi } from './test/fake-api';
+import { render } from './test/render';
 
 const url = '/api/textbooks/1/contents/10/exercises';
 const exercise = (id: number, number: string): Exercise => ({

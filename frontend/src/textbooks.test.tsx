@@ -1,7 +1,8 @@
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 
 import { type Answer, fakeApi } from './test/fake-api';
+import { render } from './test/render';
 import { textbookMeta } from './textbook';
 import { Textbooks } from './textbooks';
 

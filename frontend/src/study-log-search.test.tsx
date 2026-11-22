@@ -1,9 +1,10 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { expect, test } from 'vitest';
 
 import { StudyLogs } from './study-logs';
 import { studyLogSearchPath } from './study-logs-data';
 import { type Api, fakeApi } from './test/fake-api';
+import { render } from './test/render';
 
 type Log = {
   id: number;
