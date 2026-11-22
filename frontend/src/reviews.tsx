@@ -4,6 +4,7 @@ import { useBusy } from './busy';
 import { type RequestError, requestJson } from './lib/api';
 import { ButtonSpinner, Loading } from './loading';
 import { Memo } from './memo';
+import { plural } from './plural';
 import { overdueDays, type Review, type ReviewRange, reviewRanges, reviewTitle } from './review';
 
 // `reviewId` is the review an alert is about.
@@ -274,7 +275,7 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
                   <div className="log-head">
                     <span className="log-date">{title}</span>
                     <span className="badge">Round {review.round}</span>
-                    {late > 0 && <span className="badge stopped">{late} days late</span>}
+                    {late > 0 && <span className="badge stopped">{plural(late, 'day')} late</span>}
                   </div>
                   <p className="status">
                     Studied {review.studyDate} · due {review.dueDate}
@@ -300,7 +301,7 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
                           type="submit"
                           className="primary"
                           disabled={busy}
-                          aria-label={`${name} save due date`}
+                          aria-label={`Save due date: ${name}`}
                         >
                           <ButtonSpinner when={action === 'date'} />
                           Save
@@ -309,7 +310,7 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
                           type="button"
                           className="secondary"
                           disabled={busy}
-                          aria-label={`${name} cancel due date change`}
+                          aria-label={`Cancel due date change: ${name}`}
                           onClick={() => {
                             setEditor(undefined);
                             setWantFocus(editId(review));
@@ -326,7 +327,7 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
                         className="primary"
                         id={completeId(review)}
                         disabled={busy}
-                        aria-label={`${name} complete review`}
+                        aria-label={`Complete review: ${name}`}
                         onClick={() => void complete(review)}
                       >
                         Complete review
@@ -336,7 +337,7 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
                         className="secondary"
                         id={snoozeId(review)}
                         disabled={busy}
-                        aria-label={`${name} postpone a day`}
+                        aria-label={`Postpone a day: ${name}`}
                         onClick={() => void snooze(review)}
                       >
                         Postpone a day
@@ -346,7 +347,7 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
                         className="secondary"
                         id={editId(review)}
                         disabled={busy}
-                        aria-label={`${name} change date`}
+                        aria-label={`Change date: ${name}`}
                         onClick={() => openEditor(review)}
                       >
                         Change date

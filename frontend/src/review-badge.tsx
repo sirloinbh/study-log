@@ -4,6 +4,7 @@ import { Link, useLocation } from 'react-router';
 
 import { Badge } from './components/ui/badge';
 import { requestJson } from './lib/api';
+import { plural } from './plural';
 
 // The top bar link to the reviews page, shown while reviews are due (#44). It sits in the top bar
 // because on a phone the menu is folded away. It counts again on each page change, after a change
@@ -37,7 +38,7 @@ export function ReviewBadge({ to, version, day }: { to: string; version: number;
   return (
     <Link
       to={to}
-      aria-label={`${count} reviews today`}
+      aria-label={`${plural(count, 'review')} today`}
       className="flex min-h-11 items-center gap-1.5 rounded-md px-2 outline-none hover:bg-accent focus-visible:ring-[3px] focus-visible:ring-ring/50"
     >
       <BellRing className="size-4 shrink-0" aria-hidden />

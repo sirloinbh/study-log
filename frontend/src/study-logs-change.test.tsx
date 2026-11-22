@@ -44,7 +44,7 @@ test('saving a log reports a change, since it can make a review due', async () =
   server();
   const onChange = vi.fn();
   render(<StudyLogs today={today} onChange={onChange} />);
-  await screen.findByRole('button', { name: /delete$/ });
+  await screen.findByRole('button', { name: /Delete log/ });
   submit();
   await waitFor(() => expect(onChange).toHaveBeenCalledTimes(1));
 });
@@ -53,7 +53,7 @@ test('a failed save reports too: the server may have changed anyway', async () =
   server(500);
   const onChange = vi.fn();
   render(<StudyLogs today={today} onChange={onChange} />);
-  await screen.findByRole('button', { name: /delete$/ });
+  await screen.findByRole('button', { name: /Delete log/ });
   submit();
   await waitFor(() => expect(onChange).toHaveBeenCalledTimes(1));
 });
@@ -65,7 +65,7 @@ test.each([
   server(200, status);
   const onChange = vi.fn();
   render(<StudyLogs today={today} onChange={onChange} />);
-  fireEvent.click(await screen.findByRole('button', { name: /delete$/ }));
-  fireEvent.click(await screen.findByRole('button', { name: /confirm deletion$/ }));
+  fireEvent.click(await screen.findByRole('button', { name: /Delete log/ }));
+  fireEvent.click(await screen.findByRole('button', { name: /Confirm log deletion/ }));
   await waitFor(() => expect(onChange).toHaveBeenCalledTimes(1));
 });

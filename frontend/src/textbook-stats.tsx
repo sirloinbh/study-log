@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 
 import { type RequestError, requestJson } from './lib/api';
 import { Loading } from './loading';
+import { plural } from './plural';
 import { formatMinutes } from './study-logs-data';
 import { chapterPercent, type TextbookStats as Stats, textbookStatsPath } from './study-stats';
 
@@ -92,7 +93,7 @@ export function TextbookStats() {
             <div>
               <dt>Days done on time</dt>
               <dd>
-                {stats.schedule.onTimeDays} / {stats.schedule.dueDays} days
+                {stats.schedule.onTimeDays} / {plural(stats.schedule.dueDays, 'day')}
               </dd>
             </div>
           </dl>

@@ -307,7 +307,7 @@ export function TextbookContents({
                       id={`content-delete-confirm-${node.id}`}
                       className="danger"
                       disabled={busy}
-                      aria-label={`${label} contents entry confirm deletion`}
+                      aria-label={`Confirm contents entry deletion: ${label}`}
                       onClick={() => {
                         nameNext('delete');
                         void remove(node);
@@ -320,7 +320,7 @@ export function TextbookContents({
                       type="button"
                       className="secondary"
                       disabled={busy}
-                      aria-label={`${label} contents cancel deletion`}
+                      aria-label={`Cancel contents entry deletion: ${label}`}
                       onClick={() => {
                         setDeleting(undefined);
                         setWantFocus(`content-delete-${node.id}`);
@@ -335,7 +335,7 @@ export function TextbookContents({
                       type="button"
                       className="secondary"
                       disabled={busy || index === 0}
-                      aria-label={`${label} move up`}
+                      aria-label={`Move up: ${label}`}
                       onClick={() => void move(nodes, index, -1, parentId)}
                     >
                       Up
@@ -344,7 +344,7 @@ export function TextbookContents({
                       type="button"
                       className="secondary"
                       disabled={busy || index === nodes.length - 1}
-                      aria-label={`${label} move down`}
+                      aria-label={`Move down: ${label}`}
                       onClick={() => void move(nodes, index, 1, parentId)}
                     >
                       Down
@@ -353,7 +353,7 @@ export function TextbookContents({
                       type="button"
                       className="secondary"
                       disabled={busy}
-                      aria-label={`${label} add child`}
+                      aria-label={`Add child: ${label}`}
                       onClick={() => startAdd(node)}
                     >
                       Add child
@@ -362,7 +362,7 @@ export function TextbookContents({
                       type="button"
                       className="secondary"
                       disabled={busy}
-                      aria-label={`${label} contents entry edit`}
+                      aria-label={`Edit contents entry: ${label}`}
                       onClick={() => startEdit(node)}
                     >
                       Edit
@@ -372,7 +372,7 @@ export function TextbookContents({
                       className="secondary"
                       disabled={busy}
                       id={`content-delete-${node.id}`}
-                      aria-label={`${label} contents entry delete`}
+                      aria-label={`Delete contents entry: ${label}`}
                       onClick={() => {
                         setDeleting({ textbookId, id: node.id });
                         setWantFocus(`content-delete-confirm-${node.id}`);

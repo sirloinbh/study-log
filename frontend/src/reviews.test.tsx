@@ -109,7 +109,7 @@ test('completing removes the review, shows the next date and moves focus', async
   const api = server([review()], done({ round: 2, dueDate: '2026-11-02' }));
   render(<Reviews />);
   fireEvent.click(
-    await screen.findByRole('button', { name: '2026-10-30 study round 1 complete review' }),
+    await screen.findByRole('button', { name: 'Complete review: 2026-10-30 study round 1' }),
   );
   expect(
     await screen.findByText('Review completed. The next review is on 2026-11-02'),
@@ -122,7 +122,7 @@ test('completing removes the review, shows the next date and moves focus', async
 test('completing the last round says the reviews are finished', async () => {
   server([review({ round: 5 })], done(null));
   render(<Reviews />);
-  fireEvent.click(await screen.findByRole('button', { name: /round 5 complete review/ }));
+  fireEvent.click(await screen.findByRole('button', { name: /Complete review: .*round 5/ }));
   expect(
     await screen.findByText('Review completed. All reviews of this log are done'),
   ).toBeInTheDocument();
@@ -131,11 +131,11 @@ test('completing the last round says the reviews are finished', async () => {
 test('a failed completion keeps the review, reports it and returns focus to its button', async () => {
   server([review()], () => ({ status: 500, body: { error: 'A server error occurred' } }));
   render(<Reviews />);
-  const button = await screen.findByRole('button', { name: /complete review/ });
+  const button = await screen.findByRole('button', { name: /Complete review/ });
   fireEvent.click(button);
   expect(await screen.findByRole('alert')).toHaveTextContent('A server error occurred');
   await waitFor(() =>
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: /complete review/ })),
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: /Complete review/ })),
   );
 });
 
@@ -146,7 +146,7 @@ test('a review already completed elsewhere leaves the list and focus goes to the
   ] as const) {
     goneAfterCompleting(status, error);
     const { unmount } = render(<Reviews />);
-    fireEvent.click(await screen.findByRole('button', { name: /complete review/ }));
+    fireEvent.click(await screen.findByRole('button', { name: /Complete review/ }));
     expect(await screen.findByRole('alert')).toHaveTextContent(error);
     expect(await screen.findByText('Nothing to review today')).toBeInTheDocument();
     await waitFor(() => expect(document.activeElement?.id).toBe('reviews-today'));
@@ -158,7 +158,7 @@ test('focus goes to the heading when a failed review is gone after the reload', 
   // A 500 whose completion did commit: the review is not listed when the page reloads.
   goneAfterCompleting(500, 'Error');
   render(<Reviews />);
-  fireEvent.click(await screen.findByRole('button', { name: /complete review/ }));
+  fireEvent.click(await screen.findByRole('button', { name: /Complete review/ }));
   await screen.findByRole('alert');
   await waitFor(() => expect(document.activeElement?.id).toBe('reviews-today'));
 });
@@ -175,9 +175,9 @@ test('a failed reload keeps the list on screen and reports it', async () => {
       : { body: { today, reviews: [review()] } };
   });
   render(<Reviews />);
-  fireEvent.click(await screen.findByRole('button', { name: /complete review/ }));
+  fireEvent.click(await screen.findByRole('button', { name: /Complete review/ }));
   expect(await screen.findByRole('alert')).toHaveTextContent('Could not load the reviews');
-  expect(screen.getByRole('button', { name: /complete review/ })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /Complete review/ })).toBeInTheDocument();
 });
 
 test('the same message twice is cleared in between, so it is announced again', async () => {
@@ -193,12 +193,12 @@ test('the same message twice is cleared in between, so it is announced again', a
   });
   render(<Reviews />);
   const message = 'Review completed. The next review is on 2026-11-02';
-  fireEvent.click(await screen.findByRole('button', { name: /complete review/ }));
+  fireEvent.click(await screen.findByRole('button', { name: /Complete review/ }));
   await screen.findByText(message);
   await waitFor(() =>
-    expect(screen.getByRole('button', { name: /complete review/ })).toBeEnabled(),
+    expect(screen.getByRole('button', { name: /Complete review/ })).toBeEnabled(),
   );
-  fireEvent.click(screen.getByRole('button', { name: /complete review/ }));
+  fireEvent.click(screen.getByRole('button', { name: /Complete review/ }));
   await waitFor(() => expect(screen.queryByText(message)).toBeNull());
   release();
   await screen.findByText(message);
@@ -208,7 +208,7 @@ test('a completion reports the change once the list is up to date', async () => 
   server([review()], done({ round: 2, dueDate: '2026-11-02' }));
   const onChange = vi.fn();
   render(<Reviews onChange={onChange} />);
-  fireEvent.click(await screen.findByRole('button', { name: /complete review/ }));
+  fireEvent.click(await screen.findByRole('button', { name: /Complete review/ }));
   await waitFor(() => expect(onChange).toHaveBeenCalledTimes(1));
   expect(screen.getByText('Nothing to review today')).toBeInTheDocument();
 });
@@ -217,7 +217,7 @@ test('a failed completion reports a change too: it may be gone elsewhere', async
   server([review()], () => ({ status: 409, body: { error: 'This review is already completed' } }));
   const onChange = vi.fn();
   render(<Reviews onChange={onChange} />);
-  fireEvent.click(await screen.findByRole('button', { name: /complete review/ }));
+  fireEvent.click(await screen.findByRole('button', { name: /Complete review/ }));
   await waitFor(() => expect(onChange).toHaveBeenCalledTimes(1));
 });
 
@@ -280,7 +280,7 @@ test('a slow answer for the range left behind is not shown', async () => {
   await vi.mocked(fetch).mock.results[0].value;
   await act(async () => {});
   expect(screen.getByText('No reviews left')).toBeInTheDocument();
-  expect(screen.queryByRole('button', { name: /complete review/ })).toBeNull();
+  expect(screen.queryByRole('button', { name: /Complete review/ })).toBeNull();
 });
 
 test('a failed list shows for its own range only', async () => {
@@ -305,7 +305,7 @@ test('snoozing reports the new date, reloads the range and tells the badge', asy
   }));
   const onChange = vi.fn();
   render(<Reviews onChange={onChange} />);
-  fireEvent.click(await screen.findByRole('button', { name: /postpone a day/ }));
+  fireEvent.click(await screen.findByRole('button', { name: /Postpone a day/ }));
   expect(
     await screen.findByText('Postponed by a day. The new due date is 2026-11-01'),
   ).toBeInTheDocument();
@@ -319,7 +319,7 @@ test('snoozing reports the new date, reloads the range and tells the badge', asy
 test('a snooze that keeps the review in the range keeps focus on its button', async () => {
   rangeServer({ today: [review()] });
   render(<Reviews />);
-  fireEvent.click(await screen.findByRole('button', { name: /postpone a day/ }));
+  fireEvent.click(await screen.findByRole('button', { name: /Postpone a day/ }));
   await screen.findByText(/Postponed by a day/);
   await waitFor(() => expect(document.activeElement?.id).toBe('review-snooze-1'));
 });
@@ -328,12 +328,12 @@ test('changing a date sends it, closes the form and returns focus', async () => 
   const api = rangeServer({ today: [review({ dueDate: today })] });
   const onChange = vi.fn();
   render(<Reviews onChange={onChange} />);
-  fireEvent.click(await screen.findByRole('button', { name: /change date/ }));
+  fireEvent.click(await screen.findByRole('button', { name: /Change date/ }));
   const field = screen.getByLabelText('New due date');
   expect(field).toHaveValue(today);
   await waitFor(() => expect(document.activeElement).toBe(field));
   fireEvent.change(field, { target: { value: '2026-11-05' } });
-  fireEvent.click(screen.getByRole('button', { name: /save due date/ }));
+  fireEvent.click(screen.getByRole('button', { name: /Save due date/ }));
   expect(await screen.findByText('Changed the due date to 2026-11-05')).toBeInTheDocument();
   expect(screen.queryByLabelText('New due date')).toBeNull();
   expect(api.sent).toEqual([
@@ -346,8 +346,8 @@ test('changing a date sends it, closes the form and returns focus', async () => 
 test('cancelling a date change sends nothing and returns focus', async () => {
   const api = rangeServer({ today: [review()] });
   render(<Reviews />);
-  fireEvent.click(await screen.findByRole('button', { name: /change date/ }));
-  fireEvent.click(screen.getByRole('button', { name: /cancel due date change/ }));
+  fireEvent.click(await screen.findByRole('button', { name: /Change date/ }));
+  fireEvent.click(screen.getByRole('button', { name: /Cancel due date change/ }));
   expect(screen.queryByLabelText('New due date')).toBeNull();
   expect(api.sent).toEqual([]);
   await waitFor(() => expect(document.activeElement?.id).toBe('review-edit-1'));
@@ -359,9 +359,9 @@ test('a refused date keeps what was typed and returns focus to the field', async
     body: { error: 'This date does not exist' },
   }));
   render(<Reviews />);
-  fireEvent.click(await screen.findByRole('button', { name: /change date/ }));
+  fireEvent.click(await screen.findByRole('button', { name: /Change date/ }));
   fireEvent.change(screen.getByLabelText('New due date'), { target: { value: '2026-11-05' } });
-  fireEvent.click(screen.getByRole('button', { name: /save due date/ }));
+  fireEvent.click(screen.getByRole('button', { name: /Save due date/ }));
   expect(await screen.findByRole('alert')).toHaveTextContent('This date does not exist');
   expect(screen.getByLabelText('New due date')).toHaveValue('2026-11-05');
   await waitFor(() => expect(document.activeElement?.id).toBe('review-due-date'));
@@ -374,8 +374,8 @@ test('a date change for a review completed elsewhere closes the form', async () 
     leaves: true,
   }));
   render(<Reviews />);
-  fireEvent.click(await screen.findByRole('button', { name: /change date/ }));
-  fireEvent.click(screen.getByRole('button', { name: /save due date/ }));
+  fireEvent.click(await screen.findByRole('button', { name: /Change date/ }));
+  fireEvent.click(screen.getByRole('button', { name: /Save due date/ }));
   expect(await screen.findByRole('alert')).toHaveTextContent('This review is already completed');
   expect(screen.queryByLabelText('New due date')).toBeNull();
   await waitFor(() => expect(document.activeElement?.id).toBe('reviews-today'));
@@ -384,10 +384,10 @@ test('a date change for a review completed elsewhere closes the form', async () 
 test('another range closes the open date form and clears the message', async () => {
   rangeServer({ today: [review()], all: [review()] });
   render(<Reviews />);
-  fireEvent.click(await screen.findByRole('button', { name: /postpone a day/ }));
+  fireEvent.click(await screen.findByRole('button', { name: /Postpone a day/ }));
   await screen.findByText(/Postponed by a day/);
-  await waitFor(() => expect(screen.getByRole('button', { name: /change date/ })).toBeEnabled());
-  fireEvent.click(screen.getByRole('button', { name: /change date/ }));
+  await waitFor(() => expect(screen.getByRole('button', { name: /Change date/ })).toBeEnabled());
+  fireEvent.click(screen.getByRole('button', { name: /Change date/ }));
   screen.getByLabelText('New due date');
   fireEvent.click(screen.getByRole('button', { name: 'All' }));
   await screen.findByRole('heading', { name: 'All reviews (1)' });
@@ -398,7 +398,7 @@ test('another range closes the open date form and clears the message', async () 
 test('the range already shown keeps a date being typed and sends nothing', async () => {
   const api = rangeServer({ today: [review()] });
   render(<Reviews />);
-  fireEvent.click(await screen.findByRole('button', { name: /change date/ }));
+  fireEvent.click(await screen.findByRole('button', { name: /Change date/ }));
   fireEvent.change(screen.getByLabelText('New due date'), { target: { value: '2026-11-05' } });
   const before = api.requests.length;
   fireEvent.click(screen.getByRole('button', { name: 'Today' }));
@@ -455,14 +455,14 @@ test('a retry that works clears the error of the change before it', async () => 
     return { body: { today, reviews: [review()] } };
   });
   render(<Reviews />);
-  fireEvent.click(await screen.findByRole('button', { name: /postpone a day/ }));
+  fireEvent.click(await screen.findByRole('button', { name: /Postpone a day/ }));
   await screen.findByText('Change error');
   await screen.findByText(/List error/);
   await waitFor(() => expect(screen.getByRole('button', { name: 'Today' })).toBeEnabled());
   failing = false;
   fireEvent.click(screen.getByRole('button', { name: 'Today' }));
   await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
-  expect(screen.getByRole('button', { name: /postpone a day/ })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /Postpone a day/ })).toBeInTheDocument();
 });
 
 test('a slow older answer does not bring back a review just completed', async () => {
@@ -482,10 +482,10 @@ test('a slow older answer does not bring back a review just completed', async ()
     return { body: { today, reviews: [] } };
   });
   render(<Reviews />);
-  await screen.findByRole('button', { name: /complete review/ });
+  await screen.findByRole('button', { name: /Complete review/ });
   fireEvent.click(screen.getByRole('button', { name: 'This week' }));
   fireEvent.click(screen.getByRole('button', { name: 'Today' }));
-  fireEvent.click(screen.getByRole('button', { name: /complete review/ }));
+  fireEvent.click(screen.getByRole('button', { name: /Complete review/ }));
   await screen.findByText('Nothing to review today');
   answerOld();
   // The old list's reply has reached the page once the fetch that carried it has settled.
@@ -515,7 +515,7 @@ test('returning to the tab keeps a date being typed', async () => {
   const lists = { today: [review()] };
   const api = rangeServer(lists);
   render(<Reviews />);
-  fireEvent.click(await screen.findByRole('button', { name: /change date/ }));
+  fireEvent.click(await screen.findByRole('button', { name: /Change date/ }));
   fireEvent.change(screen.getByLabelText('New due date'), { target: { value: '2026-11-05' } });
   const before = api.requests.length;
   fireEvent.focus(window);
@@ -528,7 +528,7 @@ test('a review leaving the list closes its date form for good and says so', asyn
   const lists: Record<string, Review[]> = { today: [review()] };
   rangeServer(lists);
   render(<Reviews />);
-  fireEvent.click(await screen.findByRole('button', { name: /change date/ }));
+  fireEvent.click(await screen.findByRole('button', { name: /Change date/ }));
   fireEvent.change(screen.getByLabelText('New due date'), { target: { value: '2026-11-05' } });
   await waitFor(() => expect(document.activeElement?.id).toBe('review-due-date'));
 
@@ -544,7 +544,7 @@ test('a review leaving the list closes its date form for good and says so', asyn
   // It comes back later, with its buttons and not the old form.
   lists.today = [review()];
   fireEvent.focus(window);
-  await screen.findByRole('button', { name: /change date/ });
+  await screen.findByRole('button', { name: /Change date/ });
   expect(screen.queryByLabelText('New due date')).toBeNull();
 });
 
@@ -552,8 +552,8 @@ test('a review leaving the list replaces an error about its date', async () => {
   const lists: Record<string, Review[]> = { today: [review()] };
   rangeServer(lists, () => ({ status: 400, body: { error: 'This date does not exist' } }));
   render(<Reviews />);
-  fireEvent.click(await screen.findByRole('button', { name: /change date/ }));
-  fireEvent.click(screen.getByRole('button', { name: /save due date/ }));
+  fireEvent.click(await screen.findByRole('button', { name: /Change date/ }));
+  fireEvent.click(screen.getByRole('button', { name: /Save due date/ }));
   await screen.findByRole('alert');
   await waitFor(() => expect(screen.getByRole('button', { name: 'All' })).toBeEnabled());
   lists.today = [];
@@ -569,7 +569,7 @@ test('focus moves to the heading only when the focused review left the list', as
   rangeServer(lists);
   render(<Reviews />);
   const kept = await screen.findByRole('button', {
-    name: '2026-10-29 study round 1 complete review',
+    name: 'Complete review: 2026-10-29 study round 1',
   });
   kept.focus();
 
@@ -604,10 +604,10 @@ test('a form closing does not take focus from another control', async () => {
   rangeServer(lists);
   render(<Reviews />);
   fireEvent.click(
-    await screen.findByRole('button', { name: '2026-10-29 study round 1 change date' }),
+    await screen.findByRole('button', { name: 'Change date: 2026-10-29 study round 1' }),
   );
   await waitFor(() => expect(document.activeElement?.id).toBe('review-due-date'));
-  const other = screen.getByRole('button', { name: '2026-10-30 study round 1 complete review' });
+  const other = screen.getByRole('button', { name: 'Complete review: 2026-10-30 study round 1' });
   other.focus();
 
   lists.today = [second];
@@ -631,9 +631,11 @@ test('focus moved while the list was on its way stays where it went', async () =
         },
   );
   render(<Reviews />);
-  (await screen.findByRole('button', { name: '2026-10-29 study round 1 complete review' })).focus();
+  (
+    await screen.findByRole('button', { name: 'Complete review: 2026-10-29 study round 1' })
+  ).focus();
   fireEvent.focus(window);
-  const moved = screen.getByRole('button', { name: '2026-10-30 study round 1 complete review' });
+  const moved = screen.getByRole('button', { name: 'Complete review: 2026-10-30 study round 1' });
   moved.focus();
   answer();
   await screen.findByRole('heading', { name: 'Reviews for today (1)' });
@@ -651,9 +653,9 @@ test('a form closing keeps the failure of another review on screen', async () =>
   });
   render(<Reviews />);
   fireEvent.click(
-    await screen.findByRole('button', { name: '2026-10-29 study round 1 change date' }),
+    await screen.findByRole('button', { name: 'Change date: 2026-10-29 study round 1' }),
   );
-  fireEvent.click(screen.getByRole('button', { name: '2026-10-30 study round 1 postpone a day' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Postpone a day: 2026-10-30 study round 1' }));
   expect(await screen.findByRole('alert')).toHaveTextContent('A server error occurred');
   await waitFor(() => expect(screen.queryByLabelText('New due date')).toBeNull());
   expect(screen.getByRole('alert')).toHaveTextContent('A server error occurred');
@@ -668,11 +670,11 @@ test('a later return clears the error of a failed one', async () => {
       : { body: { today, reviews: [review()] } },
   );
   render(<Reviews />);
-  await screen.findByRole('button', { name: /complete review/ });
+  await screen.findByRole('button', { name: /Complete review/ });
   failing = true;
   fireEvent.focus(window);
   expect(await screen.findByRole('alert')).toHaveTextContent('List error');
-  expect(screen.getByRole('button', { name: /complete review/ })).toBeInTheDocument();
+  expect(screen.getByRole('button', { name: /Complete review/ })).toBeInTheDocument();
   failing = false;
   fireEvent.focus(window);
   await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
@@ -687,7 +689,7 @@ test('returning to the tab while a change runs adds no request', async () => {
       : { hold: held, body: { dueDate: '2026-11-01' } },
   );
   render(<Reviews />);
-  fireEvent.click(await screen.findByRole('button', { name: /postpone a day/ }));
+  fireEvent.click(await screen.findByRole('button', { name: /Postpone a day/ }));
   const before = api.requests.length;
   fireEvent.focus(window);
   await act(async () => {});
@@ -700,7 +702,7 @@ test('the listener goes away with the page', async () => {
   const lists = { today: [review()] };
   const api = rangeServer(lists);
   const { unmount } = render(<Reviews />);
-  await screen.findByRole('button', { name: /complete review/ });
+  await screen.findByRole('button', { name: /Complete review/ });
   unmount();
   const before = api.requests.length;
   fireEvent.focus(window);
@@ -714,21 +716,23 @@ test('changing another review closes the date form being typed', async () => {
   rangeServer(lists);
   render(<Reviews />);
   fireEvent.click(
-    await screen.findByRole('button', { name: '2026-10-29 study round 1 change date' }),
+    await screen.findByRole('button', { name: 'Change date: 2026-10-29 study round 1' }),
   );
   screen.getByLabelText('New due date');
-  fireEvent.click(screen.getByRole('button', { name: '2026-10-30 study round 1 postpone a day' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Postpone a day: 2026-10-30 study round 1' }));
   await screen.findByText(/Postponed by a day/);
   expect(screen.queryByLabelText('New due date')).toBeNull();
 
   await waitFor(() =>
     expect(
-      screen.getByRole('button', { name: '2026-10-29 study round 1 change date' }),
+      screen.getByRole('button', { name: 'Change date: 2026-10-29 study round 1' }),
     ).toBeEnabled(),
   );
-  fireEvent.click(screen.getByRole('button', { name: '2026-10-29 study round 1 change date' }));
+  fireEvent.click(screen.getByRole('button', { name: 'Change date: 2026-10-29 study round 1' }));
   screen.getByLabelText('New due date');
-  fireEvent.click(screen.getByRole('button', { name: '2026-10-30 study round 1 complete review' }));
+  fireEvent.click(
+    screen.getByRole('button', { name: 'Complete review: 2026-10-30 study round 1' }),
+  );
   await screen.findByText(/Review completed/);
   expect(screen.queryByLabelText('New due date')).toBeNull();
 });
@@ -742,7 +746,7 @@ test('the range buttons wait while a change runs', async () => {
       : { hold: held, body: { dueDate: '2026-11-01' } },
   );
   render(<Reviews />);
-  fireEvent.click(await screen.findByRole('button', { name: /postpone a day/ }));
+  fireEvent.click(await screen.findByRole('button', { name: /Postpone a day/ }));
   expect(screen.getByRole('button', { name: 'All' })).toBeDisabled();
   release();
   await waitFor(() => expect(screen.getByRole('button', { name: 'All' })).toBeEnabled());
@@ -751,7 +755,7 @@ test('the range buttons wait while a change runs', async () => {
 test('two quick clicks send one completion', async () => {
   const api = server([review()], done({ round: 2, dueDate: '2026-11-02' }));
   render(<Reviews />);
-  const button = await screen.findByRole('button', { name: /complete review/ });
+  const button = await screen.findByRole('button', { name: /Complete review/ });
   fireEvent.click(button);
   fireEvent.click(button);
   await screen.findByText('Nothing to review today');
