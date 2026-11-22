@@ -1,3 +1,4 @@
+import { QueryClientProvider } from '@tanstack/react-query';
 import {
   BookOpen,
   CalendarCheck,
@@ -17,6 +18,7 @@ import { Toaster } from './components/ui/sonner';
 import { useServiceDate } from './date';
 import { type Health, healthText, useHealth } from './health';
 import { Keywords } from './keywords';
+import { createQueryClient } from './lib/query';
 import { Retrospectives } from './retrospectives';
 import { ReviewBadge } from './review-badge';
 import { Reviews } from './reviews';
@@ -86,7 +88,7 @@ function Page({
   );
 }
 
-export function App() {
+function AppBody() {
   const health = useHealth();
   const today = useServiceDate();
   // Pages that can change what is due bump this, so the badge counts again without a page change.
@@ -221,5 +223,15 @@ export function App() {
         <Toaster />
       </SignInGate>
     </BrowserRouter>
+  );
+}
+
+// One query cache for the whole app (#287); a new App (a test render) starts with an empty one.
+export function App() {
+  const [queryClient] = useState(createQueryClient);
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AppBody />
+    </QueryClientProvider>
   );
 }

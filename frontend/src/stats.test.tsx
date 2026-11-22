@@ -1,10 +1,11 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import React from 'react';
 import { expect, test, vi } from 'vitest';
 
 import { Stats } from './stats';
 import { busiestBar, chartBars, heatLevel, heatWeeks, monthLabel } from './study-stats';
 import { type Api, fakeApi } from './test/fake-api';
+import { render } from './test/render';
 
 // Recharts draws nothing without a real layout, so a stand-in writes what it was given into the
 // page: each bar's label and values, the bar's data key and the tooltip's formatted text. The

@@ -1,8 +1,9 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 
 import { Stats } from './stats';
 import { type Answer, fakeApi } from './test/fake-api';
+import { render } from './test/render';
 
 // As in stats-review.test.tsx: the chart library draws nothing here, and the page is slow to query.
 vi.mock('recharts', () => {
