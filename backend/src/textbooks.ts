@@ -2,7 +2,7 @@ import { Router } from 'express';
 import type { Pool } from 'pg';
 import { z } from 'zod/v4';
 
-import { removeStored, storedKeys } from './exercise-files.js';
+import { removeStoredFiles, storedKeys } from './exercise-files.js';
 import type { FileStorage } from './file-storage.js';
 import { inTransaction } from './sql.js';
 import { parseId } from './standard/http.js';
@@ -69,9 +69,12 @@ export function textbookRoutes(pool: Pool, storage: FileStorage) {
 
   // Contents and exercises cascade; study logs and schedules that point to the textbook or one of
   // its chapters block the deletion (foreign keys with RESTRICT). The stored files of its exercises
-  // go too (#209); if S3 cannot remove them, nothing is deleted.
+  // go too (#209), but only after the rows are deleted and committed (#265): if S3 then cannot
+  // remove a file, the delete stands and the key is logged for a sweep, so no row ever points at a
+  // file that is gone.
   router.delete('/:id', async (req, res) => {
     const id = parseId(req.params.id, 'textbook');
+    let keys: string[] = [];
     const reply = await inTransaction<{ status: number; body?: unknown }>(
       pool,
       async (client) => {
@@ -79,7 +82,7 @@ export function textbookRoutes(pool: Pool, storage: FileStorage) {
         // (writeContents), so the two never wait on each other in a deadlock.
         const book = await client.query('SELECT 1 FROM textbooks WHERE id = $1 FOR UPDATE', [id]);
         if (!book.rowCount) return { status: 404, body: notFound };
-        const keys = await storedKeys(client, { textbookId: id });
+        const stored = await storedKeys(client, { textbookId: id });
         let rowCount: number | null;
         try {
           ({ rowCount } = await client.query('DELETE FROM textbooks WHERE id = $1', [id]));
@@ -91,10 +94,12 @@ export function textbookRoutes(pool: Pool, storage: FileStorage) {
           };
         }
         if (!rowCount) return { status: 404, body: notFound };
-        return (await removeStored(storage, keys)) ?? { status: 204 };
+        keys = stored;
+        return { status: 204 };
       },
       (reply) => reply.status < 400,
     );
+    if (reply.status === 204) await removeStoredFiles(storage, keys);
     if (reply.body === undefined) return void res.status(reply.status).end();
     res.status(reply.status).json(reply.body);
   });

@@ -45,22 +45,35 @@ export async function storedKeys(db: Pick<PoolClient, 'query'>, owner: FileOwner
 // At most this many S3 calls at once, so a textbook with many files does not fire them all together.
 const removeBatch = 10;
 
-// Removes those stored copies (#209). The caller runs it inside the delete's transaction, after the
-// delete itself succeeded, and rolls back when this returns a failure: the delete is then refused
-// and can be repeated, and no copy is ever left in S3 without its row (the user's choice). Copies
-// removed before a failure stay removed; their rows answer 404 for the content until the retry.
-// The rows stay locked meanwhile, which only makes other changes to them wait.
-export async function removeStored(storage: FileStorage, keys: string[]) {
+// Removes the stored copies of rows that were already deleted (#209, #265). The caller runs it
+// after the delete's transaction committed, so a failure here can never bring a row back or leave a
+// row pointing at a file that is gone: the delete stands, and every copy that S3 would not remove
+// is logged by key (`orphaned_files`) for a later sweep. It tries every key, never throws, and
+// returns the keys it could not remove.
+export async function removeStoredFiles(storage: FileStorage, keys: string[]) {
+  const failed: string[] = [];
+  let reason: unknown;
   for (let start = 0; start < keys.length; start += removeBatch) {
-    const results = await Promise.allSettled(
-      keys.slice(start, start + removeBatch).map((key) => storage.remove(key)),
-    );
-    const failed = results.find((result) => result.status === 'rejected');
-    if (!failed) continue;
-    if (!(failed.reason instanceof FileStorageError)) throw failed.reason;
-    return { status: failed.reason.status, body: { error: failed.reason.message } };
+    const batch = keys.slice(start, start + removeBatch);
+    const results = await Promise.allSettled(batch.map((key) => storage.remove(key)));
+    results.forEach((result, i) => {
+      if (result.status === 'fulfilled') return;
+      failed.push(batch[i]);
+      reason ??= result.reason;
+    });
   }
-  return undefined;
+  if (failed.length > 0)
+    console.error(
+      JSON.stringify({
+        time: new Date().toISOString(),
+        level: 'error',
+        event: 'orphaned_files',
+        count: failed.length,
+        keys: failed,
+        error_name: reason instanceof Error ? reason.name : typeof reason,
+      }),
+    );
+  return failed;
 }
 
 // Original files of exercises and answers (#28): PDFs and photos, kept in S3 with a row each in

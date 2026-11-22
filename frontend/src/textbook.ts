@@ -23,10 +23,11 @@ export type ContentNode = {
 export const contentLabel = (content: { number: string; title: string }) =>
   content.number.trim() ? `${content.number} ${content.title}` : content.title;
 
-// The tree as select options in reading order, each indented two spaces per level.
+// The tree as select options in reading order, indented two non-breaking spaces per level
+// (plain spaces collapse inside an <option>).
 export function contentOptions(nodes: ContentNode[], depth = 0): { id: number; label: string }[] {
   return nodes.flatMap((node) => [
-    { id: node.id, label: '  '.repeat(depth) + contentLabel(node) },
+    { id: node.id, label: '\u00a0\u00a0'.repeat(depth) + contentLabel(node) },
     ...contentOptions(node.children, depth + 1),
   ]);
 }

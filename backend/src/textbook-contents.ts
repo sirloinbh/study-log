@@ -2,7 +2,7 @@ import { type Response, Router } from 'express';
 import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod/v4';
 
-import { removeStored, storedKeys } from './exercise-files.js';
+import { removeStoredFiles, storedKeys } from './exercise-files.js';
 import type { FileStorage } from './file-storage.js';
 import { inTransaction } from './sql.js';
 import { parseId } from './standard/http.js';
@@ -259,10 +259,11 @@ export function textbookContentRoutes(pool: Pool, storage: FileStorage) {
   router.delete('/:id', async (req, res) => {
     const textbookId = textbookOf(req.params);
     const id = parseId(req.params.id, 'contents entry');
+    let keys: string[] = [];
     const reply = await writeContents(pool, textbookId, async (client) => {
-      // The stored files of its exercises and its sections' go too (#209); if S3 cannot remove
-      // them, nothing is deleted.
-      const keys = await storedKeys(client, { textbookId, contentId: id });
+      // The stored files of its exercises and its sections' go too (#209), after the rows are
+      // deleted and committed (#265); a file S3 will not remove is logged for a sweep.
+      const stored = await storedKeys(client, { textbookId, contentId: id });
       let rows: { parentId: number | null; position: number }[];
       try {
         ({ rows } = await client.query<{ parentId: number | null; position: number }>(
@@ -285,8 +286,10 @@ export function textbookContentRoutes(pool: Pool, storage: FileStorage) {
          WHERE textbook_id = $1 AND parent_id IS NOT DISTINCT FROM $2 AND position > $3`,
         [textbookId, rows[0].parentId, rows[0].position],
       );
-      return (await removeStored(storage, keys)) ?? { status: 204 };
+      keys = stored;
+      return { status: 204 };
     });
+    if (reply.status === 204) await removeStoredFiles(storage, keys);
     send(res, reply);
   });
 

@@ -19,7 +19,7 @@ const kinds: { rank: number; pattern: RegExp }[] = [
   {
     rank: 1,
     pattern: new RegExp(
-      `^(?:(?:chapter|ch\\.|appendix|unit|lesson)\\s*(?:\\d+|[A-Z])|제\\s*\\d+\\s*장|\\d+\\s*장|부록\\s*(?:\\d+|[A-Z])?)${end}`,
+      `^(?:(?:chapter|appendix|unit|lesson)\\b\\.?\\s*(?:\\d+|[A-Z]|${roman})|ch\\.\\s*(?:\\d+|[A-Z]|${roman})|제\\s*\\d+\\s*장|\\d+\\s*장|부록\\s*(?:\\d+|[A-Z])?)${end}`,
       'i',
     ),
   },
@@ -39,6 +39,9 @@ const indentOf = (raw: string) =>
 function split(text: string): { rank?: number; number: string; title: string } {
   for (const { rank, pattern } of kinds) {
     const found = text.match(pattern);
+    // A roman numeral counts only in capitals: "Chapter IV" is numbered, "Chapter Civil" is not.
+    const word = found?.[0].match(/^[A-Za-z]+\.?\s*([A-Za-z]{2,})$/)?.[1];
+    if (word && !/^[IVXLCDM]+$/.test(word)) continue;
     if (found) return { rank, number: found[0].trim(), title: text.slice(found[0].length) };
   }
   const found = text.match(decimal);
