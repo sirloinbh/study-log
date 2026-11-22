@@ -32,6 +32,9 @@ export function Retrospectives({ today }: { today: string }) {
   const [draft, setDraft] = useState<{ key: string; text: string }>();
   const [confirming, setConfirming] = useState(false);
   const [recent, setRecent] = useState<Retrospective[]>();
+  // The recent list failing to load is shown as an error with a retry, never as an empty list.
+  const [recentError, setRecentError] = useState<string>();
+  const [recentTry, setRecentTry] = useState(0);
   const [reload, setReload] = useState(0);
   const [notice, setNotice] = useState<Notice>(undefined);
   const { busy, action, nameNext, begin, end } = useBusy();
@@ -66,12 +69,16 @@ export function Retrospectives({ today }: { today: string }) {
   useEffect(() => {
     let current = true;
     requestJson<{ retrospectives: Retrospective[] }>('/api/retrospectives?limit=20')
-      .then((data) => current && setRecent(data.retrospectives))
-      .catch(() => current && setRecent([]));
+      .then((data) => {
+        if (!current) return;
+        setRecent(data.retrospectives);
+        setRecentError(undefined);
+      })
+      .catch((failure: RequestError) => current && setRecentError(failure.message));
     return () => {
       current = false;
     };
-  }, [reload]);
+  }, [reload, recentTry]);
 
   const period = periods[key];
   const error = loadError?.key === key ? loadError.message : undefined;
@@ -310,8 +317,22 @@ export function Retrospectives({ today }: { today: string }) {
 
       <section className="card" aria-label="Past retrospectives">
         <h2>Past retrospectives</h2>
+        {recentError !== undefined && (
+          <div role="alert" className="error">
+            <p>Could not load the past retrospectives: {recentError}</p>
+            <button
+              type="button"
+              onClick={() => {
+                setRecentError(undefined);
+                setRecentTry((n) => n + 1);
+              }}
+            >
+              Retry loading the past retrospectives
+            </button>
+          </div>
+        )}
         {recent === undefined ? (
-          <Loading label="Loading the retrospectives" />
+          recentError === undefined && <Loading label="Loading the retrospectives" />
         ) : recent.length === 0 ? (
           <p className="status">No retrospectives yet</p>
         ) : (
