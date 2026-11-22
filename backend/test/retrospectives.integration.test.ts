@@ -51,7 +51,8 @@ test(
           });
         await log('2102-03-05', 'done', true); // Sunday: first day of the week
         await log('2102-03-05', 'in_progress', false);
-        await log('2102-03-08', 'planned'); // not studied yet
+        // Not studied yet: its goal flag must not count either (#269).
+        await log('2102-03-08', 'planned', true);
         await log('2102-03-11', 'done'); // Saturday: last day of the week
         await log('2102-03-12', 'done'); // next week
 
@@ -69,6 +70,7 @@ test(
           goalsAchieved: 1,
           goalsChecked: 2,
         });
+        assert.ok(week.summary.goalsChecked <= week.summary.logs);
 
         const write = (kind: string, start: string, body: string) =>
           call(`/api/retrospectives/${kind}/${start}`, { method: 'PUT', body: { body } });

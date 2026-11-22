@@ -105,8 +105,8 @@ export function retrospectiveRoutes(pool: Pool, today: () => string) {
         `SELECT COALESCE(sum(duration_minutes) FILTER (WHERE status <> 'planned'), 0)::int AS "totalMinutes",
            count(DISTINCT study_date) FILTER (WHERE status <> 'planned')::int AS "studyDays",
            count(*) FILTER (WHERE status <> 'planned')::int AS "logs",
-           count(*) FILTER (WHERE goal_achieved)::int AS "goalsAchieved",
-           count(*) FILTER (WHERE goal_achieved IS NOT NULL)::int AS "goalsChecked"
+           count(*) FILTER (WHERE status <> 'planned' AND goal_achieved)::int AS "goalsAchieved",
+           count(*) FILTER (WHERE status <> 'planned' AND goal_achieved IS NOT NULL)::int AS "goalsChecked"
          FROM study_logs WHERE study_date BETWEEN $1 AND $2`,
         [from, to],
       ),
