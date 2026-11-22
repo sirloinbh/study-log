@@ -3,6 +3,7 @@ import { Readable } from 'node:stream';
 import {
   DeleteObjectCommand,
   GetObjectCommand,
+  ListObjectsV2Command,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
@@ -14,6 +15,9 @@ export type FileStorage = {
   // The stored file as a stream, so a download never holds the whole file in memory (#266).
   get: (key: string) => Promise<Readable>;
   remove: (key: string) => Promise<void>;
+  // The stored objects under a prefix with their age, for the sweep of leftovers (#335). Optional so
+  // a stand-in that never sweeps does not have to write it.
+  list?: (prefix: string) => Promise<{ key: string; lastModified: Date }[]>;
 };
 
 // A storage call that failed: the status and message the API answers with.
@@ -125,6 +129,25 @@ export function s3Storage(
       } catch (error) {
         explain(error);
       }
+    },
+    list: async (prefix) => {
+      const { s3, bucket } = connect();
+      const found: { key: string; lastModified: Date }[] = [];
+      try {
+        let token: string | undefined;
+        do {
+          const page = await s3.send(
+            new ListObjectsV2Command({ Bucket: bucket, Prefix: prefix, ContinuationToken: token }),
+          );
+          for (const object of page.Contents ?? [])
+            if (object.Key && object.LastModified)
+              found.push({ key: object.Key, lastModified: object.LastModified });
+          token = page.IsTruncated ? page.NextContinuationToken : undefined;
+        } while (token);
+      } catch (error) {
+        explain(error);
+      }
+      return found;
     },
   };
 }
