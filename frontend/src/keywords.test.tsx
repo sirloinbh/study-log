@@ -3,8 +3,7 @@ import { describe, expect, test, vi } from 'vitest';
 
 import { searchPath } from './keyword';
 import { Keywords } from './keywords';
-
-vi.setConfig({ testTimeout: 60_000 });
+import { type Answer, fakeApi, type Sent } from './test/fake-api';
 
 type Keyword = { id: number; date: string; keyword: string; memo: string };
 
@@ -17,44 +16,40 @@ type Options = {
   holdChange?: Promise<void>;
 };
 
-// In-memory keywords API that records keyword requests. Search matches keyword or memo.
+// In-memory keywords API. Search matches keyword or memo.
 function server(initial: Keyword[] = [], options: Options = {}) {
   const rows = initial.map((row) => ({ ...row }));
-  const requests: { method: string; path: string; body?: unknown }[] = [];
   let nextId = 100;
-  const reply = (status: number, body?: unknown) =>
-    new Response(status === 204 ? null : JSON.stringify(body ?? {}), { status });
-  const handle = async (path: string, init?: { method?: string; body?: string }) => {
-    const method = init?.method ?? 'GET';
-    const body = init?.body === undefined ? undefined : JSON.parse(init.body);
-    requests.push({ method, path, body });
-    if (method !== 'GET') await options.holdChange;
+  const answer = ({ method, path, body: sent }: Sent): Answer | undefined => {
+    const body = sent as { date?: string; keyword: string; memo: string } | undefined;
     if (options.reject?.method === method)
-      return reply(options.reject.status, { error: options.reject.error });
+      return { status: options.reject.status, body: { error: options.reject.error } };
     const [base, query = ''] = path.split('?');
     if (base === '/api/keywords' && method === 'GET') {
       const params = new URLSearchParams(query);
       const date = params.get('date');
-      if (date) return reply(200, { keywords: rows.filter((r) => r.date === date) });
+      if (date) return { body: { keywords: rows.filter((r) => r.date === date) } };
       const q = (params.get('q') ?? '').toLowerCase();
       const from = params.get('from') ?? '0000';
       const to = params.get('to') ?? '9999';
-      return reply(200, {
-        keywords: rows
-          .filter(
-            (r) =>
-              (r.keyword.toLowerCase().includes(q) || r.memo.toLowerCase().includes(q)) &&
-              r.date >= from &&
-              r.date <= to,
-          )
-          .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.id - b.id)),
-      });
+      return {
+        body: {
+          keywords: rows
+            .filter(
+              (r) =>
+                (r.keyword.toLowerCase().includes(q) || r.memo.toLowerCase().includes(q)) &&
+                r.date >= from &&
+                r.date <= to,
+            )
+            .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : a.id - b.id)),
+        },
+      };
     }
     const clash = (date: string, keyword: string, id?: number) =>
       rows.some(
         (r) => r.id !== id && r.date === date && r.keyword.toLowerCase() === keyword.toLowerCase(),
       );
-    if (base === '/api/keywords' && method === 'POST') {
+    if (base === '/api/keywords' && method === 'POST' && body) {
       const row = {
         id: nextId++,
         date: body.date ?? today,
@@ -62,25 +57,29 @@ function server(initial: Keyword[] = [], options: Options = {}) {
         memo: body.memo,
       };
       if (clash(row.date, row.keyword))
-        return reply(409, { error: 'This keyword already exists on this date' });
+        return { status: 409, body: { error: 'This keyword already exists on this date' } };
       rows.push(row);
-      return reply(201, { keyword: row });
+      return { status: 201, body: { keyword: row } };
     }
     const one = base.match(/^\/api\/keywords\/(\d+)$/);
-    if (!one) throw new Error('unexpected request ' + path);
+    if (!one) return undefined;
     const index = rows.findIndex((r) => r.id === Number(one[1]));
-    if (index < 0) return reply(404, { error: 'Keyword not found' });
-    if (method === 'PUT') {
-      if (clash(body.date, body.keyword, rows[index].id))
-        return reply(409, { error: 'This keyword already exists on this date' });
+    if (index < 0) return { status: 404, body: { error: 'Keyword not found' } };
+    if (method === 'PUT' && body) {
+      if (clash(body.date ?? '', body.keyword, rows[index].id))
+        return { status: 409, body: { error: 'This keyword already exists on this date' } };
       rows[index] = { ...rows[index], ...body };
-      return reply(200, { keyword: rows[index] });
+      return { body: { keyword: rows[index] } };
     }
     rows.splice(index, 1);
-    return reply(204);
+    return { status: 204 };
   };
-  vi.stubGlobal('fetch', vi.fn(handle));
-  return { requests, rows };
+  // Changes (non-GET requests) wait for the held promise before they are applied and answered.
+  const api = fakeApi(async (request) => {
+    if (request.method !== 'GET') await options.holdChange;
+    return answer(request);
+  });
+  return { requests: api.requests, rows };
 }
 
 const stored: Keyword[] = [

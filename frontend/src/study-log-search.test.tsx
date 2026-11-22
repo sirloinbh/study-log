@@ -1,11 +1,9 @@
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { expect, test, vi } from 'vitest';
+import { expect, test } from 'vitest';
 
 import { StudyLogs } from './study-logs';
 import { studyLogSearchPath } from './study-logs-data';
-import { fakeApi } from './test/fake-api';
-
-vi.setConfig({ testTimeout: 20_000 });
+import { type Api, fakeApi } from './test/fake-api';
 
 type Log = {
   id: number;
@@ -55,12 +53,10 @@ const stored = [
   log(3, '2026-09-01', '행렬'),
 ];
 
-// The study log API filtering like the server; records search requests (those with a limit of
-// 100, which only the search card asks for).
+// The study log API filtering like the server.
 function server(initial: Log[], options: { failSearch?: boolean } = {}) {
   const logs = [...initial];
-  const searches: string[] = [];
-  fakeApi(({ method, path, body }) => {
+  return fakeApi(({ method, path, body }) => {
     if (path === '/api/textbooks')
       return { body: { textbooks: [{ id: 1, title: '선형대수', author: '', edition: '' }] } };
     if (path.startsWith('/api/study-logs/calendar'))
@@ -71,17 +67,15 @@ function server(initial: Log[], options: { failSearch?: boolean } = {}) {
       return { status: 201, body: { studyLog: logs.at(-1) } };
     }
     const [base, query = ''] = path.split('?');
-    if (base !== '/api/study-logs') throw new Error(`unexpected request ${path}`);
+    if (base !== '/api/study-logs') return undefined;
     const params = Object.fromEntries(
       query
         .split('&')
         .filter(Boolean)
         .map((pair) => pair.split('=').map(decodeURIComponent)),
     );
-    if (params.limit === '100') {
-      searches.push(path);
-      if (options.failSearch) return { status: 500, body: { error: 'Server error' } };
-    }
+    if (params.limit === '100' && options.failSearch)
+      return { status: 500, body: { error: 'Server error' } };
     const words = (params.q ?? '').toLowerCase();
     const found = logs.filter(
       (l) =>
@@ -93,8 +87,11 @@ function server(initial: Log[], options: { failSearch?: boolean } = {}) {
     );
     return { body: { studyLogs: found } };
   });
-  return searches;
 }
+
+// The search requests: those with a limit of 100, which only the search card asks for.
+const searchesOf = (api: Api) =>
+  api.requests.filter((r) => r.path.includes('limit=100')).map((r) => r.path);
 
 const card = () => screen.getByRole('region', { name: 'Study log search' });
 const results = () =>
@@ -104,19 +101,21 @@ const fillIn = (label: string, value: string) =>
 const search = () => fireEvent.submit(card().querySelector('form')!);
 
 async function open(...args: Parameters<typeof server>) {
-  const searches = server(...args);
+  const api = server(...args);
   render(<StudyLogs today="2026-10-22" />);
   await within(card()).findByRole('option', { name: '선형대수' });
-  return searches;
+  return api;
 }
 
 test('a search asks with every filled condition and lists the matches', async () => {
-  const searches = await open(stored);
+  const api = await open(stored);
   fillIn('Search term', ' 고유 ');
   fillIn('Start date', '2026-10-01');
   search();
   expect(await within(card()).findByText('Found 2')).toBeInTheDocument();
-  expect(searches).toEqual(['/api/study-logs?q=%EA%B3%A0%EC%9C%A0&from=2026-10-01&limit=100']);
+  expect(searchesOf(api)).toEqual([
+    '/api/study-logs?q=%EA%B3%A0%EC%9C%A0&from=2026-10-01&limit=100',
+  ]);
   const found = results();
   expect(found).toHaveLength(2);
   expect(found[0]).toMatch(/2026-10-20.*1 h.*Done.*선형대수.*고유값 정리/s);
@@ -124,7 +123,7 @@ test('a search asks with every filled condition and lists the matches', async ()
 });
 
 test('the textbook condition narrows the search', async () => {
-  const searches = await open(stored);
+  const api = await open(stored);
   const select = within(card()).getByLabelText('Textbook');
   expect(
     within(select)
@@ -134,7 +133,7 @@ test('the textbook condition narrows the search', async () => {
   fillIn('Textbook', '1');
   search();
   await waitFor(() => expect(results()).toHaveLength(1));
-  expect(searches.at(-1)).toBe('/api/study-logs?textbookId=1&limit=100');
+  expect(searchesOf(api).at(-1)).toBe('/api/study-logs?textbookId=1&limit=100');
 });
 
 test('no match says so and a failed search is reported without old results', async () => {
@@ -151,7 +150,7 @@ test('no match says so and a failed search is reported without old results', asy
 });
 
 test('saving a log searches the shown results again', async () => {
-  const searches = await open(stored);
+  const api = await open(stored);
   fillIn('Search term', '고유');
   search();
   await waitFor(() => expect(results()).toHaveLength(2));
@@ -161,7 +160,7 @@ test('saving a log searches the shown results again', async () => {
   fireEvent.change(screen.getByLabelText('Memo'), { target: { value: '고유값 복습' } });
   fireEvent.submit(document.querySelector('form')!);
   await waitFor(() => expect(results()).toHaveLength(3));
-  expect(searches).toHaveLength(2);
+  expect(searchesOf(api)).toHaveLength(2);
 });
 
 test('the search request leaves out blank conditions', () => {

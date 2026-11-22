@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { expect, test, vi } from 'vitest';
 
 import { Stats } from './stats';
+import { type Answer, fakeApi } from './test/fake-api';
 
 // As in stats-review.test.tsx: the chart library draws nothing here, and the page is slow to query.
 vi.mock('recharts', () => {
@@ -16,7 +17,6 @@ vi.mock('recharts', () => {
     Bar: Part,
   };
 });
-vi.setConfig({ testTimeout: 20_000 });
 
 const books = [
   { id: 7, title: '선형대수', author: '', edition: '' },
@@ -44,48 +44,40 @@ const studyTime = (url: string) => {
 };
 
 function server(
-  answers: { textbooks?: number; studyTime?: (url: string) => Response | undefined } = {},
+  answers: { textbooks?: number; studyTime?: (path: string) => Answer | undefined } = {},
 ) {
-  const asked: string[] = [];
-  const json = (body: unknown, status = 200) =>
-    Promise.resolve(new Response(JSON.stringify(body), { status }));
-  vi.stubGlobal(
-    'fetch',
-    vi.fn((url: string) => {
-      asked.push(url);
-      if (url === '/api/textbooks')
-        return answers.textbooks
-          ? json({ error: 'Server error' }, answers.textbooks)
-          : json({ textbooks: books });
-      if (url.startsWith('/api/stats/reviews'))
-        return json({
-          period: 'week',
-          from: '2026-10-25',
-          to: '2026-10-31',
-          scheduled: 0,
-          completed: 0,
-          delayed: 0,
-          completionRate: null,
-        });
-      if (url.startsWith('/api/stats/heatmap'))
-        return json({ from: '2026-10-25', to: '2026-10-31', daily: [] });
-      if (url.startsWith('/api/stats/textbooks'))
-        return json({
-          textbooks: [],
-          schedule: {
-            plannedMinutes: 0,
-            achievedMinutes: 0,
-            achievementRate: null,
-            dueDays: 0,
-            onTimeDays: 0,
-            adherenceRate: null,
-          },
-        });
-      const special = answers.studyTime?.(url);
-      return special ? Promise.resolve(special) : json(studyTime(url));
-    }),
-  );
-  return asked;
+  return fakeApi({
+    'GET /api/textbooks': answers.textbooks
+      ? { status: answers.textbooks, body: { error: 'Server error' } }
+      : { body: { textbooks: books } },
+    'GET /api/stats/reviews': {
+      body: {
+        period: 'week',
+        from: '2026-10-25',
+        to: '2026-10-31',
+        scheduled: 0,
+        completed: 0,
+        delayed: 0,
+        completionRate: null,
+      },
+    },
+    'GET /api/stats/heatmap': { body: { from: '2026-10-25', to: '2026-10-31', daily: [] } },
+    'GET /api/stats/textbooks': {
+      body: {
+        textbooks: [],
+        schedule: {
+          plannedMinutes: 0,
+          achievedMinutes: 0,
+          achievementRate: null,
+          dueDays: 0,
+          onTimeDays: 0,
+          adherenceRate: null,
+        },
+      },
+    },
+    'GET /api/stats/study-time': ({ path }) =>
+      answers.studyTime?.(path) ?? { body: studyTime(path) },
+  });
 }
 
 const metrics = () => within(screen.getByRole('region', { name: 'Study time metrics' }));
@@ -97,7 +89,7 @@ const seeTotal = (text: string) =>
 const picker = () => screen.getByRole('combobox', { name: 'Study time textbook' });
 
 test('picking a textbook narrows the study time to its logs, and All brings all back', async () => {
-  const asked = server();
+  const api = server();
   render(<Stats />);
   await seeTotal('5 h');
   await waitFor(() =>
@@ -111,7 +103,9 @@ test('picking a textbook narrows the study time to its logs, and All brings all 
   fireEvent.change(picker(), { target: { value: '7' } });
   await seeTotal('1 h 30 min');
   expect(totalCard().getByText('Recorded so far: All · 선형대수')).toBeInTheDocument();
-  expect(asked).toContain('/api/stats/study-time?period=week&textbookId=7');
+  expect(api.requests.map((r) => r.path)).toContain(
+    '/api/stats/study-time?period=week&textbookId=7',
+  );
 
   // With the study type and the period as well.
   fireEvent.click(
@@ -124,13 +118,13 @@ test('picking a textbook narrows the study time to its logs, and All brings all 
       name: 'This month',
     }),
   );
-  await waitFor(() =>
-    expect(asked).toContain('/api/stats/study-time?period=month&type=review&textbookId=7'),
+  await api.requested(
+    (r) => r.path === '/api/stats/study-time?period=month&type=review&textbookId=7',
   );
 
   fireEvent.change(picker(), { target: { value: '' } });
   await seeTotal('Recorded so far: Review');
-  expect(asked.at(-1)).not.toContain('textbookId');
+  expect(api.requests.at(-1)?.path).not.toContain('textbookId');
 });
 
 test('a textbook without logs shows zeros, not the last one picked', async () => {
@@ -168,9 +162,9 @@ test('without the textbook list, only every log can be seen, and it says why', a
 
 test('a textbook deleted elsewhere is reported, and All still works', async () => {
   server({
-    studyTime: (url) =>
-      url.includes('textbookId=7')
-        ? new Response(JSON.stringify({ error: 'Textbook not found' }), { status: 404 })
+    studyTime: (path) =>
+      path.includes('textbookId=7')
+        ? { status: 404, body: { error: 'Textbook not found' } }
         : undefined,
   });
   render(<Stats />);

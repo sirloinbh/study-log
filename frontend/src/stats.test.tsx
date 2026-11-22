@@ -4,10 +4,7 @@ import { expect, test, vi } from 'vitest';
 
 import { Stats } from './stats';
 import { busiestBar, chartBars, heatLevel, heatWeeks, monthLabel } from './study-stats';
-import { fakeApi } from './test/fake-api';
-
-// The whole dashboard renders here and role queries are slow on the first run after a change.
-vi.setConfig({ testTimeout: 20_000 });
+import { type Api, fakeApi } from './test/fake-api';
 
 // Recharts draws nothing without a real layout, so a stand-in writes what it was given into the
 // page: each bar's label and values, the bar's data key and the tooltip's formatted text. The
@@ -75,12 +72,11 @@ type Options = {
   heatmap?: { from: string; to: string; daily: { date: string; minutes: number }[] } | null;
 };
 
-// The stats API; records the periods asked for.
+// The stats API.
 function server(options: Options = {}) {
   const totals = options.totals ?? { week: 285, month: 485, '3months': 665, all: 665 };
-  const asked: string[] = [];
   const hold = options.hold;
-  const answers = (path: string) => {
+  return fakeApi(({ path }) => {
     if (path.startsWith('/api/study-logs')) return { body: { studyLogs: [] } };
     if (path === '/api/textbooks') return { body: { textbooks: [] } };
     if (path.startsWith('/api/stats/textbooks'))
@@ -114,25 +110,19 @@ function server(options: Options = {}) {
         },
       };
     const match = path.match(/^\/api\/stats\/study-time\?period=(.+)$/);
-    if (!match) throw new Error(`unexpected request ${path}`);
+    if (!match) return undefined;
     const period = match[1];
-    asked.push(period);
+    // A held period answers late, when the test releases it.
+    const held = hold?.periods.includes(period) ? { hold: hold.until } : {};
     return period in totals
-      ? { body: { ...statsFor(period, totals[period]), ...options.series } }
-      : { status: 500, body: { error: 'Server error' } };
-  };
-  // A held period answers late: the real fetch stand-in is wrapped to wait for the promise.
-  fakeApi(({ path }) => answers(path));
-  if (hold) {
-    const inner = globalThis.fetch;
-    vi.stubGlobal('fetch', (path: string, init?: RequestInit) =>
-      hold.periods.some((p) => path === `/api/stats/study-time?period=${p}`)
-        ? hold.until.then(() => inner(path, init))
-        : inner(path, init),
-    );
-  }
-  return asked;
+      ? { body: { ...statsFor(period, totals[period]), ...options.series }, ...held }
+      : { status: 500, body: { error: 'Server error' }, ...held };
+  });
 }
+
+// The periods asked for, in order.
+const askedOf = (api: Api) =>
+  api.requests.flatMap((r) => r.path.match(/^\/api\/stats\/study-time\?period=(.+)$/)?.[1] ?? []);
 
 // Each metric card as "title:value".
 const cards = () =>
@@ -151,10 +141,10 @@ const pick = (label: string) =>
   fireEvent.click(within(periodGroup()).getByRole('button', { name: label }));
 
 async function openStats(options?: Options) {
-  const asked = server(options);
+  const api = server(options);
   render(<Stats />);
   await screen.findByRole('region', { name: 'Study time metrics' });
-  return asked;
+  return api;
 }
 
 // A chart that fails to load says so; it runs first because the failed import is the first one.
@@ -168,8 +158,8 @@ test('a chart that fails to load says so and keeps the summary sentence', async 
 });
 
 test('the dashboard opens on this week with the four metric cards', async () => {
-  const asked = await openStats();
-  expect(asked).toEqual(['week']);
+  const api = await openStats();
+  expect(askedOf(api)).toEqual(['week']);
   expect(pressed()).toEqual(['This week']);
   expect(cards()).toEqual([
     'Total study time:11 h 5 min',
@@ -186,10 +176,10 @@ test('the dashboard opens on this week with the four metric cards', async () => 
 });
 
 test('picking a period asks for it and relabels the period card', async () => {
-  const asked = await openStats();
+  const api = await openStats();
   pick('This month');
   await waitFor(() => expect(cards()[2]).toBe('This month:8 h 5 min'));
-  expect(asked).toEqual(['week', 'month']);
+  expect(askedOf(api)).toEqual(['week', 'month']);
   expect(pressed()).toEqual(['This month']);
   expect(cards()).toEqual([
     'Total study time:11 h 5 min',
@@ -203,22 +193,26 @@ test('picking a period asks for it and relabels the period card', async () => {
     ['All', 'all'],
   ]) {
     pick(label);
-    await waitFor(() => expect(asked.at(-1)).toBe(period));
+    await waitFor(() => expect(askedOf(api).at(-1)).toBe(period));
   }
 });
 
 test("a slow answer for the previous period is not shown as the new one's", async () => {
   let release = () => {};
-  server({ hold: { periods: ['week'], until: new Promise((r) => (release = r)) } });
+  const until = new Promise<void>((r) => (release = r));
+  server({ hold: { periods: ['week'], until } });
   render(<Stats />);
   // Announced while waiting, so the change to the cards is not silent.
   await waitFor(() => expect(screen.getAllByRole('status').at(-1)).toHaveTextContent(/Loading/));
   pick('This month');
   await waitFor(() => expect(cards()[2]).toBe('This month:8 h 5 min'));
+  // The late answer arrives. Picking another period afterwards and seeing its cards proves the
+  // late one was handled before them, and it left no trace.
   release();
-  await new Promise((r) => setTimeout(r, 50));
-  expect(pressed()).toEqual(['This month']);
-  expect(cards()[2]).toBe('This month:8 h 5 min');
+  await until;
+  pick('All');
+  await waitFor(() => expect(cards()[2]).toBe('All:11 h 5 min'));
+  expect(pressed()).toEqual(['All']);
 });
 
 test('a failed load is reported instead of empty cards', async () => {

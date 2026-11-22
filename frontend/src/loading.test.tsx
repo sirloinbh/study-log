@@ -1,8 +1,9 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { expect, test, vi } from 'vitest';
+import { expect, test } from 'vitest';
 
 import { ButtonSpinner, Loading } from './loading';
 import { StudyLogs } from './study-logs';
+import { fakeApi } from './test/fake-api';
 
 const today = '2026-10-31';
 const log = {
@@ -49,26 +50,19 @@ test('a button shows the spinner only while waiting', () => {
   expect(screen.getByRole('status', { name: 'Working' })).toBeTruthy();
 });
 
-// The requests answer when told to, so the waiting state can be looked at.
+// The writes answer when told to, so the waiting state can be looked at.
 function heldServer(logs: unknown[]) {
-  const release: (() => void)[] = [];
-  vi.stubGlobal(
-    'fetch',
-    vi.fn((url: string, init?: { method?: string }) => {
-      const answer = () =>
-        new Response(
-          init?.method === 'DELETE'
-            ? null
-            : JSON.stringify(
-                url.startsWith('/api/textbooks') ? { textbooks: [] } : { studyLogs: logs },
-              ),
-          { status: init?.method === 'DELETE' ? 204 : 200 },
-        );
-      if (init?.method && init.method !== 'GET')
-        return new Promise((resolve) => release.push(() => resolve(answer())));
-      return Promise.resolve(answer());
-    }),
-  );
+  let release = () => {};
+  const held = new Promise<void>((resolve) => (release = resolve));
+  fakeApi({
+    'GET /api/textbooks': { body: { textbooks: [] } },
+    'GET /api/study-logs': { body: { studyLogs: logs } },
+    'GET /api/study-logs/calendar': {
+      body: { month: today.slice(0, 7), days: [{ date: today, minutes: 60, logs: 1 }] },
+    },
+    'POST /api/study-logs': { hold: held, status: 201, body: { studyLog: log } },
+    'DELETE /api/study-logs/1': { hold: held, status: 204 },
+  });
   return release;
 }
 
@@ -83,7 +77,7 @@ test('saving spins on the save button only, and stops when done', async () => {
   await waitFor(() => expect(save.disabled).toBe(true));
   expect(spinners().length).toBe(1);
   expect(save.contains(spinners()[0])).toBe(true);
-  release[0]();
+  release();
   await waitFor(() => expect(spinners().length).toBe(0));
 });
 
@@ -96,6 +90,6 @@ test('deleting spins on the confirm button, not on save', async () => {
   await waitFor(() => expect(spinners().length).toBe(1));
   expect(confirm.contains(spinners()[0])).toBe(true);
   expect(within(confirm).getByRole('status', { name: 'Working' })).toBeTruthy();
-  release[0]();
+  release();
   await waitFor(() => expect(spinners().length).toBe(0));
 });

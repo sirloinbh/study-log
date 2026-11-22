@@ -1,11 +1,9 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 
+import { type Answer, fakeApi } from './test/fake-api';
 import { textbookMeta } from './textbook';
 import { Textbooks } from './textbooks';
-
-// The whole page renders in each test and role queries are slow on the first run after a change.
-vi.setConfig({ testTimeout: 20_000 });
 
 type Book = { id: number; title: string; author: string; edition: string };
 
@@ -18,46 +16,53 @@ type Options = {
   hold?: Promise<void>;
 };
 
-// In-memory stand-in for /api/textbooks that records every request the screen sends.
-function fakeApi(initial: Book[] = [], options: Options = {}) {
+// In-memory stand-in for /api/textbooks on the shared fake. It is a handler function because the
+// list needs state (saved books come back on reload) and a count of reads.
+function serve(initial: Book[] = [], options: Options = {}) {
   const { reject, failGet, hold } = options;
   let gets = 0;
   const books = [...initial];
-  const requests: { method: string; path: string; body?: unknown }[] = [];
   let nextId = 100;
-  const reply = (status: number, body?: unknown) =>
-    new Response(status === 204 ? null : JSON.stringify(body ?? {}), { status });
-  const fetch = async (path: string, init: { method?: string; body?: string } = {}) => {
-    const method = init.method ?? 'GET';
-    const body = init.body === undefined ? undefined : JSON.parse(init.body);
+  const api = fakeApi((request): Answer | undefined => {
+    const { method, path } = request;
+    const body = request.body as Omit<Book, 'id'> | undefined;
     // The selected textbook's cards (tested in textbook-contents.test.tsx and screens.test.tsx).
-    if (path.endsWith('/contents')) return reply(200, { contents: [] });
-    if (path.includes('/exercises')) return reply(200, { exercises: [] });
-    requests.push({ method, path, body });
-    if (reject && method !== 'GET') return reply(reject.status, { error: reject.error });
+    if (path.endsWith('/contents')) return { body: { contents: [] } };
+    if (path.includes('/exercises')) return { body: { exercises: [] } };
+    if (!path.startsWith('/api/textbooks')) return undefined;
+    if (reject && method !== 'GET') return { status: reject.status, body: { error: reject.error } };
     if (method === 'GET') {
-      if (failGet?.(++gets)) return reply(500, { error: 'Server error' });
+      if (failGet?.(++gets)) return { status: 500, body: { error: 'Server error' } };
       const sorted = [...books].sort((a, b) => a.title.localeCompare(b.title) || a.id - b.id);
-      return reply(200, { textbooks: sorted });
+      return { body: { textbooks: sorted } };
     }
-    await hold;
+    const held = hold ? { hold } : {};
     if (method === 'POST') {
-      const book = { id: nextId++, ...body };
+      const book = { ...body!, id: nextId++ };
       books.push(book);
-      return reply(201, { textbook: book });
+      return { status: 201, body: { textbook: book }, ...held };
     }
     const id = Number(path.split('/')[3]);
     const index = books.findIndex((book) => book.id === id);
-    if (index < 0) return reply(404, { error: 'Textbook not found' });
+    if (index < 0) return { status: 404, body: { error: 'Textbook not found' } };
     if (method === 'PUT') {
-      books[index] = { id, ...body };
-      return reply(200, { textbook: books[index] });
+      books[index] = { ...body!, id };
+      return { body: { textbook: books[index] }, ...held };
     }
     books.splice(index, 1);
-    return reply(204);
+    return { status: 204, ...held };
+  });
+  return {
+    sent: api.sent,
+    requested: api.requested,
+    // The textbook list's own requests, without the selected textbook's card requests.
+    get requests() {
+      return api.requests.filter(
+        (request) => !request.path.endsWith('/contents') && !request.path.includes('/exercises'),
+      );
+    },
+    books,
   };
-  vi.stubGlobal('fetch', vi.fn(fetch));
-  return { requests, books };
 }
 
 const linear: Book = {
@@ -100,7 +105,7 @@ const choose = async (title: string) => {
 const CHOOSE = /Choose a textbook from the list/;
 
 test('the textbook page lists titles with author and edition', async () => {
-  const api = fakeApi([linear, calculus]);
+  const api = serve([linear, calculus]);
   await open();
   expect(api.requests).toEqual([{ method: 'GET', path: '/api/textbooks' }]);
   // Server order (by title); a blank author and edition show nothing extra.
@@ -112,14 +117,14 @@ test('the textbook page lists titles with author and edition', async () => {
 });
 
 test('an empty textbook list says so', async () => {
-  fakeApi();
+  serve();
   await open();
   expect(screen.getByText('No textbooks registered yet')).toBeInTheDocument();
   expect(items()).toHaveLength(0);
 });
 
 test('registering a textbook posts it, clears the form and shows its detail', async () => {
-  const api = fakeApi();
+  const api = serve();
   await open();
   expect(heading()).toBe('Register a textbook');
   fill('Title', '확률과 통계');
@@ -147,7 +152,7 @@ test('registering a textbook posts it, clears the form and shows its detail', as
 });
 
 test('a rejected save shows the server message and keeps the input', async () => {
-  fakeApi([], { reject: { status: 400, error: 'Enter the title' } });
+  serve([], { reject: { status: 400, error: 'Enter the title' } });
   await open();
   fill('Title', '   ');
   fill('Author', '홍길동');
@@ -157,7 +162,7 @@ test('a rejected save shows the server message and keeps the input', async () =>
 });
 
 test('selecting a textbook shows its detail with blanks marked', async () => {
-  fakeApi([linear, calculus]);
+  serve([linear, calculus]);
   await open();
   await choose('미적분학');
   expect(detail().getByText('Title').closest('dl')).toHaveTextContent(
@@ -172,7 +177,7 @@ test('selecting a textbook shows its detail with blanks marked', async () => {
 });
 
 test('editing from the detail fills the form and saves it with PUT', async () => {
-  const api = fakeApi([linear]);
+  const api = serve([linear]);
   await open();
   await choose('선형대수와 그 응용');
   click('선형대수와 그 응용 textbook edit', detail());
@@ -199,7 +204,7 @@ test('editing from the detail fills the form and saves it with PUT', async () =>
 });
 
 test('cancelling an edit restores the unsaved new textbook', async () => {
-  fakeApi([linear]);
+  serve([linear]);
   await open();
   fill('Title', '작성 중인 교재');
   await choose('선형대수와 그 응용');
@@ -211,7 +216,7 @@ test('cancelling an edit restores the unsaved new textbook', async () => {
 });
 
 test('deleting needs a second click and can be cancelled', async () => {
-  const api = fakeApi([linear]);
+  const api = serve([linear]);
   await open();
   await choose('선형대수와 그 응용');
   click('선형대수와 그 응용 textbook delete', detail());
@@ -228,7 +233,7 @@ test('deleting needs a second click and can be cancelled', async () => {
 });
 
 test('deleting the textbook being edited ends the edit', async () => {
-  fakeApi([linear]);
+  serve([linear]);
   await open();
   await choose('선형대수와 그 응용');
   click('선형대수와 그 응용 textbook edit', detail());
@@ -240,7 +245,7 @@ test('deleting the textbook being edited ends the edit', async () => {
 });
 
 test('saving an edit of a textbook deleted elsewhere leaves edit mode and reloads', async () => {
-  const api = fakeApi([linear]);
+  const api = serve([linear]);
   await open();
   await choose('선형대수와 그 응용');
   click('선형대수와 그 응용 textbook edit', detail());
@@ -254,7 +259,7 @@ test('saving an edit of a textbook deleted elsewhere leaves edit mode and reload
 });
 
 test('a failed load reports the error instead of claiming there are no textbooks', async () => {
-  fakeApi([linear], { failGet: () => true });
+  serve([linear], { failGet: () => true });
   render(<Textbooks />);
   expect(await screen.findByRole('alert')).toHaveTextContent(
     /Could not load the textbooks: Server error/,
@@ -264,7 +269,7 @@ test('a failed load reports the error instead of claiming there are no textbooks
 
 test('fields and buttons are locked while a save is in flight', async () => {
   let release = () => {};
-  const api = fakeApi([linear], { hold: new Promise<void>((r) => (release = r)) });
+  const api = serve([linear], { hold: new Promise<void>((r) => (release = r)) });
   await open();
   await choose('선형대수와 그 응용');
   fill('Title', '새 교재');
@@ -281,7 +286,7 @@ test('fields and buttons are locked while a save is in flight', async () => {
 });
 
 test('detail buttons name the textbook they act on', async () => {
-  fakeApi([linear]);
+  serve([linear]);
   await open();
   await choose('선형대수와 그 응용');
   const labels = within(screen.getByRole('region', { name: 'Textbook details' }))
@@ -296,7 +301,7 @@ test('detail buttons name the textbook they act on', async () => {
 // The old test went through the app shell, which remounted each page. The real app keeps pages
 // mounted, so what stays testable here is that a fresh screen starts with an empty form.
 test('leaving a page and coming back starts it fresh', async () => {
-  fakeApi([linear]);
+  serve([linear]);
   const first = render(<Textbooks />);
   await waitFor(() =>
     expect(screen.queryByRole('group', { name: 'Loading the textbooks' })).toBeNull(),
@@ -320,7 +325,7 @@ test('selecting moves focus to the detail only when it is stacked below the list
     vi.stubGlobal('matchMedia', (query: string) => ({
       matches: narrow && query === '(max-width: 760px)',
     }));
-    fakeApi([linear]);
+    serve([linear]);
     await open();
     await choose('선형대수와 그 응용');
     expect(focused, narrow ? 'phone width' : 'desktop width').toEqual(expected);
@@ -330,7 +335,7 @@ test('selecting moves focus to the detail only when it is stacked below the list
 });
 
 test('a 404 when deleting reports it, reloads and clears the detail', async () => {
-  const api = fakeApi([linear]);
+  const api = serve([linear]);
   await open();
   await choose('선형대수와 그 응용');
   click('선형대수와 그 응용 textbook delete', detail());
@@ -355,7 +360,7 @@ test('textbook meta joins author and edition and skips blanks', () => {
 const focusedId = () => document.activeElement?.id;
 
 test('focus follows the delete flow: confirm, back on cancel, the list after', async () => {
-  fakeApi([linear]);
+  serve([linear]);
   await open();
   await choose('선형대수와 그 응용');
   click('선형대수와 그 응용 textbook delete', detail());
@@ -374,7 +379,7 @@ test('a failed textbook delete puts focus back on delete, a 404 on the list', as
     [{ status: 500, error: 'Server error' }, 'textbook-delete'],
     [{ status: 404, error: 'Textbook not found' }, 'textbook-list'],
   ] as const) {
-    fakeApi([linear], { reject });
+    serve([linear], { reject });
     await open();
     await choose('선형대수와 그 응용');
     click('선형대수와 그 응용 textbook delete', detail());
@@ -387,7 +392,7 @@ test('a failed textbook delete puts focus back on delete, a 404 on the list', as
 
 // #75: two submits in the same tick, before the screen re-renders with `busy`, send one request.
 test('a double submit in the same tick registers the textbook once', async () => {
-  const api = fakeApi();
+  const api = serve();
   await open();
   fill('Title', '확률과 통계');
   act(() => {

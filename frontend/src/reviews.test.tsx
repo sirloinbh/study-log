@@ -1,9 +1,9 @@
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { useState } from 'react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 
 import { overdueDays, type Review, reviewTitle } from './review';
 import { Reviews } from './reviews';
+import { fakeApi } from './test/fake-api';
 
 const today = '2026-10-31';
 
@@ -25,42 +25,30 @@ function server(
   completeAnswer: (rows: Review[], id: number) => { status: number; body: object },
 ) {
   let rows = initial;
-  const json = (body: object, status = 200) =>
-    new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
-  const fetch = vi.fn((url: string, init?: { method?: string }) => {
-    if (init?.method === 'POST') {
-      const id = Number(url.split('/')[3]);
+  return fakeApi((request) => {
+    if (request.method === 'POST') {
+      const id = Number(request.path.split('/')[3]);
       const answer = completeAnswer(rows, id);
       if (answer.status < 400) rows = rows.filter((row) => row.id !== id);
-      return Promise.resolve(json(answer.body, answer.status));
+      return answer;
     }
-    return Promise.resolve(json({ today, reviews: rows }));
+    if (request.path === '/api/reviews/today') return { body: { today, reviews: rows } };
   });
-  vi.stubGlobal('fetch', fetch);
-  return fetch;
 }
 
 const done = (next: object | null) => () => ({ status: 200, body: { next } });
 
 // A page whose only review has gone elsewhere: completing it fails and the reload no longer has it.
-function ReviewsWithGone({ status, error }: { status: number; error: string }) {
-  const [ready] = useState(() => {
-    let gone = false;
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((_url: string, init?: { method?: string }) => {
-        if (init?.method === 'POST') {
-          gone = true;
-          return Promise.resolve(new Response(JSON.stringify({ error }), { status }));
-        }
-        return Promise.resolve(
-          new Response(JSON.stringify({ today, reviews: gone ? [] : [review()] })),
-        );
-      }),
-    );
-    return true;
+function goneAfterCompleting(status: number, error: string) {
+  let gone = false;
+  return fakeApi((request) => {
+    if (request.method === 'POST') {
+      gone = true;
+      return { status, body: { error } };
+    }
+    if (request.path === '/api/reviews/today')
+      return { body: { today, reviews: gone ? [] : [review()] } };
   });
-  return ready ? <Reviews /> : null;
 }
 
 test('days overdue count whole days and never go below zero', () => {
@@ -90,7 +78,10 @@ test('the memo is shown as Markdown, and a blank memo not at all', async () => {
   render(<Reviews />);
   const bold = await screen.findByText('정의');
   expect(bold.tagName).toBe('STRONG');
-  expect(document.querySelectorAll('.memo')).toHaveLength(1);
+  const [withMemo, blank] = screen.getAllByRole('listitem');
+  expect(within(withMemo).getByText('정의')).toBeInTheDocument();
+  // Only the status line is left in the item with the blank memo.
+  expect(within(blank).getAllByRole('paragraph')).toHaveLength(1);
 });
 
 test('an empty list says there is nothing to review', async () => {
@@ -115,7 +106,7 @@ test('overdue reviews stay listed and say how late they are', async () => {
 });
 
 test('completing removes the review, shows the next date and moves focus', async () => {
-  const fetch = server([review()], done({ round: 2, dueDate: '2026-11-02' }));
+  const api = server([review()], done({ round: 2, dueDate: '2026-11-02' }));
   render(<Reviews />);
   fireEvent.click(
     await screen.findByRole('button', { name: '2026-10-30 study round 1 complete review' }),
@@ -124,10 +115,7 @@ test('completing removes the review, shows the next date and moves focus', async
     await screen.findByText('Review completed. The next review is on 2026-11-02'),
   ).toBeInTheDocument();
   expect(await screen.findByText('Nothing to review today')).toBeInTheDocument();
-  expect(fetch).toHaveBeenCalledWith(
-    '/api/reviews/1/complete',
-    expect.objectContaining({ method: 'POST' }),
-  );
+  expect(api.sent).toEqual([{ method: 'POST', path: '/api/reviews/1/complete' }]);
   await waitFor(() => expect(document.activeElement?.id).toBe('reviews-today'));
 });
 
@@ -156,7 +144,8 @@ test('a review already completed elsewhere leaves the list and focus goes to the
     [409, 'This review is already completed'],
     [404, 'Review not found'],
   ] as const) {
-    const { unmount } = render(<ReviewsWithGone status={status} error={error} />);
+    goneAfterCompleting(status, error);
+    const { unmount } = render(<Reviews />);
     fireEvent.click(await screen.findByRole('button', { name: /complete review/ }));
     expect(await screen.findByRole('alert')).toHaveTextContent(error);
     expect(await screen.findByText('Nothing to review today')).toBeInTheDocument();
@@ -167,19 +156,7 @@ test('a review already completed elsewhere leaves the list and focus goes to the
 
 test('focus goes to the heading when a failed review is gone after the reload', async () => {
   // A 500 whose completion did commit: the review is not listed when the page reloads.
-  let completed = false;
-  vi.stubGlobal(
-    'fetch',
-    vi.fn((_url: string, init?: { method?: string }) => {
-      if (init?.method === 'POST') {
-        completed = true;
-        return Promise.resolve(new Response(JSON.stringify({ error: 'Error' }), { status: 500 }));
-      }
-      return Promise.resolve(
-        new Response(JSON.stringify({ today, reviews: completed ? [] : [review()] })),
-      );
-    }),
-  );
+  goneAfterCompleting(500, 'Error');
   render(<Reviews />);
   fireEvent.click(await screen.findByRole('button', { name: /complete review/ }));
   await screen.findByRole('alert');
@@ -188,20 +165,15 @@ test('focus goes to the heading when a failed review is gone after the reload', 
 
 test('a failed reload keeps the list on screen and reports it', async () => {
   let posted = false;
-  vi.stubGlobal(
-    'fetch',
-    vi.fn((_url: string, init?: { method?: string }) => {
-      if (init?.method === 'POST') {
-        posted = true;
-        return Promise.resolve(new Response(JSON.stringify({ next: null })));
-      }
-      return Promise.resolve(
-        posted
-          ? new Response(JSON.stringify({ error: 'List error' }), { status: 500 })
-          : new Response(JSON.stringify({ today, reviews: [review()] })),
-      );
-    }),
-  );
+  fakeApi((request) => {
+    if (request.method === 'POST') {
+      posted = true;
+      return { body: { next: null } };
+    }
+    return posted
+      ? { status: 500, body: { error: 'List error' } }
+      : { body: { today, reviews: [review()] } };
+  });
   render(<Reviews />);
   fireEvent.click(await screen.findByRole('button', { name: /complete review/ }));
   expect(await screen.findByRole('alert')).toHaveTextContent('Could not load the reviews');
@@ -212,15 +184,13 @@ test('the same message twice is cleared in between, so it is announced again', a
   let release = () => {};
   const held = new Promise<void>((resolve) => (release = resolve));
   let posts = 0;
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async (_url: string, init?: { method?: string }) => {
-      if (init?.method !== 'POST')
-        return new Response(JSON.stringify({ today, reviews: [review()] }));
-      if (++posts === 2) await held;
-      return new Response(JSON.stringify({ next: { round: 2, dueDate: '2026-11-02' } }));
-    }),
-  );
+  fakeApi((request) => {
+    if (request.method !== 'POST') return { body: { today, reviews: [review()] } };
+    return {
+      body: { next: { round: 2, dueDate: '2026-11-02' } },
+      ...(++posts === 2 ? { hold: held } : {}),
+    };
+  });
   render(<Reviews />);
   const message = 'Review completed. The next review is on 2026-11-02';
   fireEvent.click(await screen.findByRole('button', { name: /complete review/ }));
@@ -259,24 +229,19 @@ function rangeServer(
     body: { dueDate: '2026-11-05' },
   }),
 ) {
-  const fetch = vi.fn((url: string, init?: { method?: string }) => {
-    if (init?.method && init.method !== 'GET') {
+  return fakeApi((request) => {
+    if (request.method !== 'GET') {
       const answer = moved();
       if (answer.leaves) for (const key of Object.keys(lists)) lists[key] = [];
-      return Promise.resolve(new Response(JSON.stringify(answer.body), { status: answer.status }));
+      return { status: answer.status, body: answer.body };
     }
-    const range = url.split('/').pop()!;
-    return Promise.resolve(new Response(JSON.stringify({ today, reviews: lists[range] })));
+    const range = request.path.split('/').pop()!;
+    if (lists[range]) return { body: { today, reviews: lists[range] } };
   });
-  vi.stubGlobal('fetch', fetch);
-  return fetch;
 }
 
-const changes = (fetch: ReturnType<typeof rangeServer>) =>
-  fetch.mock.calls.filter(([, init]) => init?.method && init.method !== 'GET');
-
 test('picking a range lists it, marks it and says when it is empty', async () => {
-  const fetch = rangeServer({
+  const api = rangeServer({
     today: [review()],
     week: [review({ id: 2 }), review({ id: 3 })],
     all: [],
@@ -292,40 +257,37 @@ test('picking a range lists it, marks it and says when it is empty', async () =>
 
   fireEvent.click(screen.getByRole('button', { name: 'All' }));
   expect(await screen.findByText('No reviews left')).toBeInTheDocument();
-  expect(fetch).toHaveBeenCalledWith('/api/reviews/week', expect.anything());
-  expect(fetch).toHaveBeenCalledWith('/api/reviews/all', expect.anything());
+  expect(api.requests.map((request) => request.path)).toEqual([
+    '/api/reviews/today',
+    '/api/reviews/week',
+    '/api/reviews/all',
+  ]);
 });
 
 test('a slow answer for the range left behind is not shown', async () => {
-  let answerToday = (_value: Response) => {};
-  const slow = new Promise<Response>((resolve) => (answerToday = resolve));
-  vi.stubGlobal(
-    'fetch',
-    vi.fn((url: string) =>
-      url.endsWith('/today')
-        ? slow
-        : Promise.resolve(new Response(JSON.stringify({ today, reviews: [] }))),
-    ),
+  let answerToday = () => {};
+  const slow = new Promise<void>((resolve) => (answerToday = resolve));
+  fakeApi((request) =>
+    request.path === '/api/reviews/today'
+      ? { hold: slow, body: { today, reviews: [review()] } }
+      : { body: { today, reviews: [] } },
   );
   render(<Reviews />);
   fireEvent.click(screen.getByRole('button', { name: 'All' }));
   await screen.findByText('No reviews left');
-  answerToday(new Response(JSON.stringify({ today, reviews: [review()] })));
-  await new Promise((resolve) => setTimeout(resolve));
+  answerToday();
+  // The late reply has reached the page once the first (today) fetch has settled and the page has rendered.
+  await vi.mocked(fetch).mock.results[0].value;
+  await act(async () => {});
   expect(screen.getByText('No reviews left')).toBeInTheDocument();
   expect(screen.queryByRole('button', { name: /complete review/ })).toBeNull();
 });
 
 test('a failed list shows for its own range only', async () => {
-  vi.stubGlobal(
-    'fetch',
-    vi.fn((url: string) =>
-      Promise.resolve(
-        url.endsWith('/week')
-          ? new Response(JSON.stringify({ error: 'Weekly error' }), { status: 500 })
-          : new Response(JSON.stringify({ today, reviews: [] })),
-      ),
-    ),
+  fakeApi((request) =>
+    request.path === '/api/reviews/week'
+      ? { status: 500, body: { error: 'Weekly error' } }
+      : { body: { today, reviews: [] } },
   );
   render(<Reviews />);
   fireEvent.click(screen.getByRole('button', { name: 'This week' }));
@@ -336,7 +298,7 @@ test('a failed list shows for its own range only', async () => {
 });
 
 test('snoozing reports the new date, reloads the range and tells the badge', async () => {
-  const fetch = rangeServer({ today: [review()] }, () => ({
+  const api = rangeServer({ today: [review()] }, () => ({
     status: 200,
     body: { dueDate: '2026-11-01' },
     leaves: true,
@@ -348,7 +310,7 @@ test('snoozing reports the new date, reloads the range and tells the badge', asy
     await screen.findByText('Postponed by a day. The new due date is 2026-11-01'),
   ).toBeInTheDocument();
   expect(await screen.findByText('Nothing to review today')).toBeInTheDocument();
-  expect(changes(fetch)[0][0]).toBe('/api/reviews/1/snooze');
+  expect(api.sent[0].path).toBe('/api/reviews/1/snooze');
   await waitFor(() => expect(onChange).toHaveBeenCalledTimes(1));
   // Its button left with the review, so focus goes to the heading.
   await waitFor(() => expect(document.activeElement?.id).toBe('reviews-today'));
@@ -363,7 +325,7 @@ test('a snooze that keeps the review in the range keeps focus on its button', as
 });
 
 test('changing a date sends it, closes the form and returns focus', async () => {
-  const fetch = rangeServer({ today: [review({ dueDate: today })] });
+  const api = rangeServer({ today: [review({ dueDate: today })] });
   const onChange = vi.fn();
   render(<Reviews onChange={onChange} />);
   fireEvent.click(await screen.findByRole('button', { name: /change date/ }));
@@ -374,21 +336,20 @@ test('changing a date sends it, closes the form and returns focus', async () => 
   fireEvent.click(screen.getByRole('button', { name: /save due date/ }));
   expect(await screen.findByText('Changed the due date to 2026-11-05')).toBeInTheDocument();
   expect(screen.queryByLabelText('New due date')).toBeNull();
-  const [url, init] = changes(fetch)[0] as [string, { method: string; body: string }];
-  expect(url).toBe('/api/reviews/1/due-date');
-  expect(init.method).toBe('PUT');
-  expect(JSON.parse(init.body)).toEqual({ dueDate: '2026-11-05' });
+  expect(api.sent).toEqual([
+    { method: 'PUT', path: '/api/reviews/1/due-date', body: { dueDate: '2026-11-05' } },
+  ]);
   await waitFor(() => expect(document.activeElement?.id).toBe('review-edit-1'));
   expect(onChange).toHaveBeenCalledTimes(1);
 });
 
 test('cancelling a date change sends nothing and returns focus', async () => {
-  const fetch = rangeServer({ today: [review()] });
+  const api = rangeServer({ today: [review()] });
   render(<Reviews />);
   fireEvent.click(await screen.findByRole('button', { name: /change date/ }));
   fireEvent.click(screen.getByRole('button', { name: /cancel due date change/ }));
   expect(screen.queryByLabelText('New due date')).toBeNull();
-  expect(changes(fetch)).toEqual([]);
+  expect(api.sent).toEqual([]);
   await waitFor(() => expect(document.activeElement?.id).toBe('review-edit-1'));
 });
 
@@ -435,27 +396,20 @@ test('another range closes the open date form and clears the message', async () 
 });
 
 test('the range already shown keeps a date being typed and sends nothing', async () => {
-  const fetch = rangeServer({ today: [review()] });
+  const api = rangeServer({ today: [review()] });
   render(<Reviews />);
   fireEvent.click(await screen.findByRole('button', { name: /change date/ }));
   fireEvent.change(screen.getByLabelText('New due date'), { target: { value: '2026-11-05' } });
-  const before = fetch.mock.calls.length;
+  const before = api.requests.length;
   fireEvent.click(screen.getByRole('button', { name: 'Today' }));
   expect(screen.getByLabelText('New due date')).toHaveValue('2026-11-05');
-  expect(fetch.mock.calls.length).toBe(before);
+  expect(api.requests.length).toBe(before);
 });
 
 test('the range already shown tries again after a failed list', async () => {
   let fail = true;
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(() =>
-      Promise.resolve(
-        fail
-          ? new Response(JSON.stringify({ error: 'List error' }), { status: 500 })
-          : new Response(JSON.stringify({ today, reviews: [] })),
-      ),
-    ),
+  fakeApi(() =>
+    fail ? { status: 500, body: { error: 'List error' } } : { body: { today, reviews: [] } },
   );
   render(<Reviews />);
   expect(await screen.findByRole('alert')).toHaveTextContent('List error');
@@ -466,19 +420,17 @@ test('the range already shown tries again after a failed list', async () => {
 });
 
 test('a retry unlocks the buttons, returns focus and shows that it is loading', async () => {
-  let answer = (_value: Response) => {};
+  let answer = () => {};
   let calls = 0;
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(() => {
-      calls += 1;
-      if (calls === 1)
-        return Promise.resolve(
-          new Response(JSON.stringify({ error: 'List error' }), { status: 500 }),
-        );
-      return new Promise<Response>((resolve) => (answer = resolve));
-    }),
-  );
+  fakeApi(() => {
+    calls += 1;
+    if (calls === 1) return { status: 500, body: { error: 'List error' } };
+    return {
+      status: 500,
+      body: { error: 'List error' },
+      hold: new Promise<void>((resolve) => (answer = resolve)),
+    };
+  });
   render(<Reviews />);
   await screen.findByRole('alert');
   const button = screen.getByRole('button', { name: 'Today' });
@@ -487,7 +439,7 @@ test('a retry unlocks the buttons, returns focus and shows that it is loading', 
   expect(await screen.findByText('Loading the reviews…')).toBeInTheDocument();
   expect(screen.queryByRole('alert')).toBeNull();
   expect(button).toBeDisabled();
-  answer(new Response(JSON.stringify({ error: 'List error' }), { status: 500 }));
+  answer();
   expect(await screen.findByRole('alert')).toHaveTextContent('List error');
   await waitFor(() => expect(button).toBeEnabled());
   await waitFor(() => expect(document.activeElement).toBe(button));
@@ -496,21 +448,12 @@ test('a retry unlocks the buttons, returns focus and shows that it is loading', 
 test('a retry that works clears the error of the change before it', async () => {
   let failing = true;
   let fetchedOnce = false;
-  vi.stubGlobal(
-    'fetch',
-    vi.fn((_url: string, init?: { method?: string }) => {
-      if (init?.method === 'POST')
-        return Promise.resolve(
-          new Response(JSON.stringify({ error: 'Change error' }), { status: 500 }),
-        );
-      if (failing && fetchedOnce)
-        return Promise.resolve(
-          new Response(JSON.stringify({ error: 'List error' }), { status: 500 }),
-        );
-      fetchedOnce = true;
-      return Promise.resolve(new Response(JSON.stringify({ today, reviews: [review()] })));
-    }),
-  );
+  fakeApi((request) => {
+    if (request.method === 'POST') return { status: 500, body: { error: 'Change error' } };
+    if (failing && fetchedOnce) return { status: 500, body: { error: 'List error' } };
+    fetchedOnce = true;
+    return { body: { today, reviews: [review()] } };
+  });
   render(<Reviews />);
   fireEvent.click(await screen.findByRole('button', { name: /postpone a day/ }));
   await screen.findByText('Change error');
@@ -523,37 +466,37 @@ test('a retry that works clears the error of the change before it', async () => 
 });
 
 test('a slow older answer does not bring back a review just completed', async () => {
-  let answerOld = (_value: Response) => {};
+  let answerOld = () => {};
   let todayLists = 0;
-  const list = (reviews: Review[]) =>
-    Promise.resolve(new Response(JSON.stringify({ today, reviews })));
-  vi.stubGlobal(
-    'fetch',
-    vi.fn((url: string, init?: { method?: string }) => {
-      if (init?.method === 'POST')
-        return Promise.resolve(new Response(JSON.stringify({ next: null })));
-      // The week's list never answers, so the page still shows today's when today is picked again.
-      if (url.endsWith('/week')) return new Promise<Response>(() => {});
-      todayLists += 1;
-      if (todayLists === 1) return list([review()]);
-      if (todayLists === 2) return new Promise<Response>((resolve) => (answerOld = resolve));
-      return list([]);
-    }),
-  );
+  fakeApi((request) => {
+    if (request.method === 'POST') return { body: { next: null } };
+    // The week's list never answers, so the page still shows today's when today is picked again.
+    if (request.path === '/api/reviews/week') return { hold: new Promise(() => {}), body: {} };
+    todayLists += 1;
+    if (todayLists === 1) return { body: { today, reviews: [review()] } };
+    if (todayLists === 2)
+      return {
+        body: { today, reviews: [review()] },
+        hold: new Promise<void>((resolve) => (answerOld = resolve)),
+      };
+    return { body: { today, reviews: [] } };
+  });
   render(<Reviews />);
   await screen.findByRole('button', { name: /complete review/ });
   fireEvent.click(screen.getByRole('button', { name: 'This week' }));
   fireEvent.click(screen.getByRole('button', { name: 'Today' }));
   fireEvent.click(screen.getByRole('button', { name: /complete review/ }));
   await screen.findByText('Nothing to review today');
-  answerOld(new Response(JSON.stringify({ today, reviews: [review()] })));
-  await new Promise((resolve) => setTimeout(resolve));
+  answerOld();
+  // The old list's reply has reached the page once the fetch that carried it has settled.
+  await vi.mocked(fetch).mock.results[2].value;
+  await act(async () => {});
   expect(screen.getByText('Nothing to review today')).toBeInTheDocument();
 });
 
 test('returning to the tab loads the range on screen again', async () => {
   const lists: Record<string, Review[]> = { today: [], week: [] };
-  const fetch = rangeServer(lists);
+  const api = rangeServer(lists);
   render(<Reviews />);
   await screen.findByText('Nothing to review today');
   lists.today = [review()];
@@ -565,18 +508,18 @@ test('returning to the tab loads the range on screen again', async () => {
   lists.week = [review(), review({ id: 2 })];
   fireEvent.focus(window);
   await screen.findByRole('heading', { name: 'Reviews this week (2)' });
-  expect(fetch.mock.calls.at(-1)?.[0]).toBe('/api/reviews/week');
+  expect(api.requests.at(-1)?.path).toBe('/api/reviews/week');
 });
 
 test('returning to the tab keeps a date being typed', async () => {
   const lists = { today: [review()] };
-  const fetch = rangeServer(lists);
+  const api = rangeServer(lists);
   render(<Reviews />);
   fireEvent.click(await screen.findByRole('button', { name: /change date/ }));
   fireEvent.change(screen.getByLabelText('New due date'), { target: { value: '2026-11-05' } });
-  const before = fetch.mock.calls.length;
+  const before = api.requests.length;
   fireEvent.focus(window);
-  await waitFor(() => expect(fetch.mock.calls.length).toBe(before + 1));
+  await waitFor(() => expect(api.requests.length).toBe(before + 1));
   await act(async () => {});
   expect(screen.getByLabelText('New due date')).toHaveValue('2026-11-05');
 });
@@ -677,22 +620,22 @@ test('a form closing does not take focus from another control', async () => {
 test('focus moved while the list was on its way stays where it went', async () => {
   const first = review({ id: 1, studyDate: '2026-10-29' });
   const second = review({ id: 2, studyDate: '2026-10-30' });
-  let answer = (_value: Response) => {};
+  let answer = () => {};
   let lists = 0;
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(() =>
-      ++lists === 1
-        ? Promise.resolve(new Response(JSON.stringify({ today, reviews: [first, second] })))
-        : new Promise<Response>((resolve) => (answer = resolve)),
-    ),
+  fakeApi(() =>
+    ++lists === 1
+      ? { body: { today, reviews: [first, second] } }
+      : {
+          body: { today, reviews: [second] },
+          hold: new Promise<void>((resolve) => (answer = resolve)),
+        },
   );
   render(<Reviews />);
   (await screen.findByRole('button', { name: '2026-10-29 study round 1 complete review' })).focus();
   fireEvent.focus(window);
   const moved = screen.getByRole('button', { name: '2026-10-30 study round 1 complete review' });
   moved.focus();
-  answer(new Response(JSON.stringify({ today, reviews: [second] })));
+  answer();
   await screen.findByRole('heading', { name: 'Reviews for today (1)' });
   await act(async () => {});
   expect(document.activeElement).toBe(moved);
@@ -719,15 +662,10 @@ test('a form closing keeps the failure of another review on screen', async () =>
 
 test('a later return clears the error of a failed one', async () => {
   let failing = false;
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(() =>
-      Promise.resolve(
-        failing
-          ? new Response(JSON.stringify({ error: 'List error' }), { status: 500 })
-          : new Response(JSON.stringify({ today, reviews: [review()] })),
-      ),
-    ),
+  fakeApi(() =>
+    failing
+      ? { status: 500, body: { error: 'List error' } }
+      : { body: { today, reviews: [review()] } },
   );
   render(<Reviews />);
   await screen.findByRole('button', { name: /complete review/ });
@@ -743,33 +681,30 @@ test('a later return clears the error of a failed one', async () => {
 test('returning to the tab while a change runs adds no request', async () => {
   let release = () => {};
   const held = new Promise<void>((resolve) => (release = resolve));
-  const fetch = vi.fn(async (_url: string, init?: { method?: string }) => {
-    if (init?.method && init.method !== 'GET') {
-      await held;
-      return new Response(JSON.stringify({ dueDate: '2026-11-01' }));
-    }
-    return new Response(JSON.stringify({ today, reviews: [review()] }));
-  });
-  vi.stubGlobal('fetch', fetch);
+  const api = fakeApi((request) =>
+    request.method === 'GET'
+      ? { body: { today, reviews: [review()] } }
+      : { hold: held, body: { dueDate: '2026-11-01' } },
+  );
   render(<Reviews />);
   fireEvent.click(await screen.findByRole('button', { name: /postpone a day/ }));
-  const before = fetch.mock.calls.length;
+  const before = api.requests.length;
   fireEvent.focus(window);
   await act(async () => {});
-  expect(fetch.mock.calls.length).toBe(before);
+  expect(api.requests.length).toBe(before);
   release();
   await waitFor(() => expect(screen.getByRole('button', { name: 'All' })).toBeEnabled());
 });
 
 test('the listener goes away with the page', async () => {
   const lists = { today: [review()] };
-  const fetch = rangeServer(lists);
+  const api = rangeServer(lists);
   const { unmount } = render(<Reviews />);
   await screen.findByRole('button', { name: /complete review/ });
   unmount();
-  const before = fetch.mock.calls.length;
+  const before = api.requests.length;
   fireEvent.focus(window);
-  expect(fetch.mock.calls.length).toBe(before);
+  expect(api.requests.length).toBe(before);
 });
 
 test('changing another review closes the date form being typed', async () => {
@@ -801,15 +736,10 @@ test('changing another review closes the date form being typed', async () => {
 test('the range buttons wait while a change runs', async () => {
   let release = () => {};
   const held = new Promise<void>((resolve) => (release = resolve));
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(async (_url: string, init?: { method?: string }) => {
-      if (init?.method && init.method !== 'GET') {
-        await held;
-        return new Response(JSON.stringify({ dueDate: '2026-11-01' }));
-      }
-      return new Response(JSON.stringify({ today, reviews: [review()] }));
-    }),
+  fakeApi((request) =>
+    request.method === 'GET'
+      ? { body: { today, reviews: [review()] } }
+      : { hold: held, body: { dueDate: '2026-11-01' } },
   );
   render(<Reviews />);
   fireEvent.click(await screen.findByRole('button', { name: /postpone a day/ }));
@@ -819,21 +749,17 @@ test('the range buttons wait while a change runs', async () => {
 });
 
 test('two quick clicks send one completion', async () => {
-  const fetch = server([review()], done({ round: 2, dueDate: '2026-11-02' }));
+  const api = server([review()], done({ round: 2, dueDate: '2026-11-02' }));
   render(<Reviews />);
   const button = await screen.findByRole('button', { name: /complete review/ });
   fireEvent.click(button);
   fireEvent.click(button);
   await screen.findByText('Nothing to review today');
-  const posts = fetch.mock.calls.filter(([, init]) => init?.method === 'POST');
-  expect(posts).toHaveLength(1);
+  expect(api.sent).toHaveLength(1);
 });
 
 test('a failed load reports the error instead of saying nothing is due', async () => {
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(() => Promise.resolve(new Response(JSON.stringify({ error: 'Error' }), { status: 500 }))),
-  );
+  fakeApi({ 'GET /api/reviews/today': { status: 500, body: { error: 'Error' } } });
   render(<Reviews />);
   expect(await screen.findByRole('alert')).toHaveTextContent('Could not load the reviews');
   expect(screen.queryByText('Nothing to review today')).toBeNull();

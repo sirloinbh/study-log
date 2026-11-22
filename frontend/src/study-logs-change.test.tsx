@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 
 import { StudyLogs } from './study-logs';
+import { fakeApi } from './test/fake-api';
 
 const today = '2026-10-31';
 const log = {
@@ -24,30 +25,17 @@ const log = {
 };
 
 function server(saveStatus = 200, deleteStatus = 204) {
-  vi.stubGlobal(
-    'fetch',
-    vi.fn((url: string, init?: { method?: string }) => {
-      if (init?.method === 'DELETE')
-        return Promise.resolve(
-          deleteStatus === 204
-            ? new Response(null, { status: 204 })
-            : new Response(JSON.stringify({ error: 'Error' }), { status: deleteStatus }),
-        );
-      if (init?.method && init.method !== 'GET')
-        return Promise.resolve(
-          new Response(JSON.stringify(saveStatus < 400 ? { studyLog: log } : { error: 'Error' }), {
-            status: saveStatus,
-          }),
-        );
-      return Promise.resolve(
-        new Response(
-          JSON.stringify(
-            url.startsWith('/api/textbooks') ? { textbooks: [] } : { studyLogs: [log] },
-          ),
-        ),
-      );
-    }),
-  );
+  const failed = { status: saveStatus, body: { error: 'Error' } };
+  fakeApi({
+    'GET /api/textbooks': { body: { textbooks: [] } },
+    'GET /api/study-logs': { body: { studyLogs: [log] } },
+    'GET /api/study-logs/calendar': {
+      body: { month: today.slice(0, 7), days: [{ date: today, minutes: 60, logs: 1 }] },
+    },
+    'POST /api/study-logs': saveStatus < 400 ? { status: 201, body: { studyLog: log } } : failed,
+    'DELETE /api/study-logs/1':
+      deleteStatus === 204 ? { status: 204 } : { status: deleteStatus, body: { error: 'Error' } },
+  });
 }
 
 const submit = () => fireEvent.submit(document.querySelector('form')!);
