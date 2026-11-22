@@ -144,10 +144,12 @@ test('contents of a missing textbook answer an English 404 and writes roll back'
     assert.equal(updated.status, 404);
     assert.equal(updated.data.error, 'Contents entry not found');
   });
-  // Four write transactions: each locks the textbook, finds nothing and rolls back.
+  // Four write transactions lock the textbook, find nothing and roll back. The rename of a missing
+  // entry is a transaction of its own (it writes an audit row when it changes something, #263):
+  // it changes nothing and commits.
   assert.equal(statements.filter((sql) => sql === 'ROLLBACK').length, 4);
-  assert.equal(statements.filter((sql) => sql === 'COMMIT').length, 0);
-  assert.equal(released(), 4);
+  assert.equal(statements.filter((sql) => sql === 'COMMIT').length, 1);
+  assert.equal(released(), 5);
 });
 
 // #68: a failed transaction whose ROLLBACK also fails (a dropped connection) must destroy the

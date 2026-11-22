@@ -6,6 +6,7 @@ import multer from 'multer';
 import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod/v4';
 
+import { auditChange } from './audit-log.js';
 import { type FileStorage, FileStorageError } from './file-storage.js';
 import { inTransaction } from './sql.js';
 import { parseId } from './standard/http.js';
@@ -281,6 +282,11 @@ export function exerciseFileRoutes(
                VALUES ($1, $2, $3, $4, $5, $6) RETURNING ${columns}`,
               [id, role, key, name, format.type, file.size],
             );
+            await auditChange(req, res, client, 'create', 'exercise_file', rows[0].id, {
+              exerciseId: id,
+              role,
+              name,
+            });
             return { status: 201, body: { file: rows[0] } };
           },
           (reply) => reply.status < 400,
@@ -371,7 +377,11 @@ export function fileRoutes(pool: Pool, storage: FileStorage) {
     } catch (error) {
       return void storageFailed(error, res);
     }
-    await pool.query('DELETE FROM exercise_files WHERE id = $1', [fileId]);
+    await inTransaction(pool, async (client) => {
+      const removed = await client.query('DELETE FROM exercise_files WHERE id = $1', [fileId]);
+      if (removed.rowCount)
+        await auditChange(req, res, client, 'delete', 'exercise_file', fileId, {});
+    });
     res.status(204).end();
   });
 
