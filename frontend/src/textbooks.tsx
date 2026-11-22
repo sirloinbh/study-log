@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
 
-import { type RequestError, requestJson } from './api';
 import { useBusy } from './busy';
 import { Exercises } from './exercises';
 import { ImportantExercises } from './important-exercises';
+import { type RequestError, requestJson } from './lib/api';
 import { ButtonSpinner, Loading } from './loading';
 import {
   type ContentNode,

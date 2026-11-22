@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
 
-import { type RequestError, requestForm, requestJson } from './api';
 import { useBusy } from './busy';
 import { type Exercise, exerciseLabel, exerciseLimits, matchExercise } from './exercise';
+import { type RequestError, requestForm, requestJson } from './lib/api';
 import { ButtonSpinner } from './loading';
 
 type Kind = 'problems' | 'answers';
@@ -56,7 +56,9 @@ export function ExerciseExtraction({
       const form = new FormData();
       form.append('kind', kind);
       form.append('file', file);
-      const { items } = await requestForm<{ items: Item[] }>(`${url}/extract`, form);
+      const { items } = await requestForm<{ items: Item[] }>(`${url}/extract`, form, {
+        headers: { 'x-requested-with': 'study-log' },
+      });
       setReview(
         kind === 'problems'
           ? {

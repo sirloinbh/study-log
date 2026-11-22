@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 
-import { type RequestError, requestJson } from './api';
 import { useBusy } from './busy';
 import type { ExerciseTranslation as Translation } from './exercise';
+import { type RequestError, requestJson } from './lib/api';
 import { Loading } from './loading';
 
 type Notice = { exerciseId: number; kind: 'status' | 'alert'; text: string } | undefined;
