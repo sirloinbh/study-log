@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 
-import { type RequestError, requestJson } from './api';
 import { useBusy } from './busy';
 import {
   emptyKeywordForm,
@@ -10,6 +9,7 @@ import {
   type KeywordSearch,
   searchPath,
 } from './keyword';
+import { type RequestError, requestJson } from './lib/api';
 import { ButtonSpinner, Loading } from './loading';
 
 type Notice = { kind: 'status' | 'alert'; text: string } | undefined;

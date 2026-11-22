@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 
-import { type RequestError, requestJson } from './api';
 import { useBusy } from './busy';
+import { type RequestError, requestJson } from './lib/api';
 import { ButtonSpinner, Loading } from './loading';
 import { Memo } from './memo';
 import { overdueDays, type Review, type ReviewRange, reviewRanges, reviewTitle } from './review';
