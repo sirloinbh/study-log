@@ -45,7 +45,11 @@ Detailed rules:
 
 Each Claude call, from extraction and from translation, writes one JSON line (#245, ADR-0019 in `sirloinbh/project-standards`: no LLM gateway, each caller records its own calls). The code is `backend/src/claude-usage.ts`.
 
-- A call that returned logs to stdout: `time`, `level: "info"`, `event: "claude_call"`, `requestId`, `feature` (`translation` or `extraction`), `model`, `input_tokens`, `output_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens` (each `null` when `usage` lacks it), `stop_reason`, `ms`. It is logged as soon as the call returns, so a refusal or a cut-off reply also has its line.
+- A call that returned logs to stdout: `time`, `level: "info"` (`"error"`, on stderr, when `stop_reason` is `max_tokens` or `refusal`, because that reply was paid for but cannot be used, #268), `event: "claude_call"`, `requestId`, `feature` (`translation` or `extraction`), `model`, `input_tokens`, `output_tokens`, `cache_read_input_tokens`, `cache_creation_input_tokens` (each `null` when `usage` lacks it), `stop_reason`, `ms`. It is logged as soon as the call returns, so a refusal or a cut-off reply also has its line.
 - A call that threw logs to stderr: `level: "error"`, `event: "claude_call_failed"`, `feature`, `model`, `error_type` (the error class name), `status` (HTTP status, or `null`), `ms`. The error message is left out because an API error can echo part of the request.
 - Prompt text, file content and answers are never logged.
 - `requestId` is filled when the caller passes `requestId` in the translation or extraction source. The routes do not pass it yet, so for now the field is absent; matching the line to its request log line by time and feature works meanwhile.
+
+## 5. Time budget and retries
+
+Translation and extraction share one call helper, `backend/src/claude-call.ts` (#268). One request may take 240 seconds in all (`claudeBudgetMs`), enforced with an abort signal that also covers the streamed extraction reply; each attempt is limited to 110 seconds and there is one retry (the SDK default of two retries and unlimited streams could run for many minutes). The budget has to stay under the time the proxy in front waits for a reply. A call that runs out of time answers 504. Translation also refuses a problem or answer over 40,000 characters before calling Claude, and escapes a closing `</problem>` or `</answer>` tag inside the text so it cannot end the fence around the material.

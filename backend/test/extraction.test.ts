@@ -3,6 +3,7 @@ import { mock, test } from 'node:test';
 
 import Anthropic from '@anthropic-ai/sdk';
 
+import { claudeAttemptMs, claudeMaxRetries } from '../src/claude-call.js';
 import { claudeExtractor, ExtractionError, extractionModel } from '../src/extraction.js';
 
 // A stand-in for the SDK client: records each streamed request and finishes it with `reply` (#30).
@@ -11,8 +12,11 @@ function fakeClient(reply: (params: Record<string, unknown>) => unknown) {
   const client = {
     beta: {
       messages: {
-        stream: (params: Record<string, unknown>, options?: { signal?: AbortSignal }) => {
-          sent.push({ ...params, signal: options?.signal });
+        stream: (
+          params: Record<string, unknown>,
+          options?: { signal?: AbortSignal; timeout?: number; maxRetries?: number },
+        ) => {
+          sent.push({ ...params, ...options });
           return { finalMessage: async () => reply(params) };
         },
       },
@@ -57,8 +61,14 @@ test('a PDF goes to Claude Sonnet 5.5 as a document, streamed with structured ou
     model: 'claude-sonnet-5-5',
   });
   const [params] = sent;
-  // The request's abort signal reaches the SDK call.
-  assert.equal(params.signal, stop.signal);
+  // The request's abort signal reaches the SDK call (combined with the time budget), and the
+  // timeout and retries come from the shared helper (#268).
+  const sentSignal = params.signal as AbortSignal;
+  assert.equal(sentSignal.aborted, false);
+  stop.abort();
+  assert.equal(sentSignal.aborted, true);
+  assert.equal(params.timeout, claudeAttemptMs);
+  assert.equal(params.maxRetries, claudeMaxRetries);
   assert.equal(params.model, 'claude-sonnet-5-5');
   assert.equal(params.max_tokens, 64000);
   assert.deepEqual(params.betas, ['server-side-fallback-2026-07-01']);

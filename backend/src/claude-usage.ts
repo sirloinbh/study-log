@@ -19,16 +19,22 @@ export function startClaudeCall(feature: ClaudeFeature, model: string, requestId
   return { feature, model, requestId, started: performance.now() };
 }
 
+// A reply that stopped for one of these reasons was paid for but cannot be used (#268), so its line
+// is an error, not info.
+const failedStops = new Set(['max_tokens', 'refusal']);
+
 // Logs a call that returned. Whatever `usage` or `stop_reason` is missing is null.
+
 export function logClaudeSuccess(
   call: Call,
   response: { model?: string; stop_reason?: string | null; usage?: Usage | null },
 ) {
   const usage = response.usage ?? {};
-  console.log(
+  const failed = failedStops.has(response.stop_reason ?? '');
+  (failed ? console.error : console.log)(
     JSON.stringify({
       time: new Date().toISOString(),
-      level: 'info',
+      level: failed ? 'error' : 'info',
       event: 'claude_call',
       requestId: call.requestId,
       feature: call.feature,

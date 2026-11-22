@@ -1,8 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { z } from 'zod/v4';
 
-import { logClaudeFailure, logClaudeSuccess, startClaudeCall } from './claude-usage.js';
-import { apiFailure } from './translation.js';
+import { callClaude } from './claude-call.js';
 
 // Reading the exercises or answers on uploaded textbook pages with Claude (#30, rules in
 // docs/decisions/extraction-rules.md). The route takes an `Extractor`, so tests hand in a
@@ -79,11 +78,8 @@ const reply = z.object({
 });
 
 function explain(error: unknown): never {
-  if (error instanceof ExtractionError) throw error;
   if (error instanceof SyntaxError)
     throw new ExtractionError(502, 'Could not read the extraction result');
-  const failure = apiFailure(error, 'extraction');
-  if (failure) throw new ExtractionError(failure.status, failure.message);
   throw error;
 }
 
@@ -94,41 +90,37 @@ export function claudeExtractor(client?: Anthropic): Extractor {
   let anthropic = client;
   return async ({ bytes, type, kind, signal, requestId }) => {
     try {
-      anthropic ??= new Anthropic();
       const data = bytes.toString('base64');
       const file: Anthropic.Beta.BetaContentBlockParam =
         type === 'application/pdf'
           ? { type: 'document', source: { type: 'base64', media_type: type, data } }
           : { type: 'image', source: { type: 'base64', media_type: type, data } };
-      const call = startClaudeCall('extraction', extractionModel, requestId);
-      const response = await anthropic.beta.messages
-        .stream(
-          {
-            model: extractionModel,
-            max_tokens: 64000,
-            betas: ['server-side-fallback-2026-07-01'],
-            fallbacks: 'default',
-            output_config: { effort: 'medium', format: { type: 'json_schema', schema } },
-            system,
-            messages: [{ role: 'user', content: [file, { type: 'text', text: tasks[kind] }] }],
-          },
-          { signal },
-        )
-        .finalMessage()
-        .then(
-          (done) => (logClaudeSuccess(call, done), done),
-          (error: unknown) => {
-            logClaudeFailure(call, error);
-            throw error;
-          },
-        );
-      if (response.stop_reason === 'refusal')
-        throw new ExtractionError(422, 'This file cannot be read');
-      if (response.stop_reason === 'max_tokens')
-        throw new ExtractionError(
-          502,
-          'The file holds too much to read at once. Upload fewer pages',
-        );
+      const response = await callClaude({
+        feature: 'extraction',
+        model: extractionModel,
+        requestId,
+        signal,
+        fail: (status, message) => new ExtractionError(status, message),
+        refusal: 'This file cannot be read',
+        tooLong: 'The file holds too much to read at once. Upload fewer pages',
+        run: (options) => {
+          anthropic ??= new Anthropic();
+          return anthropic.beta.messages
+            .stream(
+              {
+                model: extractionModel,
+                max_tokens: 64000,
+                betas: ['server-side-fallback-2026-07-01'],
+                fallbacks: 'default',
+                output_config: { effort: 'medium', format: { type: 'json_schema', schema } },
+                system,
+                messages: [{ role: 'user', content: [file, { type: 'text', text: tasks[kind] }] }],
+              },
+              options,
+            )
+            .finalMessage();
+        },
+      });
       const text = response.content.find((block) => block.type === 'text');
       const parsed = reply.safeParse(text ? JSON.parse(text.text) : undefined);
       if (!parsed.success) throw new ExtractionError(502, 'Could not read the extraction result');
