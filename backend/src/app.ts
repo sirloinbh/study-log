@@ -5,6 +5,7 @@ import { types } from 'pg';
 
 import { tools } from './ai-tools.js';
 import { calendarRoutes } from './calendar.js';
+import { refuseCrossSiteWrites } from './cross-site.js';
 import { exerciseFileRoutes, fileRoutes } from './exercise-files.js';
 import { contentExerciseRoutes, exerciseRoutes, textbookExerciseRoutes } from './exercises.js';
 import { claudeExtractor, type Extractor } from './extraction.js';
@@ -53,6 +54,8 @@ export function createApp(
   app.use(requestLog);
   // Before the body parser, so refused requests cost as little as possible.
   apiRateLimit(app, { limitPerMinute: options.requestsPerMinute });
+  // Before the body parser too: a request from another site's page is refused at once (#333).
+  app.use('/api', refuseCrossSiteWrites);
   // A whole chapter of reviewed problems or answers (#30) can be larger than other requests.
   app.use(
     [
