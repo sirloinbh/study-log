@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 
-import { type RequestError, requestJson } from './lib/api';
+import { apiKey, useApiQuery } from './lib/query';
 import { Loading } from './loading';
 import { plural } from './plural';
 import { formatMinutes } from './study-logs-data';
@@ -11,18 +11,12 @@ const weekdays = ['', 'Mon', '', 'Wed', '', 'Fri', ''];
 
 // The last year of study as a GitHub-style heatmap (#50): one column per week, Sunday on top.
 export function Heatmap() {
-  const [data, setData] = useState<{ from: string; to: string; daily: DayMinutes[] }>();
-  const [error, setError] = useState<string>();
-
-  useEffect(() => {
-    let current = true;
-    requestJson<{ from: string; to: string; daily: DayMinutes[] }>('/api/stats/heatmap')
-      .then((loaded) => current && setData(loaded))
-      .catch((failure: RequestError) => current && setError(failure.message));
-    return () => {
-      current = false;
-    };
-  }, []);
+  const query = useApiQuery<{ from: string; to: string; daily: DayMinutes[] }>(
+    apiKey('/api/stats/heatmap'),
+    '/api/stats/heatmap',
+  );
+  const data = query.data;
+  const error = query.error?.message;
 
   // On a narrow screen the weeks scroll sideways; start at the recent end.
   useEffect(() => {
