@@ -1,6 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 
-import { type RequestError, requestJson } from './lib/api';
+import { apiKey, useApiQuery } from './lib/query';
 import { Loading } from './loading';
 import { plural } from './plural';
 import { formatMinutes } from './study-logs-data';
@@ -12,32 +12,14 @@ const shownRate = (rate: number | null) => (rate === null ? '—' : `${rate}%`);
 // schedules were kept, for all of them or for one book.
 export function TextbookStats() {
   const [textbookId, setTextbookId] = useState('');
-  // Kept per request, so a slow answer for another pick never replaces this one's. The choices come
-  // from the unfiltered answer, which is the first one asked for.
-  const [loaded, setLoaded] = useState<Partial<Record<string, Stats>>>({});
-  const [loadError, setLoadError] = useState<{ path: string; message: string }>();
-  const [retry, setRetry] = useState(0);
-
+  // One cached answer per pick, so a slow answer for another pick never replaces this one's. The choices
+  // come from the unfiltered answer, which is the first one asked for.
   const path = textbookStatsPath(textbookId);
-  useEffect(() => {
-    let current = true;
-    requestJson<Stats>(path)
-      .then((data) => {
-        if (!current) return;
-        setLoaded((all) => ({ ...all, [path]: data }));
-        setLoadError((failed) => (failed?.path === path ? undefined : failed));
-      })
-      .catch((error: RequestError) => {
-        if (current) setLoadError({ path, message: error.message });
-      });
-    return () => {
-      current = false;
-    };
-  }, [path, retry]);
-
-  const stats = loaded[path];
-  const error = loadError?.path === path ? loadError.message : undefined;
-  const choices = loaded[textbookStatsPath('')]?.textbooks ?? [];
+  const query = useApiQuery<Stats>(apiKey(path), path);
+  const all = useApiQuery<Stats>(apiKey(textbookStatsPath('')), textbookStatsPath(''));
+  const stats = query.data;
+  const error = query.error?.message;
+  const choices = all.data?.textbooks ?? [];
 
   return (
     <section className="card textbook-stats" aria-label="Textbooks and schedules">
@@ -59,14 +41,7 @@ export function TextbookStats() {
             Could not load the textbook stats: {error}
           </p>
           {/* With the first answer lost there is no other pick to come back from. */}
-          <button
-            type="button"
-            className="secondary"
-            onClick={() => {
-              setLoadError(undefined);
-              setRetry((count) => count + 1);
-            }}
-          >
+          <button type="button" className="secondary" onClick={() => void query.refetch()}>
             Reload
           </button>
         </>
