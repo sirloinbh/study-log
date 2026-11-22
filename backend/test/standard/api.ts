@@ -15,11 +15,10 @@ import type { AddressInfo } from 'node:net';
 
 /** Ports fetch refuses to connect to. Windows and Linux can both hand them out for listen(0). */
 export const fetchBlockedPorts: ReadonlySet<number> = new Set([
-  1, 7, 9, 11, 13, 15, 17, 19, 20, 21, 22, 23, 25, 37, 42, 43, 53, 69, 77, 79, 87, 95, 101, 102,
-  103, 104, 109, 110, 111, 113, 115, 117, 119, 123, 135, 137, 139, 143, 161, 179, 389, 427, 465,
-  512, 513, 514, 515, 526, 530, 531, 532, 540, 548, 554, 556, 563, 587, 601, 636, 989, 990, 993,
-  995, 1719, 1720, 1723, 2049, 3659, 4045, 4190, 5060, 5061, 6000, 6566, 6665, 6666, 6667, 6668,
-  6669, 6679, 6697, 10080,
+  1, 7, 9, 11, 13, 15, 17, 19, 20, 21, 22, 23, 25, 37, 42, 43, 53, 69, 77, 79, 87, 95, 101, 102, 103, 104, 109, 110,
+  111, 113, 115, 117, 119, 123, 135, 137, 139, 143, 161, 179, 389, 427, 465, 512, 513, 514, 515, 526, 530, 531, 532,
+  540, 548, 554, 556, 563, 587, 601, 636, 989, 990, 993, 995, 1719, 1720, 1723, 2049, 3659, 4045, 4190, 5060, 5061,
+  6000, 6566, 6665, 6666, 6667, 6668, 6669, 6679, 6697, 10080,
 ]);
 
 /** Listens on 127.0.0.1 and returns the port, trying again while the port is one fetch refuses. */
@@ -65,13 +64,8 @@ export async function withApi(app: RequestListener, run: (call: ApiCall) => Prom
       const headers: Record<string, string> = { ...init.headers };
       if (init.body !== undefined) headers['content-type'] = 'application/json';
       else if (init.contentType) headers['content-type'] = init.contentType;
-      const body =
-        init.form ?? (init.body === undefined ? init.rawBody : JSON.stringify(init.body));
-      const response = await fetch(`http://127.0.0.1:${port}${path}`, {
-        method: init.method ?? 'GET',
-        headers,
-        body,
-      });
+      const body = init.form ?? (init.body === undefined ? init.rawBody : JSON.stringify(init.body));
+      const response = await fetch(`http://127.0.0.1:${port}${path}`, { method: init.method ?? 'GET', headers, body });
       const bytes = Buffer.from(await response.arrayBuffer());
       const text = bytes.toString('utf8');
       let data: Record<string, unknown> = {};
@@ -84,8 +78,6 @@ export async function withApi(app: RequestListener, run: (call: ApiCall) => Prom
     });
   } finally {
     server.closeAllConnections();
-    await new Promise<void>((resolve, reject) =>
-      server.close((error) => (error ? reject(error) : resolve())),
-    );
+    await new Promise<void>((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
   }
 }

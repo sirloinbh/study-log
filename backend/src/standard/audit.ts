@@ -71,15 +71,10 @@ export const AUDIT_RETENTION_DAYS = 365;
 export function auditContext(req: Request, res: Response): Pick<AuditEntry, 'actor' | 'requestId'> {
   const user: unknown = (req as { user?: unknown }).user;
   const id =
-    typeof user === 'object' && user !== null && 'id' in user && typeof user.id === 'string'
-      ? user.id
-      : null;
+    typeof user === 'object' && user !== null && 'id' in user && typeof user.id === 'string' ? user.id : null;
   // Set by requestLog in http.ts (#552).
   const requestId: unknown = res.locals.requestId;
-  return {
-    actor: { type: 'user', id },
-    requestId: typeof requestId === 'string' ? requestId : null,
-  };
+  return { actor: { type: 'user', id }, requestId: typeof requestId === 'string' ? requestId : null };
 }
 
 export async function writeAudit(db: AuditDb, entry: AuditEntry): Promise<void> {

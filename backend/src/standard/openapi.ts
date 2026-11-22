@@ -64,11 +64,7 @@ const SESSION_COOKIE = 'sirloinbh.session_token';
 
 /** A Zod schema as OpenAPI 3.1 (JSON Schema 2020-12). A type JSON Schema cannot express throws. */
 export function schemaOf(schema: ZodType): Json {
-  const json = toJSONSchema(schema, {
-    target: 'draft-2020-12',
-    io: 'input',
-    unrepresentable: 'throw',
-  }) as Json;
+  const json = toJSONSchema(schema, { target: 'draft-2020-12', io: 'input', unrepresentable: 'throw' }) as Json;
   delete json.$schema;
   return json;
 }
@@ -76,9 +72,7 @@ export function schemaOf(schema: ZodType): Json {
 /** `id` and names like `workoutId` are integer ids unless the operation lists a schema for them. */
 const isIdName = (name: string) => name === 'id' || /[a-z0-9]Id$/.test(name);
 
-const errorRef = {
-  content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } },
-};
+const errorRef = { content: { 'application/json': { schema: { $ref: '#/components/schemas/Error' } } } };
 
 /** Fails on a table entry the document cannot describe, naming the route, instead of writing a wrong document. */
 function checkOperation(route: string, op: Operation) {
@@ -91,13 +85,11 @@ function checkOperation(route: string, op: Operation) {
   const repeated = names.find((name, index) => names.indexOf(name) !== index);
   if (repeated) throw new Error(`${route}: the path parameter :${repeated} appears twice`);
   for (const name of Object.keys(op.params ?? {})) {
-    if (!names.includes(name))
-      throw new Error(`${route}: params lists '${name}', which is not a parameter of the path`);
+    if (!names.includes(name)) throw new Error(`${route}: params lists '${name}', which is not a parameter of the path`);
   }
   const headers = Object.keys(op.headers ?? {}).map((name) => name.toLowerCase());
   const twice = headers.find((name, index) => headers.indexOf(name) !== index);
-  if (twice)
-    throw new Error(`${route}: the header '${twice}' is listed twice (header names ignore case)`);
+  if (twice) throw new Error(`${route}: the header '${twice}' is listed twice (header names ignore case)`);
 }
 
 export function buildOpenApi(options: OpenApiOptions) {
@@ -105,12 +97,7 @@ export function buildOpenApi(options: OpenApiOptions) {
   const schemas: Json = {
     Error: {
       type: 'object',
-      properties: {
-        error: {
-          type: 'string',
-          description: options.errorDescription ?? 'A short message for the user',
-        },
-      },
+      properties: { error: { type: 'string', description: options.errorDescription ?? 'A short message for the user' } },
       required: ['error'],
     },
   };
@@ -119,27 +106,17 @@ export function buildOpenApi(options: OpenApiOptions) {
     const [method, path] = route.split(' ') as [string, string];
     const op = options.operations[route];
     checkOperation(route, op);
-    const parameters: Json[] = [...path.matchAll(/:(\w+)/g)].map(([, name]) => ({
+    const parameters: Json[] =[...path.matchAll(/:(\w+)/g)].map(([, name]) => ({
       name,
       in: 'path',
       required: true,
-      schema: op.params?.[name]
-        ? schemaOf(op.params[name])
-        : isIdName(name)
-          ? { type: 'integer', minimum: 1 }
-          : { type: 'string' },
+      schema: op.params?.[name] ? schemaOf(op.params[name]) : isIdName(name) ? { type: 'integer', minimum: 1 } : { type: 'string' },
     }));
     if (op.query) {
-      const query = schemaOf(op.query) as {
-        type?: unknown;
-        properties?: Json;
-        required?: string[];
-      };
+      const query = schemaOf(op.query) as { type?: unknown; properties?: Json; required?: string[] };
       // A union or an intersection has no `properties`: its parameters would silently be left out of the document.
       if (query.type !== 'object' || typeof query.properties !== 'object') {
-        throw new Error(
-          `${route}: query must be a Zod object (a union or intersection cannot be listed as parameters)`,
-        );
+        throw new Error(`${route}: query must be a Zod object (a union or intersection cannot be listed as parameters)`);
       }
       for (const [name, schema] of Object.entries(query.properties)) {
         parameters.push({ name, in: 'query', required: !!query.required?.includes(name), schema });
@@ -157,11 +134,7 @@ export function buildOpenApi(options: OpenApiOptions) {
     if (op.body) schemas[op.body[0]] = schemaOf(op.body[1]);
     const [success, ...failures] = op.status as [number, ...number[]];
     // Every guarded route can answer 401 and 429; a route with a body can also answer 413. An own entry wins.
-    const statuses = new Set([
-      ...failures,
-      ...(op.public ? [] : [401, 429]),
-      ...(op.body ? [413] : []),
-    ]);
+    const statuses = new Set([...failures, ...(op.public ? [] : [401, 429]), ...(op.body ? [413] : [])]);
     statuses.delete(success);
     const responses: Json = {
       [success]: {
@@ -182,9 +155,7 @@ export function buildOpenApi(options: OpenApiOptions) {
         ? {
             requestBody: {
               required: true,
-              content: {
-                'application/json': { schema: { $ref: `#/components/schemas/${op.body[0]}` } },
-              },
+              content: { 'application/json': { schema: { $ref: `#/components/schemas/${op.body[0]}` } } },
             },
           }
         : {}),

@@ -40,10 +40,7 @@ function code(sql: string) {
 
 const noTransaction: [RegExp, string][] = [
   [/\bCONCURRENTLY\b/i, 'CONCURRENTLY'],
-  [
-    /^\s*(BEGIN|COMMIT|ROLLBACK|START\s+TRANSACTION)\b/im,
-    'its own transaction control (BEGIN, COMMIT or ROLLBACK)',
-  ],
+  [/^\s*(BEGIN|COMMIT|ROLLBACK|START\s+TRANSACTION)\b/im, 'its own transaction control (BEGIN, COMMIT or ROLLBACK)'],
   [/^\s*VACUUM\b/im, 'VACUUM'],
   [/\b(CREATE|DROP)\s+(DATABASE|TABLESPACE)\b/i, 'CREATE or DROP DATABASE or TABLESPACE'],
   [/\bALTER\s+SYSTEM\b/i, 'ALTER SYSTEM'],
@@ -86,8 +83,7 @@ export function planMigrations(files: Migration[], applied: AppliedMigration[]) 
   for (const row of applied) {
     const file = byName.get(row.name);
     if (!file) errors.push(`An applied migration file is missing: ${row.name}`);
-    else if (file.checksum !== row.checksum)
-      errors.push(`An applied migration file was changed: ${row.name}`);
+    else if (file.checksum !== row.checksum) errors.push(`An applied migration file was changed: ${row.name}`);
   }
   const done = new Set(applied.map((row) => row.name));
   const last = applied
@@ -96,19 +92,16 @@ export function planMigrations(files: Migration[], applied: AppliedMigration[]) 
     .at(-1);
   const pending = files.filter((file) => !done.has(file.name));
   for (const file of pending) {
-    if (last && file.name < last)
-      errors.push(`A new file sorts before the applied ${last}: ${file.name}`);
+    if (last && file.name < last) errors.push(`A new file sorts before the applied ${last}: ${file.name}`);
   }
   return { pending, errors };
 }
 
 // Read-only: a database without history reports every file as pending.
 export async function migrationStatus(db: MigrationDb, files: Migration[]) {
-  const exists = (await db.query(`SELECT to_regclass('schema_migrations') IS NOT NULL AS found`))
-    .rows[0].found as boolean;
+  const exists = (await db.query(`SELECT to_regclass('schema_migrations') IS NOT NULL AS found`)).rows[0].found as boolean;
   const applied = exists
-    ? ((await db.query('SELECT name, checksum FROM schema_migrations ORDER BY name'))
-        .rows as AppliedMigration[])
+    ? ((await db.query('SELECT name, checksum FROM schema_migrations ORDER BY name')).rows as AppliedMigration[])
     : [];
   return { applied, ...planMigrations(files, applied) };
 }
@@ -139,10 +132,7 @@ async function applyPending(db: MigrationDb, files: Migration[]) {
     await db.query('BEGIN');
     try {
       await db.query(file.sql);
-      await db.query('INSERT INTO schema_migrations(name, checksum) VALUES($1, $2)', [
-        file.name,
-        file.checksum,
-      ]);
+      await db.query('INSERT INTO schema_migrations(name, checksum) VALUES($1, $2)', [file.name, file.checksum]);
       await db.query('COMMIT');
     } catch (e) {
       await db.query('ROLLBACK').catch(() => undefined);

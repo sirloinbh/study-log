@@ -14,8 +14,7 @@ import type { Express, NextFunction, Request, Response } from 'express';
 import { type AuditDb, type AuditEntry, writeAudit } from './audit.js';
 import { type TxClient, withTransaction } from './db.js';
 
-type StandardResult<T> =
-  { value: T; issues?: undefined } | { issues: readonly { message: string }[] };
+type StandardResult<T> = { value: T; issues?: undefined } | { issues: readonly { message: string }[] };
 /** The Standard Schema interface (standardschema.dev) with its optional JSON Schema part, which Zod 4 implements. */
 export type ToolInput<T = unknown> = {
   readonly '~standard': {
@@ -59,9 +58,7 @@ export type Tool<S extends ToolInput = ToolInput, D extends AuditDb = AuditDb> =
  * Keeps the tool's input type for `run`; the list passed to registerToolRoutes holds any tools. Annotate the
  * context to get the app's database type: `run: async (input, { db }: { db: Db }) => …`.
  */
-export function defineTool<S extends ToolInput, D extends AuditDb = AuditDb>(
-  tool: Tool<S, D>,
-): Tool<ToolInput, D> {
+export function defineTool<S extends ToolInput, D extends AuditDb = AuditDb>(tool: Tool<S, D>): Tool<ToolInput, D> {
   return tool;
 }
 
@@ -91,12 +88,7 @@ function base64url(part: string) {
 export type VerifiedCall = ToolCaller & { jti: string | null; tool: string | null; exp: number };
 
 /** Checks a compact EdDSA JWT from shared-ai for this app and returns the caller, or throws a 401 CallError. */
-export function verifyCallToken(
-  token: string,
-  key: KeyObject,
-  app: string,
-  now = Date.now(),
-): VerifiedCall {
+export function verifyCallToken(token: string, key: KeyObject, app: string, now = Date.now()): VerifiedCall {
   const parts = token.split('.');
   if (parts.length !== 3) throw new CallError(401, 'Invalid call token');
   const [header, payload, signature] = parts as [string, string, string];
@@ -121,27 +113,17 @@ export function verifyCallToken(
   if (!valid) throw new CallError(401, 'Invalid call token');
   const seconds = Math.floor(now / 1000);
   const { iss, aud, sub, client, scope, iat, exp, jti, tool } = claims;
-  if (iss !== 'shared-ai' || aud !== app)
-    throw new CallError(401, 'Call token is not for this app');
+  if (iss !== 'shared-ai' || aud !== app) throw new CallError(401, 'Call token is not for this app');
   if (typeof iat !== 'number' || typeof exp !== 'number' || iat > seconds + CLOCK_SKEW_SECONDS) {
     throw new CallError(401, 'Invalid call token');
   }
   if (exp <= seconds - CLOCK_SKEW_SECONDS || exp - iat > MAX_TOKEN_SECONDS) {
     throw new CallError(401, 'Call token expired');
   }
-  if (
-    typeof sub !== 'string' ||
-    !sub ||
-    typeof client !== 'string' ||
-    !client ||
-    typeof scope !== 'string'
-  ) {
+  if (typeof sub !== 'string' || !sub || typeof client !== 'string' || !client || typeof scope !== 'string') {
     throw new CallError(401, 'Invalid call token');
   }
-  if (
-    (jti !== undefined && (typeof jti !== 'string' || !jti)) ||
-    (tool !== undefined && (typeof tool !== 'string' || !tool))
-  ) {
+  if ((jti !== undefined && (typeof jti !== 'string' || !jti)) || (tool !== undefined && (typeof tool !== 'string' || !tool))) {
     throw new CallError(401, 'Invalid call token');
   }
   return {
@@ -169,12 +151,7 @@ export function createSeenTokens() {
   };
 }
 
-type CallContext = {
-  key: KeyObject;
-  app: string;
-  seen: ReturnType<typeof createSeenTokens>;
-  requireBinding: boolean;
-};
+type CallContext = { key: KeyObject; app: string; seen: ReturnType<typeof createSeenTokens>; requireBinding: boolean };
 
 /**
  * Verifies the Bearer token of one call: it must name this tool and carry a `jti` not seen before. A token without
@@ -189,8 +166,7 @@ function caller(req: Request, ctx: CallContext, tool: string) {
     return verified;
   }
   if (verified.tool !== tool) throw new CallError(401, 'Call token is not for this tool');
-  if (!ctx.seen.use(verified.jti, verified.exp))
-    throw new CallError(401, 'Call token was already used');
+  if (!ctx.seen.use(verified.jti, verified.exp)) throw new CallError(401, 'Call token was already used');
   return verified;
 }
 
@@ -199,14 +175,9 @@ export function describeTool(tool: Tool<ToolInput, never>, app: string) {
   return {
     name: tool.name,
     description: tool.description,
-    inputSchema: tool.input['~standard'].jsonSchema?.input({ target: 'draft-2020-12' }) ?? {
-      type: 'object',
-    },
+    inputSchema: tool.input['~standard'].jsonSchema?.input({ target: 'draft-2020-12' }) ?? { type: 'object' },
     scope: `${app}:${tool.access}`,
-    annotations: {
-      readOnlyHint: tool.access === 'read',
-      destructiveHint: tool.destructive === true,
-    },
+    annotations: { readOnlyHint: tool.access === 'read', destructiveHint: tool.destructive === true },
   };
 }
 
@@ -236,15 +207,11 @@ export function registerToolRoutes<D extends AuditDb>(
   };
   const byName = new Map<string, Tool<ToolInput, D>>();
   for (const tool of options.tools) {
-    if (!NAME.test(tool.name) || byName.has(tool.name))
-      throw new Error(`Invalid or repeated tool name: ${tool.name}`);
+    if (!NAME.test(tool.name) || byName.has(tool.name)) throw new Error(`Invalid or repeated tool name: ${tool.name}`);
     byName.set(tool.name, tool);
   }
   // Built once, so an input schema JSON Schema cannot express fails at start, not on every list call.
-  const listed = {
-    app: options.app,
-    tools: options.tools.map((tool) => describeTool(tool, options.app)),
-  };
+  const listed = { app: options.app, tools: options.tools.map((tool) => describeTool(tool, options.app)) };
   const log = options.log ?? ((message: string, err: unknown) => console.error(message, err));
   // The rows for a denied, invalid, or failed call and the row of a read are best effort: if the audit table or the
   // connection is broken, the caller still gets the original answer or error, and the failed write is logged.
@@ -288,10 +255,7 @@ export function registerToolRoutes<D extends AuditDb>(
       const checked = await tool.input['~standard'].validate(req.body ?? {});
       if (checked.issues) {
         await auditSoft(options.pool, { ...audit, result: 'error' });
-        throw new CallError(
-          400,
-          checked.issues.map((issue) => issue.message).join(', ') || 'Invalid input',
-        );
+        throw new CallError(400, checked.issues.map((issue) => issue.message).join(', ') || 'Invalid input');
       }
       if (tool.access === 'read') {
         let outcome: ToolOutcome;
