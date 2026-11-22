@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 
 import { type RequestError, requestJson } from './lib/api';
 import { Loading } from './loading';
+import { plural } from './plural';
 import { formatMinutes } from './study-logs-data';
 import { type DayMinutes, heatBands, heatLevel, heatWeeks, monthLabel } from './study-stats';
 
@@ -48,14 +49,14 @@ export function Heatmap() {
       ) : (
         <>
           <p className="status">
-            {studied.length} study days · total {formatMinutes(total)}
+            {plural(studied.length, 'study day')} · total {formatMinutes(total)}
           </p>
           <div className="heatmap-scroll" id="heatmap-scroll">
             {/* One image for screen readers; each day's value is in its tooltip for the mouse. */}
             <div
               className="heatmap"
               role="img"
-              aria-label={`${data.from} to ${data.to}: ${studied.length} study days, total ${formatMinutes(total)}`}
+              aria-label={`${data.from} to ${data.to}: ${plural(studied.length, 'study day')}, total ${formatMinutes(total)}`}
             >
               <div className="heat-days" aria-hidden="true">
                 <span className="heat-month" />

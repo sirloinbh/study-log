@@ -213,13 +213,13 @@ const row = (label: string) =>
   );
 // The buttons of a row are named for it; `action` is the end of that name.
 const names = {
-  up: /move up$/,
-  down: /move down$/,
-  child: /add child$/,
-  edit: /contents entry edit$/,
-  delete: /contents entry delete$/,
-  confirm: /confirm deletion$/,
-  cancel: /cancel deletion$/,
+  up: /^Move up/,
+  down: /^Move down/,
+  child: /^Add child/,
+  edit: /^Edit contents entry/,
+  delete: /^Delete contents entry/,
+  confirm: /^Confirm contents entry deletion/,
+  cancel: /^Cancel contents entry deletion/,
 };
 // Clicks once the row's button is enabled (every button is locked while a request runs).
 const press = async (label: string, action: keyof typeof names) => {
@@ -375,11 +375,11 @@ test('row buttons name the entry they act on', async () => {
     .map((button) => button.getAttribute('aria-label'))
     .filter((label) => label !== null);
   expect(labels).toEqual([
-    '극한 move up',
-    '극한 move down',
-    '극한 add child',
-    '극한 contents entry edit',
-    '극한 contents entry delete',
+    'Move up: 극한',
+    'Move down: 극한',
+    'Add child: 극한',
+    'Edit contents entry: 극한',
+    'Delete contents entry: 극한',
   ]);
 });
 

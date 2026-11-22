@@ -180,7 +180,7 @@ test('editing from the detail fills the form and saves it with PUT', async () =>
   const api = serve([linear]);
   await open();
   await choose('선형대수와 그 응용');
-  click('선형대수와 그 응용 textbook edit', detail());
+  click('Edit textbook: 선형대수와 그 응용', detail());
   expect(heading()).toBe('Edit the textbook');
   expect(field('Title')).toBe('선형대수와 그 응용');
   expect(field('Author')).toBe('Gilbert Strang');
@@ -208,7 +208,7 @@ test('cancelling an edit restores the unsaved new textbook', async () => {
   await open();
   fill('Title', '작성 중인 교재');
   await choose('선형대수와 그 응용');
-  click('선형대수와 그 응용 textbook edit', detail());
+  click('Edit textbook: 선형대수와 그 응용', detail());
   expect(field('Title')).toBe('선형대수와 그 응용');
   click('Cancel', formCard());
   expect(heading()).toBe('Register a textbook');
@@ -219,13 +219,13 @@ test('deleting needs a second click and can be cancelled', async () => {
   const api = serve([linear]);
   await open();
   await choose('선형대수와 그 응용');
-  click('선형대수와 그 응용 textbook delete', detail());
-  click('선형대수와 그 응용 textbook cancel deletion', detail());
+  click('Delete textbook: 선형대수와 그 응용', detail());
+  click('Cancel textbook deletion: 선형대수와 그 응용', detail());
   expect(calls(api, 'DELETE')).toHaveLength(0);
 
-  click('선형대수와 그 응용 textbook delete', detail());
+  click('Delete textbook: 선형대수와 그 응용', detail());
   expect(calls(api, 'DELETE')).toHaveLength(0);
-  click('선형대수와 그 응용 textbook confirm deletion');
+  click('Confirm textbook deletion: 선형대수와 그 응용');
   expect(await screen.findByText('Deleted')).toBeInTheDocument();
   expect(calls(api, 'DELETE').map((request) => request.path)).toEqual(['/api/textbooks/1']);
   await waitFor(() => expect(items()).toHaveLength(0));
@@ -236,9 +236,9 @@ test('deleting the textbook being edited ends the edit', async () => {
   serve([linear]);
   await open();
   await choose('선형대수와 그 응용');
-  click('선형대수와 그 응용 textbook edit', detail());
-  click('선형대수와 그 응용 textbook delete', detail());
-  click('선형대수와 그 응용 textbook confirm deletion');
+  click('Edit textbook: 선형대수와 그 응용', detail());
+  click('Delete textbook: 선형대수와 그 응용', detail());
+  click('Confirm textbook deletion: 선형대수와 그 응용');
   await screen.findByText('Deleted');
   expect(heading()).toBe('Register a textbook');
   expect(field('Title')).toBe('');
@@ -248,7 +248,7 @@ test('saving an edit of a textbook deleted elsewhere leaves edit mode and reload
   const api = serve([linear]);
   await open();
   await choose('선형대수와 그 응용');
-  click('선형대수와 그 응용 textbook edit', detail());
+  click('Edit textbook: 선형대수와 그 응용', detail());
   api.books.splice(0, 1);
   submit();
   expect(await screen.findByRole('alert')).toHaveTextContent(/Textbook not found/);
@@ -278,7 +278,7 @@ test('fields and buttons are locked while a save is in flight', async () => {
     for (const input of within(form()).getAllByRole('textbox')) expect(input).toBeDisabled();
   });
   expect(within(form()).getAllByRole('textbox')).toHaveLength(3);
-  for (const name of [/Register/, /textbook edit$/, /textbook delete$/])
+  for (const name of [/Register/, /Edit textbook/, /Delete textbook/])
     expect(screen.getByRole('button', { name })).toBeDisabled();
   release();
   expect(await formCard().findByText('Registered')).toBeInTheDocument();
@@ -293,8 +293,8 @@ test('detail buttons name the textbook they act on', async () => {
     .getAllByRole('button')
     .map((button) => button.getAttribute('aria-label'));
   expect(labels).toEqual([
-    '선형대수와 그 응용 textbook edit',
-    '선형대수와 그 응용 textbook delete',
+    'Edit textbook: 선형대수와 그 응용',
+    'Delete textbook: 선형대수와 그 응용',
   ]);
 });
 
@@ -338,10 +338,10 @@ test('a 404 when deleting reports it, reloads and clears the detail', async () =
   const api = serve([linear]);
   await open();
   await choose('선형대수와 그 응용');
-  click('선형대수와 그 응용 textbook delete', detail());
+  click('Delete textbook: 선형대수와 그 응용', detail());
   // The textbook disappears on the server before the delete is confirmed here.
   api.books.splice(0, 1);
-  click('선형대수와 그 응용 textbook confirm deletion');
+  click('Confirm textbook deletion: 선형대수와 그 응용');
   expect(await screen.findByRole('alert')).toHaveTextContent(/Textbook not found/);
   await waitFor(() => expect(items()).toHaveLength(0));
   expect(detail().getByText(CHOOSE)).toBeInTheDocument();
@@ -363,13 +363,13 @@ test('focus follows the delete flow: confirm, back on cancel, the list after', a
   serve([linear]);
   await open();
   await choose('선형대수와 그 응용');
-  click('선형대수와 그 응용 textbook delete', detail());
+  click('Delete textbook: 선형대수와 그 응용', detail());
   await waitFor(() => expect(focusedId()).toBe('textbook-delete-confirm'));
-  click('선형대수와 그 응용 textbook cancel deletion', detail());
+  click('Cancel textbook deletion: 선형대수와 그 응용', detail());
   await waitFor(() => expect(focusedId()).toBe('textbook-delete'));
-  click('선형대수와 그 응용 textbook delete', detail());
+  click('Delete textbook: 선형대수와 그 응용', detail());
   await waitFor(() => expect(focusedId()).toBe('textbook-delete-confirm'));
-  click('선형대수와 그 응용 textbook confirm deletion', detail());
+  click('Confirm textbook deletion: 선형대수와 그 응용', detail());
   await waitFor(() => expect(focusedId()).toBe('textbook-list'));
   expect(document.activeElement).toHaveAttribute('tabindex', '-1');
 });
@@ -382,8 +382,8 @@ test('a failed textbook delete puts focus back on delete, a 404 on the list', as
     serve([linear], { reject });
     await open();
     await choose('선형대수와 그 응용');
-    click('선형대수와 그 응용 textbook delete', detail());
-    click('선형대수와 그 응용 textbook confirm deletion', detail());
+    click('Delete textbook: 선형대수와 그 응용', detail());
+    click('Confirm textbook deletion: 선형대수와 그 응용', detail());
     await screen.findByRole('alert');
     await waitFor(() => expect(focusedId(), String(reject.status)).toBe(target));
     cleanup();

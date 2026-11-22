@@ -107,7 +107,7 @@ test('saving a log and completing a review update the badge, and the pages stay 
   });
   window.history.replaceState(null, '', '/');
   render(<App />);
-  await screen.findByRole('link', { name: '1 reviews today' });
+  await screen.findByRole('link', { name: '1 review today' });
 
   const form = document.querySelector('.study-logs form')!;
   fireEvent.submit(form);
@@ -119,8 +119,8 @@ test('saving a log and completing a review update the badge, and the pages stay 
   fireEvent.click(within(menu).getByRole('link', { name: 'Reviews' }));
   const heading = await screen.findByRole('heading', { name: 'Reviews for today (2)' });
   const card = heading.closest('section');
-  fireEvent.click(screen.getAllByRole('button', { name: /complete review/ })[0]);
-  await screen.findByRole('link', { name: '1 reviews today' });
+  fireEvent.click(screen.getAllByRole('button', { name: /Complete review/ })[0]);
+  await screen.findByRole('link', { name: '1 review today' });
   expect(heading.closest('section')).toBe(card);
   expect(heading.isConnected).toBe(true);
 });

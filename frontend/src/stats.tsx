@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { Heatmap } from './heatmap';
 import { type RequestError, requestJson } from './lib/api';
 import { Loading } from './loading';
+import { plural } from './plural';
 import { ReviewRateChart } from './review-rate-chart';
 import { formatMinutes } from './study-logs-data';
 import {
@@ -148,7 +149,7 @@ export function Stats() {
               <span className="nowrap">{stats.to}</span>
             </p>
             <p className="status">
-              {stats.studyDays} of {stats.days} days studied
+              {stats.studyDays} of {plural(stats.days, 'day')} studied
             </p>
           </article>
           <article className="card metric">

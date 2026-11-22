@@ -24,7 +24,8 @@ const page = (version = 0) => (
   </MemoryRouter>
 );
 
-const badge = (count: number) => screen.findByRole('link', { name: `${count} reviews today` });
+const badge = (count: number) =>
+  screen.findByRole('link', { name: `${count} ${count === 1 ? 'review' : 'reviews'} today` });
 
 test('due reviews show a count that links to the reviews page', async () => {
   const api = counts(3);

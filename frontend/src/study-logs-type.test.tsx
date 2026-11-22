@@ -56,7 +56,7 @@ test('a new log is new unless review is picked', async () => {
 test('a review log is marked in the list and keeps its type when edited', async () => {
   const api = server([log]);
   render(<StudyLogs today={today} />);
-  const editButton = await screen.findByRole('button', { name: /edit$/ });
+  const editButton = await screen.findByRole('button', { name: /Edit log/ });
   const item = editButton.closest('li')!;
   expect(within(item).getByText('Review')).toBeTruthy();
   fireEvent.click(editButton);
@@ -86,6 +86,6 @@ test('search results and the calendar mark a review log too', async () => {
 test('a new log has no mark', async () => {
   server([{ ...log, studyType: 'new' }]);
   render(<StudyLogs today={today} />);
-  const editButton = await screen.findByRole('button', { name: /edit$/ });
+  const editButton = await screen.findByRole('button', { name: /Edit log/ });
   expect(within(editButton.closest('li')!).queryByText('Review')).toBeNull();
 });

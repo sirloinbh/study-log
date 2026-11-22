@@ -53,7 +53,7 @@ test('Edit on a study log moves focus to the date field', async () => {
     },
   });
   render(<StudyLogs today="2026-10-23" />);
-  fireEvent.click(await screen.findByRole('button', { name: /log edit$/ }));
+  fireEvent.click(await screen.findByRole('button', { name: /Edit log/ }));
   await waitFor(() => expect(document.activeElement?.id).toBe('study-log-date'));
 });
 

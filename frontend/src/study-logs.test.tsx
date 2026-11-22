@@ -310,7 +310,7 @@ test('a rejected save shows the server message and keeps the input', async () =>
 test('editing a log fills the form and saves it with PUT', async () => {
   const api = serve([morning]);
   await open(api);
-  fireEvent.click(list(/log edit$/));
+  fireEvent.click(list(/Edit log/));
   expect(heading()).toHaveTextContent(/Edit the study log/);
   expect(field('Start').value).toBe('09:00');
   expect(field('Memo').value).toBe('선형대수 2장 행렬 곱');
@@ -350,9 +350,9 @@ test('editing a log fills the form and saves it with PUT', async () => {
 test('deleting a log needs a second confirmation click', async () => {
   const api = serve([morning]);
   await open(api);
-  fireEvent.click(list(/log delete$/));
+  fireEvent.click(list(/Delete log/));
   expect(methods(api, 'DELETE')).toHaveLength(0);
-  fireEvent.click(await screen.findByRole('button', { name: /log confirm deletion$/ }));
+  fireEvent.click(await screen.findByRole('button', { name: /Confirm log deletion/ }));
   expect(await screen.findByText('Deleted')).toBeInTheDocument();
   expect(methods(api, 'DELETE').map((request) => request.path)).toEqual(['/api/study-logs/1']);
   await waitFor(() => expect(items()).toHaveLength(0));
@@ -362,7 +362,7 @@ test('cancelling an edit restores the unsaved new entry', async () => {
   const api = serve([morning]);
   await open(api);
   fill('Start', '08:00');
-  fireEvent.click(list(/log edit$/));
+  fireEvent.click(list(/Edit log/));
   expect(field('Study date').value).toBe('2026-10-21');
   fireEvent.click(within(entryForm()).getByRole('button', { name: 'Cancel' }));
   expect(heading()).toHaveTextContent(/Add a study log/);
@@ -402,10 +402,10 @@ test('buttons stay disabled while a delete is in flight, so it is sent once', as
     hold: { method: 'DELETE', until: new Promise<void>((r) => (release = r)) },
   });
   await open(api);
-  fireEvent.click(list(/log delete$/));
-  fireEvent.click(await screen.findByRole('button', { name: /log confirm deletion$/ }));
+  fireEvent.click(list(/Delete log/));
+  fireEvent.click(await screen.findByRole('button', { name: /Confirm log deletion/ }));
   await waitFor(() => expect(methods(api, 'DELETE')).toHaveLength(1));
-  expect(screen.getByRole('button', { name: /log confirm deletion$/ })).toBeDisabled();
+  expect(screen.getByRole('button', { name: /Confirm log deletion/ })).toBeDisabled();
   expect(within(entryForm()).getByRole('button', { name: /^Save/ })).toBeDisabled();
   release();
   await waitFor(() => expect(items()).toHaveLength(0));
@@ -415,7 +415,7 @@ test('buttons stay disabled while a delete is in flight, so it is sent once', as
 test('saving an edit of a log deleted elsewhere leaves edit mode and reloads', async () => {
   const api = serve([morning]);
   await open(api);
-  fireEvent.click(list(/log edit$/));
+  fireEvent.click(list(/Edit log/));
   api.logs.splice(0, 1);
   submit();
   expect(await screen.findByRole('alert')).toHaveTextContent(/Study log not found/);
@@ -426,16 +426,16 @@ test('saving an edit of a log deleted elsewhere leaves edit mode and reloads', a
 test('a delete confirmation can be cancelled, and deleting the edited log ends the edit', async () => {
   const api = serve([morning]);
   await open(api);
-  fireEvent.click(list(/log delete$/));
-  fireEvent.click(list(/log cancel deletion$/));
-  expect(list(/log edit$/)).toBeInTheDocument();
-  expect(list(/log delete$/)).toBeInTheDocument();
-  expect(within(item()).queryByRole('button', { name: /confirm deletion$/ })).toBeNull();
+  fireEvent.click(list(/Delete log/));
+  fireEvent.click(list(/Cancel log deletion/));
+  expect(list(/Edit log/)).toBeInTheDocument();
+  expect(list(/Delete log/)).toBeInTheDocument();
+  expect(within(item()).queryByRole('button', { name: /Confirm log deletion/ })).toBeNull();
   expect(methods(api, 'DELETE')).toHaveLength(0);
 
-  fireEvent.click(list(/log edit$/));
-  fireEvent.click(list(/log delete$/));
-  fireEvent.click(await screen.findByRole('button', { name: /log confirm deletion$/ }));
+  fireEvent.click(list(/Edit log/));
+  fireEvent.click(list(/Delete log/));
+  fireEvent.click(await screen.findByRole('button', { name: /Confirm log deletion/ }));
   await waitFor(() => expect(heading()).toHaveTextContent(/Add a study log/));
   expect(field('Study date').value).toBe(today);
 });
@@ -454,12 +454,12 @@ test('a 404 when deleting another log keeps the current edit', async () => {
   await open(api);
   const [first, second] = items();
   expect(within(first).getByText('2026-10-21')).toBeInTheDocument();
-  fireEvent.click(within(first).getByRole('button', { name: /log edit$/ }));
+  fireEvent.click(within(first).getByRole('button', { name: /Edit log/ }));
   fill('Memo', '수정 중인 메모');
   // The evening log disappears on the server before it is deleted here.
   api.logs.splice(1, 1);
-  fireEvent.click(within(second).getByRole('button', { name: /log delete$/ }));
-  fireEvent.click(await screen.findByRole('button', { name: /log confirm deletion$/ }));
+  fireEvent.click(within(second).getByRole('button', { name: /Delete log/ }));
+  fireEvent.click(await screen.findByRole('button', { name: /Confirm log deletion/ }));
   expect(await screen.findByRole('alert')).toHaveTextContent(/Study log not found/);
   expect(heading()).toHaveTextContent(/Edit the study log/);
   expect(field('Memo').value).toBe('수정 중인 메모');
@@ -494,7 +494,10 @@ test('list buttons name the log they act on', async () => {
   const labels = within(document.querySelector<HTMLElement>('.log-list')!)
     .getAllByRole('button')
     .map((button) => button.getAttribute('aria-label'));
-  expect(labels).toEqual(['2026-10-21 09:00–10:30 log edit', '2026-10-21 09:00–10:30 log delete']);
+  expect(labels).toEqual([
+    'Edit log: 2026-10-21 09:00–10:30',
+    'Delete log: 2026-10-21 09:00–10:30',
+  ]);
 });
 
 test('a log can be linked to a textbook and one of its chapters', async () => {
@@ -551,7 +554,7 @@ test('editing a linked log fills in its textbook and chapter', async () => {
   const api = serve([linked]);
   await open(api);
   expect(item()).toHaveTextContent(/선형대수 · 1 벡터/);
-  fireEvent.click(list(/log edit$/));
+  fireEvent.click(list(/Edit log/));
   await waitFor(() => expect(field('Textbook').value).toBe('1'));
   await waitFor(() => expect(field('Chapter/section').value).toBe('11'));
   fill('Chapter/section', '');
@@ -601,7 +604,7 @@ test('editing a log fills in and can clear its self-assessment', async () => {
   const api = serve([assessed]);
   await open(api);
   expect(item()).toHaveTextContent(/Understanding 5\/5 · Goal achieved/);
-  fireEvent.click(list(/log edit$/));
+  fireEvent.click(list(/Edit log/));
   expect(field('Understanding').value).toBe('5');
   expect(field('Goal achieved').value).toBe('true');
   expect(field('Difficult parts').value).toBe('없음');
@@ -658,12 +661,12 @@ test('focus follows the delete flow: confirm, back on cancel, the list after', a
   const api = serve([morning]);
   await open(api);
   const focusedId = () => document.activeElement?.id;
-  fireEvent.click(list(/log delete$/));
+  fireEvent.click(list(/Delete log/));
   await waitFor(() => expect(focusedId()).toBe('study-log-delete-confirm-1'));
-  fireEvent.click(list(/log cancel deletion$/));
+  fireEvent.click(list(/Cancel log deletion/));
   await waitFor(() => expect(focusedId()).toBe('study-log-delete-1'));
-  fireEvent.click(list(/log delete$/));
-  fireEvent.click(await screen.findByRole('button', { name: /log confirm deletion$/ }));
+  fireEvent.click(list(/Delete log/));
+  fireEvent.click(await screen.findByRole('button', { name: /Confirm log deletion/ }));
   await waitFor(() => expect(focusedId()).toBe('study-log-list'));
   expect(document.getElementById('study-log-list')).toHaveAttribute('tabindex', '-1');
 });
@@ -675,8 +678,8 @@ test('a failed delete puts focus back on the delete button, a 404 on the list', 
   ] as const) {
     const api = serve([morning], { reject });
     await open(api);
-    fireEvent.click(list(/log delete$/));
-    fireEvent.click(await screen.findByRole('button', { name: /log confirm deletion$/ }));
+    fireEvent.click(list(/Delete log/));
+    fireEvent.click(await screen.findByRole('button', { name: /Confirm log deletion/ }));
     await waitFor(() => expect(document.activeElement?.id).toBe(target));
     cleanup();
   }
