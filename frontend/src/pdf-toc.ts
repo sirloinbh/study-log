@@ -29,6 +29,35 @@ export type TextPiece = { str: string; transform: number[]; height?: number };
 export function pageText(pieces: TextPiece[]): string[] {
   const visible = pieces.filter((piece) => piece.str.trim() && piece.transform?.length >= 6);
   if (!visible.length) return [];
+  // A two-column page is read one column after the other, so the columns do not merge by y.
+  return splitColumns(visible).flatMap(linesOf);
+}
+
+const widthOf = (piece: TextPiece) =>
+  (piece as { width?: number }).width ?? piece.str.length * (piece.height || 10) * 0.5;
+
+// Pieces split at a vertical gutter that no piece crosses and that has real text on both sides
+// (a column of page numbers is not a column).
+function splitColumns(pieces: TextPiece[]): TextPiece[][] {
+  const spans = pieces
+    .map((p) => ({ start: p.transform[4], end: p.transform[4] + widthOf(p) }))
+    .sort((a, b) => a.start - b.start);
+  const size = Math.max(...pieces.map((p) => p.height || Math.abs(p.transform[3]) || 10));
+  const texty = (list: TextPiece[]) =>
+    list.filter((p) => !/^[\d\s.·…_]+$/.test(p.str)).length >= Math.max(2, list.length / 2);
+  let reach = spans[0].end;
+  for (const span of spans) {
+    if (span.start - reach > size * 3) {
+      const left = pieces.filter((p) => p.transform[4] < span.start);
+      const right = pieces.filter((p) => p.transform[4] >= span.start);
+      if (texty(left) && texty(right)) return [...splitColumns(left), ...splitColumns(right)];
+    }
+    reach = Math.max(reach, span.end);
+  }
+  return [pieces];
+}
+
+function linesOf(visible: TextPiece[]): string[] {
   const size = (piece: TextPiece) => piece.height || Math.abs(piece.transform[3]) || 10;
   const lines: TextPiece[][] = [];
   const byY = [...visible].sort((a, b) => b.transform[5] - a.transform[5]);
@@ -50,9 +79,7 @@ export function pageText(pieces: TextPiece[]): string[] {
       else if (text && gap > size(piece) * 0.2 && !/\s$/.test(text)) text += ' ';
       text += piece.str;
       // Without a width, assume about half the font size per character.
-      end =
-        piece.transform[4] +
-        ((piece as { width?: number }).width ?? piece.str.length * size(piece) * 0.5);
+      end = piece.transform[4] + widthOf(piece);
     }
     const indent = Math.max(0, Math.round((line[0].transform[4] - left) / (size(line[0]) / 2)));
     return ' '.repeat(indent) + text.trim();
