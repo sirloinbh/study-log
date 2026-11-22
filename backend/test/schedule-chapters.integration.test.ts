@@ -29,7 +29,7 @@ test('a book is laid out over a schedule, chapter by chapter', { skip: !url }, a
     );
     if (books.length) await pool.query('DELETE FROM textbooks WHERE id = ANY($1)', [books]);
   };
-  // Reading the list moves every schedule behind by its "today", and each test has its own.
+  // The catch-up moves every schedule behind by its "today", and each test has its own.
   await holdExactTotalsLock(url, t, async () => {
     await cleanup();
     await pool.end();
@@ -321,6 +321,7 @@ test('a book is laid out over a schedule, chapter by chapter', { skip: !url }, a
     },
     {
       today: () => '8039-01-01',
+      scheduleCatchUp: false,
       holidayFetcher: async (year) => {
         holidayCalls += 1;
         await whileReading();

@@ -1,4 +1,4 @@
-import { type Request, type Response, Router } from 'express';
+import { type Request, type RequestHandler, type Response, Router } from 'express';
 import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod/v4';
 
@@ -200,9 +200,11 @@ async function moveOverdue(client: PoolClient, scheduleId: number, today: string
   );
 }
 
-// Run on every read (rule section 4), with no scheduler. Nothing is locked unless something is behind, each
-// schedule in a transaction of its own.
-async function catchUp(pool: Pool, today: string, scheduleId?: number) {
+// Moves the open days of every schedule that fell behind, or of one (rule section 4): one batched
+// statement in one transaction, outside any read (#270). Nothing is locked unless something is
+// behind; the schedules are locked in id order, as a change to one day locks its own, and the move
+// reads the dates only after the locks are held, so a concurrent catch-up never moves them twice.
+export async function catchUp(pool: Pool, today: string, scheduleId?: number) {
   const { rows } = await pool.query<{ id: number }>(
     `SELECT DISTINCT schedule_id AS id FROM schedule_items
      WHERE completed_on IS NULL AND item_date < $1::date
@@ -210,11 +212,58 @@ async function catchUp(pool: Pool, today: string, scheduleId?: number) {
      ORDER BY id`,
     [today, scheduleId ?? null],
   );
-  for (const { id } of rows)
-    await inTransaction(pool, async (client) => {
-      await client.query('SELECT 1 FROM schedules WHERE id = $1 FOR UPDATE', [id]);
-      await moveOverdue(client, id, today);
-    });
+  if (rows.length === 0) return;
+  await inTransaction(pool, async (client) => {
+    await client.query(
+      'SELECT 1 FROM schedules WHERE id = ANY($1::bigint[]) ORDER BY id FOR UPDATE',
+      [rows.map((row) => row.id)],
+    );
+    await client.query(
+      `UPDATE schedule_items i
+       SET item_date = i.item_date + ($2::date - e.earliest), updated_at = now()
+       FROM (
+         SELECT schedule_id, min(item_date) AS earliest FROM schedule_items
+         WHERE completed_on IS NULL AND schedule_id = ANY($1::bigint[])
+         GROUP BY schedule_id
+       ) e
+       WHERE i.schedule_id = e.schedule_id AND i.completed_on IS NULL AND e.earliest < $2::date`,
+      [rows.map((row) => row.id), today],
+    );
+  });
+}
+
+// Runs catchUp once per service day, after the response of the first /api request of the day, so
+// no read waits for it or writes (#270, rule section 4). A day's list can therefore be one request
+// behind. If it fails, the day is not marked and the next request tries again.
+export function dailyCatchUp(pool: Pool, today: () => string): RequestHandler {
+  let doneOn: string | undefined;
+  let running = false;
+  return (_req, res, next) => {
+    const day = today();
+    if (doneOn !== day && !running) {
+      running = true;
+      res.once('close', () => {
+        catchUp(pool, day)
+          .then(() => {
+            doneOn = day;
+          })
+          .catch((error: unknown) => {
+            console.error(
+              JSON.stringify({
+                time: new Date().toISOString(),
+                level: 'error',
+                event: 'schedule_catch_up_failed',
+                message: error instanceof Error ? error.message : String(error),
+              }),
+            );
+          })
+          .finally(() => {
+            running = false;
+          });
+      });
+    }
+    next();
+  };
 }
 
 type ChapterRange = {
@@ -372,7 +421,6 @@ export function scheduleRoutes(pool: Pool, today: () => string, fetcher: Holiday
   });
 
   router.get('/', async (_req, res) => {
-    await catchUp(pool, today());
     const { rows } = await pool.query(
       `SELECT ${summaryColumns} FROM schedules s
        LEFT JOIN schedule_items i ON i.schedule_id = s.id
@@ -383,7 +431,6 @@ export function scheduleRoutes(pool: Pool, today: () => string, fetcher: Holiday
 
   router.get('/:id', async (req, res) => {
     const id = parseId(req.params.id, 'schedule');
-    await catchUp(pool, today(), id);
     const found = await loadSchedule(pool, id);
     if (!found) return void res.status(404).json(notFound);
     res.json(found);

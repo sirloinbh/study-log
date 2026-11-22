@@ -13,7 +13,7 @@ import { dataPortalHolidays, type HolidayFetcher } from './holidays.js';
 import { keywordRoutes } from './keywords.js';
 import { retrospectiveRoutes } from './retrospectives.js';
 import { reviewRoutes } from './reviews.js';
-import { scheduleRoutes } from './schedules.js';
+import { dailyCatchUp, scheduleRoutes } from './schedules.js';
 import { setInt8Parser } from './standard/db.js';
 import { errorHandler, notFound, requestLog, serviceDate } from './standard/http.js';
 import { apiRateLimit } from './standard/rate-limit.js';
@@ -40,6 +40,8 @@ export function createApp(
     fileStorage?: FileStorage;
     requestsPerMinute?: number;
     auth?: express.RequestHandler;
+    // Off in the schedule tests, which move the days at moments of their own (#270).
+    scheduleCatchUp?: boolean;
     toolsPublicKey?: string;
   } = {},
 ) {
@@ -63,6 +65,8 @@ export function createApp(
   // #221: the shared sign-in guards every /api route except /api/health, before any route registers.
   if (options.auth) app.use('/api', options.auth);
   app.get('/api/me', meHandler);
+  // Moves overdue schedule days once a day, after the first schedule response, so no read writes (#270).
+  if (options.scheduleCatchUp !== false) app.use('/api/schedules', dailyCatchUp(pool, today));
   app.get('/api/health', async (_req, res) => {
     await pool.query('SELECT 1');
     res.json({ ok: true, service: 'study-log', today: today() });
