@@ -1,12 +1,9 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { expect, test, vi } from 'vitest';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
+import { expect, test } from 'vitest';
 
 import { chapterPercent, type TextbookStats as Stats, textbookStatsPath } from './study-stats';
 import { fakeApi } from './test/fake-api';
 import { TextbookStats } from './textbook-stats';
-
-// As in screens.test.tsx: the first run after a change is slow.
-vi.setConfig({ testTimeout: 20_000 });
 
 const algebra = { id: 7, title: '선형대수', completedChapters: 1, totalChapters: 4 };
 const analysis = { id: 8, title: '해석학', completedChapters: 0, totalChapters: 0 };
@@ -97,24 +94,25 @@ test('a failure says so and can be tried again', async () => {
 });
 
 test('a slow answer for another pick is not shown', async () => {
-  const late: (() => void)[] = [];
-  vi.stubGlobal(
-    'fetch',
-    vi.fn((path: string) => {
-      const reply = (body: unknown) => new Response(JSON.stringify(body));
-      if (path.endsWith('textbookId=7'))
-        return new Promise<Response>((resolve) => late.push(() => resolve(reply(one))));
-      return Promise.resolve(reply(all));
-    }),
-  );
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const api = fakeApi({
+    'GET /api/stats/textbooks': ({ path }) =>
+      path.endsWith('textbookId=7') ? { hold: held, body: one } : { body: all },
+  });
   render(<TextbookStats />);
   await card().findByText('No contents');
   fireEvent.change(card().getByLabelText('Textbook'), { target: { value: '7' } });
-  await waitFor(() => expect(late).toHaveLength(1));
+  await api.requested((request) => request.path.endsWith('textbookId=7'));
   fireEvent.change(card().getByLabelText('Textbook'), { target: { value: '' } });
   await card().findByText('No contents');
-  late.forEach((resolve) => resolve());
-  await new Promise((resolve) => setTimeout(resolve, 20));
+  release();
+  // A round trip through the fake: the held reply has been handled by the screen after it.
+  await act(async () => {
+    await (await fetch('/api/stats/textbooks')).json();
+  });
   expect(card().getByText('No contents')).toBeInTheDocument();
   expect(card().queryByText('90%')).toBeNull();
 });

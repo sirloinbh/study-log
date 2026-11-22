@@ -1,5 +1,5 @@
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { describe, expect, test, vi } from 'vitest';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { describe, expect, test } from 'vitest';
 
 import {
   dayLabel,
@@ -11,9 +11,6 @@ import {
 } from './schedule';
 import { Schedules } from './schedules';
 import { fakeApi } from './test/fake-api';
-
-// As in screens.test.tsx: the first run after a change is slow.
-vi.setConfig({ testTimeout: 20_000 });
 
 const today = '2026-03-02';
 
@@ -53,6 +50,7 @@ function server(start: Schedule[], writeFailure?: { status: number; body: object
   let rows = start;
   return fakeApi(({ method, path, body }) => {
     if (method === 'GET' && path === '/api/schedules') return { body: { schedules: rows } };
+    if (method === 'GET' && path === '/api/textbooks') return { body: { textbooks: [] } };
     if (method === 'GET') {
       const found = rows.find((item) => path.endsWith(`/${item.id}`));
       return found
@@ -69,6 +67,13 @@ function server(start: Schedule[], writeFailure?: { status: number; body: object
     return { status: 201, body: detailOf(made) };
   });
 }
+
+// A round trip through the fake: a reply that was already on its way has been handled by the screen
+// by the time this resolves, so a "nothing changed" check after it is not a guess.
+const settle = (path: string) =>
+  act(async () => {
+    await (await fetch(path)).json();
+  });
 
 const fill = (label: string, value: string) =>
   fireEvent.change(screen.getByLabelText(label), { target: { value } });
@@ -133,7 +138,7 @@ describe('a textbook', () => {
   };
 
   test('without one nothing about chapters is sent, and the choices stay hidden', async () => {
-    const sent = bookServer();
+    const { sent } = bookServer();
     await start();
     expect(screen.queryByLabelText('First chapter')).toBeNull();
     submit();
@@ -142,7 +147,7 @@ describe('a textbook', () => {
   });
 
   test('its whole range is sent as no chapters picked, and the days name their chapters', async () => {
-    const sent = bookServer();
+    const { sent } = bookServer();
     await start();
     fill('Textbook (optional)', '7');
     await screen.findAllByRole('option', { name: '1 벡터' });
@@ -158,7 +163,7 @@ describe('a textbook', () => {
   });
 
   test('picked chapters are sent, and changing the book forgets them', async () => {
-    const sent = bookServer();
+    const { sent } = bookServer();
     await start();
     fill('Textbook (optional)', '7');
     await screen.findAllByRole('option', { name: '2 행렬' });
@@ -203,7 +208,7 @@ describe('a textbook', () => {
   });
 
   test('without its chapters read, a book cannot make a schedule yet', async () => {
-    const sent = bookServer({ status: 500, body: { error: 'A server error occurred' } });
+    const { sent } = bookServer({ status: 500, body: { error: 'A server error occurred' } });
     await start();
     fill('Textbook (optional)', '7');
     await screen.findByText('Could not load the contents of this textbook');
@@ -216,7 +221,7 @@ describe('a textbook', () => {
 
   test('chapters read before do not count once the book is picked again', async () => {
     let failing = false;
-    const sent = fakeApi(({ path }) => {
+    const { sent } = fakeApi(({ path }) => {
       if (path === '/api/textbooks') return { body: { textbooks: [book] } };
       if (path === '/api/schedules') return { body: { schedules: [] } };
       return failing
@@ -239,58 +244,52 @@ describe('a textbook', () => {
   });
 
   test('while the chapters are being read a schedule waits, and another book is not offered', async () => {
-    const answers: (() => void)[] = [];
-    const reply = (body: unknown) => new Response(JSON.stringify(body));
-    const fetchMock = vi.fn((path: string) => {
-      if (path === '/api/textbooks')
-        return Promise.resolve(reply({ textbooks: [book, { ...book, id: 8, title: '해석학' }] }));
-      if (path === '/api/schedules') return Promise.resolve(reply({ schedules: [] }));
-      if (path === '/api/textbooks/7/contents') return Promise.resolve(reply({ contents }));
-      return new Promise<Response>((resolve) =>
-        answers.push(() => resolve(reply({ contents: [chapterNode(81, '1', '극한')] }))),
-      );
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
     });
-    vi.stubGlobal('fetch', fetchMock);
+    const api = fakeApi({
+      'GET /api/textbooks': { body: { textbooks: [book, { ...book, id: 8, title: '해석학' }] } },
+      'GET /api/schedules': { body: { schedules: [] } },
+      'GET /api/textbooks/7/contents': { body: { contents } },
+      'GET /api/textbooks/8/contents': {
+        hold: held,
+        body: { contents: [chapterNode(81, '1', '극한')] },
+      },
+    });
     await start();
     fill('Textbook (optional)', '7');
     await screen.findAllByRole('option', { name: '1 벡터' });
     fill('Textbook (optional)', '8');
-    await waitFor(() => expect(answers).toHaveLength(1));
+    await api.requested((request) => request.path === '/api/textbooks/8/contents');
     // Book 7's chapters are not shown for book 8 while its own are on their way.
     expect(screen.queryByRole('option', { name: '1 벡터' })).toBeNull();
     submit();
     expect(await form().findByRole('alert')).toHaveTextContent(
       'The textbook contents have not been loaded yet',
     );
-    expect(
-      fetchMock.mock.calls.some(
-        ([, init]: unknown[]) => (init as { method?: string })?.method === 'POST',
-      ),
-    ).toBe(false);
-    answers.forEach((answer) => answer());
+    expect(api.sent).toEqual([]);
+    release();
     await screen.findAllByRole('option', { name: '1 극한' });
   });
 
   test('a late answer for the book left behind is not offered for this one', async () => {
-    const late: (() => void)[] = [];
-    const reply = (body: unknown) => new Response(JSON.stringify(body));
-    vi.stubGlobal(
-      'fetch',
-      vi.fn((path: string) => {
-        if (path === '/api/textbooks')
-          return Promise.resolve(reply({ textbooks: [book, { ...book, id: 8, title: '해석학' }] }));
-        if (path === '/api/schedules') return Promise.resolve(reply({ schedules: [] }));
-        if (path === '/api/textbooks/7/contents')
-          return new Promise<Response>((resolve) => late.push(() => resolve(reply({ contents }))));
-        return Promise.resolve(reply({ contents: [chapterNode(81, '1', '극한')] }));
-      }),
-    );
+    let release!: () => void;
+    const held = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    fakeApi({
+      'GET /api/textbooks': { body: { textbooks: [book, { ...book, id: 8, title: '해석학' }] } },
+      'GET /api/schedules': { body: { schedules: [] } },
+      'GET /api/textbooks/7/contents': { hold: held, body: { contents } },
+      'GET /api/textbooks/8/contents': { body: { contents: [chapterNode(81, '1', '극한')] } },
+    });
     await start();
     fill('Textbook (optional)', '7');
     fill('Textbook (optional)', '8');
     await screen.findAllByRole('option', { name: '1 극한' });
-    late.forEach((resolve) => resolve());
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    release();
+    await settle('/api/schedules');
     expect(screen.queryByRole('option', { name: '1 벡터' })).toBeNull();
     expect(screen.getAllByRole('option', { name: '1 극한' })).toHaveLength(2);
   });
@@ -321,7 +320,7 @@ describe('adjusting the days', () => {
   const adjustable = () => {
     const made = schedule(1, '지난 일정');
     let current = detailOf(made);
-    const sent = fakeApi(({ method, path, body }) => {
+    const api = fakeApi(({ method, path, body }) => {
       if (path === '/api/textbooks') return { body: { textbooks: [] } };
       if (path === '/api/schedules') return { body: { schedules: [current.schedule] } };
       if (method === 'GET') return { body: current };
@@ -337,7 +336,7 @@ describe('adjusting the days', () => {
       };
       return { body: current };
     });
-    return sent;
+    return api;
   };
   const opened = async () => {
     render(<Schedules today={today} />);
@@ -346,7 +345,7 @@ describe('adjusting the days', () => {
   const dayCard = () => within(screen.getByRole('region', { name: 'Schedule by date' }));
 
   test('a day is completed and reopened, and focus stays on it', async () => {
-    const sent = adjustable();
+    const { sent } = adjustable();
     await opened();
     const check = days().getByRole('checkbox', { name: 'Mon, Mar 2 complete' });
     expect(check).not.toBeChecked();
@@ -368,7 +367,7 @@ describe('adjusting the days', () => {
   });
 
   test('a day moves alone unless asked, and can be cancelled', async () => {
-    const sent = adjustable();
+    const { sent } = adjustable();
     await opened();
     fireEvent.click(days().getByRole('button', { name: 'Sat, Mar 7 move' }));
     expect(days().getByLabelText('Move to')).toHaveValue('2026-03-07');
@@ -399,7 +398,7 @@ describe('adjusting the days', () => {
   });
 
   test('later days are taken along when asked', async () => {
-    const sent = adjustable();
+    const { sent } = adjustable();
     await opened();
     fireEvent.click(days().getByRole('button', { name: 'Mon, Mar 2 move' }));
     fireEvent.change(days().getByLabelText('Move to'), { target: { value: '2026-03-04' } });
@@ -620,7 +619,7 @@ test('the form starts with the suggested dates and hours', async () => {
 });
 
 test('making a schedule sends minutes and shows its days', async () => {
-  const sent = server([]);
+  const { sent } = server([]);
   render(<Schedules today={today} />);
   await screen.findByText('No schedules yet');
   fill('Schedule name', '알고리즘');
@@ -655,7 +654,7 @@ test('making a schedule sends minutes and shows its days', async () => {
 });
 
 test('hours out of range stop before the server', async () => {
-  const sent = server([]);
+  const { sent } = server([]);
   render(<Schedules today={today} />);
   await screen.findByText('No schedules yet');
   fill('Schedule name', '알고리즘');
@@ -694,7 +693,7 @@ test('the first in the list opens, another opens when picked, and today is marke
 });
 
 test('deleting asks first, and the next schedule opens', async () => {
-  const sent = server([schedule(2, '새 일정'), schedule(1, '지난 일정')]);
+  const { sent } = server([schedule(2, '새 일정'), schedule(1, '지난 일정')]);
   render(<Schedules today={today} />);
   await screen.findByRole('heading', { level: 2, name: '새 일정' });
 
@@ -798,7 +797,7 @@ test('days already read stay when reading them again fails, and focus stays', as
   submit();
   const heading = await screen.findByRole('heading', { level: 2, name: '알고리즘' });
   await waitFor(() => expect(heading).toHaveFocus());
-  await new Promise((resolve) => setTimeout(resolve, 50));
+  await settle('/api/schedules');
   expect(heading).toHaveFocus();
   expect(screen.queryByText(/Could not load the schedule days/)).toBeNull();
   expect(days().getByText('Mon, Mar 2')).toBeInTheDocument();
@@ -822,7 +821,7 @@ test('typing takes back the last complaint, and a new schedule ends a pending de
 });
 
 test('two submits at once make one schedule', async () => {
-  const sent = server([]);
+  const { sent } = server([]);
   render(<Schedules today={today} />);
   await screen.findByText('No schedules yet');
   fill('Schedule name', '알고리즘');
@@ -849,22 +848,18 @@ test('a list or days that cannot be read say so', async () => {
 });
 
 test('a slow answer for the schedule left behind is not shown', async () => {
-  const late: ((value: Response) => void)[] = [];
-  vi.stubGlobal(
-    'fetch',
-    vi.fn((path: string) => {
-      const reply = (body: unknown) => new Response(JSON.stringify(body));
-      if (path === '/api/schedules')
-        return Promise.resolve(
-          reply({ schedules: [schedule(2, '새 일정'), schedule(1, '지난 일정')] }),
-        );
-      if (path.endsWith('/2'))
-        return new Promise<Response>((resolve) =>
-          late.push(() => resolve(reply(detailOf(schedule(2, '새 일정'))))),
-        );
-      return Promise.resolve(reply(detailOf(schedule(1, '지난 일정'))));
-    }),
-  );
+  let release!: () => void;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  fakeApi({
+    'GET /api/textbooks': { body: { textbooks: [] } },
+    'GET /api/schedules': {
+      body: { schedules: [schedule(2, '새 일정'), schedule(1, '지난 일정')] },
+    },
+    'GET /api/schedules/2': { hold: held, body: detailOf(schedule(2, '새 일정')) },
+    'GET /api/schedules/1': { body: detailOf(schedule(1, '지난 일정')) },
+  });
   render(<Schedules today={today} />);
   fireEvent.click(
     await within(await screen.findByRole('region', { name: 'My schedules' })).findByRole('button', {
@@ -872,8 +867,8 @@ test('a slow answer for the schedule left behind is not shown', async () => {
     }),
   );
   await screen.findByRole('heading', { level: 2, name: '지난 일정' });
-  late.forEach((resolve) => resolve(new Response()));
-  await new Promise((resolve) => setTimeout(resolve, 20));
+  release();
+  await settle('/api/schedules');
   expect(screen.getByRole('heading', { level: 2, name: '지난 일정' })).toBeInTheDocument();
   expect(screen.queryByRole('heading', { level: 2, name: '새 일정' })).toBeNull();
 });
@@ -923,7 +918,7 @@ describe('renaming a schedule (#179)', () => {
   const renameForm = () => within(screen.getByRole('form', { name: 'Edit schedule name' }));
 
   test('a new name is saved and shown in the heading and the list', async () => {
-    const sent = renamable();
+    const { sent } = renamable();
     await opened();
     const input = await startRenaming();
     expect(input).toHaveValue('지난 일정');
@@ -950,7 +945,7 @@ describe('renaming a schedule (#179)', () => {
   });
 
   test('cancelling sends nothing and goes back to the button', async () => {
-    const sent = renamable();
+    const { sent } = renamable();
     await opened();
     const input = await startRenaming();
     fireEvent.change(input, { target: { value: '다른 이름' } });
@@ -964,7 +959,7 @@ describe('renaming a schedule (#179)', () => {
   });
 
   test('a blank or too long name is said under it, before asking the server', async () => {
-    const sent = renamable();
+    const { sent } = renamable();
     await opened();
     const input = await startRenaming();
     fireEvent.change(input, { target: { value: '   ' } });

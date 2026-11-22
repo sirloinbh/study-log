@@ -1,15 +1,11 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { describe, expect, test, vi } from 'vitest';
+import { describe, expect, test } from 'vitest';
 
 import { Exercises } from './exercises';
 import { StudyLogs } from './study-logs';
 import { fakeApi } from './test/fake-api';
 import { TextbookContents } from './textbook-contents';
 import { Textbooks } from './textbooks';
-
-// The whole page renders in each test and role queries are slow on the first run after a change.
-// The wait of `findBy` and `waitFor` is raised for all tests in test/setup.ts.
-vi.setConfig({ testTimeout: 20_000 });
 
 const fill = (label: string, value: string) =>
   fireEvent.change(screen.getByLabelText(label), { target: { value } });
@@ -47,7 +43,7 @@ describe('study logs', () => {
         const month = new URL(path, 'http://test').searchParams.get('month');
         return { body: { month, days: [{ date: `${month}-01`, minutes: 0, logs: 0 }] } };
       }
-      if (method === 'GET') {
+      if (method === 'GET' && path.startsWith('/api/study-logs')) {
         const date = new URL(path, 'http://test').searchParams.get('date');
         return { body: { studyLogs: logs.filter((item) => !date || item.studyDate === date) } };
       }
@@ -72,7 +68,7 @@ describe('study logs', () => {
   });
 
   test('adding sends the form, reloads the list and keeps the date for the next one', async () => {
-    const sent = server([]);
+    const { sent } = server([]);
     render(<StudyLogs today={today} />);
     expect(await screen.findByText('No study logs yet')).toBeInTheDocument();
     fill('Study date', '2026-10-20');
@@ -91,7 +87,7 @@ describe('study logs', () => {
   });
 
   test('deleting asks first, then the log leaves the list', async () => {
-    const sent = server([log]);
+    const { sent } = server([log]);
     render(<StudyLogs today={today} />);
     fireEvent.click(await screen.findByRole('button', { name: /log delete$/ }));
     expect(sent).toEqual([]);
@@ -112,9 +108,11 @@ describe('study logs', () => {
   });
 
   test('a failed first load says so instead of claiming there are no logs', async () => {
-    fakeApi(({ path }) =>
-      path.startsWith('/api/textbooks') ? { body: { textbooks: [] } } : serverError,
-    );
+    fakeApi({
+      'GET /api/textbooks': { body: { textbooks: [] } },
+      'GET /api/study-logs': serverError,
+      'GET /api/study-logs/calendar': serverError,
+    });
     render(<StudyLogs today={today} />);
     expect(
       await screen.findByText('Could not load the recent logs: A server error occurred'),
@@ -129,9 +127,10 @@ describe('textbooks', () => {
   function server(start: (typeof book)[]) {
     let books = start;
     return fakeApi(({ method, path, body }) => {
-      if (path.endsWith('/contents')) return { body: { contents: [] } };
-      if (path.includes('/exercises')) return { body: { exercises: [] } };
-      if (method === 'GET') return { body: { textbooks: books } };
+      if (method === 'GET' && path.endsWith('/contents')) return { body: { contents: [] } };
+      if (method === 'GET' && path.includes('/exercises')) return { body: { exercises: [] } };
+      if (method === 'GET' && path === '/api/textbooks') return { body: { textbooks: books } };
+      if (method !== 'POST') return undefined;
       const saved = { ...(body as typeof book), id: 2 };
       books = [...books, saved];
       return { status: 201, body: { textbook: saved } };
@@ -152,7 +151,7 @@ describe('textbooks', () => {
   });
 
   test('adding sends the form, lists the textbook and clears the form', async () => {
-    const sent = server([]);
+    const { sent } = server([]);
     render(<Textbooks />);
     expect(await screen.findByText('No textbooks registered yet')).toBeInTheDocument();
     fill('Title', '해석학');
@@ -180,11 +179,10 @@ describe('textbook contents', () => {
   test('moving an entry saves the new order of its siblings', async () => {
     const first = node(1, '1', '벡터');
     const second = node(2, '2', '행렬');
-    const sent = fakeApi(({ method }) =>
-      method === 'PUT'
-        ? { body: { contents: [second, first] } }
-        : { body: { contents: [first, second] } },
-    );
+    const { sent } = fakeApi({
+      'GET /api/textbooks/7/contents': { body: { contents: [first, second] } },
+      'PUT /api/textbooks/7/contents/order': { body: { contents: [second, first] } },
+    });
     render(<TextbookContents textbookId={7} />);
     fireEvent.click(await screen.findByRole('button', { name: /행렬 move up$/ }));
     await waitFor(() => expect(sent.length).toBe(1));
@@ -207,9 +205,10 @@ describe('textbook contents', () => {
   test('a refused move shows the server message', async () => {
     const first = node(1, '1', '벡터');
     const second = node(2, '2', '행렬');
-    fakeApi(({ method }) =>
-      method === 'PUT' ? serverError : { body: { contents: [first, second] } },
-    );
+    fakeApi({
+      'GET /api/textbooks/7/contents': { body: { contents: [first, second] } },
+      'PUT /api/textbooks/7/contents/order': serverError,
+    });
     render(<TextbookContents textbookId={7} />);
     fireEvent.click(await screen.findByRole('button', { name: /행렬 move up$/ }));
     expect(await screen.findByRole('alert')).toHaveTextContent('A server error occurred');
@@ -232,11 +231,12 @@ describe('exercises', () => {
   function server(start: (typeof exercise)[]) {
     let exercises = start;
     return fakeApi(({ method, path, body }) => {
-      if (method === 'GET') return { body: { exercises } };
+      if (method === 'GET' && path === url) return { body: { exercises } };
       if (method === 'DELETE') {
         exercises = exercises.filter((item) => !path.endsWith(`/${item.id}`));
         return { status: 204 };
       }
+      if (method !== 'POST') return undefined;
       const saved = { ...exercise, ...(body as object), id: 6 };
       exercises = [...exercises, saved];
       return { status: 201, body: { exercise: saved } };
@@ -244,7 +244,7 @@ describe('exercises', () => {
   }
 
   test('adding sends the problem to the picked chapter and lists it', async () => {
-    const sent = server([]);
+    const { sent } = server([]);
     render(<Exercises textbook={textbook} tree={[chapter]} />);
     await waitFor(() => expect(screen.getByRole('button', { name: 'Add problem' })).toBeEnabled());
     fireEvent.click(screen.getByRole('button', { name: 'Add problem' }));
@@ -261,7 +261,7 @@ describe('exercises', () => {
   });
 
   test('deleting asks first, then the problem leaves the list', async () => {
-    const sent = server([exercise]);
+    const { sent } = server([exercise]);
     render(<Exercises textbook={textbook} tree={[chapter]} />);
     expect(await screen.findByText('내적을 구하라')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /^Problem 1 delete$/ }));

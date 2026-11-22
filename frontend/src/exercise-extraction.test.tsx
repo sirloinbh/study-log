@@ -4,6 +4,7 @@ import { expect, test, vi } from 'vitest';
 import type { Exercise } from './exercise';
 import { matchExercise } from './exercise';
 import { ExerciseExtraction } from './exercise-extraction';
+import { type Answer, fakeApi } from './test/fake-api';
 
 const url = '/api/textbooks/1/contents/10/exercises';
 const exercise = (id: number, number: string): Exercise => ({
@@ -16,37 +17,14 @@ const exercise = (id: number, number: string): Exercise => ({
 });
 const chapter = [exercise(1, '1.1'), exercise(2, '1.2'), exercise(3, '')];
 
-type Sent = { method: string; path: string; body?: unknown; form?: FormData };
-
 // Answers the extraction with `items` and every save with `saved`; keeps what was sent (#30).
-function fakeServer(items: unknown[], saved: { status?: number; body?: unknown } = {}) {
-  const sent: Sent[] = [];
-  vi.stubGlobal(
-    'fetch',
-    vi.fn(
-      (
-        path: string,
-        init: { method: string; headers?: Record<string, string>; body?: unknown },
-      ) => {
-        const form = init.body instanceof FormData ? init.body : undefined;
-        sent.push({
-          method: init.method,
-          path,
-          ...(form ? { form } : { body: JSON.parse(String(init.body)) as unknown }),
-        });
-        if (form) {
-          expect(init.headers).toEqual({ 'x-requested-with': 'study-log' });
-          return Promise.resolve(
-            new Response(JSON.stringify({ items, model: 'claude-sonnet-5-5' })),
-          );
-        }
-        return Promise.resolve(
-          new Response(JSON.stringify(saved.body ?? {}), { status: saved.status ?? 200 }),
-        );
-      },
-    ),
-  );
-  return sent;
+function fakeServer(items: unknown[], saved: Answer = {}) {
+  const api = fakeApi((request) => {
+    if (!request.form) return saved;
+    expect(request.headers).toEqual({ 'x-requested-with': 'study-log' });
+    return { body: { items, model: 'claude-sonnet-5-5' } };
+  });
+  return api.sent;
 }
 
 function open() {
