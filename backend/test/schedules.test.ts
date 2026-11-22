@@ -134,3 +134,78 @@ test('a schedule deleted right after its rename is 404, not an empty 200', async
     assert.match(String(data.error), /Schedule not found/);
   });
 });
+
+// #270: reading never writes; the catch-up runs once a service day, after the first schedule response.
+const statementsOf = (calls: string[]) =>
+  calls.map((sql) => sql.trim().split(/\s+/).slice(0, 2).join(' ').toUpperCase());
+const catchUpPool = (calls: string[], failures: { left: number }) =>
+  ({
+    query: async (sql: string) => {
+      calls.push(sql);
+      if (sql.includes('SELECT DISTINCT schedule_id')) {
+        if (failures.left-- > 0) throw new Error('database is down');
+        return { rows: [{ id: 7 }] };
+      }
+      return { rows: [], rowCount: 0 };
+    },
+  }) as unknown as Pool;
+const settle = () => new Promise((resolve) => setTimeout(resolve, 50));
+
+test('GET /api/schedules issues no writes, and the catch-up runs after the response, once a day', async () => {
+  const calls: string[] = [];
+  let day = '2026-11-01';
+  await withApi(
+    catchUpPool(calls, { left: 0 }),
+    async (call) => {
+      assert.equal((await call('/api/schedules')).status, 200);
+      await settle();
+      // The list itself only read: the first write comes after its query.
+      const list = calls.findIndex((sql) => /FROM schedules s\b/.test(sql));
+      const firstWrite = calls.findIndex((sql) => /^\s*(UPDATE|INSERT|DELETE)/i.test(sql));
+      assert.ok(list >= 0 && firstWrite > list, calls.map((sql) => sql.slice(0, 40)).join('\n'));
+      assert.ok(calls.some((sql) => /UPDATE schedule_items/.test(sql)));
+      const updates = () => calls.filter((sql) => /UPDATE schedule_items/.test(sql)).length;
+      assert.equal(updates(), 1);
+
+      // The same day again: no second catch-up.
+      await call('/api/schedules');
+      await settle();
+      assert.equal(updates(), 1);
+
+      // The next day: once more.
+      day = '2026-11-02';
+      await call('/api/schedules');
+      await settle();
+      assert.equal(updates(), 2);
+      assert.deepEqual(
+        statementsOf(calls).filter((sql) => sql === 'UPDATE SCHEDULE_ITEMS'),
+        ['UPDATE SCHEDULE_ITEMS', 'UPDATE SCHEDULE_ITEMS'],
+      );
+    },
+    { today: () => day },
+  );
+});
+
+test('a failed catch-up does not fail the request and is tried again on the next one', async () => {
+  const calls: string[] = [];
+  const original = console.error;
+  const logged: string[] = [];
+  console.error = (line: string) => void logged.push(line);
+  try {
+    await withApi(
+      catchUpPool(calls, { left: 1 }),
+      async (call) => {
+        assert.equal((await call('/api/schedules')).status, 200);
+        await settle();
+        assert.equal(calls.filter((sql) => /UPDATE schedule_items/.test(sql)).length, 0);
+        assert.match(logged.join('\n'), /schedule_catch_up_failed/);
+        assert.equal((await call('/api/schedules')).status, 200);
+        await settle();
+        assert.equal(calls.filter((sql) => /UPDATE schedule_items/.test(sql)).length, 1);
+      },
+      { today: () => '2026-11-01' },
+    );
+  } finally {
+    console.error = original;
+  }
+});

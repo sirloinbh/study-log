@@ -119,6 +119,7 @@ export async function withApi(
     fileStorage?: FileStorage;
     requestsPerMinute?: number;
     auth?: express.RequestHandler;
+    scheduleCatchUp?: boolean;
   } = {},
 ) {
   const { server, port } = await openFetchablePort(async () => {
