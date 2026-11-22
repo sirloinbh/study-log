@@ -152,18 +152,30 @@ test(
         failing.put = false;
         assert.equal(((await call(files)).data.files as StoredFile[]).length, 2);
 
-        // Deleting removes the S3 object first; when that fails the row stays for a retry.
+        // Deleting commits the row first (#335); when S3 then refuses, the delete still stands, no row
+        // points at a missing file, and the key left behind is logged for the sweep.
         failing.remove = true;
-        const kept = await call(`/api/exercise-files/${answer.id}`, { method: 'DELETE' });
-        assert.equal(kept.status, 502);
-        assert.equal(((await call(files)).data.files as StoredFile[]).length, 2);
-        failing.remove = false;
-        assert.equal(
-          (await call(`/api/exercise-files/${answer.id}`, { method: 'DELETE' })).status,
-          204,
-        );
-        assert.equal(objects.size, 1);
+        const logged: string[] = [];
+        const original = console.error;
+        console.error = (line: string) => void logged.push(line);
+        try {
+          assert.equal(
+            (await call(`/api/exercise-files/${answer.id}`, { method: 'DELETE' })).status,
+            204,
+          );
+        } finally {
+          console.error = original;
+          failing.remove = false;
+        }
+        assert.equal(((await call(files)).data.files as StoredFile[]).length, 1);
         assert.equal((await call(`/api/exercise-files/${answer.id}`)).status, 404);
+        assert.equal(objects.size, 2);
+        const orphaned = logged
+          .map((line) => JSON.parse(line))
+          .find((l) => l.event === 'orphaned_files');
+        assert.equal(orphaned?.keys.length, 1);
+        objects.delete(orphaned.keys[0]); // the sweep removes it
+        assert.equal(objects.size, 1);
 
         // A row whose object is gone answers 404 for the content, not a server error.
         objects.clear();

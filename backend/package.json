@@ -8,6 +8,7 @@
     "start": "node dist/server.js",
     "openapi": "tsx src/openapi-cli.ts",
     "db:migrate": "tsx --env-file-if-exists=../.env src/migrate.ts",
+    "files:sweep": "tsx --env-file-if-exists=../.env src/file-sweep-cli.ts",
     "build": "tsc",
     "test": "tsx --test test/*.test.ts",
     "typecheck": "tsc -p tsconfig.check.json"
