@@ -1,9 +1,10 @@
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, expect, test, vi } from 'vitest';
 
 import { Retrospectives } from './retrospectives';
 import { StudyLogSearch } from './study-log-search';
 import type { StudyLog } from './study-logs-data';
+import { render } from './test/render';
 
 vi.setConfig({ testTimeout: 60_000 });
 afterEach(() => {
