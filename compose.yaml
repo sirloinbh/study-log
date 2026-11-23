@@ -13,9 +13,11 @@ services:
       # Over TCP: while a new volume is set up, the temporary server answers only on its socket, and
       # the migration step after this check connects over TCP.
       test: ['CMD-SHELL', 'pg_isready -h 127.0.0.1 -U $$POSTGRES_USER -d $$POSTGRES_DB']
-      interval: 5s
+      interval: 60s
       timeout: 5s
-      retries: 15
+      retries: 3
+      start_period: 30s
+      start_interval: 2s
     restart: unless-stopped
   api:
     # deploy/remote-deploy.sh tags each build by commit, so a rollback starts the old images
@@ -58,10 +60,11 @@ services:
           '-e',
           "fetch('http://127.0.0.1:3102/api/health').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))",
         ]
-      interval: 5s
+      interval: 60s
       timeout: 5s
-      retries: 15
-      start_period: 10s
+      retries: 3
+      start_period: 60s
+      start_interval: 2s
     restart: unless-stopped
   web:
     image: study-frontend:${IMAGE_TAG:-local}
