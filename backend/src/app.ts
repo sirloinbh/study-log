@@ -11,6 +11,7 @@ import { refuseCrossSiteWrites } from './cross-site.js';
 import { attemptRoutes, exerciseAttemptRoutes, wrongExerciseRoutes } from './exercise-attempts.js';
 import { exerciseFileRoutes, fileRoutes } from './exercise-files.js';
 import { contentExerciseRoutes, exerciseRoutes, textbookExerciseRoutes } from './exercises.js';
+import { exportRoutes } from './export.js';
 import { claudeExtractor, type Extractor } from './extraction.js';
 import { type FileStorage, s3Storage } from './file-storage.js';
 import { dataPortalHolidays, type HolidayFetcher } from './holidays.js';
@@ -89,6 +90,7 @@ export function createApp(
   app.use('/api/study-logs', studyLogRoutes(pool));
   app.use('/api/study-timer', studyTimerRoutes(pool));
   app.use('/api/reviews', reviewRoutes(pool, today));
+  app.use('/api/export', exportRoutes(pool, today));
   app.use('/api/keywords', keywordRoutes(pool, today));
   app.use('/api/flashcards', flashcardRoutes(pool, today));
   app.use(
