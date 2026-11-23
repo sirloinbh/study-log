@@ -76,7 +76,8 @@ function server(answers: { reviews?: unknown; reviewsStatus?: number } = {}) {
 const asks = (api: Api, prefix: string) =>
   api.requests.filter((r) => r.path.startsWith(prefix)).length;
 
-const reviewCard = () => within(document.querySelector<HTMLElement>('.review-chart')!);
+const reviewCard = () =>
+  within(document.querySelector<HTMLElement>('section[aria-labelledby="review-chart-heading"]')!);
 
 test('the completion rate and its counts are shown for the period', async () => {
   server();
