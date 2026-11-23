@@ -32,6 +32,7 @@ import { dueDateInput } from './reviews.js';
 import { moveInput, scheduleCreateInput, scheduleUpdateInput } from './schedules.js';
 import { buildOpenApi, type Operation } from './standard/openapi.js';
 import { patternQuery, statsPeriodQuery, studyTimeQuery, textbookQuery } from './stats.js';
+import { goalInput } from './study-goal.js';
 import { studyLogInput, studyLogListQuery } from './study-logs.js';
 import {
   contentBulkInput,
@@ -103,6 +104,17 @@ export const operations: Record<string, Operation> = {
     summary: 'Set the due date of an open review round',
     body: ['ReviewDueDate', dueDateInput],
     status: [200, 400, 404, 409],
+  },
+
+  'GET /api/stats/goal': {
+    summary:
+      "This week's goal, the minutes studied so far, the achievement rate and the streak of study days",
+    status: [200],
+  },
+  'PUT /api/stats/goal': {
+    summary: "Set this week's goal in minutes; later weeks keep it until it is changed",
+    body: ['WeeklyGoal', goalInput],
+    status: [200, 400],
   },
 
   'GET /api/study-timer': {

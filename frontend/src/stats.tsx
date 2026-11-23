@@ -7,6 +7,7 @@ import { apiKey, useApiQuery } from './lib/query';
 import { Loading } from './loading';
 import { plural } from './plural';
 import { ReviewRateChart } from './review-rate-chart';
+import { StudyGoal } from './study-goal';
 import { formatMinutes } from './study-logs-data';
 import {
   type ChartUnit,
@@ -158,6 +159,7 @@ export function Stats() {
           </article>
         </section>
       )}
+      <StudyGoal />
       {stats && !error && (
         <StudyTimeChart
           stats={stats}

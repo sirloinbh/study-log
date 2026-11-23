@@ -79,7 +79,7 @@ export function bucket(daily: Day[], keyOf: (date: string) => string) {
 }
 
 // Planned sessions have not been studied yet, so they do not count; later dates neither.
-const counted = `status <> 'planned' AND study_date <= $1`;
+export const counted = `status <> 'planned' AND study_date <= $1`;
 
 // Minutes studied on every day from `from` to `to`, a day without study as 0; only one kind of
 // study when `studyType` is given, and only one textbook's logs when `textbookId` is.
