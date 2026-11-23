@@ -193,3 +193,14 @@ export function busiestBar(bars: ChartBar[]) {
     undefined,
   );
 }
+
+// What each cell looks like by level (#347): empty, two tints of the text colour, then the ring and primary
+// colours. A level that is in the future draws nothing. The tests check that every level has its own look.
+export const heatCellStyle: Record<string, string> = {
+  '0': 'bg-muted outline outline-1 -outline-offset-1 outline-border',
+  '1': 'bg-[color-mix(in_oklch,var(--foreground)_9%,transparent)]',
+  '2': 'bg-[color-mix(in_oklch,var(--foreground)_18%,transparent)]',
+  '3': 'bg-ring',
+  '4': 'bg-primary',
+  future: 'bg-transparent',
+};

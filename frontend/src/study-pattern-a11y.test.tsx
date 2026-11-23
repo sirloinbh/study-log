@@ -1,10 +1,8 @@
-import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-
 import { screen, waitFor, within } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 
 import { StudyPattern } from './study-pattern';
+import { heatCellStyle } from './study-stats';
 import { render } from './test/render';
 
 test('the hour values can be found by accessible text', async () => {
@@ -27,12 +25,7 @@ test('the hour values can be found by accessible text', async () => {
   expect(within(list).getAllByText(/no study/)).toHaveLength(23);
 });
 
-test('heatmap levels 1 and 2 have different backgrounds', () => {
-  // Vitest empties imported CSS, so the stylesheet is read as text (tests run from frontend/).
-  const css = readFileSync(resolve(process.cwd(), 'src/style.css'), 'utf8');
-  const background = (level: number) =>
-    css.match(new RegExp(`\\.heat-cell\\.level-${level} \\{\\s*background: ([^;]+);`))?.[1];
-  expect(background(1)).toBeTruthy();
-  expect(background(2)).toBeTruthy();
-  expect(background(1)).not.toBe(background(2));
+test('every heatmap level has its own look, and the two tints differ', () => {
+  const levels = ['0', '1', '2', '3', '4', 'future'];
+  expect(new Set(levels.map((level) => heatCellStyle[level])).size).toBe(levels.length);
 });

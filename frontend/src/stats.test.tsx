@@ -241,40 +241,22 @@ const twoWeeks = {
 test('the heatmap shows each day in its band with a tooltip, by week columns', async () => {
   await openStats({ heatmap: twoWeeks });
   await screen.findByRole('img');
-  const weeks = Array.from(document.querySelectorAll('.heat-week'));
+  const weeks = Array.from(document.querySelectorAll('[data-week]'));
   expect(weeks).toHaveLength(2);
   const cells = (week: Element) =>
-    Array.from(week.querySelectorAll('.heat-cell')).map((n) =>
-      n.className.replace('heat-cell ', ''),
-    );
-  expect(cells(weeks[0])).toEqual([
-    'level-0',
-    'level-1',
-    'level-2',
-    'level-2',
-    'level-3',
-    'level-3',
-    'level-4',
-  ]);
+    Array.from(week.querySelectorAll('[data-level]')).map((n) => n.getAttribute('data-level'));
+  expect(cells(weeks[0])).toEqual(['0', '1', '2', '2', '3', '3', '4']);
   // Sunday to Tuesday, then the rest of this week is empty.
-  expect(cells(weeks[1])).toEqual([
-    'level-0',
-    'level-0',
-    'level-2',
-    'future',
-    'future',
-    'future',
-    'future',
-  ]);
+  expect(cells(weeks[1])).toEqual(['0', '0', '2', 'future', 'future', 'future', 'future']);
   expect(document.querySelector('[title="2026-10-09: 1 h 59 min"]')).not.toBeNull();
   // One summary for screen readers.
   expect(screen.getByRole('img')).toHaveAccessibleName(
     '2026-10-04 to 2026-10-13: 7 study days, total 7 h 23 min',
   );
   expect(document.body).toHaveTextContent(/7 study days · total 7 h 23 min/);
-  const legend = document.querySelector('.heat-legend')!;
+  const legend = screen.getByRole('list', { name: 'Intensity levels' });
   expect(
-    within(legend as HTMLElement)
+    within(legend)
       .getAllByRole('listitem')
       .map((n) => n.textContent),
   ).toEqual(['0 min', 'Under 30 min', '30 min–1 h', '1–2 h', '2 h or more']);
