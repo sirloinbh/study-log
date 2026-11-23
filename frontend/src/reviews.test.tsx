@@ -771,3 +771,28 @@ test('a failed load reports the error instead of saying nothing is due', async (
   expect(await screen.findByRole('alert')).toHaveTextContent('Could not load the reviews');
   expect(screen.queryByText('Nothing to review today')).toBeNull();
 });
+
+test('exercises due for another try are listed with the chapter reviews, even when there are none (#358)', async () => {
+  fakeApi({
+    'GET /api/reviews/today': {
+      body: {
+        today: '2026-11-23',
+        reviews: [],
+        exerciseReviews: [
+          {
+            exerciseId: 7,
+            step: 1,
+            dueDate: '2026-11-23',
+            number: '3',
+            body: 'Prove it.',
+            textbookTitle: 'Linear algebra',
+            contentTitle: 'Chapter 1',
+          },
+        ],
+      },
+    },
+  });
+  render(<Reviews />);
+  expect(await screen.findByText('Linear algebra > Chapter 1 · Problem 3')).toBeInTheDocument();
+  expect(screen.queryByText('Nothing to review today')).not.toBeInTheDocument();
+});

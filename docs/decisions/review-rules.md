@@ -79,3 +79,17 @@ Detailed rules:
 - A record whose type is review also creates review round 1 when it is completed, as in chapter 1.
 - When you pick a filter, even the total study time is calculated for that type. The review completion rate and the heatmap are independent of the filter.
 - The start of the all-time period is the first record date of the chosen type. So the daily average for all time can divide by a different number of days for each type. The card shows the period too.
+
+## 7. Reviews of exercises I got wrong
+
+User decision (#358, 2026-11-23): **After a wrong or hinted attempt the exercise is due in 1, 3, 7, then 14 days.** A clean correct retry moves it to the next step. Finishing the 14-day step ends the cycle. A wrong (or hinted) retry restarts at 1 day. They show in today's review list and in the menu badge.
+
+Detailed rules:
+
+- Attempts are recorded per exercise (#356). A "clean" attempt is a correct one with no hint. A wrong attempt, or one with a hint (even if correct), is not clean.
+- The days are counted from the date of the attempt that set the step, not from the previous due date: a wrong attempt on day 0 makes step 1 due on day 1. A clean correct attempt on day 1 makes step 2 due on day 4 (3 days later), then step 3 7 days after the next one, then step 4 14 days after that.
+- There is at most one running cycle per exercise (one row, `exercise_reviews`). A clean correct attempt on an exercise with no running cycle starts nothing.
+- A clean correct attempt before the due date still moves to the next step. Nothing is postponed or edited by hand for exercises (unlike chapter 3).
+- Deleting an attempt does not recalculate the cycle. Deleting the exercise deletes its cycle.
+- Due and overdue rows are listed in the same ranges as chapter reviews (today, this week, all) and counted in the badge, which becomes the number of chapter rounds plus exercises due today or earlier.
+- The exercise review rows are not part of the completion rate statistics in chapter 5.
