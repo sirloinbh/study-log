@@ -4,12 +4,15 @@ import { useState } from 'react';
 import { useBusy } from './busy';
 import {
   type Filters,
+  type ImportResult,
   listPath,
   type ProblemRow,
   type Result,
   resultLabels,
   type Site,
   siteLabels,
+  type SolvedProblem,
+  tierLabel,
 } from './coding';
 import { CodingProblemDetail } from './coding-problem-detail';
 import { CodingProblemForm } from './coding-problem-form';
@@ -17,9 +20,9 @@ import { Button } from './components/ui/button';
 import { ConfirmDialog } from './components/ui/confirm-dialog';
 import { Input } from './components/ui/input';
 import { NativeSelect } from './components/ui/native-select';
-import { type RequestError } from './lib/api';
+import { type RequestError, requestJson } from './lib/api';
 import { apiKey, useApiMutation, useApiQuery } from './lib/query';
-import { Loading } from './loading';
+import { ButtonSpinner, Loading } from './loading';
 
 type Notice = { kind: 'status' | 'alert'; text: string } | undefined;
 
@@ -80,6 +83,45 @@ export function CodingProblems({
 
   const invalid = (text: string) => setNotice({ kind: 'alert', text });
 
+  // Reads from solved.ac without changing anything saved, so it only needs the one-at-a-time guard.
+  const lookup = async (number: string): Promise<SolvedProblem | undefined> => {
+    nameNext('lookup');
+    if (!begin()) return undefined;
+    setNotice(undefined);
+    try {
+      const data = await requestJson<{ problem: SolvedProblem }>(
+        `/api/coding/solvedac/problems/${encodeURIComponent(number)}`,
+      );
+      setNotice({ kind: 'status', text: `Filled in from solved.ac: ${data.problem.title}` });
+      return data.problem;
+    } catch (failure) {
+      setNotice({ kind: 'alert', text: (failure as RequestError).message });
+      return undefined;
+    } finally {
+      end();
+    }
+  };
+
+  const importSolved = async () => {
+    nameNext('import');
+    if (!begin()) return;
+    setNotice(undefined);
+    try {
+      const result = await requestJson<ImportResult>('/api/coding/solvedac/import', {
+        method: 'POST',
+      });
+      setNotice({
+        kind: 'status',
+        text: `Imported from solved.ac: ${result.added} added, ${result.skipped} already recorded`,
+      });
+    } catch (failure) {
+      setNotice({ kind: 'alert', text: (failure as RequestError).message });
+    } finally {
+      await client.invalidateQueries({ queryKey: apiKey('/api/coding') });
+      end();
+    }
+  };
+
   return (
     <div className="coding">
       <section className="card" aria-label="Add a problem">
@@ -87,9 +129,11 @@ export function CodingProblems({
         <CodingProblemForm
           today={today}
           busy={busy}
+          action={action}
           spinning={action === 'add-problem'}
           onSubmit={addProblem}
           onInvalid={invalid}
+          onLookup={lookup}
         />
         {/* Always mounted so screen readers announce each new message. */}
         <p role="status" className="status">
@@ -100,6 +144,25 @@ export function CodingProblems({
             {notice.text}
           </p>
         )}
+      </section>
+
+      <section className="card" aria-label="Import">
+        <h2>Import from solved.ac</h2>
+        <p className="status">
+          Adds the Baekjoon problems your solved.ac account has solved. Problems already recorded
+          are skipped, so you can run it again.
+        </p>
+        <div className="actions">
+          <Button
+            type="button"
+            variant="outline"
+            disabled={busy}
+            onClick={() => void importSolved()}
+          >
+            <ButtonSpinner when={action === 'import'} />
+            Import solved problems
+          </Button>
+        </div>
       </section>
 
       <section className="card" aria-label="Problems">
@@ -156,6 +219,12 @@ export function CodingProblems({
                     <span>{problem.title}</span>
                   )}
                 </div>
+                {problem.level !== null && (
+                  <p className="log-memo">
+                    {tierLabel(problem.level)}
+                    {problem.tags.length > 0 && `, ${problem.tags.join(', ')}`}
+                  </p>
+                )}
                 <p className="log-memo">
                   {problem.attemptCount === 0
                     ? 'No attempts'

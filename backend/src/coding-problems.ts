@@ -111,6 +111,19 @@ export const problemInput = z
         .refine((value) => value.length >= 1, 'Enter the problem ID'),
       title,
       url: link.optional(),
+      // From solved.ac (#369): the tier and the tags.
+      level: z
+        .number({ error: 'The level format is invalid' })
+        .int('The level format is invalid')
+        .min(0, 'The level format is invalid')
+        .max(40, 'The level format is invalid')
+        .optional(),
+      tags: z
+        .array(z.string().regex(/^[a-z0-9_]{1,50}$/, 'A tag is lower-case letters, digits, or _'), {
+          error: 'The tags format is invalid',
+        })
+        .max(30, 'There can be at most 30 tags')
+        .default([]),
       // The first attempt, saved with the problem.
       attempt: attemptInput.optional(),
     },
@@ -162,7 +175,7 @@ export function defaultUrl(site: CodingSite, key: string) {
   return null;
 }
 
-const problemColumns = `p.id, p.site, p.problem_key AS "problemKey", p.title, p.url`;
+const problemColumns = `p.id, p.site, p.problem_key AS "problemKey", p.title, p.url, p.level, p.tags`;
 const attemptColumns = `id, attempt_date AS date, result, language, minutes, notes,
   study_log_id AS "studyLogId"`;
 
@@ -280,9 +293,10 @@ export function codingRoutes(pool: Pool, today: () => string) {
       const created = await inTransaction(pool, async (client) => {
         const url = input.url ?? defaultUrl(input.site, input.problemKey);
         const { rows } = await client.query<Problem & { url: string | null }>(
-          `INSERT INTO coding_problems (site, problem_key, title, url) VALUES ($1, $2, $3, $4)
-           RETURNING id, site, problem_key AS "problemKey", title, url`,
-          [input.site, input.problemKey, input.title, url],
+          `INSERT INTO coding_problems (site, problem_key, title, url, level, tags)
+           VALUES ($1, $2, $3, $4, $5, $6)
+           RETURNING id, site, problem_key AS "problemKey", title, url, level, tags`,
+          [input.site, input.problemKey, input.title, url, input.level ?? null, input.tags],
         );
         const problem = rows[0];
         await auditChange(req, res, client, 'create', 'coding_problem', problem.id, {
