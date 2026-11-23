@@ -44,8 +44,8 @@ test('nothing is requested until the panel is opened, then the history is listed
   show();
   const items = await screen.findAllByRole('listitem');
   expect(items.map((li) => li.textContent)).toEqual([
-    '2026-11-05 · CorrectDelete',
-    '2026-11-01 · Wrong · hint usedDelete',
+    '2026-11-05 · CorrectDeleteAsk Claude',
+    '2026-11-01 · Wrong · hint usedDeleteAsk Claude',
   ]);
 });
 
