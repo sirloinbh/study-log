@@ -5,6 +5,7 @@ import { types } from 'pg';
 
 import { tools } from './ai-tools.js';
 import { calendarRoutes } from './calendar.js';
+import { leetCodeRoutes } from './coding-leetcode.js';
 import { codingRoutes } from './coding-problems.js';
 import { solvedAcRoutes } from './coding-solvedac.js';
 import { refuseCrossSiteWrites } from './cross-site.js';
@@ -19,6 +20,7 @@ import { type FileStorage, s3Storage } from './file-storage.js';
 import { dataPortalHolidays, type HolidayFetcher } from './holidays.js';
 import { flashcardRoutes } from './keyword-flashcards.js';
 import { keywordRoutes } from './keywords.js';
+import { type LeetCodeClient, leetCodeClient } from './leetcode.js';
 import { claudeDrafter, type Drafter } from './retrospective-draft.js';
 import { retrospectiveRoutes } from './retrospectives.js';
 import { reviewRoutes } from './reviews.js';
@@ -60,6 +62,9 @@ export function createApp(
     solvedAcClient?: SolvedAcClient;
     // The solved.ac account to import from (SOLVEDAC_HANDLE) (#369).
     solvedAcHandle?: string;
+    leetCodeClient?: LeetCodeClient;
+    // The LeetCode account to import from (LEETCODE_USERNAME) (#370).
+    leetCodeUsername?: string;
   } = {},
 ) {
   const fileStorage = options.fileStorage ?? s3Storage();
@@ -104,6 +109,14 @@ export function createApp(
       pool,
       options.solvedAcClient ?? solvedAcClient(),
       () => options.solvedAcHandle ?? process.env.SOLVEDAC_HANDLE,
+    ),
+  );
+  app.use(
+    '/api/coding/leetcode',
+    leetCodeRoutes(
+      pool,
+      options.leetCodeClient ?? leetCodeClient(),
+      () => options.leetCodeUsername ?? process.env.LEETCODE_USERNAME,
     ),
   );
   app.use('/api/coding', codingRoutes(pool, today));

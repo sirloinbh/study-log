@@ -31,6 +31,8 @@ export type ProblemRow = {
   // From solved.ac for Baekjoon problems (#369).
   level: number | null;
   tags: string[];
+  // From LeetCode for LeetCode problems (#370).
+  difficulty: 'Easy' | 'Medium' | 'Hard' | null;
   attemptCount: number;
   totalMinutes: number;
   lastAttemptDate: string | null;

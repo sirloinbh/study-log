@@ -32,6 +32,7 @@ type Problem = {
   url: string | null;
   level?: number | null;
   tags?: string[];
+  difficulty?: string | null;
 };
 
 // In-memory coding API: problems with attempts, the latest attempt decides the list's result.
@@ -43,6 +44,7 @@ function server(initial: { problem: Problem; attempts: Attempt[] }[] = []) {
     return {
       level: null,
       tags: [],
+      difficulty: null,
       ...row.problem,
       attemptCount: row.attempts.length,
       totalMinutes: row.attempts.reduce((sum, a) => sum + (a.minutes ?? 0), 0),
@@ -66,6 +68,8 @@ function server(initial: { problem: Problem; attempts: Attempt[] }[] = []) {
       };
     if (base.startsWith('/api/coding/solvedac/problems/'))
       return { status: 503, body: { error: 'Could not reach solved.ac. Try again in a moment' } };
+    if (base === '/api/coding/leetcode/import' && method === 'POST')
+      return { body: { added: 4, skipped: 0, total: 4 } };
     if (base === '/api/coding/solvedac/import' && method === 'POST')
       return { body: { added: 2, skipped: 1, total: 3 } };
     const input = body as Record<string, unknown> | undefined;
@@ -330,5 +334,28 @@ describe('coding problem log', () => {
       'Master',
       undefined,
     ]);
+  });
+
+  test('imports recent LeetCode submissions and shows the difficulty in the list', async () => {
+    const api = server([
+      {
+        problem: {
+          id: 2,
+          site: 'leetcode',
+          problemKey: 'two-sum',
+          title: 'Two Sum',
+          url: null,
+          difficulty: 'Easy',
+        },
+        attempts: [],
+      },
+    ]);
+    render(<CodingProblems today={today} />);
+    expect(await screen.findByText('Easy')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Import recent LeetCode submissions' }));
+    expect(
+      await screen.findByText('Imported from LeetCode: 4 added, 0 already recorded'),
+    ).toBeTruthy();
+    expect(api.requests.some((r) => r.path === '/api/coding/leetcode/import')).toBe(true);
   });
 });

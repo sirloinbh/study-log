@@ -5022,6 +5022,46 @@
         }
       }
     },
+    "/api/coding/leetcode/import": {
+      "post": {
+        "summary": "Add the recent accepted LeetCode submissions of the configured user as solved problems; recorded ones are skipped",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Sign-in required (no session from the shared sign-in)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to an external service",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "An external service (sign-in, file storage, holidays, Claude) is unavailable or not configured",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/coding/problems/{id}/attempts": {
       "post": {
         "summary": "Add an attempt; studyLog also records a study log of the same length",

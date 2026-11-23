@@ -167,3 +167,48 @@ test('importing solved.ac problems twice adds them once', { skip: !url }, async 
     { solvedAcClient: client, solvedAcHandle: 'some_user' },
   );
 });
+
+test('importing LeetCode submissions twice adds them once', { skip: !url }, async (t) => {
+  const pool = new Pool({ connectionString: url });
+  const slugs = ['zz-test-import-one', 'zz-test-import-two'];
+  const cleanup = () =>
+    pool.query(`DELETE FROM coding_problems WHERE site = 'leetcode' AND problem_key = ANY($1)`, [
+      slugs,
+    ]);
+  await cleanup();
+  t.after(async () => {
+    await cleanup();
+    await pool.end();
+  });
+  const client = {
+    recentAccepted: async () => [
+      { slug: slugs[0], title: 'Import one', timestamp: 1700004600 },
+      { slug: slugs[1], title: 'Import two', timestamp: 1700100000 },
+    ],
+    difficulty: async () => 'Hard' as const,
+  };
+  await withApi(
+    pool,
+    async (call) => {
+      const first = await call('/api/coding/leetcode/import', { method: 'POST' });
+      assert.deepEqual(first.data, { added: 2, skipped: 0, total: 2 });
+      const second = await call('/api/coding/leetcode/import', { method: 'POST' });
+      assert.deepEqual(second.data, { added: 0, skipped: 2, total: 2 });
+      const { rows } = await pool.query(
+        `SELECT p.problem_key, p.difficulty, p.url, a.result, a.attempt_date
+         FROM coding_problems p JOIN coding_attempts a ON a.problem_id = p.id
+         WHERE p.site = 'leetcode' AND p.problem_key = ANY($1) ORDER BY p.problem_key`,
+        [slugs],
+      );
+      assert.equal(rows.length, 2, 'one attempt each, also after the second run');
+      assert.deepEqual(rows[0], {
+        problem_key: slugs[0],
+        difficulty: 'Hard',
+        url: `https://leetcode.com/problems/${slugs[0]}/`,
+        result: 'solved',
+        attempt_date: '2023-11-15',
+      });
+    },
+    { leetCodeClient: client, leetCodeUsername: 'some_user' },
+  );
+});

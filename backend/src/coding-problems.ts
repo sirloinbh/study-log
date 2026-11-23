@@ -175,7 +175,8 @@ export function defaultUrl(site: CodingSite, key: string) {
   return null;
 }
 
-const problemColumns = `p.id, p.site, p.problem_key AS "problemKey", p.title, p.url, p.level, p.tags`;
+const problemColumns = `p.id, p.site, p.problem_key AS "problemKey", p.title, p.url, p.level, p.tags,
+  p.difficulty`;
 const attemptColumns = `id, attempt_date AS date, result, language, minutes, notes,
   study_log_id AS "studyLogId"`;
 
