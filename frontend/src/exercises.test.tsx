@@ -531,6 +531,7 @@ describe('exercises', () => {
       'Problem #1 mark important',
       'Problem #1 edit',
       'Problem #1 delete',
+      'Problem #1 show attempts',
     ]);
   });
 
