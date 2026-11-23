@@ -12,7 +12,7 @@ After a wrong or hinted attempt the exercise is due in 1, 3, 7, then 14 days. A 
 
 | File                                                                                    | Change                                                                                                                                          |
 | --------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| `database/migrations/025_exercise_reviews.sql`                                          | `exercise_reviews`: one row per exercise while its cycle runs (step 1-4, due date), deleted with the exercise                                   |
+| `database/migrations/026_exercise_reviews.sql`                                          | `exercise_reviews`: one row per exercise while its cycle runs (step 1-4, due date), deleted with the exercise                                   |
 | `backend/src/exercise-reviews.ts` (new)                                                 | The step rule (`nextExerciseReview`), applying it in the attempt's transaction, and the list and count queries                                  |
 | `backend/src/exercise-attempts.ts`                                                      | Saving an attempt updates the review in the same transaction                                                                                    |
 | `backend/src/reviews.ts` (single spot), `openapi.ts`, `docs/openapi.json`               | The three list routes also return `exerciseReviews`; the badge count adds them                                                                  |
@@ -24,7 +24,7 @@ After a wrong or hinted attempt the exercise is due in 1, 3, 7, then 14 days. A 
 
 - Days are counted from the date of the attempt that sets the step (a wrong attempt on day 0 makes step 1 due on day 1; a clean correct one on day 1 makes step 2 due on day 4).
 - Deleting an attempt does not recalculate the cycle; exercise reviews are not postponed by hand and are not in the completion-rate statistics.
-- Migration number 025 is the next free one; renumber on a clash at merge.
+- Migration number 026 is the next free one; renumber on a clash at merge.
 
 ## Verification
 
