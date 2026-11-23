@@ -150,7 +150,7 @@ export function Retrospectives({ today }: { today: string }) {
     <div className="retrospectives">
       <section className="card" aria-label="Write a retrospective">
         <div className="calendar-head">
-          <div className="period-filter" role="group" aria-label="Retrospective kind">
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Retrospective kind">
             {(['weekly', 'monthly'] as const).map((value) => (
               <Button
                 key={value}
