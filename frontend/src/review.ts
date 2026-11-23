@@ -36,3 +36,14 @@ export function reviewTitle(review: Review) {
       : ` · ${contentLabel({ number: review.contentNumber ?? '', title: review.contentTitle })}`;
   return `${review.textbookTitle}${content}`;
 }
+
+// An exercise I got wrong that is due for another try (#358).
+export type ExerciseReview = {
+  exerciseId: number;
+  step: number;
+  dueDate: string;
+  number: string;
+  body: string;
+  textbookTitle: string;
+  contentTitle: string;
+};

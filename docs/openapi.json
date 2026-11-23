@@ -3326,7 +3326,7 @@
     },
     "/api/reviews/today": {
       "get": {
-        "summary": "List open review rounds due today or earlier",
+        "summary": "List open review rounds due today or earlier, with the exercises due for another try (exerciseReviews)",
         "responses": {
           "200": {
             "description": "Success"

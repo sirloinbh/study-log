@@ -4,6 +4,7 @@ import { z } from 'zod/v4';
 
 import { auditChange } from './audit-log.js';
 import { calendarDate } from './dates.js';
+import { syncExerciseReview } from './exercise-reviews.js';
 import { inTransaction } from './sql.js';
 import { parseId } from './standard/http.js';
 import { missingOrInvalid } from './validation.js';
@@ -55,16 +56,22 @@ export function exerciseAttemptRoutes(pool: Pool, today: () => string) {
   router.post('/', async (req, res) => {
     const id = parseId((req.params as Record<string, string>).id, 'exercise');
     const input = attemptInput.parse(req.body);
+    const date = input.date ?? today();
     try {
       const attempt = await inTransaction(pool, async (client) => {
         const { rows } = await client.query(
           `INSERT INTO exercise_attempts (exercise_id, attempt_date, result, hint_used, note)
            VALUES ($1, $2, $3, $4, $5) RETURNING ${columns}`,
-          [id, input.date ?? today(), input.result, input.hintUsed, input.note],
+          [id, date, input.result, input.hintUsed, input.note],
         );
         await auditChange(req, res, client, 'create', 'exercise_attempt', rows[0].id, {
           exerciseId: id,
           result: input.result,
+        });
+        await syncExerciseReview(client, id, {
+          date,
+          result: input.result,
+          hintUsed: input.hintUsed,
         });
         return rows[0];
       });

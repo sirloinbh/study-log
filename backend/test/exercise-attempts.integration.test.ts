@@ -158,3 +158,87 @@ test(
     });
   },
 );
+
+test(
+  'attempts drive the review cycle: 1, 3, 7, 14 days, restart on a wrong try (#358)',
+  { skip: !url },
+  async (t) => {
+    const pool = new Pool({ connectionString: url });
+    const prefix = '[통합테스트 문제복습]';
+    const cleanup = () => pool.query('DELETE FROM textbooks WHERE title LIKE $1', [`${prefix}%`]);
+    await cleanup();
+    t.after(async () => {
+      await cleanup();
+      await pool.end();
+    });
+
+    await withApi(
+      pool,
+      async (call) => {
+        const post = async (path: string, body: unknown, field: string) =>
+          ((await call(path, { method: 'POST', body })).data[field] as { id: number }).id;
+        const book = await post('/api/textbooks', { title: `${prefix} 책` }, 'textbook');
+        const chapter = await post(`/api/textbooks/${book}/contents`, { title: '1장' }, 'content');
+        const exercise = await post(
+          `/api/textbooks/${book}/contents/${chapter}/exercises`,
+          { number: '3', body: '복습할 문제' },
+          'exercise',
+        );
+        const attempt = (body: object) =>
+          call(`/api/exercises/${exercise}/attempts`, { method: 'POST', body });
+        const mine = async (range = 'all') =>
+          (
+            (await call(`/api/reviews/${range}`)).data.exerciseReviews as {
+              exerciseId: number;
+              step: number;
+              dueDate: string;
+            }[]
+          ).filter((r) => r.exerciseId === exercise);
+        const count = async () => (await call('/api/reviews/today/count')).data.count as number;
+
+        // A clean correct attempt on a never-wrong exercise schedules nothing.
+        await attempt({ result: 'correct', date: '2026-11-01' });
+        assert.deepEqual(await mine(), []);
+
+        await attempt({ result: 'wrong', date: '2026-11-10' });
+        assert.deepEqual(
+          (await mine()).map((r) => [r.step, r.dueDate]),
+          [[1, '2026-11-11']],
+        );
+        // Due today (2026-11-23 in the test clock) or earlier shows in today's list and the badge.
+        assert.equal((await mine('today')).length, 1);
+        const before = await count();
+        assert.ok(before >= 1);
+
+        await attempt({ result: 'correct', date: '2026-11-11' });
+        await attempt({ result: 'correct', date: '2026-11-14' });
+        assert.deepEqual(
+          (await mine()).map((r) => [r.step, r.dueDate]),
+          [[3, '2026-11-21']],
+        );
+        // A hinted retry restarts the cycle.
+        await attempt({ result: 'correct', hintUsed: true, date: '2026-11-22' });
+        assert.deepEqual(
+          (await mine()).map((r) => [r.step, r.dueDate]),
+          [[1, '2026-11-23']],
+        );
+        // Four clean attempts finish it.
+        for (const date of ['2026-11-23', '2026-11-24', '2026-11-27', '2026-12-04']) {
+          await attempt({ result: 'correct', date });
+        }
+        assert.deepEqual(await mine(), []);
+        assert.equal(await count(), before - 1);
+
+        // Deleting the exercise removes a running cycle.
+        await attempt({ result: 'wrong', date: '2026-11-23' });
+        assert.equal((await mine()).length, 1);
+        await call(`/api/exercises/${exercise}`, { method: 'DELETE' });
+        const left = await pool.query('SELECT 1 FROM exercise_reviews WHERE exercise_id = $1', [
+          exercise,
+        ]);
+        assert.equal(left.rowCount, 0);
+      },
+      { today: () => '2026-11-23' },
+    );
+  },
+);

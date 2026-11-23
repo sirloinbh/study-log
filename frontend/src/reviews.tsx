@@ -3,16 +3,24 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useBusy } from './busy';
 import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
+import { ExerciseReviewList } from './exercise-review-list';
 import type { RequestError } from './lib/api';
 import { apiKey, useApiMutation, useApiQuery } from './lib/query';
 import { ButtonSpinner, Loading } from './loading';
 import { Memo } from './memo';
 import { plural } from './plural';
-import { overdueDays, type Review, type ReviewRange, reviewRanges, reviewTitle } from './review';
+import {
+  type ExerciseReview,
+  overdueDays,
+  type Review,
+  type ReviewRange,
+  reviewRanges,
+  reviewTitle,
+} from './review';
 
 // `reviewId` is the review an alert is about.
 type Notice = { kind: 'status' | 'alert'; text: string; reviewId?: number } | undefined;
-type Listed = { today: string; reviews: Review[] };
+type Listed = { today: string; reviews: Review[]; exerciseReviews?: ExerciseReview[] };
 type Completed = { next: { round: number; dueDate: string } | null };
 type Moved = { dueDate: string };
 
@@ -258,9 +266,9 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
         )}
         {shown === undefined ? (
           !error && <Loading label="Loading the reviews" />
-        ) : shown.reviews.length === 0 ? (
+        ) : shown.reviews.length === 0 && !shown.exerciseReviews?.length ? (
           <p className="status">{empty}</p>
-        ) : (
+        ) : shown.reviews.length === 0 ? null : (
           <ul className="log-list">
             {shown.reviews.map((review) => {
               const title = reviewTitle(review);
@@ -358,6 +366,16 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
               );
             })}
           </ul>
+        )}
+        {shown && (
+          <ExerciseReviewList
+            items={shown.exerciseReviews ?? []}
+            today={shown.today}
+            onChanged={() => {
+              void load();
+              onChange?.();
+            }}
+          />
         )}
       </section>
     </div>

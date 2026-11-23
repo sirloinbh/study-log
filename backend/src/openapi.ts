@@ -78,7 +78,8 @@ export const operations: Record<string, Operation> = {
   'DELETE /api/study-logs/:id': { summary: 'Delete a study log', status: [204, 400, 404] },
 
   'GET /api/reviews/today': {
-    summary: 'List open review rounds due today or earlier',
+    summary:
+      'List open review rounds due today or earlier, with the exercises due for another try (exerciseReviews)',
     status: [200],
   },
   'GET /api/reviews/week': {

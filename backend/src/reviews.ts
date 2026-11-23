@@ -4,6 +4,7 @@ import { z } from 'zod/v4';
 
 import { auditChange } from './audit-log.js';
 import { calendarDate, datePlusDays } from './dates.js';
+import { countExerciseReviews, listExerciseReviews } from './exercise-reviews.js';
 import { inTransaction } from './sql.js';
 import { parseId } from './standard/http.js';
 import { missingOrInvalid } from './validation.js';
@@ -138,7 +139,12 @@ export function reviewRoutes(pool: Pool, today: () => string) {
          ORDER BY r.due_date, r.id`,
         [until(date)],
       );
-      res.json({ today: date, reviews: rows });
+      // The exercises I got wrong that are due too (#358), listed beside the study log reviews.
+      res.json({
+        today: date,
+        reviews: rows,
+        exerciseReviews: await listExerciseReviews(pool, until(date)),
+      });
     });
   listRoute('/today', (date) => date);
   listRoute('/week', weekEnd);
@@ -152,7 +158,7 @@ export function reviewRoutes(pool: Pool, today: () => string) {
        WHERE completed_on IS NULL AND due_date <= $1`,
       [today()],
     );
-    res.json({ count: rows[0].count });
+    res.json({ count: rows[0].count + (await countExerciseReviews(pool, today())) });
   });
 
   // Completes a round for good and creates the next one, due from today.
