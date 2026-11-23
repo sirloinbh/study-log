@@ -10,6 +10,8 @@
 # replaced the container (.errors-before-deploy.log, emptied after a send). remote-deploy.sh saves with
 # the same start time, so a container that ran across a report is not counted twice (#644).
 # The line gets errors=<N> and, when N > 0, up to 5 "<requestId> <status> <path>" entries, never a message.
+# Sign-ins (#1089): a service that logs "event":"sign_in" lines (shared-auth) also gets signins=<N> refused=<M>
+# from the same window and saved file; repos without such lines get no sign-in field.
 # Thresholds (server .env, optional): REPORT_MEMORY_PERCENT (default 85), REPORT_DISK_PERCENT (default 90),
 # REPORT_ERROR_LIMIT (default 0: any error fails the day).
 set -euo pipefail
@@ -46,13 +48,12 @@ if [ -f .report-last-sent ]; then
 fi
 started=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
-error_lines() {
+api_lines() {
   local id
   # -a: a crashed api container still has its logs. oneoff=False: not a leftover `docker compose run` (migrations).
   # 2>&1: stdout and stderr, both kept by the log driver.
   id=$(project_ids -a --filter label=com.docker.compose.service=api --filter label=com.docker.compose.oneoff=False | head -n 1)
-  { cat .errors-before-deploy.log 2> /dev/null || true; if [ -n "$id" ]; then docker logs --since "$since" --until "$started" "$id" 2>&1 || true; fi; } |
-    { grep -F '"level":"error"' || true; }
+  { cat .errors-before-deploy.log 2> /dev/null || true; if [ -n "$id" ]; then docker logs --since "$since" --until "$started" "$id" 2>&1 || true; fi; }
 }
 # "<requestId> <status> <path>" for the first 5 request IDs; "-" for a field a line does not have.
 # An unexpected 500 writes two error lines with one ID (the handler and the request line): both
@@ -68,15 +69,25 @@ error_entries() {
   ' <<< "$1"
 }
 error_count() { if [ -z "$1" ]; then echo 0; else printf '%s\n' "$1" | awk 'END { print NR }'; fi; }
+# " signins=<N> refused=<M>" from the sign-in lines, or nothing when there are none.
+signin_text() {
+  [ -n "$1" ] || return 0
+  awk '/"outcome":"success"/ { s++ } /"outcome":"refused_/ { r++ } END { printf " signins=%d refused=%d", s, r }' <<< "$1"
+}
 
 line() {
   local failed="" errors_text=" errors=$error_total"
   if [ -f .autodeploy-failed ]; then failed=" autodeploy-failed=$(cat .autodeploy-failed)"; fi
   if [ "$error_total" -gt 0 ]; then errors_text="$errors_text [$(error_entries "$error_source")]"; fi
-  printf 'memory=%s%% disk=%s%% deployed=%s%s%s containers: %s\n' "$(memory_percent)" "$(disk_percent)" "$(cat .deployed 2>/dev/null || echo none)" "$failed" "$errors_text" "$(containers)"
+  printf 'memory=%s%% disk=%s%% deployed=%s%s%s%s containers: %s\n' "$(memory_percent)" "$(disk_percent)" "$(cat .deployed 2>/dev/null || echo none)" "$failed" "$errors_text" "$(signin_text "$signin_source")" "$(containers)"
 }
 
-error_source=$(error_lines)
+# The api lines go to a temporary file once (a day of logs can be megabytes), then each count reads it.
+lines_file=$(mktemp)
+trap 'rm -f "$lines_file"' EXIT
+api_lines > "$lines_file"
+error_source=$(grep -F '"level":"error"' "$lines_file" || true)
+signin_source=$(grep -F '"event":"sign_in"' "$lines_file" || true)
 error_total=$(error_count "$error_source")
 
 case "${1:-}" in
@@ -86,10 +97,13 @@ case "${1:-}" in
     echo "$text"
     memory_limit=$(env_value REPORT_MEMORY_PERCENT)
     disk_limit=$(env_value REPORT_DISK_PERCENT)
+    # A value like 90% would make [ -gt ] fail and silently turn the alert off: use the default instead.
+    case "$memory_limit" in '' | *[!0-9]*) memory_limit=85 ;; esac
+    case "$disk_limit" in '' | *[!0-9]*) disk_limit=90 ;; esac
     error_limit=$(env_value REPORT_ERROR_LIMIT)
     case "$error_limit" in '' | *[!0-9]*) error_limit=0 ;; esac
     status=ok
-    if [ "$(memory_percent)" -gt "${memory_limit:-85}" ] || [ "$(disk_percent)" -gt "${disk_limit:-90}" ]; then status=fail; fi
+    if [ "$(memory_percent)" -gt "$memory_limit" ] || [ "$(disk_percent)" -gt "$disk_limit" ]; then status=fail; fi
     if [ "$error_total" -gt "$error_limit" ]; then status=fail; fi
     # The saved lines are counted once; the running container keeps its own logs. The next report
     # starts its window where this one started, so no line is counted twice or skipped.
