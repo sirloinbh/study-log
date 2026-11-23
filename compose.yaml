@@ -42,6 +42,10 @@ services:
       AWS_REGION: ${AWS_REGION:-}
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:-}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY:-}
+      # Daily review reminder email through AWS SES (#365); off unless both addresses are set.
+      REMINDER_EMAIL_TO: ${REMINDER_EMAIL_TO:-}
+      REMINDER_EMAIL_FROM: ${REMINDER_EMAIL_FROM:-}
+      SES_REGION: ${SES_REGION:-}
       # #221: the shared sign-in (sirloinbh/shared-auth) checks each /api session on its network.
       AUTH_INTERNAL_URL: ${AUTH_INTERNAL_URL:-http://shared-auth-api:3110}
       # shared-ai's public key; /internal/tools is served only when it is set (project-standards docs/ai-tools.md).

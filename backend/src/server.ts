@@ -1,5 +1,7 @@
 import { createApp } from './app.js';
 import { connectPool } from './pool.js';
+import { sesSender } from './reminder-sender.js';
+import { reminderConfig, startReminderJob } from './reminders.js';
 import { listenHost, sharedAuth } from './standard/auth.js';
 
 const pool = connectPool(process.env.DATABASE_URL);
@@ -12,8 +14,12 @@ const server = createApp(pool, { auth, toolsPublicKey: process.env.AI_TOOLS_PUBL
   host,
   () => console.log(`API http://${host}:${port}`),
 );
-process.on('SIGTERM', () =>
+// The daily review reminder email (#365); off unless both addresses are set.
+const reminder = reminderConfig();
+const stopReminder = reminder ? startReminderJob(pool, sesSender(), reminder) : undefined;
+process.on('SIGTERM', () => {
+  stopReminder?.();
   server.close(() => {
     void pool.end();
-  }),
-);
+  });
+});
