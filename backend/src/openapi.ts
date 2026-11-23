@@ -5,6 +5,13 @@ import { z } from 'zod/v4';
 
 import { calendarQuery } from './calendar.js';
 import {
+  attemptInput,
+  attemptUpdateInput,
+  problemInput,
+  problemListQuery,
+  problemUpdateInput,
+} from './coding-problems.js';
+import {
   answerInput,
   answersInput,
   exerciseBulkInput,
@@ -113,6 +120,42 @@ export const operations: Record<string, Operation> = {
     status: [200, 400, 404, 409],
   },
   'DELETE /api/keywords/:id': { summary: 'Delete a keyword', status: [204, 400, 404] },
+
+  'GET /api/coding/problems': {
+    summary: 'List coding problems with attempt counts; result and dates match the latest attempt',
+    query: problemListQuery,
+    status: [200, 400],
+  },
+  'GET /api/coding/problems/:id': {
+    summary: 'Get a problem with its attempts',
+    status: [200, 400, 404],
+  },
+  'POST /api/coding/problems': {
+    summary:
+      'Add a problem (site and ID are unique), with a first attempt and optionally a study log',
+    body: ['CodingProblem', problemInput],
+    status: [201, 400, 409],
+  },
+  'PUT /api/coding/problems/:id': {
+    summary: 'Change the title and link of a problem',
+    body: ['CodingProblemUpdate', problemUpdateInput],
+    status: [200, 400, 404],
+  },
+  'DELETE /api/coding/problems/:id': {
+    summary: 'Delete a problem and its attempts; study logs made from them stay',
+    status: [204, 400, 404],
+  },
+  'POST /api/coding/problems/:id/attempts': {
+    summary: 'Add an attempt; studyLog also records a study log of the same length',
+    body: ['CodingAttempt', attemptInput],
+    status: [201, 400, 404],
+  },
+  'PUT /api/coding/attempts/:id': {
+    summary: 'Replace an attempt; a left-out date keeps the stored date',
+    body: ['CodingAttemptUpdate', attemptUpdateInput],
+    status: [200, 400, 404],
+  },
+  'DELETE /api/coding/attempts/:id': { summary: 'Delete an attempt', status: [204, 400, 404] },
 
   'GET /api/stats/study-time': {
     summary: 'Get study time series and totals for a period, by study type or textbook',
