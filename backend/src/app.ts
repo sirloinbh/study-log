@@ -5,6 +5,13 @@ import { types } from 'pg';
 
 import { tools } from './ai-tools.js';
 import { calendarRoutes } from './calendar.js';
+import {
+  type CalendarSettings,
+  calendarSyncHook,
+  calendarSyncRoutes,
+  settingsFromEnv,
+  syncRunner,
+} from './calendar-sync.js';
 import { leetCodeRoutes } from './coding-leetcode.js';
 import { codingRoutes } from './coding-problems.js';
 import { solvedAcRoutes } from './coding-solvedac.js';
@@ -17,6 +24,7 @@ import { contentExerciseRoutes, exerciseRoutes, textbookExerciseRoutes } from '.
 import { exportRoutes } from './export.js';
 import { claudeExtractor, type Extractor } from './extraction.js';
 import { type FileStorage, s3Storage } from './file-storage.js';
+import { type GoogleCalendarClient, googleCalendarClient } from './google-calendar.js';
 import { dataPortalHolidays, type HolidayFetcher } from './holidays.js';
 import { flashcardRoutes } from './keyword-flashcards.js';
 import { keywordRoutes } from './keywords.js';
@@ -65,6 +73,11 @@ export function createApp(
     leetCodeClient?: LeetCodeClient;
     // The LeetCode account to import from (LEETCODE_USERNAME) (#370).
     leetCodeUsername?: string;
+    // Google Calendar sync (#366): a stand-in client in tests, the settings (else read from the env),
+    // and how long a change waits before it syncs.
+    googleCalendarClient?: GoogleCalendarClient;
+    calendarSettings?: () => CalendarSettings;
+    calendarSyncDelayMs?: number;
   } = {},
 ) {
   const fileStorage = options.fileStorage ?? s3Storage();
@@ -89,6 +102,24 @@ export function createApp(
   // #221: the shared sign-in guards every /api route except /api/health, before any route registers.
   if (options.auth) app.use('/api', options.auth);
   app.get('/api/me', meHandler);
+  // #366: a change to schedules, reviews or study logs (which create reviews) syncs the Google calendar.
+  const calendarClient = options.googleCalendarClient ?? googleCalendarClient();
+  const calendarSettings = options.calendarSettings ?? (() => settingsFromEnv());
+  const calendarRunner = syncRunner(
+    pool,
+    calendarClient,
+    calendarSettings,
+    today,
+    options.calendarSyncDelayMs,
+  );
+  app.use(
+    ['/api/schedules', '/api/reviews', '/api/study-logs', '/api/study-timer'],
+    calendarSyncHook(pool, calendarRunner),
+  );
+  app.use(
+    '/api/calendar-sync',
+    calendarSyncRoutes(pool, calendarClient, calendarSettings, calendarRunner),
+  );
   // Moves overdue schedule days once a day, after the first schedule response, so no read writes (#270).
   if (options.scheduleCatchUp !== false) app.use('/api/schedules', dailyCatchUp(pool, today));
   app.get('/api/health', async (_req, res) => {
