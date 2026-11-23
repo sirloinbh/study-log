@@ -100,7 +100,7 @@ test('the calendar shows this month from Sunday with each day’s study time', a
   await open(logs);
   expect(card()).toHaveTextContent(/October 2026/);
   // 2026-10-01 is a Thursday: four empty slots (Sun to Wed) before it (#96).
-  const grid = card().querySelector('.calendar-grid')!;
+  const grid = card().querySelector('[data-calendar-grid]')!;
   const slots = Array.from(grid.children).map((n) => n.tagName);
   // Seven weekday names (Sunday first), then four empty slots, then the 1st.
   expect(slots.slice(7, 12)).toEqual(['SPAN', 'SPAN', 'SPAN', 'SPAN', 'BUTTON']);
@@ -109,7 +109,7 @@ test('the calendar shows this month from Sunday with each day’s study time', a
   const todayButton = dayButton(today);
   expect(todayButton).toHaveAccessibleName('2026-10-22, studied 1 h 30 min, 2 logs');
   expect(todayButton).toHaveTextContent(/1\.5 h/);
-  expect(todayButton.className).toMatch(/today/);
+  expect(within(todayButton).getByText('22')).toHaveClass('font-bold');
   expect(todayButton).toHaveAttribute('aria-pressed', 'true');
   expect(dayButton('2026-10-02')).toHaveAccessibleName('2026-10-02, no study, 0 logs');
   // Today's logs are listed under the calendar.

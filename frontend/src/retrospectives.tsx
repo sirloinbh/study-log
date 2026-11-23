@@ -149,7 +149,7 @@ export function Retrospectives({ today }: { today: string }) {
   return (
     <div className="retrospectives">
       <section className="card" aria-label="Write a retrospective">
-        <div className="calendar-head">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap gap-2" role="group" aria-label="Retrospective kind">
             {(['weekly', 'monthly'] as const).map((value) => (
               <Button
