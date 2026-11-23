@@ -139,6 +139,15 @@ export const operations: Record<string, Operation> = {
   },
   'DELETE /api/keywords/:id': { summary: 'Delete a keyword', status: [204, 400, 404] },
 
+  'GET /api/coding/solvedac/problems/:number': {
+    summary: 'Look up a Baekjoon problem on solved.ac (title, tier, tags) to fill in the form',
+    status: [200, 400, 404, 503],
+  },
+  'POST /api/coding/solvedac/import': {
+    summary:
+      'Add the Baekjoon problems the configured solved.ac handle has solved; recorded ones are skipped',
+    status: [200, 503],
+  },
   'GET /api/coding/problems': {
     summary: 'List coding problems with attempt counts; result and dates match the latest attempt',
     query: problemListQuery,
