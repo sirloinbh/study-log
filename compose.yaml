@@ -34,6 +34,8 @@ services:
       HOLIDAY_API_KEY: ${HOLIDAY_API_KEY:-}
       # The solved.ac account to import from (#369); without it only the import fails.
       SOLVEDAC_HANDLE: ${SOLVEDAC_HANDLE:-}
+      # The LeetCode account to import from (#370); without it only the import fails.
+      LEETCODE_USERNAME: ${LEETCODE_USERNAME:-}
       # Exercise files in S3 (#28); without the bucket and region only file requests fail. Empty
       # keys fall through to the server's IAM role.
       FILE_BUCKET: ${FILE_BUCKET:-}

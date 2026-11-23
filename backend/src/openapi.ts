@@ -196,6 +196,11 @@ export const operations: Record<string, Operation> = {
       'Add the Baekjoon problems the configured solved.ac handle has solved; recorded ones are skipped',
     status: [200, 503],
   },
+  'POST /api/coding/leetcode/import': {
+    summary:
+      'Add the recent accepted LeetCode submissions of the configured user as solved problems; recorded ones are skipped',
+    status: [200, 503],
+  },
   'GET /api/coding/problems': {
     summary: 'List coding problems with attempt counts; result and dates match the latest attempt',
     query: problemListQuery,

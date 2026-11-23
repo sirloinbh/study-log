@@ -102,17 +102,16 @@ export function CodingProblems({
     }
   };
 
-  const importSolved = async () => {
-    nameNext('import');
+  // The two imports differ only in the route and the wording.
+  const importFrom = async (name: string, route: string, source: string) => {
+    nameNext(name);
     if (!begin()) return;
     setNotice(undefined);
     try {
-      const result = await requestJson<ImportResult>('/api/coding/solvedac/import', {
-        method: 'POST',
-      });
+      const result = await requestJson<ImportResult>(route, { method: 'POST' });
       setNotice({
         kind: 'status',
-        text: `Imported from solved.ac: ${result.added} added, ${result.skipped} already recorded`,
+        text: `Imported from ${source}: ${result.added} added, ${result.skipped} already recorded`,
       });
     } catch (failure) {
       setNotice({ kind: 'alert', text: (failure as RequestError).message });
@@ -121,6 +120,9 @@ export function CodingProblems({
       end();
     }
   };
+  const importSolved = () => importFrom('import', '/api/coding/solvedac/import', 'solved.ac');
+  const importLeetCode = () =>
+    importFrom('import-leetcode', '/api/coding/leetcode/import', 'LeetCode');
 
   return (
     <div className="coding">
@@ -161,6 +163,15 @@ export function CodingProblems({
           >
             <ButtonSpinner when={action === 'import'} />
             Import solved problems
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={busy}
+            onClick={() => void importLeetCode()}
+          >
+            <ButtonSpinner when={action === 'import-leetcode'} />
+            Import recent LeetCode submissions
           </Button>
         </div>
       </section>
@@ -219,6 +230,7 @@ export function CodingProblems({
                     <span>{problem.title}</span>
                   )}
                 </div>
+                {problem.difficulty !== null && <p className="log-memo">{problem.difficulty}</p>}
                 {problem.level !== null && (
                   <p className="log-memo">
                     {tierLabel(problem.level)}

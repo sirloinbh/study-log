@@ -8,6 +8,7 @@ import type { Feedbacker } from '../src/exercise-feedback.js';
 import type { Extractor } from '../src/extraction.js';
 import type { FileStorage } from '../src/file-storage.js';
 import type { HolidayFetcher } from '../src/holidays.js';
+import type { LeetCodeClient } from '../src/leetcode.js';
 import type { Drafter } from '../src/retrospective-draft.js';
 import type { SolvedAcClient } from '../src/solvedac.js';
 import type { Translator } from '../src/translation.js';
@@ -127,6 +128,8 @@ export async function withApi(
     scheduleCatchUp?: boolean;
     solvedAcClient?: SolvedAcClient;
     solvedAcHandle?: string;
+    leetCodeClient?: LeetCodeClient;
+    leetCodeUsername?: string;
   } = {},
 ) {
   const { server, port } = await openFetchablePort(async () => {
@@ -178,9 +181,19 @@ export async function withApi(
         throw new Error('tests must not call solved.ac');
       },
     };
+    // Nor LeetCode (#370).
+    const leetCode: LeetCodeClient = options.leetCodeClient ?? {
+      recentAccepted: async () => {
+        throw new Error('tests must not call LeetCode');
+      },
+      difficulty: async () => {
+        throw new Error('tests must not call LeetCode');
+      },
+    };
     const server = createApp(withTransactions(pool), {
       ...options,
       solvedAcClient: solvedAc,
+      leetCodeClient: leetCode,
       translator,
       drafter,
       extractor,
