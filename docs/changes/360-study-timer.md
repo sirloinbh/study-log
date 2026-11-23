@@ -7,7 +7,7 @@
 
 ## What changed
 
-- `database/migrations/025_study_timer.sql`: table `study_timer` with at most one row (`id = 1`): `started_at`, `paused_at`, `paused_seconds`.
+- `database/migrations/026_study_timer.sql`: table `study_timer` with at most one row (`id = 1`): `started_at`, `paused_at`, `paused_seconds`.
 - `backend/src/study-timer.ts`, mounted at `/api/study-timer`: `GET` (the timer with its studied seconds, or null), `POST /start`, `/pause`, `/resume`, `/stop` (creates a done study log with its first review, then removes the timer), `DELETE` (cancel). The time is counted in the database clock, so a reload or another tab shows the same value. A second start, a pause without a timer and similar give 409; stopping under a minute or over 23 h 59 min gives 400 and keeps the timer (the log table allows 1 to 1439 minutes).
 - `docs/openapi.json` and the operation table list the six routes. Every write is audited.
 - Frontend `study-timer.tsx`: a "Study timer" card at the top of the study log page with start, pause, resume, stop and save, and discard (behind the shared confirm dialog). The display counts seconds since the last server answer. Stopping reloads the recent list, the calendar and the review badge.
