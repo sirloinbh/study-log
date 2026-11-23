@@ -12,6 +12,7 @@ import {
 } from './exercise';
 import { ExerciseActions } from './exercise-actions';
 import { ExerciseAnswerView } from './exercise-answer';
+import { ExerciseAttempts } from './exercise-attempts';
 import { ExerciseExtraction } from './exercise-extraction';
 import { ExerciseFormView } from './exercise-form';
 import { ExerciseToolbar } from './exercise-toolbar';
@@ -395,6 +396,7 @@ export function Exercises({
                       setDeleting({ contentId: exercise.contentId, id: exercise.id })
                     }
                   />
+                  <ExerciseAttempts exerciseId={exercise.id} label={label} disabled={busy} />
                 </li>
               );
             })}

@@ -11,6 +11,16 @@ export type Exercise = {
 
 export type ExerciseForm = Pick<Exercise, 'number' | 'body' | 'important'>;
 
+// One try at an exercise (#356).
+export type ExerciseAttempt = {
+  id: number;
+  exerciseId: number;
+  date: string;
+  result: 'correct' | 'wrong';
+  hintUsed: boolean;
+  note: string;
+};
+
 export type ExerciseAnswer = { exerciseId: number; body: string };
 
 // The Korean translation of an exercise and its answer (#31). `stale`: the exercise or its answer
