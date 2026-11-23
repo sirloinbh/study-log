@@ -4,6 +4,7 @@ import {
   CalendarCheck,
   CalendarDays,
   ChartColumn,
+  CircleX,
   NotebookPen,
   NotebookText,
   Settings2,
@@ -27,6 +28,7 @@ import { AccountActions, SignInGate } from './sign-in';
 import { Stats } from './stats';
 import { StudyLogs } from './study-logs';
 import { Textbooks } from './textbooks';
+import { WrongExercises } from './wrong-exercises';
 
 // Every page URL lives here (central docs/directory-rules.md). The study log is the first page.
 const pages = {
@@ -35,6 +37,7 @@ const pages = {
   reviews: '/reviews',
   textbooks: '/textbooks',
   keywords: '/keywords',
+  wrongExercises: '/wrong-exercises',
   stats: '/stats',
   retrospectives: '/retrospectives',
   settings: '/settings',
@@ -47,6 +50,7 @@ const nav: NavItem[] = [
   { to: pages.reviews, label: 'Reviews', icon: CalendarCheck },
   { to: pages.textbooks, label: 'Textbooks', icon: BookOpen },
   { to: pages.keywords, label: 'Keywords', icon: Tags },
+  { to: pages.wrongExercises, label: 'Wrong problems', icon: CircleX },
   { to: pages.stats, label: 'Stats', icon: ChartColumn },
   { to: pages.retrospectives, label: 'Retrospectives', icon: NotebookText },
   { to: pages.settings, label: 'Settings', icon: Settings2 },
@@ -170,6 +174,19 @@ function AppBody() {
                   today={today}
                 >
                   {(today) => <Keywords today={today} />}
+                </Page>
+              }
+            />
+            <Route
+              path={pages.wrongExercises}
+              element={
+                <Page
+                  title="Wrong problems"
+                  description="Practise again the problems whose latest try was wrong or needed a hint"
+                  health={health}
+                  today={today}
+                >
+                  {() => <WrongExercises />}
                 </Page>
               }
             />

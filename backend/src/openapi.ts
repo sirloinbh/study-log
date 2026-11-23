@@ -4,7 +4,7 @@
 import { z } from 'zod/v4';
 
 import { calendarQuery } from './calendar.js';
-import { attemptInput } from './exercise-attempts.js';
+import { attemptInput, wrongListQuery } from './exercise-attempts.js';
 import {
   answerInput,
   answersInput,
@@ -285,6 +285,12 @@ export const operations: Record<string, Operation> = {
   'GET /api/exercise-files/:fileId/content': {
     summary: 'Download the stored file itself',
     status: [200, 400, 404, 502, 503],
+  },
+  'GET /api/exercises/wrong': {
+    summary:
+      'List exercises whose latest attempt was wrong or used a hint, across textbooks, newest attempt first',
+    query: wrongListQuery,
+    status: [200, 400],
   },
   'GET /api/exercises/:id/attempts': {
     summary: 'List the attempts at an exercise, newest first',
