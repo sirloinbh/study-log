@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 
 import { useBusy } from './busy';
 import { Button } from './components/ui/button';
+import { DeleteConfirm } from './delete-confirm';
 import type { RequestError } from './lib/api';
 import { apiKey, useApiMutation, useApiQuery } from './lib/query';
 import { ButtonSpinner, Loading } from './loading';
@@ -251,48 +252,32 @@ export function Retrospectives({ today }: { today: string }) {
                   <ButtonSpinner when={action === 'save'} />
                   {period.retrospective ? 'Save changes' : 'Save'}
                 </Button>
-                {period.retrospective &&
-                  (confirming ? (
-                    <>
-                      <Button
-                        type="button"
-                        id="retro-delete-confirm"
-                        variant="destructive"
-                        disabled={busy}
-                        onClick={() => {
-                          nameNext('delete');
-                          void remove();
-                        }}
-                      >
-                        <ButtonSpinner when={action === 'delete'} />
-                        Confirm delete
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        disabled={busy}
-                        onClick={() => {
-                          setConfirming(false);
-                          setWantFocus('retro-delete');
-                        }}
-                      >
-                        Cancel
-                      </Button>
-                    </>
-                  ) : (
+                {period.retrospective && (
+                  <>
                     <Button
                       type="button"
                       id="retro-delete"
                       variant="outline"
                       disabled={busy}
-                      onClick={() => {
-                        setConfirming(true);
-                        setWantFocus('retro-delete-confirm');
-                      }}
+                      onClick={() => setConfirming(true)}
                     >
                       Delete
                     </Button>
-                  ))}
+                    <DeleteConfirm
+                      open={confirming}
+                      title="Delete this retrospective?"
+                      description={`${period.from} to ${period.to}`}
+                      onConfirm={() => {
+                        nameNext('delete');
+                        return remove();
+                      }}
+                      onCancel={() => {
+                        setConfirming(false);
+                        setWantFocus('retro-delete');
+                      }}
+                    />
+                  </>
+                )}
               </div>
             </form>
             {period.retrospective && (

@@ -83,6 +83,12 @@ const form = () => within(screen.getByRole('region', { name: 'Create a schedule'
 const list = () => within(screen.getByRole('region', { name: 'My schedules' }));
 const days = () => within(screen.getByRole('list', { name: 'Target time by date' }));
 
+// Confirms in the dialog and waits for it to close, so the page behind it is readable again.
+async function confirmDelete() {
+  fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+}
+
 describe('a textbook', () => {
   const book = { id: 7, title: '선형대수', author: '', edition: '' };
   const chapterNode = (id: number, number: string, title: string) => ({
@@ -451,7 +457,7 @@ describe('adjusting the days', () => {
     fireEvent.click(days().getByRole('checkbox', { name: 'Complete day: Mon, Mar 2' }));
     await dayCard().findByText('Marked as done');
     fireEvent.click(list().getByRole('button', { name: 'Delete schedule: 새 일정' }));
-    fireEvent.click(list().getByRole('button', { name: 'Confirm deletion: 새 일정' }));
+    await confirmDelete();
     await screen.findByRole('heading', { level: 2, name: '지난 일정' });
     expect(dayCard().queryByText('Marked as done')).toBeNull();
   });
@@ -702,17 +708,15 @@ test('deleting asks first, and the next schedule opens', async () => {
   await screen.findByRole('heading', { level: 2, name: '새 일정' });
 
   fireEvent.click(list().getByRole('button', { name: 'Delete schedule: 새 일정' }));
-  await waitFor(() =>
-    expect(list().getByRole('button', { name: 'Confirm deletion: 새 일정' })).toHaveFocus(),
-  );
-  fireEvent.click(list().getByRole('button', { name: 'Cancel deletion: 새 일정' }));
+  expect(await screen.findByRole('dialog')).toBeInTheDocument();
+  fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
   await waitFor(() =>
     expect(list().getByRole('button', { name: 'Delete schedule: 새 일정' })).toHaveFocus(),
   );
   expect(sent).toEqual([]);
 
   fireEvent.click(list().getByRole('button', { name: 'Delete schedule: 새 일정' }));
-  fireEvent.click(list().getByRole('button', { name: 'Confirm deletion: 새 일정' }));
+  await confirmDelete();
   await screen.findByRole('heading', { level: 2, name: '지난 일정' });
   expect(sent).toEqual([{ method: 'DELETE', path: '/api/schedules/2' }]);
   expect(list().queryByRole('button', { name: '새 일정' })).toBeNull();
@@ -726,7 +730,7 @@ test('a failed delete says why and leaves the schedule', async () => {
   render(<Schedules today={today} />);
   await screen.findByRole('heading', { level: 2, name: '지난 일정' });
   fireEvent.click(list().getByRole('button', { name: 'Delete schedule: 지난 일정' }));
-  fireEvent.click(list().getByRole('button', { name: 'Confirm deletion: 지난 일정' }));
+  await confirmDelete();
   expect(await list().findByRole('alert')).toHaveTextContent('A server error occurred');
   expect(list().getByRole('button', { name: '지난 일정' })).toBeInTheDocument();
   await waitFor(() =>
@@ -739,7 +743,7 @@ test('a schedule deleted elsewhere says so and focus goes to the list heading', 
   render(<Schedules today={today} />);
   await screen.findByRole('heading', { level: 2, name: '지난 일정' });
   fireEvent.click(list().getByRole('button', { name: 'Delete schedule: 지난 일정' }));
-  fireEvent.click(list().getByRole('button', { name: 'Confirm deletion: 지난 일정' }));
+  await confirmDelete();
   expect(await list().findByRole('alert')).toHaveTextContent('Schedule not found');
   await waitFor(() => expect(screen.getByRole('heading', { name: 'My schedules' })).toHaveFocus());
 });
@@ -759,7 +763,7 @@ test('a deleted schedule leaves at once, even when the list cannot be read again
   render(<Schedules today={today} />);
   await screen.findByRole('heading', { level: 2, name: '새 일정' });
   fireEvent.click(list().getByRole('button', { name: 'Delete schedule: 새 일정' }));
-  fireEvent.click(list().getByRole('button', { name: 'Confirm deletion: 새 일정' }));
+  await confirmDelete();
   await list().findByText('Schedule deleted');
   expect(list().queryByRole('button', { name: '새 일정' })).toBeNull();
   expect(list().getByRole('button', { name: '지난 일정' })).toBeInTheDocument();
@@ -809,7 +813,7 @@ test('days already read stay when reading them again fails, and focus stays', as
   expect(days().getByText('Mon, Mar 2')).toBeInTheDocument();
 });
 
-test('Delete schedule: typing takes back the last complaint, and a new schedule ends a pending', async () => {
+test('typing takes back the last complaint, and a new schedule opens', async () => {
   server([schedule(1, '지난 일정')]);
   render(<Schedules today={today} />);
   await screen.findByRole('heading', { level: 2, name: '지난 일정' });
@@ -820,10 +824,8 @@ test('Delete schedule: typing takes back the last complaint, and a new schedule 
   fill('Weekdays (hours)', '2');
   expect(form().queryByRole('alert')).toBeNull();
 
-  fireEvent.click(list().getByRole('button', { name: 'Delete schedule: 지난 일정' }));
   submit();
   await screen.findByRole('heading', { level: 2, name: '알고리즘' });
-  expect(list().queryByRole('button', { name: 'Confirm deletion: 지난 일정' })).toBeNull();
 });
 
 test('two submits at once make one schedule', async () => {

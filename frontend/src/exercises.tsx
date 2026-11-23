@@ -372,10 +372,9 @@ export function Exercises({
                     answerOpen={answerShown?.id === exercise.id}
                     translationOpen={translationShown === exercise.id}
                     busy={busy}
-                    action={action}
                     onConfirmDelete={() => {
                       nameNext('delete');
-                      void remove(exercise);
+                      return remove(exercise);
                     }}
                     onCancelDelete={() => {
                       setDeleting(undefined);
@@ -392,10 +391,9 @@ export function Exercises({
                     }
                     onMarkImportant={() => void markImportant(exercise)}
                     onEdit={() => startEdit(exercise)}
-                    onAskDelete={() => {
-                      setDeleting({ contentId: exercise.contentId, id: exercise.id });
-                      setWantFocus(`exercise-delete-confirm-${exercise.id}`);
-                    }}
+                    onAskDelete={() =>
+                      setDeleting({ contentId: exercise.contentId, id: exercise.id })
+                    }
                   />
                 </li>
               );

@@ -1,5 +1,6 @@
 import { Button } from './components/ui/button';
-import { ButtonSpinner, Loading } from './loading';
+import { DeleteConfirm } from './delete-confirm';
+import { Loading } from './loading';
 import { plural } from './plural';
 import type { Schedule } from './schedule';
 import type { Notice } from './schedule-create-form';
@@ -14,7 +15,6 @@ export function ScheduleList({
   shownId,
   confirming,
   busy,
-  action,
   onPick,
   onAskDelete,
   onCancelDelete,
@@ -26,11 +26,10 @@ export function ScheduleList({
   shownId: number | undefined;
   confirming: number | undefined;
   busy: boolean;
-  action: string | undefined;
   onPick: (id: number) => void;
   onAskDelete: (id: number) => void;
   onCancelDelete: (id: number) => void;
-  onDelete: (id: number) => void;
+  onDelete: (id: number) => Promise<unknown>;
 }) {
   return (
     <section className="card" aria-label="My schedules">
@@ -70,41 +69,23 @@ export function ScheduleList({
                   {item.title}
                 </button>
                 <div className="actions">
-                  {confirming === item.id ? (
-                    <>
-                      <Button
-                        type="button"
-                        id={`schedule-delete-confirm-${item.id}`}
-                        variant="destructive"
-                        aria-label={`Confirm deletion: ${item.title}`}
-                        disabled={busy}
-                        onClick={() => onDelete(item.id)}
-                      >
-                        <ButtonSpinner when={action === 'delete'} />
-                        Confirm delete
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        aria-label={`Cancel deletion: ${item.title}`}
-                        disabled={busy}
-                        onClick={() => onCancelDelete(item.id)}
-                      >
-                        Cancel
-                      </Button>
-                    </>
-                  ) : (
-                    <Button
-                      type="button"
-                      id={`schedule-delete-${item.id}`}
-                      variant="outline"
-                      aria-label={`Delete schedule: ${item.title}`}
-                      disabled={busy}
-                      onClick={() => onAskDelete(item.id)}
-                    >
-                      Delete
-                    </Button>
-                  )}
+                  <Button
+                    type="button"
+                    id={`schedule-delete-${item.id}`}
+                    variant="outline"
+                    aria-label={`Delete schedule: ${item.title}`}
+                    disabled={busy}
+                    onClick={() => onAskDelete(item.id)}
+                  >
+                    Delete
+                  </Button>
+                  <DeleteConfirm
+                    open={confirming === item.id}
+                    title="Delete this schedule?"
+                    description={item.title}
+                    onConfirm={() => onDelete(item.id)}
+                    onCancel={() => onCancelDelete(item.id)}
+                  />
                 </div>
               </div>
               <p className="status">
