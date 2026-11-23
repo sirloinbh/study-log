@@ -360,17 +360,13 @@ export function TextbookContents({
           openId={open?.id}
           deletingId={deletingId}
           busy={busy}
-          action={action}
           onMove={(siblings, index, step, parentId) => void move(siblings, index, step, parentId)}
           onAddChild={startAdd}
           onEdit={startEdit}
-          onAskDelete={(node) => {
-            setDeleting({ textbookId, id: node.id });
-            setWantFocus(`content-delete-confirm-${node.id}`);
-          }}
+          onAskDelete={(node) => setDeleting({ textbookId, id: node.id })}
           onConfirmDelete={(node) => {
             nameNext('delete');
-            void remove(node);
+            return remove(node);
           }}
           onCancelDelete={(node) => {
             setDeleting(undefined);

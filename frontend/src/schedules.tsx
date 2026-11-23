@@ -281,17 +281,13 @@ export function Schedules({ today }: { today: string }) {
         shownId={shownId}
         confirming={confirming}
         busy={busy}
-        action={action}
         onPick={pick}
-        onAskDelete={(id) => {
-          setConfirming(id);
-          setWantFocus(`schedule-delete-confirm-${id}`);
-        }}
+        onAskDelete={(id) => setConfirming(id)}
         onCancelDelete={(id) => {
           setConfirming(undefined);
           setWantFocus(`schedule-delete-${id}`);
         }}
-        onDelete={(id) => void remove(id)}
+        onDelete={remove}
       />
 
       {shown && (

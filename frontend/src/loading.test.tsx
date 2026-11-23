@@ -86,7 +86,7 @@ test('deleting spins on the confirm button, not on save', async () => {
   const release = heldServer([log]);
   render(<StudyLogs today={today} />);
   fireEvent.click(await screen.findByRole('button', { name: /Delete log/ }));
-  const confirm = await screen.findByRole('button', { name: /Confirm log deletion/ });
+  const confirm = await screen.findByRole('button', { name: 'Delete' });
   fireEvent.click(confirm);
   await waitFor(() => expect(spinners().length).toBe(1));
   expect(confirm.contains(spinners()[0])).toBe(true);

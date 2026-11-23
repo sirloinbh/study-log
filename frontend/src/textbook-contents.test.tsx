@@ -219,8 +219,6 @@ const names = {
   child: /^Add child/,
   edit: /^Edit contents entry/,
   delete: /^Delete contents entry/,
-  confirm: /^Confirm contents entry deletion/,
-  cancel: /^Cancel contents entry deletion/,
 };
 // Clicks once the row's button is enabled (every button is locked while a request runs).
 const press = async (label: string, action: keyof typeof names) => {
@@ -228,6 +226,11 @@ const press = async (label: string, action: keyof typeof names) => {
     expect(row(label).getByRole('button', { name: names[action] })).toBeEnabled(),
   );
   fireEvent.click(row(label).getByRole('button', { name: names[action] }));
+};
+// Answers the delete dialog and waits for it to close, so the page behind it is readable again.
+const answerDialog = async (name: 'Delete' | 'Cancel') => {
+  fireEvent.click(await screen.findByRole('button', { name }));
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
 };
 const saveEditor = () => fireEvent.submit(editorForm()!);
 const statusText = () => screen.getByRole('status').textContent;
@@ -319,10 +322,10 @@ test('deleting needs a confirmation and removes the entry with its sections', as
   const api = serve(outline);
   await openBook();
   await press('1 벡터', 'delete');
-  await press('1 벡터', 'cancel');
+  await answerDialog('Cancel');
   await press('1 벡터', 'delete');
   expect(calls(api, 'DELETE')).toHaveLength(0);
-  await press('1 벡터', 'confirm');
+  await answerDialog('Delete');
   expect(await screen.findByText('Deleted')).toBeInTheDocument();
   expect(calls(api, 'DELETE').map((r) => r.path)).toEqual(['/api/textbooks/1/contents/1']);
   await waitFor(() => expect(treeShape()).toBe('2 행렬'));
@@ -338,7 +341,7 @@ test('a delete refused because study logs use the entry shows the server message
   await openBook();
   await press('2 행렬', 'edit');
   await press('1.2 내적', 'delete');
-  await press('1.2 내적', 'confirm');
+  await answerDialog('Delete');
   expect(await within(card()).findByRole('alert')).toHaveTextContent(
     /A contents entry with a study log or schedule attached cannot be deleted/,
   );
@@ -444,8 +447,8 @@ test('contents delete focus: confirm, back on cancel, button on failure, heading
   const api = serve(outline);
   await openBook();
   await press('2 행렬', 'delete');
-  await waitFor(() => expect(focusedId()).toBe('content-delete-confirm-4'));
-  await press('2 행렬', 'cancel');
+  expect(await screen.findByRole('dialog')).toBeInTheDocument();
+  await answerDialog('Cancel');
   await waitFor(() => expect(focusedId()).toBe('content-delete-4'));
   // Study logs still point at it: the entry stays with its delete button.
   api.options.rejectDelete = {
@@ -453,12 +456,12 @@ test('contents delete focus: confirm, back on cancel, button on failure, heading
     error: 'A contents entry with a study log or schedule attached cannot be deleted',
   };
   await press('2 행렬', 'delete');
-  await press('2 행렬', 'confirm');
+  await answerDialog('Delete');
   await within(card()).findByRole('alert');
   await waitFor(() => expect(focusedId()).toBe('content-delete-4'));
   api.options.rejectDelete = undefined;
   await press('2 행렬', 'delete');
-  await press('2 행렬', 'confirm');
+  await answerDialog('Delete');
   await waitFor(() => expect(treeShape()).toBe('1 벡터[1.1 덧셈|1.2 내적]'));
   await waitFor(() => expect(focusedId()).toBe('contents-heading'));
 });

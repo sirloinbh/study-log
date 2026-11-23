@@ -1,5 +1,5 @@
 import { Button } from './components/ui/button';
-import { ButtonSpinner } from './loading';
+import { DeleteConfirm } from './delete-confirm';
 import { Memo } from './memo';
 import {
   formatMinutes,
@@ -18,7 +18,6 @@ export function StudyLogItem({
   editing,
   confirming,
   busy,
-  action,
   onEdit,
   onAskDelete,
   onCancelDelete,
@@ -28,11 +27,10 @@ export function StudyLogItem({
   editing: boolean;
   confirming: boolean;
   busy: boolean;
-  action: string | undefined;
   onEdit: () => void;
   onAskDelete: () => void;
   onCancelDelete: () => void;
-  onDelete: () => void;
+  onDelete: () => Promise<unknown>;
 }) {
   return (
     <li className={editing ? 'editing' : ''}>
@@ -50,52 +48,32 @@ export function StudyLogItem({
       {log.difficulties && <p className="log-memo">Difficult parts: {log.difficulties}</p>}
       {log.memo && <Memo text={log.memo} clamp />}
       <div className="log-actions">
-        {confirming ? (
-          <>
-            <Button
-              type="button"
-              id={`study-log-delete-confirm-${log.id}`}
-              variant="destructive"
-              disabled={busy}
-              aria-label={`Confirm log deletion: ${describe(log)}`}
-              onClick={onDelete}
-            >
-              <ButtonSpinner when={action === 'delete'} />
-              Confirm delete
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={busy}
-              aria-label={`Cancel log deletion: ${describe(log)}`}
-              onClick={onCancelDelete}
-            >
-              Cancel
-            </Button>
-          </>
-        ) : (
-          <>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={busy}
-              aria-label={`Edit log: ${describe(log)}`}
-              onClick={onEdit}
-            >
-              Edit
-            </Button>
-            <Button
-              type="button"
-              id={`study-log-delete-${log.id}`}
-              variant="outline"
-              disabled={busy}
-              aria-label={`Delete log: ${describe(log)}`}
-              onClick={onAskDelete}
-            >
-              Delete
-            </Button>
-          </>
-        )}
+        <Button
+          type="button"
+          variant="outline"
+          disabled={busy}
+          aria-label={`Edit log: ${describe(log)}`}
+          onClick={onEdit}
+        >
+          Edit
+        </Button>
+        <Button
+          type="button"
+          id={`study-log-delete-${log.id}`}
+          variant="outline"
+          disabled={busy}
+          aria-label={`Delete log: ${describe(log)}`}
+          onClick={onAskDelete}
+        >
+          Delete
+        </Button>
+        <DeleteConfirm
+          open={confirming}
+          title="Delete this study log?"
+          description={describe(log)}
+          onConfirm={onDelete}
+          onCancel={onCancelDelete}
+        />
       </div>
     </li>
   );
