@@ -17,8 +17,8 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
 
 import { CodingProblems } from './coding-problems';
 import { AppShell, type NavItem } from './components/layout/app-shell';
-import { EmptyState } from './components/ui/empty-state';
 import { Toaster } from './components/ui/sonner';
+import { DataExport } from './data-export';
 import { useServiceDate } from './date';
 import { Flashcards } from './flashcards';
 import { type Health, healthText, useHealth } from './health';
@@ -259,12 +259,7 @@ function AppBody() {
                   health={health}
                   today={today}
                 >
-                  {() => (
-                    <EmptyState
-                      title="No settings yet"
-                      description="Settings are added in the related issue cards."
-                    />
-                  )}
+                  {() => <DataExport />}
                 </Page>
               }
             />
