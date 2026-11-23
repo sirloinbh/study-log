@@ -4,14 +4,14 @@
 import { z } from 'zod/v4';
 
 import { calendarQuery } from './calendar.js';
-import { attemptInput } from './exercise-attempts.js';
 import {
-  attemptInput,
-  attemptUpdateInput,
+  attemptInput as codingAttemptInput,
+  attemptUpdateInput as codingAttemptUpdateInput,
   problemInput,
   problemListQuery,
   problemUpdateInput,
 } from './coding-problems.js';
+import { attemptInput } from './exercise-attempts.js';
 import {
   answerInput,
   answersInput,
@@ -148,12 +148,12 @@ export const operations: Record<string, Operation> = {
   },
   'POST /api/coding/problems/:id/attempts': {
     summary: 'Add an attempt; studyLog also records a study log of the same length',
-    body: ['CodingAttempt', attemptInput],
+    body: ['CodingAttempt', codingAttemptInput],
     status: [201, 400, 404],
   },
   'PUT /api/coding/attempts/:id': {
     summary: 'Replace an attempt; a left-out date keeps the stored date',
-    body: ['CodingAttemptUpdate', attemptUpdateInput],
+    body: ['CodingAttemptUpdate', codingAttemptUpdateInput],
     status: [200, 400, 404],
   },
   'DELETE /api/coding/attempts/:id': { summary: 'Delete an attempt', status: [204, 400, 404] },
