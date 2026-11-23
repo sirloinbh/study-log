@@ -4,6 +4,7 @@
 import { z } from 'zod/v4';
 
 import { calendarQuery } from './calendar.js';
+import { attemptInput } from './exercise-attempts.js';
 import {
   attemptInput,
   attemptUpdateInput,
@@ -328,6 +329,17 @@ export const operations: Record<string, Operation> = {
     summary: 'Download the stored file itself',
     status: [200, 400, 404, 502, 503],
   },
+  'GET /api/exercises/:id/attempts': {
+    summary: 'List the attempts at an exercise, newest first',
+    status: [200, 400, 404],
+  },
+  'POST /api/exercises/:id/attempts': {
+    summary:
+      'Record an attempt: correct or wrong, whether a hint was used, on a date (default today)',
+    body: ['ExerciseAttempt', attemptInput],
+    status: [201, 400, 404],
+  },
+  'DELETE /api/exercise-attempts/:id': { summary: 'Delete an attempt', status: [204, 400, 404] },
   'DELETE /api/exercise-files/:fileId': {
     summary: 'Delete a stored file',
     status: [204, 400, 404, 502, 503],

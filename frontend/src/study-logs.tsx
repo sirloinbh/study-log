@@ -221,17 +221,13 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
                 editing={log.id === editingId}
                 confirming={deletingId === log.id}
                 busy={busy}
-                action={action}
                 onEdit={() => edit(log)}
-                onAskDelete={() => {
-                  setDeletingId(log.id);
-                  setWantFocus(`study-log-delete-confirm-${log.id}`);
-                }}
+                onAskDelete={() => setDeletingId(log.id)}
                 onCancelDelete={() => {
                   setDeletingId(undefined);
                   setWantFocus(`study-log-delete-${log.id}`);
                 }}
-                onDelete={() => void remove(log.id)}
+                onDelete={() => remove(log.id)}
               />
             ))}
           </ul>

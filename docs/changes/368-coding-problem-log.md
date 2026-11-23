@@ -8,7 +8,7 @@ Algorithm practice (Baekjoon, LeetCode, other sites) was not recorded anywhere. 
 
 ## Changes
 
-- `database/migrations/023_coding_problems.sql`: `coding_problems` (site, problem key, title, link; unique per site and key) and `coding_attempts` (date, result, language, minutes, notes, optional `study_log_id`; deleted with the problem, and deleting a study log keeps the attempt).
+- `database/migrations/024_coding_problems.sql`: `coding_problems` (site, problem key, title, link; unique per site and key) and `coding_attempts` (date, result, language, minutes, notes, optional `study_log_id`; deleted with the problem, and deleting a study log keeps the attempt).
 - `backend/src/coding-problems.ts` (new), mounted at `/api/coding`: list with `site`, `result` (the latest attempt), `q`, `from`, `to`, `limit`; get, add, rename and delete a problem; add, edit and delete an attempt. Every change writes its audit row in the same transaction.
   - Problem key rules: Baekjoon is digits, LeetCode is the lower-cased title slug, another site is any one-line text up to 100 characters. A repeated site and key is 409.
   - The link is optional and only `http` or `https` (never `javascript:`). Baekjoon and LeetCode get their own address when it is left out.

@@ -7,6 +7,7 @@ import { tools } from './ai-tools.js';
 import { calendarRoutes } from './calendar.js';
 import { codingRoutes } from './coding-problems.js';
 import { refuseCrossSiteWrites } from './cross-site.js';
+import { attemptRoutes, exerciseAttemptRoutes } from './exercise-attempts.js';
 import { exerciseFileRoutes, fileRoutes } from './exercise-files.js';
 import { contentExerciseRoutes, exerciseRoutes, textbookExerciseRoutes } from './exercises.js';
 import { claudeExtractor, type Extractor } from './extraction.js';
@@ -93,6 +94,8 @@ export function createApp(
   );
   app.use('/api/textbooks/:textbookId/contents', textbookContentRoutes(pool, fileStorage));
   app.use('/api/textbooks/:textbookId/exercises', textbookExerciseRoutes(pool));
+  app.use('/api/exercises/:id/attempts', exerciseAttemptRoutes(pool, today));
+  app.use('/api/exercise-attempts', attemptRoutes(pool));
   app.use('/api/exercises/:id/files', exerciseFileRoutes(pool, fileStorage));
   app.use('/api/exercise-files', fileRoutes(pool, fileStorage));
   app.use(

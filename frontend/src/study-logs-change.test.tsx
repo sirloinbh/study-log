@@ -67,6 +67,6 @@ test.each([
   const onChange = vi.fn();
   render(<StudyLogs today={today} onChange={onChange} />);
   fireEvent.click(await screen.findByRole('button', { name: /Delete log/ }));
-  fireEvent.click(await screen.findByRole('button', { name: /Confirm log deletion/ }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
   await waitFor(() => expect(onChange).toHaveBeenCalledTimes(1));
 });

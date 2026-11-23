@@ -269,6 +269,12 @@ afterEach(() => {
   Reflect.deleteProperty(navigator, 'clipboard');
 });
 
+// Answers the delete dialog and waits for it to close, so the page behind it is readable again.
+const answerDialog = async (name: 'Delete' | 'Cancel') => {
+  fireEvent.click(await screen.findByRole('button', { name }));
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+};
+
 describe('exercises', () => {
   test('the first chapter is picked and its exercises are listed in order', async () => {
     const api = fakeServer(problems);
@@ -331,12 +337,10 @@ describe('exercises', () => {
     await press('Problem 3 edit');
     await waitFor(() => expect(focused()).toEqual(['exercise-body']));
     await press('Problem #2 delete', () => item('Problem #2'));
-    await press('Problem #2 confirm deletion', () => item('Problem #2'));
+    await answerDialog('Delete');
     await expectListed(['Problem 3:벡터 u를 구하라.']);
     // The confirm button, then the card heading once the exercise is gone (#86).
-    await waitFor(() =>
-      expect(focused()).toEqual(['exercise-body', 'exercise-delete-confirm-2', 'exercise-heading']),
-    );
+    await waitFor(() => expect(focused()).toEqual(['exercise-body', 'exercise-heading']));
     // The edit stays open with its input.
     expect(field('Problem text')).toHaveValue('벡터 u를 구하라.');
   });
@@ -375,7 +379,7 @@ describe('exercises', () => {
     const api = fakeServer(problems, { holdChange: new Promise<void>((r) => (release = r)) });
     await openBook(api);
     await press('Problem 3 delete', () => item('Problem 3'));
-    await press('Problem 3 confirm deletion', () => item('Problem 3'));
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
     const controls = () => Array.from(card().querySelectorAll<HTMLElement>('button, select'));
     const copy = (el: HTMLElement) => el.getAttribute('aria-label')?.endsWith('copy question');
     await waitFor(() => {
@@ -396,7 +400,7 @@ describe('exercises', () => {
     await openBook(api);
     await press('Problem 3 delete', () => item('Problem 3'));
     api.rows.splice(0, 1);
-    await press('Problem 3 confirm deletion', () => item('Problem 3'));
+    await answerDialog('Delete');
     await expectText(/Exercise not found/);
     await expectListed(['Problem #1:증명하라.']);
   });
@@ -422,10 +426,10 @@ describe('exercises', () => {
     const api = fakeServer(problems);
     await openBook(api);
     await press('Problem 3 delete', () => item('Problem 3'));
-    await press('Problem 3 cancel deletion', () => item('Problem 3'));
+    await answerDialog('Cancel');
     expect(api.requests.filter((r) => r.method === 'DELETE')).toHaveLength(0);
     await press('Problem 3 delete', () => item('Problem 3'));
-    await press('Problem 3 confirm deletion', () => item('Problem 3'));
+    await answerDialog('Delete');
     await expectListed(['Problem #1:증명하라.']);
     expect(api.requests.filter((r) => r.method === 'DELETE').map((r) => r.path)).toEqual([
       '/api/exercises/1',
@@ -527,6 +531,7 @@ describe('exercises', () => {
       'Problem #1 mark important',
       'Problem #1 edit',
       'Problem #1 delete',
+      'Problem #1 show attempts',
     ]);
   });
 
@@ -802,7 +807,7 @@ describe('exercises changed elsewhere', () => {
     const loadsBefore = api.treeLoads();
     await press('Problem 3 delete', () => item('Problem 3'));
     api.rows.splice(0, 1);
-    await press('Problem 3 confirm deletion', () => item('Problem 3'));
+    await answerDialog('Delete');
     await expectListed(['Problem #1:증명하라.']);
     expect(textOf(alertEl())).toMatch(/Exercise not found/);
     expect(api.treeLoads()).toBe(loadsBefore);
@@ -832,18 +837,18 @@ describe('exercises changed elsewhere', () => {
     const focusedId = () => document.activeElement?.id;
     const entry = () => item('Problem #2');
     await press('Problem #2 delete', entry);
-    await waitFor(() => expect(focusedId()).toBe('exercise-delete-confirm-2'));
-    await press('Problem #2 cancel deletion', entry);
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    await answerDialog('Cancel');
     await waitFor(() => expect(focusedId()).toBe('exercise-delete-2'));
     options.reject = { method: 'DELETE', status: 500, error: 'Server error' };
     await press('Problem #2 delete', entry);
-    await press('Problem #2 confirm deletion', entry);
+    await answerDialog('Delete');
     await expectText(/Server error/);
     await waitFor(() => expect(focusedId()).toBe('exercise-delete-2'));
     options.reject = undefined;
     api.rows.splice(1, 1);
     await press('Problem #2 delete', entry);
-    await press('Problem #2 confirm deletion', entry);
+    await answerDialog('Delete');
     await expectText(/Exercise not found/);
     await waitFor(() => expect(focusedId()).toBe('exercise-heading'));
   });

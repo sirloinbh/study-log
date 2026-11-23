@@ -131,7 +131,8 @@ async function move(name: string, title: string) {
 const recordFocus = () => {
   const focused: string[] = [];
   vi.spyOn(HTMLElement.prototype, 'focus').mockImplementation(function (this: HTMLElement) {
-    focused.push(this.id);
+    // The dialog moves its own focus around; only the screen's focus steps are of interest.
+    if (!this.closest('[role="dialog"]')) focused.push(this.id);
   });
   return focused;
 };
@@ -212,12 +213,12 @@ describe('retrospectives', () => {
     await waitFor(() => expect(field()).toHaveValue('이번 주 회고'));
     const lastFocus = (id: string) => waitFor(() => expect(focused.at(-1)).toBe(id));
     fireEvent.click(writer().getByRole('button', { name: 'Delete' }));
-    await lastFocus('retro-delete-confirm');
-    fireEvent.click(writer().getByRole('button', { name: 'Cancel' }));
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
     await lastFocus('retro-delete');
     expect(api.writes).toHaveLength(0);
     fireEvent.click(writer().getByRole('button', { name: 'Delete' }));
-    fireEvent.click(await writer().findByRole('button', { name: 'Confirm delete' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
     await lastFocus('retro-heading');
     expect(api.writes.map((w) => `${w.method} ${w.path}`)).toEqual([
       'DELETE /api/retrospectives/weekly/2026-10-18',

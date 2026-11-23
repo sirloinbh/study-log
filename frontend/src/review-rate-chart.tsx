@@ -16,7 +16,10 @@ function ReviewBars({ stats }: { stats: ReviewStats }) {
     );
   if (!R) return <Loading label="Loading the chart" kind="text" />;
   return (
-    <div className="chart-box" aria-hidden="true">
+    <div
+      className="min-w-0 text-primary [&_.recharts-cartesian-axis-tick-value]:fill-muted-foreground"
+      aria-hidden="true"
+    >
       <R.ResponsiveContainer width="100%" height={200}>
         <R.BarChart data={reviewBars(stats)} margin={{ top: 8, right: 8, bottom: 0, left: 8 }}>
           <R.CartesianGrid vertical={false} stroke="var(--border)" />
@@ -53,7 +56,7 @@ export function ReviewRateChart({ period }: { period: StatPeriod }) {
   const error = query.error?.message;
 
   return (
-    <section className="card study-chart review-chart" aria-labelledby="review-chart-heading">
+    <section className="card grid min-w-0 gap-2.5" aria-labelledby="review-chart-heading">
       <h2 id="review-chart-heading">Review completion rate</h2>
       {error ? (
         <p role="alert" className="error">
