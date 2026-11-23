@@ -4,7 +4,20 @@ import { apiKey, useApiQuery } from './lib/query';
 import { Loading } from './loading';
 import { plural } from './plural';
 import { formatMinutes } from './study-logs-data';
-import { type DayMinutes, heatBands, heatLevel, heatWeeks, monthLabel } from './study-stats';
+import {
+  type DayMinutes,
+  heatBands,
+  heatCellStyle,
+  heatLevel,
+  heatWeeks,
+  monthLabel,
+} from './study-stats';
+
+const cellBase = 'block size-[11px] rounded-[2px]';
+// Weekday names and weeks are columns of one month-label row and seven days.
+const column = 'grid grid-rows-[14px_repeat(7,11px)] gap-[3px]';
+const monthLabelClass =
+  'w-[11px] overflow-visible whitespace-nowrap text-[10px] leading-[14px] text-muted-foreground';
 
 // Rows run Sunday to Saturday (#96); Monday, Wednesday and Friday are labelled.
 const weekdays = ['', 'Mon', '', 'Wed', '', 'Fri', ''];
@@ -32,7 +45,7 @@ export function Heatmap() {
   const total = studied.reduce((sum, day) => sum + day.minutes, 0);
 
   return (
-    <section className="card heatmap-card" aria-label="Study in the last year">
+    <section className="card min-w-0" aria-label="Study in the last year">
       <h2>Last year</h2>
       {error ? (
         <p role="alert" className="error">
@@ -42,44 +55,59 @@ export function Heatmap() {
         <Loading label="Loading the heatmap" kind="text" />
       ) : (
         <>
-          <p className="status">
+          <p className="status mt-0 mb-3">
             {plural(studied.length, 'study day')} · total {formatMinutes(total)}
           </p>
-          <div className="heatmap-scroll" id="heatmap-scroll">
+          <div className="overflow-x-auto pb-1" id="heatmap-scroll">
             {/* One image for screen readers; each day's value is in its tooltip for the mouse. */}
             <div
-              className="heatmap"
+              className="flex w-max gap-[3px]"
               role="img"
               aria-label={`${data.from} to ${data.to}: ${plural(studied.length, 'study day')}, total ${formatMinutes(total)}`}
             >
-              <div className="heat-days" aria-hidden="true">
-                <span className="heat-month" />
+              <div
+                className={`${column} sticky left-0 z-[1] bg-card pr-1 text-[10px] leading-[11px] text-muted-foreground shadow-[-4px_0_0_var(--card)]`}
+                aria-hidden="true"
+              >
+                <span className={monthLabelClass} />
                 {weekdays.map((day, index) => (
                   <span key={index}>{day}</span>
                 ))}
               </div>
               {heatWeeks(data.daily).map((week) => (
-                <div key={week[0]?.date} className="heat-week" aria-hidden="true">
-                  <span className="heat-month">{monthLabel(week)}</span>
+                <div key={week[0]?.date} className={column} data-week aria-hidden="true">
+                  <span className={monthLabelClass}>{monthLabel(week)}</span>
                   {week.map((day, index) =>
                     day ? (
                       <span
                         key={day.date}
-                        className={`heat-cell level-${heatLevel(day.minutes)}`}
+                        data-level={heatLevel(day.minutes)}
+                        className={`${cellBase} ${heatCellStyle[heatLevel(day.minutes)]}`}
                         title={`${day.date}: ${formatMinutes(day.minutes)}`}
                       />
                     ) : (
-                      <span key={`after-${index}`} className="heat-cell future" />
+                      <span
+                        key={`after-${index}`}
+                        data-level="future"
+                        className={`${cellBase} ${heatCellStyle.future}`}
+                      />
                     ),
                   )}
                 </div>
               ))}
             </div>
           </div>
-          <ul className="heat-legend" aria-label="Intensity levels">
+          <ul
+            className="mx-0 mt-3 mb-0 flex list-none flex-wrap gap-x-[14px] gap-y-1.5 p-0 text-[12px] text-muted-foreground"
+            aria-label="Intensity levels"
+          >
             {heatBands.map((band) => (
-              <li key={band.level}>
-                <span className={`heat-cell level-${band.level}`} aria-hidden="true" />
+              <li key={band.level} className="flex items-center gap-1.5">
+                <span
+                  data-level={band.level}
+                  className={`${cellBase} ${heatCellStyle[band.level]}`}
+                  aria-hidden="true"
+                />
                 {band.label}
               </li>
             ))}

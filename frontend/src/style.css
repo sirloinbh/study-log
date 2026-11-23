@@ -422,17 +422,6 @@
 .metric .nowrap {
   white-space: nowrap;
 }
-/* A grid item would otherwise grow to the heatmap's width and scroll the whole page. */
-.heatmap-card {
-  min-width: 0;
-}
-.heatmap-card .status {
-  margin: 0 0 12px;
-}
-.heatmap-scroll {
-  overflow-x: auto;
-  padding-bottom: 4px;
-}
 /* Study time chart (#49): bars take the primary colour through currentColor. */
 .study-chart {
   display: grid;
@@ -455,78 +444,6 @@
 }
 .chart-box .recharts-cartesian-axis-tick-value {
   fill: var(--muted-foreground);
-}
-.heatmap {
-  display: flex;
-  gap: 3px;
-  width: max-content;
-}
-.heat-days,
-.heat-week {
-  display: grid;
-  grid-template-rows: 14px repeat(7, 11px);
-  gap: 3px;
-}
-.heat-days {
-  font-size: 10px;
-  line-height: 11px;
-  color: var(--muted-foreground);
-  padding-right: 4px;
-  /* The weekday names stay in view while the weeks scroll under them. */
-  position: sticky;
-  left: 0;
-  z-index: 1;
-  background: var(--card);
-  box-shadow: -4px 0 0 var(--card);
-}
-.heat-month {
-  font-size: 10px;
-  line-height: 14px;
-  color: var(--muted-foreground);
-  white-space: nowrap;
-  width: 11px;
-  overflow: visible;
-}
-.heat-cell {
-  display: block;
-  width: 11px;
-  height: 11px;
-  border-radius: 2px;
-}
-.heat-cell.level-0 {
-  background: var(--muted);
-  outline: 1px solid var(--border);
-  outline-offset: -1px;
-}
-.heat-cell.level-1 {
-  background: color-mix(in oklch, var(--foreground) 9%, transparent);
-}
-.heat-cell.level-2 {
-  background: color-mix(in oklch, var(--foreground) 18%, transparent);
-}
-.heat-cell.level-3 {
-  background: var(--ring);
-}
-.heat-cell.level-4 {
-  background: var(--primary);
-}
-.heat-cell.future {
-  background: transparent;
-}
-.heat-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px 14px;
-  margin: 12px 0 0;
-  padding: 0;
-  list-style: none;
-  font-size: 12px;
-  color: var(--muted-foreground);
-}
-.heat-legend li {
-  display: flex;
-  align-items: center;
-  gap: 6px;
 }
 .calendar-head {
   display: flex;
