@@ -92,7 +92,7 @@ describe('study logs', () => {
     render(<StudyLogs today={today} />);
     fireEvent.click(await screen.findByRole('button', { name: /Delete log/ }));
     expect(sent).toEqual([]);
-    fireEvent.click(await screen.findByRole('button', { name: /Confirm log deletion/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
     expect(await screen.findByText('No study logs yet')).toBeInTheDocument();
     expect(sent).toEqual([{ method: 'DELETE', path: '/api/study-logs/1' }]);
   });
@@ -267,7 +267,7 @@ describe('exercises', () => {
     expect(await screen.findByText('내적을 구하라')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /^Problem 1 delete$/ }));
     expect(sent).toEqual([]);
-    fireEvent.click(await screen.findByRole('button', { name: /^Problem 1 confirm deletion$/ }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
     await waitFor(() => expect(screen.queryByText('내적을 구하라')).toBeNull());
     expect(sent).toEqual([{ method: 'DELETE', path: '/api/exercises/5' }]);
   });

@@ -120,7 +120,8 @@ const submitSearch = () => fireEvent.submit(regionEl('Keyword search').querySele
 const recordFocus = () => {
   const focused: string[] = [];
   vi.spyOn(HTMLElement.prototype, 'focus').mockImplementation(function (this: HTMLElement) {
-    focused.push(this.id);
+    // The dialog moves its own focus around; only the screen's focus steps are of interest.
+    if (!this.closest('[role="dialog"]')) focused.push(this.id);
   });
   return focused;
 };
@@ -215,10 +216,10 @@ describe('keywords', () => {
     const api = await openKeywords(stored);
     await expectListed(['고유값:Ax = λx', '대각화:']);
     fireEvent.click(item('고유값').getByRole('button', { name: '고유값 delete' }));
-    fireEvent.click(await screen.findByRole('button', { name: '고유값 cancel deletion' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Cancel' }));
     expect(api.requests.filter((r) => r.method === 'DELETE')).toHaveLength(0);
     fireEvent.click(await screen.findByRole('button', { name: '고유값 delete' }));
-    fireEvent.click(await screen.findByRole('button', { name: '고유값 confirm deletion' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
     await expectListed(['대각화:']);
     expect(api.requests.filter((r) => r.method === 'DELETE').map((r) => r.path)).toEqual([
       '/api/keywords/1',
@@ -276,7 +277,7 @@ describe('keywords', () => {
     await openKeywords(stored, { holdChange: new Promise<void>((r) => (release = r)) });
     await expectListed(['고유값:Ax = λx', '대각화:']);
     fireEvent.click(item('고유값').getByRole('button', { name: '고유값 delete' }));
-    fireEvent.click(await screen.findByRole('button', { name: '고유값 confirm deletion' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
     await waitFor(() => {
       const controls = Array.from(
         document.querySelectorAll<HTMLButtonElement | HTMLInputElement>(
@@ -374,7 +375,7 @@ describe('keywords', () => {
       ]),
     );
     fireEvent.click(await screen.findByRole('button', { name: '대각화 delete' }));
-    fireEvent.click(await screen.findByRole('button', { name: '대각화 confirm deletion' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
     // Save, cancel, then the delete flow: its confirm button and the heading after (#86).
     await waitFor(() =>
       expect(focused).toEqual([
@@ -382,7 +383,6 @@ describe('keywords', () => {
         'keyword-day',
         'keyword-edit-keyword',
         'keyword-day',
-        'keyword-delete-confirm-2',
         'keyword-day',
       ]),
     );
@@ -414,18 +414,18 @@ describe('keywords', () => {
     };
     const lastFocus = (id: string) => waitFor(() => expect(focused.at(-1)).toBe(id));
     await press('대각화 delete');
-    await lastFocus('keyword-delete-confirm-2');
-    await press('대각화 cancel deletion');
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    await press('Cancel');
     await lastFocus('keyword-delete-2');
     options.reject = { method: 'DELETE', status: 500, error: 'Server error' };
     await press('대각화 delete');
-    await press('대각화 confirm deletion');
+    await press('Delete');
     await screen.findByRole('alert');
     await lastFocus('keyword-delete-2');
     options.reject = undefined;
     api.rows.splice(1, 1);
     await press('대각화 delete');
-    await press('대각화 confirm deletion');
+    await press('Delete');
     await lastFocus('keyword-day');
   });
 });

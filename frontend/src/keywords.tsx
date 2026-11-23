@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 
 import { useBusy } from './busy';
 import { Button } from './components/ui/button';
+import { DeleteConfirm } from './delete-confirm';
 import {
   emptyKeywordForm,
   type Keyword,
@@ -14,7 +15,7 @@ import { KeywordFormView } from './keyword-form';
 import { KeywordSearchCard } from './keyword-search-card';
 import { type RequestError, requestJson } from './lib/api';
 import { apiKey, useApiMutation, useApiQuery } from './lib/query';
-import { ButtonSpinner, Loading } from './loading';
+import { Loading } from './loading';
 
 type Notice = { kind: 'status' | 'alert'; text: string } | undefined;
 
@@ -274,71 +275,48 @@ export function Keywords({ today }: { today: string }) {
                   </div>
                   {keyword.memo && <p className="log-memo">{keyword.memo}</p>}
                   <div className="log-actions">
-                    {deletingId === keyword.id ? (
-                      <>
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          id={`keyword-delete-confirm-${keyword.id}`}
-                          disabled={busy}
-                          aria-label={`${keyword.keyword} confirm deletion`}
-                          onClick={() => {
-                            nameNext('delete');
-                            void remove(keyword);
-                          }}
-                        >
-                          <ButtonSpinner when={action === 'delete'} />
-                          Confirm delete
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          disabled={busy}
-                          aria-label={`${keyword.keyword} cancel deletion`}
-                          onClick={() => {
-                            setDeletingId(undefined);
-                            setWantFocus(`keyword-delete-${keyword.id}`);
-                          }}
-                        >
-                          Cancel
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          disabled={busy}
-                          aria-label={`${keyword.keyword} edit`}
-                          onClick={() => {
-                            setDeletingId(undefined);
-                            setNotice(undefined);
-                            // The Edit button is replaced by the form; focus goes to its first field.
-                            setWantFocus('keyword-edit-keyword');
-                            setEditor({
-                              id: keyword.id,
-                              date: keyword.date,
-                              form: { keyword: keyword.keyword, memo: keyword.memo },
-                            });
-                          }}
-                        >
-                          Edit
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          id={`keyword-delete-${keyword.id}`}
-                          disabled={busy}
-                          aria-label={`${keyword.keyword} delete`}
-                          onClick={() => {
-                            setDeletingId(keyword.id);
-                            setWantFocus(`keyword-delete-confirm-${keyword.id}`);
-                          }}
-                        >
-                          Delete
-                        </Button>
-                      </>
-                    )}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      disabled={busy}
+                      aria-label={`${keyword.keyword} edit`}
+                      onClick={() => {
+                        setDeletingId(undefined);
+                        setNotice(undefined);
+                        // The Edit button is replaced by the form; focus goes to its first field.
+                        setWantFocus('keyword-edit-keyword');
+                        setEditor({
+                          id: keyword.id,
+                          date: keyword.date,
+                          form: { keyword: keyword.keyword, memo: keyword.memo },
+                        });
+                      }}
+                    >
+                      Edit
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      id={`keyword-delete-${keyword.id}`}
+                      disabled={busy}
+                      aria-label={`${keyword.keyword} delete`}
+                      onClick={() => setDeletingId(keyword.id)}
+                    >
+                      Delete
+                    </Button>
+                    <DeleteConfirm
+                      open={deletingId === keyword.id}
+                      title="Delete this keyword?"
+                      description={keyword.keyword}
+                      onConfirm={() => {
+                        nameNext('delete');
+                        return remove(keyword);
+                      }}
+                      onCancel={() => {
+                        setDeletingId(undefined);
+                        setWantFocus(`keyword-delete-${keyword.id}`);
+                      }}
+                    />
                   </div>
                 </li>
               ),

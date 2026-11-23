@@ -4,6 +4,7 @@ import React, { useEffect, useState } from 'react';
 import { useBusy } from './busy';
 import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
+import { DeleteConfirm } from './delete-confirm';
 import { Exercises } from './exercises';
 import { ImportantExercises } from './important-exercises';
 import type { RequestError } from './lib/api';
@@ -263,58 +264,35 @@ export function Textbooks() {
                 </div>
               </dl>
               <div className="log-actions">
-                {confirmingDelete ? (
-                  <>
-                    <Button
-                      type="button"
-                      id="textbook-delete-confirm"
-                      variant="destructive"
-                      disabled={busy}
-                      aria-label={`Confirm textbook deletion: ${selected.title}`}
-                      onClick={() => void remove(selected.id)}
-                    >
-                      <ButtonSpinner when={action === 'delete'} />
-                      Confirm delete
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={busy}
-                      aria-label={`Cancel textbook deletion: ${selected.title}`}
-                      onClick={() => {
-                        setConfirmingDelete(false);
-                        setWantFocus('textbook-delete');
-                      }}
-                    >
-                      Cancel
-                    </Button>
-                  </>
-                ) : (
-                  <>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      disabled={busy}
-                      aria-label={`Edit textbook: ${selected.title}`}
-                      onClick={() => edit(selected)}
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      type="button"
-                      id="textbook-delete"
-                      variant="outline"
-                      disabled={busy}
-                      aria-label={`Delete textbook: ${selected.title}`}
-                      onClick={() => {
-                        setConfirmingDelete(true);
-                        setWantFocus('textbook-delete-confirm');
-                      }}
-                    >
-                      Delete
-                    </Button>
-                  </>
-                )}
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={busy}
+                  aria-label={`Edit textbook: ${selected.title}`}
+                  onClick={() => edit(selected)}
+                >
+                  Edit
+                </Button>
+                <Button
+                  type="button"
+                  id="textbook-delete"
+                  variant="outline"
+                  disabled={busy}
+                  aria-label={`Delete textbook: ${selected.title}`}
+                  onClick={() => setConfirmingDelete(true)}
+                >
+                  Delete
+                </Button>
+                <DeleteConfirm
+                  open={confirmingDelete}
+                  title="Delete this textbook?"
+                  description={selected.title}
+                  onConfirm={() => remove(selected.id)}
+                  onCancel={() => {
+                    setConfirmingDelete(false);
+                    setWantFocus('textbook-delete');
+                  }}
+                />
               </div>
             </>
           )}

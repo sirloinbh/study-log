@@ -91,6 +91,11 @@ const form = () => document.querySelector('form')!;
 const submit = () => fireEvent.submit(form());
 // The register/edit card, the textbook list card and the detail card.
 const formCard = () => within(form().closest('section')!);
+// Confirms in the dialog and waits for it to close, so the page behind it is readable again.
+async function confirmDelete() {
+  click('Delete');
+  await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+}
 const detail = () => within(screen.getByRole('region', { name: 'Textbook details' }));
 const items = () =>
   within(screen.getByRole('heading', { name: 'Textbook list' }).closest('section')!).queryAllByRole(
@@ -222,12 +227,12 @@ test('deleting needs a second click and can be cancelled', async () => {
   await open();
   await choose('선형대수와 그 응용');
   click('Delete textbook: 선형대수와 그 응용', detail());
-  click('Cancel textbook deletion: 선형대수와 그 응용', detail());
+  click('Cancel');
   expect(calls(api, 'DELETE')).toHaveLength(0);
 
   click('Delete textbook: 선형대수와 그 응용', detail());
   expect(calls(api, 'DELETE')).toHaveLength(0);
-  click('Confirm textbook deletion: 선형대수와 그 응용');
+  await confirmDelete();
   expect(await screen.findByText('Deleted')).toBeInTheDocument();
   expect(calls(api, 'DELETE').map((request) => request.path)).toEqual(['/api/textbooks/1']);
   await waitFor(() => expect(items()).toHaveLength(0));
@@ -240,7 +245,7 @@ test('deleting the textbook being edited ends the edit', async () => {
   await choose('선형대수와 그 응용');
   click('Edit textbook: 선형대수와 그 응용', detail());
   click('Delete textbook: 선형대수와 그 응용', detail());
-  click('Confirm textbook deletion: 선형대수와 그 응용');
+  await confirmDelete();
   await screen.findByText('Deleted');
   expect(heading()).toBe('Register a textbook');
   expect(field('Title')).toBe('');
@@ -322,7 +327,8 @@ test('selecting moves focus to the detail only when it is stacked below the list
   ] as const) {
     const focused: string[] = [];
     vi.spyOn(HTMLElement.prototype, 'focus').mockImplementation(function (this: HTMLElement) {
-      focused.push(this.id);
+      // The dialog moves its own focus around; only the screen's focus steps are of interest.
+      if (!this.closest('[role="dialog"]')) focused.push(this.id);
     });
     vi.stubGlobal('matchMedia', (query: string) => ({
       matches: narrow && query === '(max-width: 760px)',
@@ -343,7 +349,7 @@ test('a 404 when deleting reports it, reloads and clears the detail', async () =
   click('Delete textbook: 선형대수와 그 응용', detail());
   // The textbook disappears on the server before the delete is confirmed here.
   api.books.splice(0, 1);
-  click('Confirm textbook deletion: 선형대수와 그 응용');
+  await confirmDelete();
   expect(await screen.findByRole('alert')).toHaveTextContent(/Textbook not found/);
   await waitFor(() => expect(items()).toHaveLength(0));
   expect(detail().getByText(CHOOSE)).toBeInTheDocument();
@@ -366,12 +372,12 @@ test('focus follows the delete flow: confirm, back on cancel, the list after', a
   await open();
   await choose('선형대수와 그 응용');
   click('Delete textbook: 선형대수와 그 응용', detail());
-  await waitFor(() => expect(focusedId()).toBe('textbook-delete-confirm'));
-  click('Cancel textbook deletion: 선형대수와 그 응용', detail());
+  expect(await screen.findByRole('dialog')).toBeInTheDocument();
+  click('Cancel');
   await waitFor(() => expect(focusedId()).toBe('textbook-delete'));
   click('Delete textbook: 선형대수와 그 응용', detail());
-  await waitFor(() => expect(focusedId()).toBe('textbook-delete-confirm'));
-  click('Confirm textbook deletion: 선형대수와 그 응용', detail());
+  expect(await screen.findByRole('dialog')).toBeInTheDocument();
+  await confirmDelete();
   await waitFor(() => expect(focusedId()).toBe('textbook-list'));
   expect(document.activeElement).toHaveAttribute('tabindex', '-1');
 });
@@ -385,7 +391,7 @@ test('a failed textbook delete puts focus back on delete, a 404 on the list', as
     await open();
     await choose('선형대수와 그 응용');
     click('Delete textbook: 선형대수와 그 응용', detail());
-    click('Confirm textbook deletion: 선형대수와 그 응용', detail());
+    await confirmDelete();
     await screen.findByRole('alert');
     await waitFor(() => expect(focusedId(), String(reject.status)).toBe(target));
     cleanup();
