@@ -41,6 +41,8 @@ type Options = {
   failReload?: boolean;
   // The pattern answered for every period; null answers a 500.
   pattern?: Record<string, unknown> | null;
+  // The answer to a draft request (#362).
+  draft?: Answer;
 };
 
 // The retrospective API in memory. `periods`, `patterns` and `writes` read what the screen asked.
@@ -73,6 +75,8 @@ function server(initial: Retro[] = [], options: Options = {}) {
     }
     if (path.startsWith('/api/retrospectives?'))
       return { body: { retrospectives: [...rows].sort((a, b) => b.from.localeCompare(a.from)) } };
+    if (method === 'POST' && /^\/api\/retrospectives\/\w+\/.+\/draft$/.test(path))
+      return options.draft ?? { body: { draft: 'Drafted by Claude', model: 'claude-sonnet-5-5' } };
     const one = path.match(/^\/api\/retrospectives\/(\w+)\/(.+)$/);
     if (!one) return undefined;
     const index = rows.findIndex((r) => r.kind === one[1] && r.from === one[2]);
@@ -242,6 +246,54 @@ describe('retrospectives', () => {
     await expectHeading('September 2026 Monthly retrospective');
     expect(api.periods.at(-1)).toBe('monthly:2026-09-01');
     expect(field()).toHaveValue('9월에는 미적분을 끝냈다');
+  });
+
+  test('a draft from Claude fills the empty editor and saves nothing (#362)', async () => {
+    const api = await open();
+    await expectHeading('Oct 18 – Oct 24, 2026 Weekly retrospective');
+    fireEvent.click(await writer().findByRole('button', { name: 'Draft with Claude' }));
+    await waitFor(() => expect(field()).toHaveValue('Drafted by Claude'));
+    expect(await writer().findByText('Draft ready. Edit it, then save')).toBeInTheDocument();
+    expect(api.writes).toEqual([
+      { method: 'POST', path: '/api/retrospectives/weekly/2026-10-18/draft', body: {} },
+    ]);
+    expect(api.rows).toEqual([]);
+    // Saving is a separate step, with the edited text.
+    type('Drafted by Claude, edited');
+    submit();
+    await waitFor(() => expect(api.rows).toHaveLength(1));
+    expect(api.rows[0].body).toBe('Drafted by Claude, edited');
+  });
+
+  test('a draft over written text asks before it replaces it', async () => {
+    const api = await open();
+    await expectHeading('Oct 18 – Oct 24, 2026 Weekly retrospective');
+    type('my own words');
+    fireEvent.click(writer().getByRole('button', { name: 'Draft with Claude' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(api.writes).toEqual([]);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(field()).toHaveValue('my own words');
+    fireEvent.click(writer().getByRole('button', { name: 'Draft with Claude' }));
+    fireEvent.click(
+      within(await screen.findByRole('dialog')).getByRole('button', { name: 'Replace' }),
+    );
+    await waitFor(() => expect(field()).toHaveValue('Drafted by Claude'));
+  });
+
+  test('a failed draft is reported and the written text stays', async () => {
+    await open([], {
+      draft: {
+        status: 429,
+        body: { error: 'Too many retrospective requests. Try again in a moment' },
+      },
+    });
+    await expectHeading('Oct 18 – Oct 24, 2026 Weekly retrospective');
+    fireEvent.click(await writer().findByRole('button', { name: 'Draft with Claude' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(/Too many retrospective requests/);
+    expect(field()).toHaveValue('');
+    expect(writer().getByRole('button', { name: 'Draft with Claude' })).toBeEnabled();
   });
 
   test('a failed load is reported instead of an empty form', async () => {

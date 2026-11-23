@@ -16,6 +16,7 @@ import { type FileStorage, s3Storage } from './file-storage.js';
 import { dataPortalHolidays, type HolidayFetcher } from './holidays.js';
 import { flashcardRoutes } from './keyword-flashcards.js';
 import { keywordRoutes } from './keywords.js';
+import { claudeDrafter, type Drafter } from './retrospective-draft.js';
 import { retrospectiveRoutes } from './retrospectives.js';
 import { reviewRoutes } from './reviews.js';
 import { dailyCatchUp, scheduleRoutes } from './schedules.js';
@@ -43,6 +44,7 @@ export function createApp(
   options: {
     today?: () => string;
     translator?: Translator;
+    drafter?: Drafter;
     extractor?: Extractor;
     holidayFetcher?: HolidayFetcher;
     fileStorage?: FileStorage;
@@ -103,7 +105,10 @@ export function createApp(
   // Before the stats routes, so '/goal' is not looked up there.
   app.use('/api/stats/goal', studyGoalRoutes(pool, today));
   app.use('/api/stats', statsRoutes(pool, today));
-  app.use('/api/retrospectives', retrospectiveRoutes(pool, today));
+  app.use(
+    '/api/retrospectives',
+    retrospectiveRoutes(pool, today, options.drafter ?? claudeDrafter()),
+  );
   app.use(
     '/api/schedules',
     scheduleRoutes(pool, today, options.holidayFetcher ?? dataPortalHolidays()),

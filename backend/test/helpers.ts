@@ -7,6 +7,7 @@ import { createApp } from '../src/app.js';
 import type { Extractor } from '../src/extraction.js';
 import type { FileStorage } from '../src/file-storage.js';
 import type { HolidayFetcher } from '../src/holidays.js';
+import type { Drafter } from '../src/retrospective-draft.js';
 import type { SolvedAcClient } from '../src/solvedac.js';
 import type { Translator } from '../src/translation.js';
 
@@ -115,6 +116,7 @@ export async function withApi(
   options: {
     today?: () => string;
     translator?: Translator;
+    drafter?: Drafter;
     extractor?: Extractor;
     holidayFetcher?: HolidayFetcher;
     fileStorage?: FileStorage;
@@ -129,6 +131,12 @@ export async function withApi(
     // Tests never reach Claude: translating fails unless a test hands in its own translator (#31).
     const translator: Translator =
       options.translator ??
+      (async () => {
+        throw new Error('tests must not call the Claude API');
+      });
+    // Nor for retrospective drafts (#362).
+    const drafter: Drafter =
+      options.drafter ??
       (async () => {
         throw new Error('tests must not call the Claude API');
       });
@@ -166,6 +174,7 @@ export async function withApi(
       ...options,
       solvedAcClient: solvedAc,
       translator,
+      drafter,
       extractor,
       holidayFetcher,
       fileStorage,
