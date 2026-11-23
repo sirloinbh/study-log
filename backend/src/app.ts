@@ -14,6 +14,7 @@ import { contentExerciseRoutes, exerciseRoutes, textbookExerciseRoutes } from '.
 import { claudeExtractor, type Extractor } from './extraction.js';
 import { type FileStorage, s3Storage } from './file-storage.js';
 import { dataPortalHolidays, type HolidayFetcher } from './holidays.js';
+import { flashcardRoutes } from './keyword-flashcards.js';
 import { keywordRoutes } from './keywords.js';
 import { retrospectiveRoutes } from './retrospectives.js';
 import { reviewRoutes } from './reviews.js';
@@ -86,6 +87,7 @@ export function createApp(
   app.use('/api/study-logs', studyLogRoutes(pool));
   app.use('/api/reviews', reviewRoutes(pool, today));
   app.use('/api/keywords', keywordRoutes(pool, today));
+  app.use('/api/flashcards', flashcardRoutes(pool, today));
   app.use(
     '/api/coding/solvedac',
     solvedAcRoutes(
