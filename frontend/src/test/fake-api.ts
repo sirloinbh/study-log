@@ -97,7 +97,10 @@ export function fakeApi(source: Handler | Routes): Api {
         };
         api.requests.push(request);
         if (method !== 'GET') api.sent.push(request);
-        const answer = await handle(request);
+        // The study timer card sits on the study log page; a test that does not care sees no timer.
+        const answer =
+          (await handle(request)) ??
+          (method === 'GET' && path === '/api/study-timer' ? { body: { timer: null } } : undefined);
         if (!answer) {
           api.unexpected.push(request);
           throw new TypeError(`Unexpected request: ${method} ${path}`);

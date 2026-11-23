@@ -23,6 +23,7 @@ import { apiRateLimit } from './standard/rate-limit.js';
 import { registerToolRoutes } from './standard/tools.js';
 import { statsRoutes } from './stats.js';
 import { studyLogRoutes } from './study-logs.js';
+import { studyTimerRoutes } from './study-timer.js';
 import { textbookContentRoutes } from './textbook-contents.js';
 import { textbookRoutes } from './textbooks.js';
 import { claudeTranslator, type Translator } from './translation.js';
@@ -79,6 +80,7 @@ export function createApp(
   // Before the study log routes, where 'calendar' would be read as a log id.
   app.use('/api/study-logs/calendar', calendarRoutes(pool, today));
   app.use('/api/study-logs', studyLogRoutes(pool));
+  app.use('/api/study-timer', studyTimerRoutes(pool));
   app.use('/api/reviews', reviewRoutes(pool, today));
   app.use('/api/keywords', keywordRoutes(pool, today));
   app.use('/api/coding', codingRoutes(pool, today));
