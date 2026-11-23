@@ -39,9 +39,11 @@ export function StudyTimeChart({
   }[unit];
 
   return (
-    <section className="card study-chart" aria-labelledby="study-chart-heading">
-      <div className="chart-head">
-        <h2 id="study-chart-heading">Study time trend</h2>
+    <section className="card grid min-w-0 gap-2.5" aria-labelledby="study-chart-heading">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 id="study-chart-heading" className="m-0">
+          Study time trend
+        </h2>
         <div className="period-filter" role="group" aria-label="Chart unit">
           {chartUnits.map((key) => (
             <Button
@@ -71,7 +73,10 @@ export function StudyTimeChart({
           ) : !R ? (
             <Loading label="Loading the chart" kind="text" />
           ) : (
-            <div className="chart-box" aria-hidden="true">
+            <div
+              className="min-w-0 text-primary [&_.recharts-cartesian-axis-tick-value]:fill-muted-foreground"
+              aria-hidden="true"
+            >
               <R.ResponsiveContainer width="100%" height={240}>
                 <R.BarChart data={bars} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
                   <R.CartesianGrid vertical={false} stroke="var(--border)" />
