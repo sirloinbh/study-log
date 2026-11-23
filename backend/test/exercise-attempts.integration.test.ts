@@ -242,3 +242,95 @@ test(
     );
   },
 );
+
+test(
+  'feedback is stored per attempt, listed with it after a reload, and goes with it (#363)',
+  { skip: !url },
+  async (t) => {
+    const pool = new Pool({ connectionString: url });
+    const prefix = '[통합테스트 피드백]';
+    const cleanup = () => pool.query('DELETE FROM textbooks WHERE title LIKE $1', [`${prefix}%`]);
+    await cleanup();
+    t.after(async () => {
+      await cleanup();
+      await pool.end();
+    });
+
+    await withApi(
+      pool,
+      async (call) => {
+        const post = async (path: string, body: unknown, field: string) =>
+          ((await call(path, { method: 'POST', body })).data[field] as { id: number }).id;
+        const book = await post('/api/textbooks', { title: `${prefix} 책` }, 'textbook');
+        const chapter = await post(`/api/textbooks/${book}/contents`, { title: '1장' }, 'content');
+        const exercise = await post(
+          `/api/textbooks/${book}/contents/${chapter}/exercises`,
+          { body: '증명하시오' },
+          'exercise',
+        );
+        await call(`/api/exercises/${exercise}/answer`, {
+          method: 'PUT',
+          body: { body: '귀납법' },
+        });
+        const first = await post(
+          `/api/exercises/${exercise}/attempts`,
+          { result: 'wrong', date: '2026-11-01' },
+          'attempt',
+        );
+        const second = await post(
+          `/api/exercises/${exercise}/attempts`,
+          { result: 'correct', date: '2026-11-02' },
+          'attempt',
+        );
+
+        const asked = await call(`/api/exercise-attempts/${first}/feedback`, {
+          method: 'POST',
+          body: { mode: 'grade', solution: '내 풀이' },
+        });
+        assert.equal(asked.status, 201);
+        await call(`/api/exercise-attempts/${first}/feedback`, {
+          method: 'POST',
+          body: { mode: 'hint', solution: '다시 푼 풀이' },
+        });
+
+        // After a reload the attempt lists its feedback, oldest first; the other attempt has none.
+        const list = (await call(`/api/exercises/${exercise}/attempts`)).data.attempts as {
+          id: number;
+          feedback: { mode: string; solution: string; feedback: string; hasImage: boolean }[];
+        }[];
+        const byId = new Map(list.map((a) => [a.id, a.feedback]));
+        assert.deepEqual(byId.get(second), []);
+        assert.deepEqual(
+          byId.get(first)?.map((f) => [f.mode, f.solution, f.feedback, f.hasImage]),
+          [
+            ['grade', '내 풀이', 'Feedback: grade', false],
+            ['hint', '다시 푼 풀이', 'Feedback: hint', false],
+          ],
+        );
+        assert.equal(
+          (
+            await call('/api/exercise-attempts/999999999/feedback', {
+              method: 'POST',
+              body: { mode: 'hint', solution: 'x' },
+            })
+          ).status,
+          404,
+        );
+
+        // Deleting the attempt, then the exercise, removes the feedback rows.
+        await call(`/api/exercise-attempts/${first}`, { method: 'DELETE' });
+        const left = await pool.query(
+          'SELECT 1 FROM exercise_attempt_feedback WHERE attempt_id = $1',
+          [first],
+        );
+        assert.equal(left.rowCount, 0);
+      },
+      {
+        feedbacker: async (source) => ({
+          feedback: `Feedback: ${source.mode}`,
+          model: 'claude-sonnet-5-5',
+        }),
+      },
+    );
+  },
+);

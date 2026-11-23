@@ -4,6 +4,7 @@ import { z } from 'zod/v4';
 
 import { auditChange } from './audit-log.js';
 import { calendarDate } from './dates.js';
+import { feedbackColumns } from './exercise-feedback-routes.js';
 import { syncExerciseReview } from './exercise-reviews.js';
 import { inTransaction } from './sql.js';
 import { parseId } from './standard/http.js';
@@ -45,8 +46,13 @@ export function exerciseAttemptRoutes(pool: Pool, today: () => string) {
     const id = parseId((req.params as Record<string, string>).id, 'exercise');
     const exercise = await pool.query('SELECT 1 FROM exercises WHERE id = $1', [id]);
     if (!exercise.rowCount) return void res.status(404).json(notFound);
+    // Each attempt carries the feedback Claude gave on it (#363), oldest first.
     const { rows } = await pool.query(
-      `SELECT ${columns} FROM exercise_attempts WHERE exercise_id = $1
+      `SELECT ${columns},
+         COALESCE((SELECT json_agg(to_jsonb(f) ORDER BY f.id) FROM (
+           SELECT ${feedbackColumns} FROM exercise_attempt_feedback WHERE attempt_id = a.id
+         ) f), '[]'::json) AS feedback
+       FROM exercise_attempts a WHERE exercise_id = $1
        ORDER BY attempt_date DESC, id DESC`,
       [id],
     );

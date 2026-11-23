@@ -4,6 +4,7 @@ import type express from 'express';
 import { Client, type Pool, Pool as RealPool } from 'pg';
 
 import { createApp } from '../src/app.js';
+import type { Feedbacker } from '../src/exercise-feedback.js';
 import type { Extractor } from '../src/extraction.js';
 import type { FileStorage } from '../src/file-storage.js';
 import type { HolidayFetcher } from '../src/holidays.js';
@@ -118,6 +119,7 @@ export async function withApi(
     translator?: Translator;
     drafter?: Drafter;
     extractor?: Extractor;
+    feedbacker?: Feedbacker;
     holidayFetcher?: HolidayFetcher;
     fileStorage?: FileStorage;
     requestsPerMinute?: number;
@@ -143,6 +145,12 @@ export async function withApi(
     // Nor for reading files (#30).
     const extractor: Extractor =
       options.extractor ??
+      (async () => {
+        throw new Error('tests must not call the Claude API');
+      });
+    // Nor for feedback on solutions (#363).
+    const feedbacker: Feedbacker =
+      options.feedbacker ??
       (async () => {
         throw new Error('tests must not call the Claude API');
       });
@@ -176,6 +184,7 @@ export async function withApi(
       translator,
       drafter,
       extractor,
+      feedbacker,
       holidayFetcher,
       fileStorage,
     }).listen(0, '127.0.0.1');

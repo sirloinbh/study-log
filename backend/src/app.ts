@@ -9,6 +9,8 @@ import { codingRoutes } from './coding-problems.js';
 import { solvedAcRoutes } from './coding-solvedac.js';
 import { refuseCrossSiteWrites } from './cross-site.js';
 import { attemptRoutes, exerciseAttemptRoutes, wrongExerciseRoutes } from './exercise-attempts.js';
+import { claudeFeedbacker, type Feedbacker } from './exercise-feedback.js';
+import { feedbackRoutes } from './exercise-feedback-routes.js';
 import { exerciseFileRoutes, fileRoutes } from './exercise-files.js';
 import { contentExerciseRoutes, exerciseRoutes, textbookExerciseRoutes } from './exercises.js';
 import { exportRoutes } from './export.js';
@@ -47,6 +49,7 @@ export function createApp(
     translator?: Translator;
     drafter?: Drafter;
     extractor?: Extractor;
+    feedbacker?: Feedbacker;
     holidayFetcher?: HolidayFetcher;
     fileStorage?: FileStorage;
     requestsPerMinute?: number;
@@ -124,6 +127,7 @@ export function createApp(
   app.use('/api/exercises/wrong', wrongExerciseRoutes(pool));
   app.use('/api/exercises/:id/attempts', exerciseAttemptRoutes(pool, today));
   app.use('/api/exercise-attempts', attemptRoutes(pool));
+  app.use('/api/exercise-attempts', feedbackRoutes(pool, options.feedbacker ?? claudeFeedbacker()));
   app.use('/api/exercises/:id/files', exerciseFileRoutes(pool, fileStorage));
   app.use('/api/exercise-files', fileRoutes(pool, fileStorage));
   app.use(

@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Button } from './components/ui/button';
 import { DeleteConfirm } from './delete-confirm';
 import type { ExerciseAttempt } from './exercise';
+import { ExerciseFeedback } from './exercise-feedback';
 import { apiKey, useApiMutation, useApiQuery } from './lib/query';
 import { Loading } from './loading';
 
@@ -125,6 +126,12 @@ export function ExerciseAttempts({
                   >
                     Delete
                   </Button>
+                  <ExerciseFeedback
+                    attemptId={attempt.id}
+                    label={`${label} attempt of ${attempt.date}`}
+                    items={attempt.feedback ?? []}
+                    onSaved={() => void query.refetch()}
+                  />
                 </li>
               ))}
             </ul>

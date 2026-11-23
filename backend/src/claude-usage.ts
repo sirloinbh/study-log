@@ -2,7 +2,7 @@
 // called which model, and what it cost in tokens. The shape follows the request log in
 // standard/http.ts. Prompt and answer text are never logged, and a failure logs only its type and
 // status, not its message (an API error message can echo part of the request).
-export type ClaudeFeature = 'translation' | 'extraction' | 'retrospective';
+export type ClaudeFeature = 'translation' | 'extraction' | 'retrospective' | 'feedback';
 
 const count = (value: unknown) => (typeof value === 'number' ? value : null);
 

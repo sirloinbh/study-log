@@ -19,6 +19,20 @@ export type ExerciseAttempt = {
   result: 'correct' | 'wrong';
   hintUsed: boolean;
   note: string;
+  // Claude's feedback on this attempt (#363), oldest first.
+  feedback?: AttemptFeedback[];
+};
+
+export type FeedbackMode = 'hint' | 'grade' | 'explanation';
+export type AttemptFeedback = {
+  id: number;
+  attemptId: number;
+  mode: FeedbackMode;
+  solution: string;
+  hasImage: boolean;
+  feedback: string;
+  model: string;
+  createdAt: string;
 };
 
 // A row of the wrong-exercise list (#357).

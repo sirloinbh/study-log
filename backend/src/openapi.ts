@@ -12,6 +12,7 @@ import {
   problemUpdateInput,
 } from './coding-problems.js';
 import { attemptInput, wrongListQuery } from './exercise-attempts.js';
+import { feedbackInput } from './exercise-feedback-routes.js';
 import {
   answerInput,
   answersInput,
@@ -417,6 +418,12 @@ export const operations: Record<string, Operation> = {
       'Record an attempt: correct or wrong, whether a hint was used, on a date (default today)',
     body: ['ExerciseAttempt', attemptInput],
     status: [201, 400, 404],
+  },
+  'POST /api/exercise-attempts/:id/feedback': {
+    summary:
+      'Ask Claude for a hint, a grade or an explanation of a solution (JSON text, or multipart with a JPEG or PNG photo); stored per attempt',
+    body: ['ExerciseFeedback', feedbackInput],
+    status: [201, 400, 403, 404, 415, 422, 429, 502, 503, 504],
   },
   'DELETE /api/exercise-attempts/:id': { summary: 'Delete an attempt', status: [204, 400, 404] },
   'DELETE /api/exercise-files/:fileId': {
