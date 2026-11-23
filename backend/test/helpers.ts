@@ -7,6 +7,7 @@ import { createApp } from '../src/app.js';
 import type { Extractor } from '../src/extraction.js';
 import type { FileStorage } from '../src/file-storage.js';
 import type { HolidayFetcher } from '../src/holidays.js';
+import type { SolvedAcClient } from '../src/solvedac.js';
 import type { Translator } from '../src/translation.js';
 
 // Ports the fetch standard refuses to connect to ("bad port"), as listed in the Fetch spec's
@@ -120,6 +121,8 @@ export async function withApi(
     requestsPerMinute?: number;
     auth?: express.RequestHandler;
     scheduleCatchUp?: boolean;
+    solvedAcClient?: SolvedAcClient;
+    solvedAcHandle?: string;
   } = {},
 ) {
   const { server, port } = await openFetchablePort(async () => {
@@ -150,8 +153,18 @@ export async function withApi(
       get: refuse,
       remove: refuse,
     };
+    // Nor solved.ac (#369).
+    const solvedAc: SolvedAcClient = options.solvedAcClient ?? {
+      problem: async () => {
+        throw new Error('tests must not call solved.ac');
+      },
+      solvedPage: async () => {
+        throw new Error('tests must not call solved.ac');
+      },
+    };
     const server = createApp(withTransactions(pool), {
       ...options,
+      solvedAcClient: solvedAc,
       translator,
       extractor,
       holidayFetcher,
