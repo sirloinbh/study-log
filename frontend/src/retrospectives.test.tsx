@@ -314,13 +314,11 @@ describe('retrospectives', () => {
       /You study most at 21:00–22:00 \(1 h 45 min\), and on Wed \(1 h 45 min\)/,
     );
     // Weekday bars from Sunday, widths relative to the busiest day.
-    const bars = Array.from(patternEl().querySelectorAll<HTMLElement>('.pattern-bar'));
+    const bars = Array.from(patternEl().querySelectorAll<HTMLElement>('[data-bar]'));
     expect(bars.map((n) => n.style.width)).toEqual(['86%', '0%', '0%', '100%', '0%', '0%', '0%']);
-    const hours = Array.from(
-      patternEl().querySelectorAll<HTMLElement>('.pattern-hour, .pattern-hour.top'),
-    );
+    const hours = Array.from(patternEl().querySelectorAll<HTMLElement>('[data-hour]'));
     expect(hours).toHaveLength(24);
-    expect(hours[21].className).toBe('pattern-hour top');
+    expect(hours.filter((hour) => hour.hasAttribute('data-top'))).toEqual([hours[21]]);
     expect(hours[0].title).toBe('00:00–01:00: 1 h');
     // Moving to another week asks for its pattern.
     await move('Previous week', 'Oct 11 – Oct 17, 2026 Weekly retrospective');

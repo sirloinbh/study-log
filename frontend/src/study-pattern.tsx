@@ -26,8 +26,8 @@ export function StudyPattern({
   const failed = query.error?.message;
 
   return (
-    <section className="study-pattern" aria-label="Study pattern">
-      <h3>Study pattern</h3>
+    <section className="mt-5 border-t border-border pt-4" aria-label="Study pattern">
+      <h3 className="m-0 mb-2 text-[14px]">Study pattern</h3>
       {failed ? (
         <p role="alert" className="error">
           Could not load the study pattern: {failed}
@@ -40,33 +40,44 @@ export function StudyPattern({
         </p>
       ) : (
         <>
-          <p className="pattern-summary">
+          <p className="m-0 mb-3">
             You study most at <strong>{hourLabel(pattern.topHour)}</strong> (
             {formatMinutes(pattern.byHour[pattern.topHour])}), and on{' '}
             <strong>{weekdayNames[pattern.topWeekday]}</strong> (
             {formatMinutes(pattern.byWeekday[pattern.topWeekday])}).
           </p>
-          <div className="pattern-bars" aria-label="Study time by weekday">
+          <div className="mb-4 grid gap-1" aria-label="Study time by weekday">
             {pattern.byWeekday.map((minutes, day) => (
-              <div key={day} className="pattern-row">
-                <span className="pattern-name">{weekdayNames[day]}</span>
-                <span className="pattern-track" aria-hidden="true">
+              <div
+                key={day}
+                className="grid grid-cols-[20px_minmax(0,1fr)_84px] items-center gap-2 text-[12px]"
+              >
+                <span>{weekdayNames[day]}</span>
+                <span className="h-2.5 rounded-[3px] bg-muted" aria-hidden="true">
                   <span
-                    className="pattern-bar"
+                    data-bar
+                    className="block h-full rounded-[3px] bg-ring"
                     style={{ width: barWidth(minutes, pattern.byWeekday) }}
                   />
                 </span>
-                <span className="pattern-value">{minutes ? formatMinutes(minutes) : '—'}</span>
+                <span className="text-right whitespace-nowrap text-muted-foreground">
+                  {minutes ? formatMinutes(minutes) : '—'}
+                </span>
               </div>
             ))}
           </div>
           {/* Twenty-four thin columns, midnight first. The bars are for sight; the values are in a
               list for screen readers and touch users, who have no tooltip. */}
-          <div className="pattern-hours" aria-hidden="true">
+          <div
+            className="grid h-16 grid-cols-[repeat(24,minmax(0,1fr))] items-end gap-0.5 border-b border-border"
+            aria-hidden="true"
+          >
             {pattern.byHour.map((minutes, hour) => (
               <span
                 key={hour}
-                className={hour === pattern.topHour ? 'pattern-hour top' : 'pattern-hour'}
+                data-hour
+                data-top={hour === pattern.topHour ? '' : undefined}
+                className={`block min-h-px rounded-t-[2px] ${hour === pattern.topHour ? 'bg-primary' : 'bg-[color-mix(in_oklch,var(--foreground)_18%,transparent)]'}`}
                 title={`${hourLabel(hour)}: ${formatMinutes(minutes)}`}
                 style={{ height: barWidth(minutes, pattern.byHour) }}
               />
@@ -79,7 +90,10 @@ export function StudyPattern({
               </li>
             ))}
           </ul>
-          <div className="pattern-axis" aria-hidden="true">
+          <div
+            className="flex justify-between text-[11px] text-muted-foreground"
+            aria-hidden="true"
+          >
             <span>00:00</span>
             <span>06:00</span>
             <span>12:00</span>
