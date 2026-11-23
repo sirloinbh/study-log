@@ -16,3 +16,7 @@
 ## Checked
 
 - `npm run check`, `node .standards/check.mjs`; browser at 390x844 and 1440x900 (mocked API): range typed, a download starts, buttons fit the card, no overflow.
+
+## Also in this PR
+
+- Renumbered `027_keyword_cards.sql` to `028_keyword_cards.sql`: it and lane-3's `027_weekly_goals.sql` were merged to main at the same time and `db:migrate` refused two files with number 027 (main CI was red). Both files are idempotent, so re-running under the new name is safe.
