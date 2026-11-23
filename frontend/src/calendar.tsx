@@ -56,9 +56,9 @@ export function Calendar({ today, reloadKey }: { today: string; reloadKey?: numb
     `${day.logs} ${day.logs === 1 ? 'log' : 'logs'}`;
 
   return (
-    <section className="card study-calendar" aria-label="Study calendar">
-      <div className="calendar-head">
-        <h2>{monthTitle(month)}</h2>
+    <section className="card" aria-label="Study calendar">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <h2 className="m-0">{monthTitle(month)}</h2>
         <div className="actions">
           <Button
             type="button"
@@ -98,9 +98,13 @@ export function Calendar({ today, reloadKey }: { today: string; reloadKey?: numb
       {!days ? (
         !error && <Loading label="Loading the calendar" kind="text" />
       ) : (
-        <div className="calendar-grid">
+        <div className="grid grid-cols-[repeat(7,minmax(0,1fr))] gap-1" data-calendar-grid>
           {weekdays.map((name) => (
-            <span key={name} className="calendar-weekday" aria-hidden="true">
+            <span
+              key={name}
+              className="text-center text-[12px] text-muted-foreground"
+              aria-hidden="true"
+            >
               {name}
             </span>
           ))}
@@ -109,19 +113,19 @@ export function Calendar({ today, reloadKey }: { today: string; reloadKey?: numb
               <button
                 key={day.date}
                 type="button"
-                className={[
-                  'calendar-day',
-                  day.minutes > 0 ? 'studied' : '',
-                  day.date === today ? 'today' : '',
-                ]
-                  .filter(Boolean)
-                  .join(' ')}
+                className={`flex min-h-[52px] flex-col items-center gap-0.5 rounded-[calc(var(--radius)-2px)] border border-border px-0.5 py-1.5 text-foreground aria-pressed:border-primary aria-pressed:shadow-[inset_0_0_0_1px_var(--primary)] ${day.minutes > 0 ? 'bg-muted' : 'bg-card'}`}
                 aria-pressed={day.date === selected}
                 aria-label={describe(day)}
                 onClick={() => setSelected(day.date)}
               >
-                <span className="calendar-date">{Number(day.date.slice(8))}</span>
-                <span className="calendar-minutes">{shortMinutes(day.minutes)}</span>
+                <span
+                  className={`text-[13px] ${day.date === today ? 'font-bold text-primary' : ''}`}
+                >
+                  {Number(day.date.slice(8))}
+                </span>
+                <span className="text-[11px] whitespace-nowrap text-primary">
+                  {shortMinutes(day.minutes)}
+                </span>
               </button>
             ) : (
               <span key={`before-${index}`} aria-hidden="true" />
@@ -129,8 +133,8 @@ export function Calendar({ today, reloadKey }: { today: string; reloadKey?: numb
           )}
         </div>
       )}
-      <div className="calendar-logs">
-        <h3>Logs for {selected}</h3>
+      <div>
+        <h3 className="mt-4 mb-2 text-[14px]">Logs for {selected}</h3>
         {logsError ? (
           <p role="alert" className="error">
             Could not load the logs: {logsError}

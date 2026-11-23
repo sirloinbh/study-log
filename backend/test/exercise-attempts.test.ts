@@ -65,3 +65,28 @@ test('an attempt is saved with today as its default date (#356)', async () => {
     { today: () => '2026-11-23' },
   );
 });
+
+test('the wrong-exercise list refuses a bad filter before touching the DB (#357)', async () => {
+  await withApi(untouchedPool, async (call) => {
+    for (const query of ['textbookId=abc', 'contentId=0', 'textbookId=1&contentId=-2']) {
+      const { status } = await call(`/api/exercises/wrong?${query}`);
+      assert.equal(status, 400, query);
+    }
+  });
+});
+
+test('the wrong-exercise list is not mistaken for an exercise id (#357)', async () => {
+  const seen: string[] = [];
+  const pool = {
+    query: async (sql: string, values?: unknown[]) => {
+      seen.push(`${sql.includes('latest') ? 'wrong-list' : 'other'} ${JSON.stringify(values)}`);
+      return { rows: [], rowCount: 0 };
+    },
+  } as unknown as Pool;
+  await withApi(pool, async (call) => {
+    const { status, data } = await call('/api/exercises/wrong?textbookId=4');
+    assert.equal(status, 200);
+    assert.deepEqual(data, { exercises: [] });
+  });
+  assert.deepEqual(seen, ['wrong-list [4,null]']);
+});

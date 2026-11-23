@@ -2,9 +2,9 @@
 
 ## What changed
 
-- `frontend/src/style.css` (screens, forms, contents, exercises, schedules, retrospectives, memo, badges) now uses Tailwind's `@apply` with the design tokens instead of plain declarations: 766 to about 470 lines. Class names and screens are unchanged, so no other lane's files are touched.
+- `frontend/src/style.css` (screens, forms, contents, exercises, schedules, retrospectives, memo, badges) now uses Tailwind's `@apply` with the design tokens instead of plain declarations: 766 to 399 lines. Class names and screens are unchanged, so no other lane's files are touched.
 - Removed dead rules (`.empty`, `.primary/.secondary/.danger` in the narrow-screen block); merged duplicates (`.log-actions`, status/alert margins, field boxes).
-- The calendar block stays for the lane that owns the calendar; the coding and attempt blocks belong to their lanes.
+- Merged with origin/main (lane-3 removed the calendar block); the coding and attempt blocks of the other lanes were converted too, since the file had to get under 400 lines.
 - `code` in memos now uses the token mono font stack.
 
 ## Checked

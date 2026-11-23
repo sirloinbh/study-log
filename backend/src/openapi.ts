@@ -11,7 +11,7 @@ import {
   problemListQuery,
   problemUpdateInput,
 } from './coding-problems.js';
-import { attemptInput } from './exercise-attempts.js';
+import { attemptInput, wrongListQuery } from './exercise-attempts.js';
 import {
   answerInput,
   answersInput,
@@ -122,6 +122,15 @@ export const operations: Record<string, Operation> = {
   },
   'DELETE /api/keywords/:id': { summary: 'Delete a keyword', status: [204, 400, 404] },
 
+  'GET /api/coding/solvedac/problems/:number': {
+    summary: 'Look up a Baekjoon problem on solved.ac (title, tier, tags) to fill in the form',
+    status: [200, 400, 404, 503],
+  },
+  'POST /api/coding/solvedac/import': {
+    summary:
+      'Add the Baekjoon problems the configured solved.ac handle has solved; recorded ones are skipped',
+    status: [200, 503],
+  },
   'GET /api/coding/problems': {
     summary: 'List coding problems with attempt counts; result and dates match the latest attempt',
     query: problemListQuery,
@@ -328,6 +337,12 @@ export const operations: Record<string, Operation> = {
   'GET /api/exercise-files/:fileId/content': {
     summary: 'Download the stored file itself',
     status: [200, 400, 404, 502, 503],
+  },
+  'GET /api/exercises/wrong': {
+    summary:
+      'List exercises whose latest attempt was wrong or used a hint, across textbooks, newest attempt first',
+    query: wrongListQuery,
+    status: [200, 400],
   },
   'GET /api/exercises/:id/attempts': {
     summary: 'List the attempts at an exercise, newest first',

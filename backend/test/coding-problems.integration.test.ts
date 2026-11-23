@@ -112,3 +112,58 @@ test(
     });
   },
 );
+
+test('importing solved.ac problems twice adds them once', { skip: !url }, async (t) => {
+  const pool = new Pool({ connectionString: url });
+  const ids = [9990001, 9990002, 9990003];
+  const cleanup = () =>
+    pool.query(`DELETE FROM coding_problems WHERE site = 'baekjoon' AND problem_key = ANY($1)`, [
+      ids.map(String),
+    ]);
+  await cleanup();
+  t.after(async () => {
+    await cleanup();
+    await pool.end();
+  });
+  const client = {
+    problem: async () => undefined,
+    solvedPage: async () => ({
+      total: 3,
+      items: ids.map((id) => ({ id, title: `Imported ${id}`, level: 7, tags: ['math', 'dp'] })),
+    }),
+  };
+  await withApi(
+    pool,
+    async (call) => {
+      // One of the three is recorded by hand first: it is skipped and left as it is.
+      await call('/api/coding/problems', {
+        method: 'POST',
+        body: { site: 'baekjoon', problemKey: String(ids[0]), title: 'By hand' },
+      });
+      const first = await call('/api/coding/solvedac/import', { method: 'POST' });
+      assert.deepEqual(first.data, { added: 2, skipped: 1, total: 3 });
+      const second = await call('/api/coding/solvedac/import', { method: 'POST' });
+      assert.deepEqual(second.data, { added: 0, skipped: 3, total: 3 });
+
+      const { rows } = await pool.query(
+        `SELECT problem_key, title, url, level, tags FROM coding_problems
+         WHERE site = 'baekjoon' AND problem_key = ANY($1) ORDER BY problem_key`,
+        [ids.map(String)],
+      );
+      assert.equal(rows.length, 3);
+      assert.equal(rows[0].title, 'By hand');
+      assert.deepEqual(rows[1], {
+        problem_key: String(ids[1]),
+        title: `Imported ${ids[1]}`,
+        url: `https://www.acmicpc.net/problem/${ids[1]}`,
+        level: 7,
+        tags: ['math', 'dp'],
+      });
+      const audited = await pool.query(
+        `SELECT 1 FROM audit_log WHERE entity = 'coding_problem' AND after->>'source' = 'solved.ac'`,
+      );
+      assert.ok(audited.rowCount && audited.rowCount >= 1, 'the import leaves an audit row');
+    },
+    { solvedAcClient: client, solvedAcHandle: 'some_user' },
+  );
+});
