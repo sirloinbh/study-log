@@ -68,7 +68,9 @@ export function ReviewRateChart({ period }: { period: StatPeriod }) {
         <p className="status">No reviews were scheduled for {periodLabels[period].toLowerCase()}</p>
       ) : (
         <>
-          <p className="metric-value">{stats.completionRate}%</p>
+          <p className="m-0 mb-1.5 text-[26px] font-semibold" data-metric-value>
+            {stats.completionRate}%
+          </p>
           <p className="status">
             {periodLabels[period]}: {stats.completed} of {stats.scheduled} scheduled reviews
             completed, {stats.delayed} delayed. Delayed means completed late, or past due and not

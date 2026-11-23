@@ -24,11 +24,15 @@ export function TextbookStats() {
   const choices = all.data?.textbooks ?? [];
 
   return (
-    <section className="card textbook-stats" aria-label="Textbooks and schedules">
+    <section className="card" aria-label="Textbooks and schedules">
       <h2>Textbooks and schedules</h2>
-      <label className="textbook-filter">
+      <label className="mb-4 grid max-w-80 grid-cols-[minmax(0,1fr)] gap-1.5 text-[12px] font-medium">
         Textbook
-        <NativeSelect value={textbookId} onChange={(event) => setTextbookId(event.target.value)}>
+        <NativeSelect
+          className="w-full min-w-0"
+          value={textbookId}
+          onChange={(event) => setTextbookId(event.target.value)}
+        >
           <option value="">All</option>
           {choices.map((book) => (
             <option key={book.id} value={book.id}>
@@ -75,15 +79,15 @@ export function TextbookStats() {
             </div>
           </dl>
           {stats.schedule.dueDays === 0 && (
-            <p className="status">No schedule has passed its due date yet</p>
+            <p className="status m-0">No schedule has passed its due date yet</p>
           )}
           {stats.textbooks.length === 0 ? (
-            <p className="status">No textbooks registered yet</p>
+            <p className="status m-0">No textbooks registered yet</p>
           ) : (
-            <ul className="textbook-progress">
+            <ul className="m-0 grid list-none gap-3.5 p-0">
               {stats.textbooks.map((book) => (
                 <li key={book.id}>
-                  <p>
+                  <p className="m-0 mb-1.5 flex flex-wrap justify-between gap-x-3 gap-y-1">
                     <span className="log-studied">{book.title}</span>
                     <span className="status">
                       {book.totalChapters === 0
@@ -94,12 +98,16 @@ export function TextbookStats() {
                   {book.totalChapters > 0 && (
                     <div
                       role="progressbar"
+                      className="h-2 overflow-hidden rounded-[4px] bg-muted"
                       aria-label={`${book.title} completed chapters`}
                       aria-valuemin={0}
                       aria-valuemax={100}
                       aria-valuenow={chapterPercent(book)}
                     >
-                      <div style={{ width: `${chapterPercent(book)}%` }} />
+                      <div
+                        className="h-full bg-primary"
+                        style={{ width: `${chapterPercent(book)}%` }}
+                      />
                     </div>
                   )}
                 </li>

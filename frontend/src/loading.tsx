@@ -22,7 +22,9 @@ export function Loading({
         role="group"
         aria-busy="true"
         aria-label={label}
-        className={kind === 'cards' ? 'metric-grid' : undefined}
+        className={
+          kind === 'cards' ? 'grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-4' : undefined
+        }
       >
         {kind === 'list' && <SkeletonList />}
         {kind === 'text' && <SkeletonText />}
