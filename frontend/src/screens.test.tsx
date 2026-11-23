@@ -40,6 +40,7 @@ describe('study logs', () => {
     let logs = start;
     return fakeApi(({ method, path, body }) => {
       if (path.startsWith('/api/textbooks')) return { body: { textbooks: [] } };
+      if (path === '/api/study-timer') return { body: { timer: null } };
       if (path.startsWith('/api/study-logs/calendar')) {
         const month = new URL(path, 'http://test').searchParams.get('month');
         return { body: { month, days: [{ date: `${month}-01`, minutes: 0, logs: 0 }] } };
