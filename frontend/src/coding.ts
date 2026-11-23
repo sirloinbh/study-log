@@ -28,6 +28,9 @@ export type ProblemRow = {
   problemKey: string;
   title: string;
   url: string | null;
+  // From solved.ac for Baekjoon problems (#369).
+  level: number | null;
+  tags: string[];
   attemptCount: number;
   totalMinutes: number;
   lastAttemptDate: string | null;
@@ -102,3 +105,23 @@ export function listPath(filters: Filters) {
   const query = params.map(([key, value]) => `${key}=${encodeURIComponent(value)}`).join('&');
   return query ? `/api/coding/problems?${query}` : '/api/coding/problems';
 }
+
+const tiers = ['Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Ruby'];
+const numerals = ['I', 'II', 'III', 'IV', 'V'];
+
+// The solved.ac tier of a level: 1 is Bronze V, 5 is Bronze I, 6 is Silver V ... 30 is Ruby I.
+export function tierLabel(level: number | null) {
+  if (level === null) return undefined;
+  if (level === 0) return 'Unrated';
+  if (level > 30) return 'Master';
+  return `${tiers[Math.floor((level - 1) / 5)]} ${numerals[4 - ((level - 1) % 5)]}`;
+}
+
+export type SolvedProblem = {
+  id: number;
+  title: string;
+  level: number;
+  tags: string[];
+  url: string;
+};
+export type ImportResult = { added: number; skipped: number; total: number };

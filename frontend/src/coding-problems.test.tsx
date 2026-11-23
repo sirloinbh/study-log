@@ -1,6 +1,7 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, test } from 'vitest';
 
+import { tierLabel } from './coding';
 import { CodingProblems } from './coding-problems';
 import { type Answer, fakeApi, type Sent } from './test/fake-api';
 import { render } from './test/render';
@@ -23,7 +24,15 @@ type Attempt = {
   notes: string;
   studyLogId: number | null;
 };
-type Problem = { id: number; site: string; problemKey: string; title: string; url: string | null };
+type Problem = {
+  id: number;
+  site: string;
+  problemKey: string;
+  title: string;
+  url: string | null;
+  level?: number | null;
+  tags?: string[];
+};
 
 // In-memory coding API: problems with attempts, the latest attempt decides the list's result.
 function server(initial: { problem: Problem; attempts: Attempt[] }[] = []) {
@@ -32,6 +41,8 @@ function server(initial: { problem: Problem; attempts: Attempt[] }[] = []) {
   const summary = (row: (typeof rows)[number]) => {
     const latest = [...row.attempts].sort((a, b) => (a.date < b.date ? 1 : -1))[0];
     return {
+      level: null,
+      tags: [],
       ...row.problem,
       attemptCount: row.attempts.length,
       totalMinutes: row.attempts.reduce((sum, a) => sum + (a.minutes ?? 0), 0),
@@ -41,6 +52,22 @@ function server(initial: { problem: Problem; attempts: Attempt[] }[] = []) {
   };
   const answer = ({ method, path, body }: Sent): Answer | undefined => {
     const [base, query = ''] = path.split('?');
+    if (base === '/api/coding/solvedac/problems/1000')
+      return {
+        body: {
+          problem: {
+            id: 1000,
+            title: 'A+B',
+            level: 1,
+            tags: ['math', 'implementation'],
+            url: 'https://www.acmicpc.net/problem/1000',
+          },
+        },
+      };
+    if (base.startsWith('/api/coding/solvedac/problems/'))
+      return { status: 503, body: { error: 'Could not reach solved.ac. Try again in a moment' } };
+    if (base === '/api/coding/solvedac/import' && method === 'POST')
+      return { body: { added: 2, skipped: 1, total: 3 } };
     const input = body as Record<string, unknown> | undefined;
     if (base === '/api/coding/problems' && method === 'GET') {
       const params = new URLSearchParams(query);
@@ -250,5 +277,58 @@ describe('coding problem log', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'A+B delete' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
     expect(await screen.findByText('No problems yet')).toBeTruthy();
+  });
+
+  test('fills in the title, tier and tags from solved.ac and saves them with the problem', async () => {
+    const api = server();
+    render(<CodingProblems today={today} />);
+    await screen.findByText('No problems yet');
+    fireEvent.change(screen.getByLabelText('Problem ID'), { target: { value: '1000' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Fill in from solved.ac' }));
+    await waitFor(() => expect(screen.getByLabelText<HTMLInputElement>('Title').value).toBe('A+B'));
+    expect(screen.getByText('Bronze V, math, implementation')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Add problem' }));
+    await screen.findByText('Baekjoon 1000');
+    const post = api.requests.find((r) => r.method === 'POST');
+    expect(post?.body).toMatchObject({ level: 1, tags: ['math', 'implementation'] });
+  });
+
+  test('a failed lookup shows the message and leaves the form alone; other sites have no button', async () => {
+    server();
+    render(<CodingProblems today={today} />);
+    await screen.findByText('No problems yet');
+    fireEvent.change(screen.getByLabelText('Problem ID'), { target: { value: '1001' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Fill in from solved.ac' }));
+    expect((await screen.findByRole('alert')).textContent).toMatch(/Could not reach solved\.ac/);
+    expect(screen.getByLabelText<HTMLInputElement>('Title').value).toBe('');
+    fireEvent.change(within(screen.getByLabelText('Add a problem')).getByLabelText('Site'), {
+      target: { value: 'leetcode' },
+    });
+    expect(screen.queryByRole('button', { name: 'Fill in from solved.ac' })).toBeNull();
+  });
+
+  test('imports the solved problems and says how many were added', async () => {
+    const api = server();
+    render(<CodingProblems today={today} />);
+    await screen.findByText('No problems yet');
+    fireEvent.click(screen.getByRole('button', { name: 'Import solved problems' }));
+    expect(
+      await screen.findByText('Imported from solved.ac: 2 added, 1 already recorded'),
+    ).toBeTruthy();
+    expect(api.requests.some((r) => r.path === '/api/coding/solvedac/import')).toBe(true);
+  });
+
+  test('tier names follow the solved.ac levels', () => {
+    expect([0, 1, 5, 6, 15, 16, 30, 31, null].map(tierLabel)).toEqual([
+      'Unrated',
+      'Bronze V',
+      'Bronze I',
+      'Silver V',
+      'Gold I',
+      'Platinum V',
+      'Ruby I',
+      'Master',
+      undefined,
+    ]);
   });
 });

@@ -6,6 +6,7 @@ import { types } from 'pg';
 import { tools } from './ai-tools.js';
 import { calendarRoutes } from './calendar.js';
 import { codingRoutes } from './coding-problems.js';
+import { solvedAcRoutes } from './coding-solvedac.js';
 import { refuseCrossSiteWrites } from './cross-site.js';
 import { attemptRoutes, exerciseAttemptRoutes, wrongExerciseRoutes } from './exercise-attempts.js';
 import { exerciseFileRoutes, fileRoutes } from './exercise-files.js';
@@ -17,6 +18,7 @@ import { keywordRoutes } from './keywords.js';
 import { retrospectiveRoutes } from './retrospectives.js';
 import { reviewRoutes } from './reviews.js';
 import { dailyCatchUp, scheduleRoutes } from './schedules.js';
+import { type SolvedAcClient, solvedAcClient } from './solvedac.js';
 import { setInt8Parser } from './standard/db.js';
 import { errorHandler, notFound, requestLog, serviceDate } from './standard/http.js';
 import { apiRateLimit } from './standard/rate-limit.js';
@@ -46,6 +48,9 @@ export function createApp(
     // Off in the schedule tests, which move the days at moments of their own (#270).
     scheduleCatchUp?: boolean;
     toolsPublicKey?: string;
+    solvedAcClient?: SolvedAcClient;
+    // The solved.ac account to import from (SOLVEDAC_HANDLE) (#369).
+    solvedAcHandle?: string;
   } = {},
 ) {
   const fileStorage = options.fileStorage ?? s3Storage();
@@ -81,6 +86,14 @@ export function createApp(
   app.use('/api/study-logs', studyLogRoutes(pool));
   app.use('/api/reviews', reviewRoutes(pool, today));
   app.use('/api/keywords', keywordRoutes(pool, today));
+  app.use(
+    '/api/coding/solvedac',
+    solvedAcRoutes(
+      pool,
+      options.solvedAcClient ?? solvedAcClient(),
+      () => options.solvedAcHandle ?? process.env.SOLVEDAC_HANDLE,
+    ),
+  );
   app.use('/api/coding', codingRoutes(pool, today));
   app.use('/api/stats', statsRoutes(pool, today));
   app.use('/api/retrospectives', retrospectiveRoutes(pool, today));
