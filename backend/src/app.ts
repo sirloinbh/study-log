@@ -24,6 +24,7 @@ import { errorHandler, notFound, requestLog, serviceDate } from './standard/http
 import { apiRateLimit } from './standard/rate-limit.js';
 import { registerToolRoutes } from './standard/tools.js';
 import { statsRoutes } from './stats.js';
+import { studyGoalRoutes } from './study-goal.js';
 import { studyLogRoutes } from './study-logs.js';
 import { studyTimerRoutes } from './study-timer.js';
 import { textbookContentRoutes } from './textbook-contents.js';
@@ -97,6 +98,8 @@ export function createApp(
     ),
   );
   app.use('/api/coding', codingRoutes(pool, today));
+  // Before the stats routes, so '/goal' is not looked up there.
+  app.use('/api/stats/goal', studyGoalRoutes(pool, today));
   app.use('/api/stats', statsRoutes(pool, today));
   app.use('/api/retrospectives', retrospectiveRoutes(pool, today));
   app.use(

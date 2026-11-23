@@ -59,6 +59,22 @@ function toHandler(source: Handler | Routes): Handler {
   };
 }
 
+const backgroundAnswers: Record<string, Answer> = {
+  '/api/study-timer': { body: { timer: null } },
+  '/api/stats/goal': {
+    body: {
+      weekStart: '2026-10-18',
+      weekEnd: '2026-10-24',
+      goalMinutes: null,
+      goalSince: null,
+      studiedMinutes: 0,
+      achievementRate: null,
+      streakDays: 0,
+      studiedToday: false,
+    },
+  },
+};
+
 export function fakeApi(source: Handler | Routes): Api {
   const handle = toHandler(source);
   const api: Api = {
@@ -97,10 +113,10 @@ export function fakeApi(source: Handler | Routes): Api {
         };
         api.requests.push(request);
         if (method !== 'GET') api.sent.push(request);
-        // The study timer card sits on the study log page; a test that does not care sees no timer.
+        // Cards that sit on a page next to what a test is about: a test with no handler for them sees
+        // no timer and no goal.
         const answer =
-          (await handle(request)) ??
-          (method === 'GET' && path === '/api/study-timer' ? { body: { timer: null } } : undefined);
+          (await handle(request)) ?? (method === 'GET' ? backgroundAnswers[path] : undefined);
         if (!answer) {
           api.unexpected.push(request);
           throw new TypeError(`Unexpected request: ${method} ${path}`);
