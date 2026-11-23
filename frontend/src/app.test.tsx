@@ -14,6 +14,7 @@ function server(health: { body: object; status?: number }) {
     'GET /api/health': { body: health.body, status: health.status },
     ...Object.fromEntries(
       [
+        '/api/exercises/wrong',
         '/api/keywords',
         '/api/retrospectives/period',
         '/api/retrospectives',
@@ -59,6 +60,7 @@ test('each page has its own address and is marked in the main menu', async () =>
     ['Reviews', '/reviews'],
     ['Textbooks', '/textbooks'],
     ['Keywords', '/keywords'],
+    ['Wrong problems', '/wrong-exercises'],
     ['Stats', '/stats'],
     ['Retrospectives', '/retrospectives'],
     ['Settings', '/settings'],
