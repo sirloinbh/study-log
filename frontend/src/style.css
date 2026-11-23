@@ -794,69 +794,6 @@
   font-size: 12px;
   color: var(--muted-foreground);
 }
-.study-pattern {
-  margin-top: 20px;
-  padding-top: 16px;
-  border-top: 1px solid var(--border);
-}
-.study-pattern h3 {
-  margin: 0 0 8px;
-  font-size: 14px;
-}
-.pattern-summary {
-  margin: 0 0 12px;
-}
-.pattern-bars {
-  display: grid;
-  gap: 4px;
-  margin-bottom: 16px;
-}
-.pattern-row {
-  display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) 84px;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-}
-.pattern-track {
-  height: 10px;
-  background: var(--muted);
-  border-radius: 3px;
-}
-.pattern-bar {
-  display: block;
-  height: 100%;
-  background: var(--ring);
-  border-radius: 3px;
-}
-.pattern-value {
-  color: var(--muted-foreground);
-  text-align: right;
-  white-space: nowrap;
-}
-.pattern-hours {
-  display: grid;
-  grid-template-columns: repeat(24, minmax(0, 1fr));
-  align-items: end;
-  gap: 2px;
-  height: 64px;
-  border-bottom: 1px solid var(--border);
-}
-.pattern-hour {
-  display: block;
-  min-height: 1px;
-  background: color-mix(in oklch, var(--foreground) 18%, transparent);
-  border-radius: 2px 2px 0 0;
-}
-.pattern-hour.top {
-  background: var(--primary);
-}
-.pattern-axis {
-  display: flex;
-  justify-content: space-between;
-  font-size: 11px;
-  color: var(--muted-foreground);
-}
 @media (max-width: 760px) {
   /* Five menu items share the width at 390px: the icon above a smaller label (#48). */
   .log-form {
