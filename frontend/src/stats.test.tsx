@@ -127,9 +127,9 @@ const askedOf = (api: Api) =>
 
 // Each metric card as "title:value".
 const cards = () =>
-  Array.from(document.querySelectorAll('.card.metric')).map(
+  Array.from(document.querySelectorAll('[data-metric]')).map(
     (card) =>
-      `${card.querySelector('h2')!.textContent}:${card.querySelector('.metric-value')!.textContent}`,
+      `${card.querySelector('h2')!.textContent}:${card.querySelector('[data-metric-value]')!.textContent}`,
   );
 const periodGroup = () => screen.getByRole('group', { name: 'Period' });
 // The pressed period button; the chart's unit buttons are not periods.
@@ -173,7 +173,9 @@ test('the dashboard opens on this week with the four metric cards', async () => 
   expect(page).toHaveTextContent(/3 of 5 days studied/);
   expect(page).toHaveTextContent(/Study days only: 1 h 35 min/);
   // The cards hold more than the period (the all-time total), so their group is named neutrally.
-  expect(document.querySelector('.metric-grid')).toHaveAccessibleName('Study time metrics');
+  expect(screen.getByRole('region', { name: 'Study time metrics' })).toHaveAccessibleName(
+    'Study time metrics',
+  );
 });
 
 test('picking a period asks for it and relabels the period card', async () => {

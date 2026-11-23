@@ -5,6 +5,7 @@ import { types } from 'pg';
 
 import { tools } from './ai-tools.js';
 import { calendarRoutes } from './calendar.js';
+import { codingRoutes } from './coding-problems.js';
 import { refuseCrossSiteWrites } from './cross-site.js';
 import { attemptRoutes, exerciseAttemptRoutes, wrongExerciseRoutes } from './exercise-attempts.js';
 import { exerciseFileRoutes, fileRoutes } from './exercise-files.js';
@@ -80,6 +81,7 @@ export function createApp(
   app.use('/api/study-logs', studyLogRoutes(pool));
   app.use('/api/reviews', reviewRoutes(pool, today));
   app.use('/api/keywords', keywordRoutes(pool, today));
+  app.use('/api/coding', codingRoutes(pool, today));
   app.use('/api/stats', statsRoutes(pool, today));
   app.use('/api/retrospectives', retrospectiveRoutes(pool, today));
   app.use(

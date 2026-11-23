@@ -44,7 +44,7 @@ export function StudyTimeChart({
         <h2 id="study-chart-heading" className="m-0">
           Study time trend
         </h2>
-        <div className="period-filter" role="group" aria-label="Chart unit">
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Chart unit">
           {chartUnits.map((key) => (
             <Button
               key={key}

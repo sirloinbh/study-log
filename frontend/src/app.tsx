@@ -5,6 +5,7 @@ import {
   CalendarDays,
   ChartColumn,
   CircleX,
+  Code,
   NotebookPen,
   NotebookText,
   Settings2,
@@ -13,6 +14,7 @@ import {
 import { type ReactNode, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
 
+import { CodingProblems } from './coding-problems';
 import { AppShell, type NavItem } from './components/layout/app-shell';
 import { EmptyState } from './components/ui/empty-state';
 import { Toaster } from './components/ui/sonner';
@@ -38,6 +40,7 @@ const pages = {
   textbooks: '/textbooks',
   keywords: '/keywords',
   wrongExercises: '/wrong-exercises',
+  coding: '/coding',
   stats: '/stats',
   retrospectives: '/retrospectives',
   settings: '/settings',
@@ -51,6 +54,7 @@ const nav: NavItem[] = [
   { to: pages.textbooks, label: 'Textbooks', icon: BookOpen },
   { to: pages.keywords, label: 'Keywords', icon: Tags },
   { to: pages.wrongExercises, label: 'Wrong problems', icon: CircleX },
+  { to: pages.coding, label: 'Coding', icon: Code },
   { to: pages.stats, label: 'Stats', icon: ChartColumn },
   { to: pages.retrospectives, label: 'Retrospectives', icon: NotebookText },
   { to: pages.settings, label: 'Settings', icon: Settings2 },
@@ -174,6 +178,19 @@ function AppBody() {
                   today={today}
                 >
                   {(today) => <Keywords today={today} />}
+                </Page>
+              }
+            />
+            <Route
+              path={pages.coding}
+              element={
+                <Page
+                  title="Coding"
+                  description="Record the coding problems you solve and every attempt at them"
+                  health={health}
+                  today={today}
+                >
+                  {(today) => <CodingProblems today={today} onChange={reviewsChanged} />}
                 </Page>
               }
             />

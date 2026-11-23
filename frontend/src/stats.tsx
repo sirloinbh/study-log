@@ -52,7 +52,7 @@ export function Stats() {
 
   return (
     <div className="stats">
-      <div className="period-filter" role="group" aria-label="Period">
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Period">
         {statPeriods.map((key) => (
           <Button
             key={key}
@@ -65,7 +65,7 @@ export function Stats() {
           </Button>
         ))}
       </div>
-      <div className="period-filter" role="group" aria-label="Study type">
+      <div className="flex flex-wrap gap-2" role="group" aria-label="Study type">
         {statStudyTypes.map((key) => (
           <Button
             key={key}
@@ -79,10 +79,11 @@ export function Stats() {
         ))}
       </div>
       {/* Named apart from the textbook filter of "Textbooks and schedules" below, which covers only that card. */}
-      <label className="textbook-filter">
+      <label className="mb-4 grid max-w-80 grid-cols-[minmax(0,1fr)] gap-1.5 text-[12px] font-medium">
         Textbook
         <NativeSelect
           aria-label="Study time textbook"
+          className="w-full min-w-0"
           value={textbookId}
           onChange={(event) => setTextbookId(event.target.value)}
         >
@@ -106,37 +107,52 @@ export function Stats() {
       ) : !stats ? (
         <Loading label="Loading the stats" kind="cards" />
       ) : (
-        <section className="metric-grid" aria-label="Study time metrics">
-          <article className="card metric">
-            <h2>Total study time</h2>
-            <p className="metric-value">{formatMinutes(stats.cumulativeMinutes)}</p>
-            <p className="status">
+        <section
+          className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-4"
+          aria-label="Study time metrics"
+        >
+          <article className="card" data-metric>
+            <h2 className="m-0 mb-2 text-[13px] font-medium text-muted-foreground">
+              Total study time
+            </h2>
+            <p className="m-0 mb-1.5 text-[26px] font-semibold" data-metric-value>
+              {formatMinutes(stats.cumulativeMinutes)}
+            </p>
+            <p className="status m-0 text-[12px] [word-break:keep-all]">
               Recorded so far: {statStudyTypeLabels[studyType]}
               {bookTitle && ` · ${bookTitle}`}
             </p>
           </article>
-          <article className="card metric">
-            <h2>Today</h2>
-            <p className="metric-value">{formatMinutes(stats.todayMinutes)}</p>
-            <p className="status">{stats.to}</p>
-          </article>
-          <article className="card metric">
-            <h2>{label}</h2>
-            <p className="metric-value">{formatMinutes(stats.totalMinutes)}</p>
-            {/* Breaks only around "~", never inside a date. */}
-            <p className="status">
-              <span className="nowrap">{stats.from}</span> ~{' '}
-              <span className="nowrap">{stats.to}</span>
+          <article className="card" data-metric>
+            <h2 className="m-0 mb-2 text-[13px] font-medium text-muted-foreground">Today</h2>
+            <p className="m-0 mb-1.5 text-[26px] font-semibold" data-metric-value>
+              {formatMinutes(stats.todayMinutes)}
             </p>
-            <p className="status">
+            <p className="status m-0 text-[12px] [word-break:keep-all]">{stats.to}</p>
+          </article>
+          <article className="card" data-metric>
+            <h2 className="m-0 mb-2 text-[13px] font-medium text-muted-foreground">{label}</h2>
+            <p className="m-0 mb-1.5 text-[26px] font-semibold" data-metric-value>
+              {formatMinutes(stats.totalMinutes)}
+            </p>
+            {/* Breaks only around "~", never inside a date. */}
+            <p className="status m-0 text-[12px] [word-break:keep-all]">
+              <span className="whitespace-nowrap">{stats.from}</span> ~{' '}
+              <span className="whitespace-nowrap">{stats.to}</span>
+            </p>
+            <p className="status m-0 text-[12px] [word-break:keep-all]">
               {stats.studyDays} of {plural(stats.days, 'day')} studied
             </p>
           </article>
-          <article className="card metric">
-            <h2>Daily average</h2>
-            <p className="metric-value">{formatMinutes(stats.averageMinutesPerDay)}</p>
-            <p className="status">Based on {label}</p>
-            <p className="status">
+          <article className="card" data-metric>
+            <h2 className="m-0 mb-2 text-[13px] font-medium text-muted-foreground">
+              Daily average
+            </h2>
+            <p className="m-0 mb-1.5 text-[26px] font-semibold" data-metric-value>
+              {formatMinutes(stats.averageMinutesPerDay)}
+            </p>
+            <p className="status m-0 text-[12px] [word-break:keep-all]">Based on {label}</p>
+            <p className="status m-0 text-[12px] [word-break:keep-all]">
               Study days only: {formatMinutes(stats.averageMinutesPerStudyDay)}
             </p>
           </article>
