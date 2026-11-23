@@ -11,11 +11,13 @@ import { refuseCrossSiteWrites } from './cross-site.js';
 import { attemptRoutes, exerciseAttemptRoutes, wrongExerciseRoutes } from './exercise-attempts.js';
 import { exerciseFileRoutes, fileRoutes } from './exercise-files.js';
 import { contentExerciseRoutes, exerciseRoutes, textbookExerciseRoutes } from './exercises.js';
+import { exportRoutes } from './export.js';
 import { claudeExtractor, type Extractor } from './extraction.js';
 import { type FileStorage, s3Storage } from './file-storage.js';
 import { dataPortalHolidays, type HolidayFetcher } from './holidays.js';
 import { flashcardRoutes } from './keyword-flashcards.js';
 import { keywordRoutes } from './keywords.js';
+import { claudeDrafter, type Drafter } from './retrospective-draft.js';
 import { retrospectiveRoutes } from './retrospectives.js';
 import { reviewRoutes } from './reviews.js';
 import { dailyCatchUp, scheduleRoutes } from './schedules.js';
@@ -43,6 +45,7 @@ export function createApp(
   options: {
     today?: () => string;
     translator?: Translator;
+    drafter?: Drafter;
     extractor?: Extractor;
     holidayFetcher?: HolidayFetcher;
     fileStorage?: FileStorage;
@@ -89,6 +92,7 @@ export function createApp(
   app.use('/api/study-logs', studyLogRoutes(pool));
   app.use('/api/study-timer', studyTimerRoutes(pool));
   app.use('/api/reviews', reviewRoutes(pool, today));
+  app.use('/api/export', exportRoutes(pool, today));
   app.use('/api/keywords', keywordRoutes(pool, today));
   app.use('/api/flashcards', flashcardRoutes(pool, today));
   app.use(
@@ -103,7 +107,10 @@ export function createApp(
   // Before the stats routes, so '/goal' is not looked up there.
   app.use('/api/stats/goal', studyGoalRoutes(pool, today));
   app.use('/api/stats', statsRoutes(pool, today));
-  app.use('/api/retrospectives', retrospectiveRoutes(pool, today));
+  app.use(
+    '/api/retrospectives',
+    retrospectiveRoutes(pool, today, options.drafter ?? claudeDrafter()),
+  );
   app.use(
     '/api/schedules',
     scheduleRoutes(pool, today, options.holidayFetcher ?? dataPortalHolidays()),

@@ -7,7 +7,7 @@
 
 ## What changed
 
-- `database/migrations/027_weekly_goals.sql`: `weekly_goals (week_start, goal_minutes 1..10080)`. A week without a row uses the latest earlier goal, so a goal stays until it is changed; the earlier weeks keep their own.
+- `database/migrations/029_weekly_goals.sql`: `weekly_goals (week_start, goal_minutes 1..10080)`. A week without a row uses the latest earlier goal, so a goal stays until it is changed; the earlier weeks keep their own.
 - `backend/src/study-goal.ts`, mounted at `/api/stats/goal` before the stats routes: `GET` returns this week's range, goal (and the week it was set in), minutes studied so far, the rounded achievement rate (null without a goal, above 100 when beaten) and the streak; `PUT {minutes}` sets this week's goal (validated 1 to 10080 whole minutes, audited).
 - The streak is the newest run of consecutive study days. It counts to today, or to yesterday while today has no study yet, so it only breaks when a whole day passes without study.
 - `counted` is exported from `stats.ts`; OpenAPI table and `docs/openapi.json` list both routes.
@@ -23,3 +23,9 @@
 
 - Browser (Vite, mock API, no database): 390x844 and 1440x900, set a goal of 10 hours, 55% with the bar, the streak line, the goal kept after a reload, no overflow.
 - The backend integration tests ran in CI only. `npm run check` and CI: see the PR.
+
+## Renumbered (2026-11-23)
+
+The migration was merged as `027_weekly_goals.sql` while another lane merged `027_keyword_cards.sql`, so `main` had two files with number 027 and `db:migrate` refused to run. It is `029_weekly_goals.sql` now (fixed in the PR for #362). Nothing had been deployed with the old name.
+
+Both lanes renumbered to 028 at the same time, so it is `029_weekly_goals.sql` now (`028_keyword_cards.sql` keeps 028).

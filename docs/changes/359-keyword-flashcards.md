@@ -3,7 +3,7 @@
 ## Rule (user decision 2026-11-23)
 
 - The flashcards of a day are the keywords noted on the study date of every study log with an open review due by that day (overdue reviews count). Keywords of days with no due review, and of planned logs, are not shown.
-- Known / not known is stored per keyword per day (`keyword_cards`, migration 027); answering again the same day replaces it; answers go with their keyword.
+- Known / not known is stored per keyword per day (`keyword_cards`, migration 028); answering again the same day replaces it; answers go with their keyword.
 - Order: keywords whose latest earlier answer was "not known" first, then never answered, then known; answers of the day itself do not reorder, so the cards stay put while they are answered.
 
 ## What changed

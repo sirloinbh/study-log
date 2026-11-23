@@ -3,8 +3,9 @@ import React, { useEffect, useState } from 'react';
 
 import { useBusy } from './busy';
 import { Button } from './components/ui/button';
+import { ConfirmDialog } from './components/ui/confirm-dialog';
 import { DeleteConfirm } from './delete-confirm';
-import type { RequestError } from './lib/api';
+import { type RequestError, requestJson } from './lib/api';
 import { apiKey, useApiMutation, useApiQuery } from './lib/query';
 import { ButtonSpinner, Loading } from './loading';
 import {
@@ -131,6 +132,29 @@ export function Retrospectives({ today }: { today: string }) {
     });
   };
 
+  // A draft from Claude (#362) fills the editor and saves nothing. The call can take minutes, so it
+  // waits longer than the usual 30 seconds (the server gives up at 4).
+  const [replacing, setReplacing] = useState(false);
+  const draftWithClaude = async () => {
+    if (!period || !draftKey) return;
+    nameNext('draft');
+    if (!begin()) return;
+    setNotice(undefined);
+    try {
+      const result = await requestJson<{ draft: string }>(
+        `/api/retrospectives/${period.kind}/${period.from}/draft`,
+        { method: 'POST', body: {}, timeoutMs: 270_000 },
+      );
+      setDraft({ key: draftKey, text: result.draft });
+      setNotice({ kind: 'status', text: 'Draft ready. Edit it, then save' });
+    } catch (failure) {
+      setNotice({ kind: 'alert', text: (failure as RequestError).message });
+    } finally {
+      end();
+    }
+  };
+  const askDraft = () => (text.trim() ? setReplacing(true) : void draftWithClaude());
+
   const remove = () =>
     period &&
     change(async () => {
@@ -252,6 +276,10 @@ export function Retrospectives({ today }: { today: string }) {
                   <ButtonSpinner when={action === 'save'} />
                   {period.retrospective ? 'Save changes' : 'Save'}
                 </Button>
+                <Button type="button" variant="outline" disabled={busy} onClick={askDraft}>
+                  <ButtonSpinner when={action === 'draft'} />
+                  Draft with Claude
+                </Button>
                 {period.retrospective && (
                   <>
                     <Button
@@ -286,6 +314,15 @@ export function Retrospectives({ today }: { today: string }) {
             <StudyPattern from={period.from} to={period.to} reloadKey={reload} />
           </>
         )}
+        <ConfirmDialog
+          open={replacing}
+          onOpenChange={setReplacing}
+          title="Replace the text with a draft?"
+          description="What is in the editor now is replaced by a draft from Claude. Nothing is saved until you press save."
+          confirmLabel="Replace"
+          destructive={false}
+          onConfirm={() => draftWithClaude()}
+        />
         {/* Always mounted so screen readers announce each new message. */}
         <p role="status" className="status">
           {notice?.kind === 'status' ? notice.text : ''}

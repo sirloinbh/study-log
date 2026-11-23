@@ -4,8 +4,11 @@ import { z } from 'zod/v4';
 
 import { auditChange } from './audit-log.js';
 import { monthRange } from './calendar.js';
+import { claudeSlots } from './claude-call.js';
 import { calendarDate } from './dates.js';
+import { type Drafter, DraftError } from './retrospective-draft.js';
 import { inTransaction } from './sql.js';
+import { requestIdOf } from './standard/http.js';
 import { addDays, weekStart } from './stats.js';
 import { missingOrInvalid } from './validation.js';
 
@@ -90,8 +93,10 @@ const columns = `id, kind, period_start AS "from", period_end AS "to", body,
 const notFound = { error: 'Retrospective not found' };
 
 // Retrospectives (#19): /api/retrospectives
-export function retrospectiveRoutes(pool: Pool, today: () => string) {
+export function retrospectiveRoutes(pool: Pool, today: () => string, drafter: Drafter) {
   const router = Router();
+  // The periods being drafted now: a repeated request for the same one is refused, not paid twice.
+  const drafting = new Set<string>();
 
   // The period holding ?date (today by default), its retrospective if written, and a summary of
   // its study logs (planned ones do not count as studied, as in the stats).
@@ -131,6 +136,71 @@ export function retrospectiveRoutes(pool: Pool, today: () => string) {
       [query.kind ?? null, query.limit],
     );
     res.json({ retrospectives: rows });
+  });
+
+  // A draft for the period from its study logs, difficult parts and keywords (#362). Nothing is
+  // saved: the person edits the draft and saves it with the normal save.
+  router.post('/:kind/:start/draft', async (req, res) => {
+    // Only a JSON request, which another site's page cannot send without a CORS preflight this server
+    // never allows: a draft costs money, so a form or a no-cors fetch must not start one.
+    if (!req.is('application/json'))
+      return void res.status(415).json({ error: 'Send the draft request as JSON' });
+    const period = periodPath(req.params);
+    const key = `${period.kind}:${period.from}`;
+    const logs = await pool.query(
+      `SELECT to_char(l.study_date, 'YYYY-MM-DD') AS date, l.duration_minutes AS minutes,
+         l.study_type AS "studyType", t.title AS textbook, l.memo, l.difficulties, l.understanding,
+         l.goal_achieved AS "goalAchieved"
+       FROM study_logs l LEFT JOIN textbooks t ON t.id = l.textbook_id
+       WHERE l.status <> 'planned' AND l.study_date BETWEEN $1 AND $2
+       ORDER BY l.study_date, l.start_time LIMIT 200`,
+      [period.from, period.to],
+    );
+    if (logs.rows.length === 0)
+      return void res
+        .status(400)
+        .json({ error: 'There are no study logs in this period to write a draft from' });
+    if (drafting.has(key))
+      return void res
+        .status(409)
+        .json({ error: 'A draft for this period is already being written' });
+    if (!claudeSlots.enter()) {
+      res.set('retry-after', '5');
+      return void res
+        .status(503)
+        .json({ error: 'Too many files are being read or translated. Try again shortly' });
+    }
+    drafting.add(key);
+    // A request the person gave up on (tab closed) stops the paid call too.
+    const stop = new AbortController();
+    res.on('close', () => {
+      if (!res.writableFinished) stop.abort();
+    });
+    try {
+      const keywords = await pool.query(
+        `SELECT to_char(keyword_date, 'YYYY-MM-DD') AS date, keyword, memo FROM keywords
+         WHERE keyword_date BETWEEN $1 AND $2 ORDER BY keyword_date, id LIMIT 100`,
+        [period.from, period.to],
+      );
+      const drafted = await drafter({
+        kind: period.kind,
+        from: period.from,
+        to: period.to,
+        logs: logs.rows,
+        keywords: keywords.rows,
+        signal: stop.signal,
+        requestId: requestIdOf(res),
+      });
+      if (stop.signal.aborted) return;
+      res.json({ draft: drafted.body, model: drafted.model });
+    } catch (error) {
+      if (stop.signal.aborted) return;
+      if (!(error instanceof DraftError)) throw error;
+      res.status(error.status).json({ error: error.message });
+    } finally {
+      claudeSlots.leave();
+      drafting.delete(key);
+    }
   });
 
   // Writes the period's retrospective, replacing the one already there (one per period).

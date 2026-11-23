@@ -20,6 +20,7 @@ import {
   importantInput,
   textbookListQuery,
 } from './exercises.js';
+import { exportQuery } from './export.js';
 import { flashcardAnswer, flashcardQuery } from './keyword-flashcards.js';
 import { keywordInput, keywordListQuery } from './keywords.js';
 import {
@@ -118,6 +119,12 @@ export const operations: Record<string, Operation> = {
     status: [200, 400],
   },
 
+  'POST /api/retrospectives/:kind/:start/draft': {
+    summary:
+      'Ask Claude for a draft retrospective of the period from its study logs, difficult parts and keywords; nothing is saved',
+    status: [200, 400, 409, 415, 422, 429, 502, 503],
+  },
+
   'GET /api/study-timer': {
     summary: 'Get the running timer with its studied seconds, or null',
     status: [200],
@@ -133,6 +140,22 @@ export const operations: Record<string, Operation> = {
   'DELETE /api/study-timer': {
     summary: 'Cancel the timer without a study log',
     status: [204, 404],
+  },
+
+  'GET /api/export/study-logs.csv': {
+    summary: 'Download study logs as CSV, with an optional date range',
+    query: exportQuery,
+    status: [200, 400],
+  },
+  'GET /api/export/exercises.md': {
+    summary: 'Download exercises with their answers as Markdown, by the date they were added',
+    query: exportQuery,
+    status: [200, 400],
+  },
+  'GET /api/export/retrospectives.md': {
+    summary: 'Download retrospectives as Markdown, by the start of their period',
+    query: exportQuery,
+    status: [200, 400],
   },
 
   'GET /api/keywords': {
