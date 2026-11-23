@@ -8,4 +8,10 @@ describe('style rules', () => {
     expect(ruleBody('.actions')).toMatch(/flex-wrap/);
     expect(ruleBody('.log-actions')).toMatch(/flex-wrap/);
   });
+
+  // #395: the check boxes of a schedule are 18px; the label around them is the 44px touch target.
+  test('schedule day controls have a 44px touch target', () => {
+    expect(ruleBody('.schedule-days .schedule-day-check')).toMatch(/min-h-11/);
+    expect(ruleBody('.schedule-move .schedule-later')).toMatch(/min-h-11/);
+  });
 });

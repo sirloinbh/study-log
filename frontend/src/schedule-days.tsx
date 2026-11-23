@@ -43,20 +43,23 @@ export function ScheduleDays({
           aria-current={item.date === today ? 'date' : undefined}
           className={item.completedOn ? 'done' : undefined}
         >
-          <input
-            type="checkbox"
-            id={`schedule-day-check-${item.id}`}
-            aria-label={`Complete day: ${names.get(item.id)}`}
-            checked={item.completedOn !== null}
-            disabled={busy}
-            onChange={() => onToggle(item.id, item.completedOn !== null)}
-          />
-          <span className="schedule-day">
-            <span>{dayLabel(item.date, detail.schedule.startDate)}</span>
-            {item.contents.length > 0 && (
-              <span className="status">{item.contents.map(contentLabel).join(' · ')}</span>
-            )}
-          </span>
+          {/* The label makes the whole date a touch target (#395), not only the small box. */}
+          <label className="schedule-day-check">
+            <input
+              type="checkbox"
+              id={`schedule-day-check-${item.id}`}
+              aria-label={`Complete day: ${names.get(item.id)}`}
+              checked={item.completedOn !== null}
+              disabled={busy}
+              onChange={() => onToggle(item.id, item.completedOn !== null)}
+            />
+            <span className="schedule-day">
+              <span>{dayLabel(item.date, detail.schedule.startDate)}</span>
+              {item.contents.length > 0 && (
+                <span className="status">{item.contents.map(contentLabel).join(' · ')}</span>
+              )}
+            </span>
+          </label>
           <strong>{formatMinutes(item.targetMinutes)}</strong>
           {!item.completedOn && moving?.id !== item.id && (
             <Button

@@ -376,6 +376,15 @@ describe('adjusting the days', () => {
     expect(days().getByRole('button', { name: 'Move day: Mon, Mar 2' })).toBeInTheDocument();
   });
 
+  // #395: the date next to the small box is part of the touch target.
+  test('tapping the date of a day completes it', async () => {
+    const { sent } = adjustable();
+    await opened();
+    fireEvent.click(days().getByText('Mon, Mar 2'));
+    await dayCard().findByText('Marked as done');
+    expect(sent).toEqual([{ method: 'POST', path: '/api/schedules/1/items/10/complete' }]);
+  });
+
   test('a day moves alone unless asked, and can be cancelled', async () => {
     const { sent } = adjustable();
     await opened();
