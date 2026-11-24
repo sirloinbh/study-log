@@ -229,9 +229,21 @@ test(
         assert.deepEqual(await mine(), []);
         assert.equal(await count(), before - 1);
 
-        // Deleting the exercise removes a running cycle.
-        await attempt({ result: 'wrong', date: '2026-11-23' });
+        // Deleting the only wrong attempt clears its review (#393); an earlier date added later
+        // is placed in date order.
+        const wrong = await attempt({ result: 'wrong', date: '2026-11-23' });
         assert.equal((await mine()).length, 1);
+        const wrongId = (wrong.data.attempt as { id: number }).id;
+        await call(`/api/exercise-attempts/${wrongId}`, { method: 'DELETE' });
+        assert.deepEqual(await mine(), []);
+        await attempt({ result: 'wrong', date: '2026-11-23' });
+        await attempt({ result: 'wrong', date: '2026-11-01' });
+        assert.deepEqual(
+          (await mine()).map((r) => [r.step, r.dueDate]),
+          [[1, '2026-11-24']],
+        );
+
+        // Deleting the exercise removes a running cycle.
         await call(`/api/exercises/${exercise}`, { method: 'DELETE' });
         const left = await pool.query('SELECT 1 FROM exercise_reviews WHERE exercise_id = $1', [
           exercise,

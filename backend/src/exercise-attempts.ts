@@ -74,11 +74,7 @@ export function exerciseAttemptRoutes(pool: Pool, today: () => string) {
           exerciseId: id,
           result: input.result,
         });
-        await syncExerciseReview(client, id, {
-          date,
-          result: input.result,
-          hintUsed: input.hintUsed,
-        });
+        await syncExerciseReview(client, id);
         return rows[0];
       });
       res.status(201).json({ attempt });
@@ -98,9 +94,15 @@ export function attemptRoutes(pool: Pool) {
   router.delete('/:id', async (req, res) => {
     const id = parseId(req.params.id, 'attempt');
     const removed = await inTransaction(pool, async (client) => {
-      const { rowCount } = await client.query('DELETE FROM exercise_attempts WHERE id = $1', [id]);
-      if (rowCount) await auditChange(req, res, client, 'delete', 'exercise_attempt', id, {});
-      return Boolean(rowCount);
+      const { rows } = await client.query<{ exerciseId: number }>(
+        'DELETE FROM exercise_attempts WHERE id = $1 RETURNING exercise_id AS "exerciseId"',
+        [id],
+      );
+      if (!rows[0]) return false;
+      await auditChange(req, res, client, 'delete', 'exercise_attempt', id, {});
+      // The review follows the attempts that are left (#393).
+      await syncExerciseReview(client, rows[0].exerciseId);
+      return true;
     });
     if (!removed) return void res.status(404).json({ error: 'Attempt not found' });
     res.status(204).end();

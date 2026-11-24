@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { nextExerciseReview } from '../src/exercise-reviews.js';
+import { nextExerciseReview, replayExerciseReview } from '../src/exercise-reviews.js';
 
 const attempt = (result: 'correct' | 'wrong', hintUsed = false, date = '2026-11-10') => ({
   date,
@@ -48,4 +48,31 @@ test('a wrong or hinted retry restarts at step 1 from any step (#358)', () => {
     });
     assert.equal(nextExerciseReview({ step }, attempt('correct', true)).action, 'set');
   }
+});
+
+test('replaying the attempts gives the review the history leads to (#393)', () => {
+  assert.equal(replayExerciseReview([]), undefined);
+  assert.equal(replayExerciseReview([attempt('correct')]), undefined);
+  assert.deepEqual(replayExerciseReview([attempt('wrong', false, '2026-11-10')]), {
+    step: 1,
+    dueDate: '2026-11-11',
+  });
+  // A wrong try, then a clean one: step 2.
+  assert.deepEqual(
+    replayExerciseReview([
+      attempt('wrong', false, '2026-11-10'),
+      attempt('correct', false, '2026-11-11'),
+    ]),
+    { step: 2, dueDate: '2026-11-14' },
+  );
+  // Four clean tries after a wrong one end the cycle.
+  assert.equal(
+    replayExerciseReview([
+      attempt('wrong', false, '2026-11-10'),
+      ...['2026-11-11', '2026-11-14', '2026-11-21', '2026-12-05'].map((d) =>
+        attempt('correct', false, d),
+      ),
+    ]),
+    undefined,
+  );
 });
