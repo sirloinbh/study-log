@@ -13,11 +13,19 @@ vi.mock('recharts', () => {
   const Group = ({ children }: { children?: React.ReactNode }) => <div>{children}</div>;
   return {
     ResponsiveContainer: Group,
-    BarChart: ({ accessibilityLayer }: { accessibilityLayer?: boolean }) => (
-      <div data-testid="review-chart" data-accessibility-layer={String(accessibilityLayer)} />
+    BarChart: ({
+      accessibilityLayer,
+      children,
+    }: {
+      accessibilityLayer?: boolean;
+      children?: React.ReactNode;
+    }) => (
+      <div data-testid="review-chart" data-accessibility-layer={String(accessibilityLayer)}>
+        {children}
+      </div>
     ),
     CartesianGrid: Part,
-    XAxis: Part,
+    XAxis: ({ fontSize }: { fontSize?: number }) => <span data-testid="axis-font">{fontSize}</span>,
     YAxis: Part,
     Tooltip: Part,
     Bar: Part,
@@ -95,6 +103,8 @@ test('the completion rate and its counts are shown for the period', async () => 
     'data-accessibility-layer',
     'false',
   );
+  // The labels carry the counts, so they are at least 13px (#406).
+  expect(Number(reviewCard().getByTestId('axis-font').textContent)).toBeGreaterThanOrEqual(13);
 });
 
 test('the page holds the card of textbooks and schedules', async () => {

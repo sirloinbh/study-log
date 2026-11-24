@@ -28,7 +28,7 @@ function ReviewBars({ stats }: { stats: ReviewStats }) {
         >
           <R.CartesianGrid vertical={false} stroke="var(--border)" />
           {/* Every label, since the counts are read from them. */}
-          <R.XAxis dataKey="label" interval={0} tickLine={false} fontSize={12} />
+          <R.XAxis dataKey="label" interval={0} tickLine={false} fontSize={13} />
           <R.YAxis hide allowDecimals={false} />
           <R.Tooltip
             cursor={{ fill: 'var(--muted)' }}
