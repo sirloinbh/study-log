@@ -1,6 +1,6 @@
 // What the sync does to make Google match the app (#366): a pure comparison, so it is tested
 // without a database or Google.
-export type Source = 'schedule_item' | 'review';
+export type Source = 'schedule_item' | 'review' | 'exercise_review';
 export type Wanted = { source: Source; sourceId: number; date: string; summary: string };
 export type Mapped = Wanted & { eventId: string };
 

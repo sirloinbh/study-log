@@ -48,7 +48,7 @@ const minutesText = (minutes: number) =>
     ? `${Math.floor(minutes / 60)} h${minutes % 60 ? ` ${minutes % 60} min` : ''}`
     : `${minutes} min`;
 
-// Open schedule items from today on, and every open review round. Only titles and dates go to
+// Open schedule items from today on, every open review round and every exercise review. Only titles and dates go to
 // Google, never memos or answers.
 export async function wantedEvents(pool: Pool, today: string): Promise<Wanted[]> {
   const items = await pool.query<{ id: number; date: string; minutes: number; title: string }>(
@@ -66,6 +66,22 @@ export async function wantedEvents(pool: Pool, today: string): Promise<Wanted[]>
      LEFT JOIN textbook_contents c ON c.id = l.content_id
      WHERE r.completed_on IS NULL`,
   );
+  // The exercises I got wrong (#403): the exercise id stands for its one open review. The body text
+  // stays here; only the textbook, chapter and number go to Google.
+  const exercises = await pool.query<{
+    id: number;
+    date: string;
+    step: number;
+    number: string;
+    textbook: string;
+    chapter: string;
+  }>(
+    `SELECT e.id, r.due_date AS date, r.step, e.number, t.title AS textbook, c.title AS chapter
+     FROM exercise_reviews r
+     JOIN exercises e ON e.id = r.exercise_id
+     JOIN textbooks t ON t.id = e.textbook_id
+     JOIN textbook_contents c ON c.id = e.content_id`,
+  );
   return [
     ...items.rows.map((row) => ({
       source: 'schedule_item' as const,
@@ -79,16 +95,25 @@ export async function wantedEvents(pool: Pool, today: string): Promise<Wanted[]>
       date: row.date,
       summary: `Review ${row.round}/5: ${row.title}`,
     })),
+    ...exercises.rows.map((row) => ({
+      source: 'exercise_review' as const,
+      sourceId: row.id,
+      date: row.date,
+      summary: `Exercise review ${row.step}/4: ${row.textbook}, ${row.chapter}${
+        row.number ? ` #${row.number}` : ''
+      }`,
+    })),
   ];
 }
 
 const describe = (item: Wanted): CalendarEvent => ({
   summary: item.summary,
   date: item.date,
-  description:
-    item.source === 'review'
-      ? 'Review round from the study log app'
-      : 'Planned study time from the study log app',
+  description: {
+    schedule_item: 'Planned study time from the study log app',
+    review: 'Review round from the study log app',
+    exercise_review: 'Review of an exercise I got wrong, from the study log app',
+  }[item.source],
 });
 
 type Connection = { refreshTokenEnc: string; calendarId: string };
