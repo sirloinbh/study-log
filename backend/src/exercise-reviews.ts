@@ -25,26 +25,47 @@ export function nextExerciseReview(
   return { action: 'set', step, dueDate: datePlusDays(attempt.date, exerciseReviewGaps[step - 1]) };
 }
 
-// Applies an attempt to the review, in the transaction that saved the attempt.
-export async function syncExerciseReview(
-  client: PoolClient,
-  exerciseId: number,
-  attempt: { date: string; result: 'correct' | 'wrong'; hintUsed: boolean },
-) {
-  const { rows } = await client.query<{ step: number }>(
-    'SELECT step FROM exercise_reviews WHERE exercise_id = $1 FOR UPDATE',
+export type ExerciseAttempt = { date: string; result: 'correct' | 'wrong'; hintUsed: boolean };
+export type ExerciseReviewRow = { step: number; dueDate: string };
+
+// The review an exercise has after all its attempts, replayed oldest first (date, then entry
+// order, as the attempt list sorts them). The review follows the history, so deleting an attempt or
+// entering one with an earlier date gives the same state as if the history had been entered in order.
+export function replayExerciseReview(attempts: ExerciseAttempt[]): ExerciseReviewRow | undefined {
+  let state: ExerciseReviewRow | undefined;
+  for (const attempt of attempts) {
+    const change = nextExerciseReview(state, attempt);
+    if (change.action === 'set') state = { step: change.step, dueDate: change.dueDate };
+    else if (change.action === 'end') state = undefined;
+  }
+  return state;
+}
+
+// Rebuilds the review from the exercise's attempts, in the transaction that added or deleted one.
+export async function syncExerciseReview(client: PoolClient, exerciseId: number) {
+  // The exercise row is locked so two attempts of one exercise rebuild one after the other. NO KEY
+  // UPDATE, not UPDATE: the attempt insert already holds a key share on the row, and two of them
+  // asking for the full lock would wait on each other.
+  const locked = await client.query('SELECT 1 FROM exercises WHERE id = $1 FOR NO KEY UPDATE', [
+    exerciseId,
+  ]);
+  if (!locked.rowCount) return;
+  const { rows } = await client.query<ExerciseAttempt>(
+    `SELECT to_char(attempt_date, 'YYYY-MM-DD') AS date, result, hint_used AS "hintUsed"
+     FROM exercise_attempts WHERE exercise_id = $1 ORDER BY attempt_date, id`,
     [exerciseId],
   );
-  const change = nextExerciseReview(rows[0], attempt);
-  if (change.action === 'set')
+  const state = replayExerciseReview(rows);
+  if (state)
     await client.query(
       `INSERT INTO exercise_reviews (exercise_id, step, due_date) VALUES ($1, $2, $3)
        ON CONFLICT (exercise_id) DO UPDATE
-         SET step = EXCLUDED.step, due_date = EXCLUDED.due_date, updated_at = now()`,
-      [exerciseId, change.step, change.dueDate],
+         SET step = EXCLUDED.step, due_date = EXCLUDED.due_date, updated_at = now()
+         WHERE (exercise_reviews.step, exercise_reviews.due_date)
+           IS DISTINCT FROM (EXCLUDED.step, EXCLUDED.due_date)`,
+      [exerciseId, state.step, state.dueDate],
     );
-  else if (change.action === 'end')
-    await client.query('DELETE FROM exercise_reviews WHERE exercise_id = $1', [exerciseId]);
+  else await client.query('DELETE FROM exercise_reviews WHERE exercise_id = $1', [exerciseId]);
 }
 
 // The exercise reviews due up to `until` (all without one), oldest first, with where the exercise is.

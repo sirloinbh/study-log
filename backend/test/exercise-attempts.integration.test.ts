@@ -229,12 +229,40 @@ test(
         assert.deepEqual(await mine(), []);
         assert.equal(await count(), before - 1);
 
+        // Deleting the only wrong attempt clears its review (#393); an earlier date added later
+        // is placed in date order. A fresh exercise, so the history above does not count.
+        const second = await post(
+          `/api/textbooks/${book}/contents/${chapter}/exercises`,
+          { number: '4', body: '다시 계산할 문제' },
+          'exercise',
+        );
+        const tryOn = (body: object) =>
+          call(`/api/exercises/${second}/attempts`, { method: 'POST', body });
+        const dueOf = async () =>
+          (
+            (await call('/api/reviews/all')).data.exerciseReviews as {
+              exerciseId: number;
+              step: number;
+              dueDate: string;
+            }[]
+          )
+            .filter((r) => r.exerciseId === second)
+            .map((r) => [r.step, r.dueDate]);
+        const wrong = await tryOn({ result: 'wrong', date: '2026-11-23' });
+        assert.deepEqual(await dueOf(), [[1, '2026-11-24']]);
+        await call(`/api/exercise-attempts/${(wrong.data.attempt as { id: number }).id}`, {
+          method: 'DELETE',
+        });
+        assert.deepEqual(await dueOf(), []);
+        // A clean attempt entered after a later wrong one, but dated before it, changes nothing.
+        await tryOn({ result: 'wrong', date: '2026-11-23' });
+        await tryOn({ result: 'correct', date: '2026-11-01' });
+        assert.deepEqual(await dueOf(), [[1, '2026-11-24']]);
+
         // Deleting the exercise removes a running cycle.
-        await attempt({ result: 'wrong', date: '2026-11-23' });
-        assert.equal((await mine()).length, 1);
-        await call(`/api/exercises/${exercise}`, { method: 'DELETE' });
+        await call(`/api/exercises/${second}`, { method: 'DELETE' });
         const left = await pool.query('SELECT 1 FROM exercise_reviews WHERE exercise_id = $1', [
-          exercise,
+          second,
         ]);
         assert.equal(left.rowCount, 0);
       },

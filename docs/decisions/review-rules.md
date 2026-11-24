@@ -90,6 +90,6 @@ Detailed rules:
 - The days are counted from the date of the attempt that set the step, not from the previous due date: a wrong attempt on day 0 makes step 1 due on day 1. A clean correct attempt on day 1 makes step 2 due on day 4 (3 days later), then step 3 7 days after the next one, then step 4 14 days after that.
 - There is at most one running cycle per exercise (one row, `exercise_reviews`). A clean correct attempt on an exercise with no running cycle starts nothing.
 - A clean correct attempt before the due date still moves to the next step. Nothing is postponed or edited by hand for exercises (unlike chapter 3).
-- Deleting an attempt does not recalculate the cycle. Deleting the exercise deletes its cycle.
+- The cycle follows the attempts (#393): after an attempt is added or deleted it is rebuilt by replaying the exercise's attempts oldest first (by date, then entry order). Deleting the only wrong attempt clears the review, and an attempt entered with an earlier date lands in date order. Deleting the exercise deletes its cycle.
 - Due and overdue rows are listed in the same ranges as chapter reviews (today, this week, all) and counted in the badge, which becomes the number of chapter rounds plus exercises due today or earlier.
 - The exercise review rows are not part of the completion rate statistics in chapter 5.
