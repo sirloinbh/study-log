@@ -78,7 +78,11 @@ export function StudyTimeChart({
               aria-hidden="true"
             >
               <R.ResponsiveContainer width="100%" height={240}>
-                <R.BarChart data={bars} margin={{ top: 8, right: 8, bottom: 0, left: -16 }}>
+                <R.BarChart
+                  accessibilityLayer={false}
+                  data={bars}
+                  margin={{ top: 8, right: 8, bottom: 0, left: -16 }}
+                >
                   <R.CartesianGrid vertical={false} stroke="var(--border)" />
                   <R.XAxis dataKey="label" tickLine={false} minTickGap={12} fontSize={11} />
                   <R.YAxis allowDecimals={false} unit="h" tickLine={false} fontSize={11} />
