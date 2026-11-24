@@ -113,7 +113,14 @@ export function createApp(
     options.calendarSyncDelayMs,
   );
   app.use(
-    ['/api/schedules', '/api/reviews', '/api/study-logs', '/api/study-timer'],
+    [
+      '/api/schedules',
+      '/api/reviews',
+      '/api/study-logs',
+      '/api/study-timer',
+      '/api/exercises',
+      '/api/exercise-attempts',
+    ],
     calendarSyncHook(pool, calendarRunner),
   );
   app.use(
