@@ -36,6 +36,11 @@ services:
       SOLVEDAC_HANDLE: ${SOLVEDAC_HANDLE:-}
       # The LeetCode account to import from (#370); without it only the import fails.
       LEETCODE_USERNAME: ${LEETCODE_USERNAME:-}
+      # Google Calendar one-way sync (#366); without them only the sync is unavailable.
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-}
+      CALENDAR_TOKEN_KEY: ${CALENDAR_TOKEN_KEY:-}
       # Exercise files in S3 (#28); without the bucket and region only file requests fail. Empty
       # keys fall through to the server's IAM role.
       FILE_BUCKET: ${FILE_BUCKET:-}

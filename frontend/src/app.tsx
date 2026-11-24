@@ -15,6 +15,7 @@ import {
 import { type ReactNode, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
 
+import { CalendarSync } from './calendar-sync';
 import { CodingProblems } from './coding-problems';
 import { AppShell, type NavItem } from './components/layout/app-shell';
 import { Toaster } from './components/ui/sonner';
@@ -259,7 +260,12 @@ function AppBody() {
                   health={health}
                   today={today}
                 >
-                  {() => <DataExport />}
+                  {() => (
+                    <>
+                      <CalendarSync />
+                      <DataExport />
+                    </>
+                  )}
                 </Page>
               }
             />
