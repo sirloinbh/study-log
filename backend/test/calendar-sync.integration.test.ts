@@ -51,7 +51,7 @@ function fakeGoogle() {
     [...events.entries()]
       .filter(([, event]) => event.summary.includes(marker))
       .map(([id, event]) => ({ id, summary: event.summary, date: event.date }))
-      .sort((a, b) => a.summary.localeCompare(b.summary));
+      .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
   return { client, mine, log, all: () => events.values() };
 }
 
@@ -214,8 +214,8 @@ test(
         assert.deepEqual(
           google.mine().map(({ summary, date }) => [summary, date]),
           [
-            [`Exercise review 2/4: ${marker} Linear Algebra, Vectors #3`, '7003-01-11'],
             [`${marker} Algorithms (1 h 30 min)`, '7003-01-09'],
+            [`Exercise review 2/4: ${marker} Linear Algebra, Vectors #3`, '7003-01-11'],
           ],
         );
         assert.ok(![...google.all()].some((event) => event.description.includes('private')));
