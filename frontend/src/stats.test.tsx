@@ -248,6 +248,17 @@ const twoWeeks = {
   })),
 };
 
+// #405: the heatmap scrolls sideways, so a keyboard must be able to focus it.
+test('the heatmap scroll area is a named region that takes keyboard focus', async () => {
+  await openStats({ heatmap: twoWeeks });
+  const region = await screen.findByRole('region', {
+    name: 'Heatmap of the last year, scrolls sideways',
+  });
+  expect(region).toHaveAttribute('tabindex', '0');
+  region.focus();
+  expect(region).toHaveFocus();
+});
+
 test('the heatmap shows each day in its band with a tooltip, by week columns', async () => {
   await openStats({ heatmap: twoWeeks });
   await screen.findByRole('img');
