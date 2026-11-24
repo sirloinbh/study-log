@@ -19,9 +19,17 @@ vi.mock('recharts', () => {
   type Row = { label: string; minutes: number; hours: number };
   const Part = () => null;
   const Group = ({ children }: { children?: React.ReactNode }) => <div>{children}</div>;
-  const BarChart = ({ data, children }: { data: Row[]; children?: React.ReactNode }) => {
+  const BarChart = ({
+    data,
+    children,
+    accessibilityLayer,
+  }: {
+    data: Row[];
+    children?: React.ReactNode;
+    accessibilityLayer?: boolean;
+  }) => {
     return (
-      <div data-testid="bar-chart">
+      <div data-testid="bar-chart" data-accessibility-layer={String(accessibilityLayer)}>
         {data.map((row) => (
           <span key={row.label} data-testid="bar">
             {`${row.label}:${row.hours}:${row.minutes}`}
@@ -320,6 +328,8 @@ test('the chart shows the period by day, with a sentence naming the busiest day'
       .map((b) => b.textContent.split(':').slice(0, 2).join(':')),
   ).toEqual(['10/19:0', '10/20:1.5', '10/21:2.5', '10/22:0.8']);
   expect(chart().getByText(/Busiest day of 4 days: 10\/21 \(2 h 30 min\)/)).toBeVisible();
+  // The chart sits in an aria-hidden wrapper, so its own keyboard layer must be off (#404).
+  expect(chart().getByTestId('bar-chart')).toHaveAttribute('data-accessibility-layer', 'false');
   // Bars show hours; the tooltip shows the exact minutes.
   expect(chart().getByTestId('bar-key')).toHaveTextContent('hours');
   expect(JSON.parse(chart().getByTestId('tooltip').textContent)).toEqual([

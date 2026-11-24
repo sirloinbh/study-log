@@ -10,9 +10,12 @@ import { render } from './test/render';
 // in a browser instead.
 vi.mock('recharts', () => {
   const Part = () => null;
+  const Group = ({ children }: { children?: React.ReactNode }) => <div>{children}</div>;
   return {
-    ResponsiveContainer: Part,
-    BarChart: Part,
+    ResponsiveContainer: Group,
+    BarChart: ({ accessibilityLayer }: { accessibilityLayer?: boolean }) => (
+      <div data-testid="review-chart" data-accessibility-layer={String(accessibilityLayer)} />
+    ),
     CartesianGrid: Part,
     XAxis: Part,
     YAxis: Part,
@@ -87,6 +90,11 @@ test('the completion rate and its counts are shown for the period', async () => 
   expect(
     reviewCard().getByText(/This week: 3 of 4 scheduled reviews completed, 2 delayed/),
   ).toBeTruthy();
+  // The chart sits in an aria-hidden wrapper, so its own keyboard layer must be off (#404).
+  expect(await reviewCard().findByTestId('review-chart')).toHaveAttribute(
+    'data-accessibility-layer',
+    'false',
+  );
 });
 
 test('the page holds the card of textbooks and schedules', async () => {
