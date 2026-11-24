@@ -43,8 +43,10 @@ export function replayExerciseReview(attempts: ExerciseAttempt[]): ExerciseRevie
 
 // Rebuilds the review from the exercise's attempts, in the transaction that added or deleted one.
 export async function syncExerciseReview(client: PoolClient, exerciseId: number) {
-  // The exercise row is locked so two attempts of one exercise rebuild one after the other.
-  const locked = await client.query('SELECT 1 FROM exercises WHERE id = $1 FOR UPDATE', [
+  // The exercise row is locked so two attempts of one exercise rebuild one after the other. NO KEY
+  // UPDATE, not UPDATE: the attempt insert already holds a key share on the row, and two of them
+  // asking for the full lock would wait on each other.
+  const locked = await client.query('SELECT 1 FROM exercises WHERE id = $1 FOR NO KEY UPDATE', [
     exerciseId,
   ]);
   if (!locked.rowCount) return;
