@@ -58,7 +58,15 @@ export function Heatmap() {
           <p className="status mt-0 mb-3">
             {plural(studied.length, 'study day')} · total {formatMinutes(total)}
           </p>
-          <div className="overflow-x-auto pb-1" id="heatmap-scroll">
+          {/* The year is wider than a phone, so the region takes focus and a keyboard can scroll it (#405). */}
+          <div
+            className="overflow-x-auto pb-1 focus-visible:outline-[3px] focus-visible:outline-offset-2 focus-visible:outline-ring"
+            id="heatmap-scroll"
+            role="region"
+            aria-label="Heatmap of the last year, scrolls sideways"
+            // eslint-disable-next-line jsx-a11y-x/no-noninteractive-tabindex -- a scrollable region must take focus so a keyboard can scroll it (WCAG 2.1.1).
+            tabIndex={0}
+          >
             {/* One image for screen readers; each day's value is in its tooltip for the mouse. */}
             <div
               className="flex w-max gap-[3px]"
