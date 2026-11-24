@@ -102,7 +102,7 @@ export function Calendar({ today, reloadKey }: { today: string; reloadKey?: numb
           {weekdays.map((name) => (
             <span
               key={name}
-              className="text-center text-[12px] text-muted-foreground"
+              className="text-center text-[13px] text-muted-foreground"
               aria-hidden="true"
             >
               {name}
@@ -123,7 +123,7 @@ export function Calendar({ today, reloadKey }: { today: string; reloadKey?: numb
                 >
                   {Number(day.date.slice(8))}
                 </span>
-                <span className="text-[11px] whitespace-nowrap text-primary">
+                <span className="text-center text-[13px] leading-tight text-primary">
                   {shortMinutes(day.minutes)}
                 </span>
               </button>

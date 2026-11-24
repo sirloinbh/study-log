@@ -98,7 +98,7 @@ export function Heatmap() {
             </div>
           </div>
           <ul
-            className="mx-0 mt-3 mb-0 flex list-none flex-wrap gap-x-[14px] gap-y-1.5 p-0 text-[12px] text-muted-foreground"
+            className="mx-0 mt-3 mb-0 flex list-none flex-wrap gap-x-[14px] gap-y-1.5 p-0 text-[13px] text-muted-foreground"
             aria-label="Intensity levels"
           >
             {heatBands.map((band) => (
