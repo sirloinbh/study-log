@@ -50,7 +50,7 @@ export function StudyPattern({
             {pattern.byWeekday.map((minutes, day) => (
               <div
                 key={day}
-                className="grid grid-cols-[20px_minmax(0,1fr)_84px] items-center gap-2 text-[12px]"
+                className="grid grid-cols-[20px_minmax(0,1fr)_84px] items-center gap-2 text-[13px]"
               >
                 <span>{weekdayNames[day]}</span>
                 <span className="h-2.5 rounded-[3px] bg-muted" aria-hidden="true">
@@ -91,7 +91,7 @@ export function StudyPattern({
             ))}
           </ul>
           <div
-            className="flex justify-between text-[11px] text-muted-foreground"
+            className="flex justify-between text-[13px] text-muted-foreground"
             aria-hidden="true"
           >
             <span>00:00</span>

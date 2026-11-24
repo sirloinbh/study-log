@@ -14,6 +14,9 @@
 :where(.legacy) :is(button, input, select, textarea) {
   font: inherit;
 }
+:where(.legacy) textarea {
+  @apply text-base md:text-[14px];
+}
 :where(.legacy) button {
   @apply inline-flex cursor-pointer items-center gap-2;
 }
@@ -50,7 +53,7 @@
   @apply grid grid-cols-4 gap-[14px];
 }
 .log-form label {
-  @apply grid gap-1.5 text-[12px] font-medium;
+  @apply grid gap-1.5 text-[13px] font-medium;
 }
 .log-form textarea {
   @apply w-full resize-y rounded-[calc(var(--radius)-2px)] border border-border bg-card px-2.5 py-[9px] text-foreground;
@@ -134,7 +137,7 @@
   @apply m-0 min-w-0 rounded-[calc(var(--radius)-2px)] border border-border p-2.5;
 }
 .exercise-extraction legend {
-  @apply px-1 text-[12px] font-semibold;
+  @apply px-1 text-[13px] font-semibold;
 }
 .exercise-extraction .extraction-kind {
   @apply grid gap-2;
@@ -163,14 +166,14 @@
   @apply w-full;
 }
 .answer-label {
-  @apply m-0 text-[12px] text-muted-foreground;
+  @apply m-0 text-[13px] text-muted-foreground;
 }
 .detail {
   @apply mx-0 mt-0 mb-4 grid gap-3;
 }
 .detail dt,
 .retro-summary dt {
-  @apply text-[12px] text-muted-foreground;
+  @apply text-[13px] text-muted-foreground;
 }
 .detail dd {
   @apply mt-0.5 mb-0 [overflow-wrap:anywhere];
@@ -188,7 +191,7 @@
   @apply font-semibold [overflow-wrap:anywhere];
 }
 .badge {
-  @apply rounded-full bg-muted px-2.5 py-0.5 text-[11px];
+  @apply rounded-full bg-muted px-2.5 py-0.5 text-[13px];
 }
 .badge.done {
   @apply bg-primary text-primary-foreground;
@@ -259,7 +262,7 @@
 }
 .schedule-move label,
 .schedule-rename label {
-  @apply grid gap-1.5 text-[12px] font-medium;
+  @apply grid gap-1.5 text-[13px] font-medium;
 }
 .schedule-move input[type='date'],
 .schedule-rename input {
@@ -344,14 +347,14 @@
   @apply max-h-[6.2em] overflow-hidden;
 }
 .hint {
-  @apply mx-0 -mt-1 mb-0 text-[12px] text-muted-foreground;
+  @apply mx-0 -mt-1 mb-0 text-[13px] text-muted-foreground;
 }
 .memo-preview {
   @apply rounded-[calc(var(--radius)-2px)] border border-dashed border-border px-3 py-2;
 }
 .toc-preview h4,
 .memo-preview h3 {
-  @apply mt-0 mb-1.5 text-[12px] text-muted-foreground;
+  @apply mt-0 mb-1.5 text-[13px] text-muted-foreground;
 }
 @media (max-width: 760px) {
   .log-form,
