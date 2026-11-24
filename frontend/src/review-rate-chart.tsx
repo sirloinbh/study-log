@@ -21,7 +21,11 @@ function ReviewBars({ stats }: { stats: ReviewStats }) {
       aria-hidden="true"
     >
       <R.ResponsiveContainer width="100%" height={200}>
-        <R.BarChart data={reviewBars(stats)} margin={{ top: 8, right: 8, bottom: 0, left: 8 }}>
+        <R.BarChart
+          accessibilityLayer={false}
+          data={reviewBars(stats)}
+          margin={{ top: 8, right: 8, bottom: 0, left: 8 }}
+        >
           <R.CartesianGrid vertical={false} stroke="var(--border)" />
           {/* Every label, since the counts are read from them. */}
           <R.XAxis dataKey="label" interval={0} tickLine={false} fontSize={12} />
