@@ -143,6 +143,28 @@ export const operations: Record<string, Operation> = {
     status: [204, 404],
   },
 
+  'GET /api/calendar-sync/status': {
+    summary: 'Get whether Google Calendar sync is set up and connected, and how the last sync went',
+    status: [200],
+  },
+  'POST /api/calendar-sync/connect': {
+    summary: 'Get the address of Google sign-in for connecting the Study log calendar',
+    status: [200, 503],
+  },
+  'GET /api/calendar-sync/callback': {
+    summary:
+      'Where Google sends the browser back after sign-in: saves the access, then redirects to the settings page',
+    status: [302, 503],
+  },
+  'POST /api/calendar-sync/sync': {
+    summary: 'Sync schedule items and review due dates to the Study log calendar now',
+    status: [200, 409, 503],
+  },
+  'DELETE /api/calendar-sync': {
+    summary: 'Disconnect Google Calendar and revoke the access (the calendar stays in Google)',
+    status: [204, 404],
+  },
+
   'GET /api/export/study-logs.csv': {
     summary: 'Download study logs as CSV, with an optional date range',
     query: exportQuery,

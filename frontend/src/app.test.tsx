@@ -14,6 +14,7 @@ function server(health: { body: object; status?: number }) {
     'GET /api/health': { body: health.body, status: health.status },
     ...Object.fromEntries(
       [
+        '/api/calendar-sync/status',
         '/api/exercises/wrong',
         '/api/keywords',
         '/api/retrospectives/period',

@@ -80,7 +80,7 @@ export function Stats() {
         ))}
       </div>
       {/* Named apart from the textbook filter of "Textbooks and schedules" below, which covers only that card. */}
-      <label className="mb-4 grid max-w-80 grid-cols-[minmax(0,1fr)] gap-1.5 text-[12px] font-medium">
+      <label className="mb-4 grid max-w-80 grid-cols-[minmax(0,1fr)] gap-1.5 text-[13px] font-medium">
         Textbook
         <NativeSelect
           aria-label="Study time textbook"
@@ -119,7 +119,7 @@ export function Stats() {
             <p className="m-0 mb-1.5 text-[26px] font-semibold" data-metric-value>
               {formatMinutes(stats.cumulativeMinutes)}
             </p>
-            <p className="status m-0 text-[12px] [word-break:keep-all]">
+            <p className="status m-0 text-[13px] [word-break:keep-all]">
               Recorded so far: {statStudyTypeLabels[studyType]}
               {bookTitle && ` · ${bookTitle}`}
             </p>
@@ -129,7 +129,7 @@ export function Stats() {
             <p className="m-0 mb-1.5 text-[26px] font-semibold" data-metric-value>
               {formatMinutes(stats.todayMinutes)}
             </p>
-            <p className="status m-0 text-[12px] [word-break:keep-all]">{stats.to}</p>
+            <p className="status m-0 text-[13px] [word-break:keep-all]">{stats.to}</p>
           </article>
           <article className="card" data-metric>
             <h2 className="m-0 mb-2 text-[13px] font-medium text-muted-foreground">{label}</h2>
@@ -137,11 +137,11 @@ export function Stats() {
               {formatMinutes(stats.totalMinutes)}
             </p>
             {/* Breaks only around "~", never inside a date. */}
-            <p className="status m-0 text-[12px] [word-break:keep-all]">
+            <p className="status m-0 text-[13px] [word-break:keep-all]">
               <span className="whitespace-nowrap">{stats.from}</span> ~{' '}
               <span className="whitespace-nowrap">{stats.to}</span>
             </p>
-            <p className="status m-0 text-[12px] [word-break:keep-all]">
+            <p className="status m-0 text-[13px] [word-break:keep-all]">
               {stats.studyDays} of {plural(stats.days, 'day')} studied
             </p>
           </article>
@@ -152,8 +152,8 @@ export function Stats() {
             <p className="m-0 mb-1.5 text-[26px] font-semibold" data-metric-value>
               {formatMinutes(stats.averageMinutesPerDay)}
             </p>
-            <p className="status m-0 text-[12px] [word-break:keep-all]">Based on {label}</p>
-            <p className="status m-0 text-[12px] [word-break:keep-all]">
+            <p className="status m-0 text-[13px] [word-break:keep-all]">Based on {label}</p>
+            <p className="status m-0 text-[13px] [word-break:keep-all]">
               Study days only: {formatMinutes(stats.averageMinutesPerStudyDay)}
             </p>
           </article>

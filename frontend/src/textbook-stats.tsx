@@ -26,7 +26,7 @@ export function TextbookStats() {
   return (
     <section className="card" aria-label="Textbooks and schedules">
       <h2>Textbooks and schedules</h2>
-      <label className="mb-4 grid max-w-80 grid-cols-[minmax(0,1fr)] gap-1.5 text-[12px] font-medium">
+      <label className="mb-4 grid max-w-80 grid-cols-[minmax(0,1fr)] gap-1.5 text-[13px] font-medium">
         Textbook
         <NativeSelect
           className="w-full min-w-0"

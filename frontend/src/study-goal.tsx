@@ -108,7 +108,7 @@ export function StudyGoal() {
             className="mt-4 flex flex-wrap items-end gap-3"
             onSubmit={(event) => void submit(event)}
           >
-            <label className="grid gap-1.5 text-[12px] font-medium">
+            <label className="grid gap-1.5 text-[13px] font-medium">
               Goal for this week (hours)
               <Input
                 type="number"
