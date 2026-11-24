@@ -101,6 +101,12 @@ test('the plan creates new items, moves changed ones and removes the ones that a
   );
   assert.equal(same.create.length, 1);
   assert.equal(same.remove.length, 1);
+  // An exercise review is its own kind too, so exercise 1 is not review 1 or item 1.
+  const exercise = planSync(
+    [{ ...item(1, '2026-11-25'), source: 'exercise_review' }],
+    [{ ...item(1, '2026-11-25'), source: 'exercise_review', eventId: 'x' }],
+  );
+  assert.deepEqual(exercise, { create: [], update: [], remove: [] });
 });
 
 type Call = { url: string; method: string; body: string | null; auth: string | null };

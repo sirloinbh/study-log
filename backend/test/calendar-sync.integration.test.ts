@@ -52,7 +52,7 @@ function fakeGoogle() {
       .filter(([, event]) => event.summary.includes(marker))
       .map(([id, event]) => ({ id, summary: event.summary, date: event.date }))
       .sort((a, b) => a.summary.localeCompare(b.summary));
-  return { client, mine, log };
+  return { client, mine, log, all: () => events.values() };
 }
 
 // Requires a dedicated test DB with database/migrations applied. Skipped (not passed) without it.
@@ -65,6 +65,7 @@ test(
       await pool.query('DELETE FROM calendar_events');
       await pool.query('DELETE FROM calendar_connection');
       await pool.query('DELETE FROM schedules WHERE title LIKE $1', [`${marker}%`]);
+      await pool.query('DELETE FROM textbooks WHERE title LIKE $1', [`${marker}%`]);
       await pool.query(
         `DELETE FROM study_logs WHERE study_date BETWEEN '7002-12-01' AND '7003-12-31'`,
       );
@@ -188,6 +189,50 @@ test(
         assert.equal(status.connected, true);
         assert.equal(status.lastError, null);
         assert.ok(status.lastSyncedAt);
+
+        // An exercise I got wrong has a review date (#403): it becomes an event, moves, and goes when
+        // the cycle ends. Only the textbook, chapter and number are sent, never the exercise text.
+        const book = await pool.query<{ id: number }>(
+          'INSERT INTO textbooks (title) VALUES ($1) RETURNING id',
+          [`${marker} Linear Algebra`],
+        );
+        const chapter = await pool.query<{ id: number }>(
+          `INSERT INTO textbook_contents (textbook_id, parent_id, position, number, title)
+           VALUES ($1, NULL, 0, '1', 'Vectors') RETURNING id`,
+          [book.rows[0].id],
+        );
+        const exercise = await pool.query<{ id: number }>(
+          `INSERT INTO exercises (textbook_id, content_id, number, body)
+           VALUES ($1, $2, '3', 'private exercise text') RETURNING id`,
+          [book.rows[0].id, chapter.rows[0].id],
+        );
+        await pool.query(
+          `INSERT INTO exercise_reviews (exercise_id, step, due_date) VALUES ($1, 2, '7003-01-11')`,
+          [exercise.rows[0].id],
+        );
+        await call('/api/calendar-sync/sync', { method: 'POST' });
+        assert.deepEqual(
+          google.mine().map(({ summary, date }) => [summary, date]),
+          [
+            [`Exercise review 2/4: ${marker} Linear Algebra, Vectors #3`, '7003-01-11'],
+            [`${marker} Algorithms (1 h 30 min)`, '7003-01-09'],
+          ],
+        );
+        assert.ok(![...google.all()].some((event) => event.description.includes('private')));
+        await pool.query(
+          `UPDATE exercise_reviews SET step = 3, due_date = '7003-01-14' WHERE exercise_id = $1`,
+          [exercise.rows[0].id],
+        );
+        await call('/api/calendar-sync/sync', { method: 'POST' });
+        assert.ok(google.mine().some((event) => event.date === '7003-01-14'));
+        await pool.query('DELETE FROM exercise_reviews WHERE exercise_id = $1', [
+          exercise.rows[0].id,
+        ]);
+        await call('/api/calendar-sync/sync', { method: 'POST' });
+        assert.deepEqual(
+          google.mine().map((event) => event.date),
+          ['7003-01-09'],
+        );
 
         // A sync run does not repeat what is already there.
         const before = google.log.length;
