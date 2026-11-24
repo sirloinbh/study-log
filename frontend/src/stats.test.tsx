@@ -43,8 +43,8 @@ vi.mock('recharts', () => {
     ResponsiveContainer: Group,
     BarChart,
     CartesianGrid: Part,
-    XAxis: Part,
-    YAxis: Part,
+    XAxis: ({ fontSize }: { fontSize?: number }) => <span data-testid="axis-font">{fontSize}</span>,
+    YAxis: ({ fontSize }: { fontSize?: number }) => <span data-testid="axis-font">{fontSize}</span>,
     Tooltip: ({ formatter }: { formatter: (v: number, n: string, i: unknown) => unknown }) => (
       <span data-testid="tooltip">
         {JSON.stringify(formatter(2.5, 'hours', { payload: { minutes: 150 } }))}
@@ -341,6 +341,9 @@ test('the chart shows the period by day, with a sentence naming the busiest day'
   expect(chart().getByText(/Busiest day of 4 days: 10\/21 \(2 h 30 min\)/)).toBeVisible();
   // The chart sits in an aria-hidden wrapper, so its own keyboard layer must be off (#404).
   expect(chart().getByTestId('bar-chart')).toHaveAttribute('data-accessibility-layer', 'false');
+  // Axis labels are at least 13px (#406).
+  for (const axis of chart().getAllByTestId('axis-font'))
+    expect(Number(axis.textContent)).toBeGreaterThanOrEqual(13);
   // Bars show hours; the tooltip shows the exact minutes.
   expect(chart().getByTestId('bar-key')).toHaveTextContent('hours');
   expect(JSON.parse(chart().getByTestId('tooltip').textContent)).toEqual([

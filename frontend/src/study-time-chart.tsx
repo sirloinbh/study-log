@@ -84,8 +84,8 @@ export function StudyTimeChart({
                   margin={{ top: 8, right: 8, bottom: 0, left: -16 }}
                 >
                   <R.CartesianGrid vertical={false} stroke="var(--border)" />
-                  <R.XAxis dataKey="label" tickLine={false} minTickGap={12} fontSize={11} />
-                  <R.YAxis allowDecimals={false} unit="h" tickLine={false} fontSize={11} />
+                  <R.XAxis dataKey="label" tickLine={false} minTickGap={12} fontSize={13} />
+                  <R.YAxis allowDecimals={false} unit="h" tickLine={false} fontSize={13} />
                   <R.Tooltip
                     cursor={{ fill: 'var(--muted)' }}
                     formatter={(_value, _name, item) => [
