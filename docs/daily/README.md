@@ -12,3 +12,4 @@ For each work day in Asia/Seoul, create a new `YYYY-MM-DD.md`, and put additiona
 - [2026-11-16](2026-11-16.md)
 - [2026-11-17](2026-11-17.md)
 - [2026-11-23](2026-11-23.md)
+- [2026-11-24](2026-11-24.md)
