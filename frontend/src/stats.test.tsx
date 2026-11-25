@@ -259,6 +259,23 @@ test('the heatmap scroll area is a named region that takes keyboard focus', asyn
   expect(region).toHaveFocus();
 });
 
+// #411: the labels are 13px, and only every other weekday is named so they fit beside 11px rows.
+test('the heatmap labels are 13px and name every other weekday', async () => {
+  await openStats({ heatmap: twoWeeks });
+  const region = await screen.findByRole('region', {
+    name: 'Heatmap of the last year, scrolls sideways',
+  });
+  const labels = Array.from(region.querySelectorAll('span')).filter(
+    (node) => node.textContent && !node.hasAttribute('data-level'),
+  );
+  expect(
+    labels.map((node) => node.textContent).filter((text) => /^[A-Z][a-z]{2}$/.test(text)),
+  ).toEqual(['Mon', 'Wed', 'Fri']);
+  expect(region.querySelector('[class*="text-[13px]"]')).not.toBeNull();
+  expect(region.innerHTML).not.toMatch(/text-\[1[0-2]px\]/);
+  expect(region.textContent).not.toMatch(/Tue|Thu|Sat|Sun/);
+});
+
 test('the heatmap shows each day in its band with a tooltip, by week columns', async () => {
   await openStats({ heatmap: twoWeeks });
   await screen.findByRole('img');
