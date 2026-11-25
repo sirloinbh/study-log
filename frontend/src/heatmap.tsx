@@ -15,9 +15,9 @@ import {
 
 const cellBase = 'block size-[11px] rounded-[2px]';
 // Weekday names and weeks are columns of one month-label row and seven days.
-const column = 'grid grid-rows-[14px_repeat(7,11px)] gap-[3px]';
+const column = 'grid grid-rows-[16px_repeat(7,11px)] gap-[3px]';
 const monthLabelClass =
-  'w-[11px] overflow-visible whitespace-nowrap text-[10px] leading-[14px] text-muted-foreground';
+  'w-[11px] overflow-visible whitespace-nowrap text-[13px] leading-[16px] text-muted-foreground';
 
 // Rows run Sunday to Saturday (#96); Monday, Wednesday and Friday are labelled.
 const weekdays = ['', 'Mon', '', 'Wed', '', 'Fri', ''];
@@ -74,7 +74,7 @@ export function Heatmap() {
               aria-label={`${data.from} to ${data.to}: ${plural(studied.length, 'study day')}, total ${formatMinutes(total)}`}
             >
               <div
-                className={`${column} sticky left-0 z-[1] bg-card pr-1 text-[10px] leading-[11px] text-muted-foreground shadow-[-4px_0_0_var(--card)]`}
+                className={`${column} sticky left-0 z-[1] bg-card pr-1 text-[13px] leading-[11px] text-muted-foreground shadow-[-4px_0_0_var(--card)]`}
                 aria-hidden="true"
               >
                 <span className={monthLabelClass} />
