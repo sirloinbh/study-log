@@ -5,6 +5,7 @@ import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
 import { NativeSelect } from './components/ui/native-select';
 import { type Exercise, exerciseLabel, exerciseLimits, matchExercise } from './exercise';
+import { FileField } from './file-field';
 import { type RequestError, requestForm } from './lib/api';
 import { type ApiRequest, useApiMutation } from './lib/query';
 import { ButtonSpinner } from './loading';
@@ -196,15 +197,14 @@ export function ExerciseExtraction({
           Claude reads the file. Each reading is a paid request and can take up to a minute. Nothing
           is saved until you check the result.
         </p>
-        <label className="wide">
-          PDF or photo (up to 20 MB)
-          <input
-            type="file"
-            accept="application/pdf,.pdf,image/jpeg,.jpg,.jpeg,image/png,.png"
-            disabled={busy}
-            onChange={(event) => setFile(event.target.files?.[0])}
-          />
-        </label>
+        <FileField
+          className="wide"
+          label="PDF or photo (up to 20 MB)"
+          accept="application/pdf,.pdf,image/jpeg,.jpg,.jpeg,image/png,.png"
+          file={file}
+          disabled={busy}
+          onFile={setFile}
+        />
         <fieldset className="wide extraction-kind">
           <legend>The file holds</legend>
           <label className="check">

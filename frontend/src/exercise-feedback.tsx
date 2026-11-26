@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useBusy } from './busy';
 import { Button } from './components/ui/button';
 import type { AttemptFeedback, FeedbackMode } from './exercise';
+import { FileField } from './file-field';
 import { type RequestError, requestForm } from './lib/api';
 import { ButtonSpinner } from './loading';
 
@@ -98,15 +99,13 @@ export function ExerciseFeedback({
               onChange={(event) => setSolution(event.target.value)}
             />
           </label>
-          <label>
-            Or a photo of it (JPEG or PNG, up to 20 MB)
-            <input
-              type="file"
-              accept="image/jpeg,image/png"
-              disabled={busy}
-              onChange={(event) => setFile(event.target.files?.[0])}
-            />
-          </label>
+          <FileField
+            label="Or a photo of it (JPEG or PNG, up to 20 MB)"
+            accept="image/jpeg,image/png"
+            file={file}
+            disabled={busy}
+            onFile={setFile}
+          />
           <div className="log-actions">
             {modes.map(({ mode, label: text }) => (
               <Button
