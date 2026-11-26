@@ -157,3 +157,20 @@ test('the old stats address goes to the dashboard', async () => {
   expect(await screen.findByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument();
   expect(window.location.pathname).toBe('/dashboard');
 });
+
+test('every menu entry has its own icon', () => {
+  server({ body: { today: '2026-10-26' } });
+  render(<App />);
+  const menu = screen.getByRole('navigation', { name: 'Main menu' });
+  const icons = within(menu)
+    .getAllByRole('link')
+    .map((link) =>
+      link
+        .querySelector('svg')
+        ?.getAttribute('class')
+        ?.split(' ')
+        .find((c) => c.startsWith('lucide-') && c !== 'lucide'),
+    );
+  expect(icons.every(Boolean)).toBe(true);
+  expect(new Set(icons).size).toBe(icons.length);
+});

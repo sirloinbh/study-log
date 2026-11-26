@@ -3,13 +3,14 @@ import {
   BookOpen,
   CalendarCheck,
   CalendarDays,
-  CalendarRange,
   ChartColumn,
   CircleX,
   Code,
+  Grid3x3,
   Layers,
   NotebookPen,
   NotebookText,
+  Rows3,
   Settings2,
   Tags,
 } from 'lucide-react';
@@ -59,8 +60,8 @@ const pages = {
 // the day log, Week, 12 weeks, the app's other pages, Dashboard, Settings last.
 const nav: NavItem[] = [
   { to: pages.logs, label: 'Study log', icon: NotebookPen },
-  { to: pages.week, label: 'Week', icon: CalendarRange },
-  { to: pages.twelveWeeks, label: '12 weeks', icon: CalendarRange },
+  { to: pages.week, label: 'Week', icon: Rows3 },
+  { to: pages.twelveWeeks, label: '12 weeks', icon: Grid3x3 },
   { to: pages.schedules, label: 'Schedules', icon: CalendarDays },
   { to: pages.reviews, label: 'Reviews', icon: CalendarCheck },
   { to: pages.textbooks, label: 'Textbooks', icon: BookOpen },
