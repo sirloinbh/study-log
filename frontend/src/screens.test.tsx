@@ -41,6 +41,8 @@ describe('study logs', () => {
     return fakeApi(({ method, path, body }) => {
       if (path.startsWith('/api/textbooks')) return { body: { textbooks: [] } };
       if (path === '/api/study-timer') return { body: { timer: null } };
+      // The algorithm goals card of the day log (#426): no goal list.
+      if (path.startsWith('/api/coding/goals')) return { body: { date: today, lists: [] } };
       if (path.startsWith('/api/study-logs/calendar')) {
         const month = new URL(path, 'http://test').searchParams.get('month');
         return { body: { month, days: [{ date: `${month}-01`, minutes: 0, logs: 0 }] } };

@@ -238,9 +238,20 @@ export const operations: Record<string, Operation> = {
       'Import one sheet as a goal list, or with dryRun only show what would change; a list of the same name is updated, and the sheet progress columns become attempts on the first import only; multipart/form-data with fields file, sheet, name, site, targetDate, mapping (JSON) and dryRun, header X-Requested-With: study-log',
     status: [200, 201, 400, 413],
   },
-  'GET /api/coding/goals': { summary: 'List the goal lists with their item counts', status: [200] },
+  'GET /api/coding/goals': {
+    summary:
+      'List the goal lists with their progress (solved, late, due this week) and the next problems to solve',
+    status: [200],
+  },
+  'GET /api/coding/goals/today': {
+    summary:
+      'Per goal list, the problems due on a day (default today), the ones solved on it and the next ones in order',
+    query: z.object({ date: z.string().optional() }),
+    status: [200, 400],
+  },
   'GET /api/coding/goals/:id': {
-    summary: 'Get a goal list with its items in order, linked to the problem log',
+    summary:
+      'Get a goal list with its progress and its items in order, each with its state (solved, late or left), its attempts and the latest solved date',
     status: [200, 400, 404],
   },
   'DELETE /api/coding/goals/:id': {

@@ -60,6 +60,8 @@ function toHandler(source: Handler | Routes): Handler {
 }
 
 const backgroundAnswers: Record<string, Answer> = {
+  // The algorithm goals of the day log (#426): none.
+  '/api/coding/goals/today': { body: { date: '', lists: [] } },
   '/api/study-timer': { body: { timer: null } },
   '/api/stats/goal': {
     body: {
@@ -116,7 +118,10 @@ export function fakeApi(source: Handler | Routes): Api {
         // Cards that sit on a page next to what a test is about: a test with no handler for them sees
         // no timer and no goal.
         const answer =
-          (await handle(request)) ?? (method === 'GET' ? backgroundAnswers[path] : undefined);
+          (await handle(request)) ??
+          (method === 'GET'
+            ? (backgroundAnswers[path] ?? backgroundAnswers[pathname(path)])
+            : undefined);
         if (!answer) {
           api.unexpected.push(request);
           throw new TypeError(`Unexpected request: ${method} ${path}`);

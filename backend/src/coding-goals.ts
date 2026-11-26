@@ -15,6 +15,7 @@ import {
   maxSheetRows,
   type Skipped,
 } from './coding-goal-import.js';
+import { progressOf, stateOf } from './coding-goal-progress.js';
 import { codingSites, defaultUrl } from './coding-problems.js';
 import { calendarDate } from './dates.js';
 import { inTransaction } from './sql.js';
@@ -67,6 +68,13 @@ async function readSheets(read: WorkbookReader, file: Buffer) {
   if (sheets.length === 0) throw new HttpError(400, 'The workbook has no sheets');
   return sheets;
 }
+
+const dateQuery = z.object({
+  date: calendarDate(
+    z.string({ error: 'The date format is invalid' }),
+    'The date must be in YYYY-MM-DD format',
+  ).optional(),
+});
 
 const oneLine = (label: string, max: number) =>
   z
@@ -215,7 +223,50 @@ const columns = (items: GoalItem[]) => [
 ];
 
 // /api/coding/goals (#425): goal lists imported from an Excel file.
-export function codingGoalRoutes(pool: Pool, read: WorkbookReader) {
+type GoalItemRow = {
+  id: number;
+  listId: number;
+  site: string;
+  problemKey: string;
+  title: string;
+  group: string;
+  topic: string;
+  level: number | null;
+  targetDate: string | null;
+  dueDate: string | null;
+  position: number;
+  problemId: number | null;
+  attemptCount: number;
+  solvedDate: string | null;
+};
+
+// The items with the state of their problem: its attempts and the latest solved one.
+async function loadItems(db: Db, listId?: number): Promise<GoalItemRow[]> {
+  const { rows } = await db.query<GoalItemRow>(
+    `SELECT i.id, i.list_id AS "listId", i.site, i.problem_key AS "problemKey", i.title,
+            i.group_name AS "group", i.topic, i.level, i.position, p.id AS "problemId",
+            to_char(i.target_date, 'YYYY-MM-DD') AS "targetDate",
+            to_char(COALESCE(i.target_date, l.target_date), 'YYYY-MM-DD') AS "dueDate",
+            COALESCE(s.attempts, 0)::int AS "attemptCount",
+            to_char(s.solved_date, 'YYYY-MM-DD') AS "solvedDate"
+     FROM coding_goal_items i
+     JOIN coding_goal_lists l ON l.id = i.list_id
+     LEFT JOIN coding_problems p ON p.site = i.site AND p.problem_key = i.problem_key
+     LEFT JOIN LATERAL (
+       SELECT count(*) AS attempts, max(attempt_date) FILTER (WHERE result = 'solved') AS solved_date
+       FROM coding_attempts WHERE problem_id = p.id) s ON true
+     ${listId === undefined ? '' : 'WHERE i.list_id = $1'}
+     ORDER BY i.list_id, i.position, i.id`,
+    listId === undefined ? [] : [listId],
+  );
+  return rows;
+}
+
+const withState = (items: GoalItemRow[], today: string) =>
+  items.map((item) => ({ ...item, state: stateOf(item, today) }));
+const nextCount = 3;
+
+export function codingGoalRoutes(pool: Pool, read: WorkbookReader, today: () => string) {
   const router = Router();
 
   // Step 1: what is in the file, so the screen can offer the sheets and the guessed columns.
@@ -355,37 +406,70 @@ export function codingGoalRoutes(pool: Pool, read: WorkbookReader) {
     res.status(result.created ? 201 : 200).json({ id: result.listId, plan: result.plan });
   });
 
+  // Each list with its progress and the next problems to solve, in order.
   router.get('/', async (_req, res) => {
-    const { rows } = await pool.query(
-      `SELECT l.id, l.name, to_char(l.target_date, 'YYYY-MM-DD') AS "targetDate",
-              count(i.id)::int AS total,
-              count(p.id)::int AS "alreadyLogged"
-       FROM coding_goal_lists l
-       LEFT JOIN coding_goal_items i ON i.list_id = l.id
-       LEFT JOIN coding_problems p ON p.site = i.site AND p.problem_key = i.problem_key
-       GROUP BY l.id ORDER BY l.name`,
+    const day = today();
+    const lists = await pool.query<{ id: number; name: string; targetDate: string | null }>(
+      `SELECT id, name, to_char(target_date, 'YYYY-MM-DD') AS "targetDate"
+       FROM coding_goal_lists ORDER BY name`,
     );
-    res.json({ lists: rows });
+    const items = withState(await loadItems(pool), day);
+    res.json({
+      lists: lists.rows.map((list) => {
+        const own = items.filter((item) => item.listId === list.id);
+        return {
+          ...list,
+          ...progressOf(own, day),
+          alreadyLogged: own.filter((item) => item.problemId !== null).length,
+          next: own.filter((item) => item.state !== 'solved').slice(0, nextCount),
+        };
+      }),
+    });
+  });
+
+  // What the day log shows (#426): per list, the problems due on the day, the ones solved on the day
+  // and the next ones in order. Before '/:id', where 'today' would be read as a list id.
+  router.get('/today', async (req, res) => {
+    const { date } = dateQuery.parse(req.query);
+    const day = date ?? today();
+    const lists = await pool.query<{ id: number; name: string }>(
+      `SELECT id, name FROM coding_goal_lists ORDER BY name`,
+    );
+    const items = withState(await loadItems(pool), day);
+    const solvedOn = await pool.query<{ id: number }>(
+      `SELECT DISTINCT i.id FROM coding_goal_items i
+       JOIN coding_problems p ON p.site = i.site AND p.problem_key = i.problem_key
+       JOIN coding_attempts a ON a.problem_id = p.id
+       WHERE a.attempt_date = $1 AND a.result = 'solved'`,
+      [day],
+    );
+    const solvedToday = new Set(solvedOn.rows.map((row) => row.id));
+    res.json({
+      date: day,
+      lists: lists.rows.map((list) => {
+        const own = items.filter((item) => item.listId === list.id);
+        return {
+          id: list.id,
+          name: list.name,
+          planned: own.filter((item) => item.dueDate === day),
+          solved: own.filter((item) => solvedToday.has(item.id)),
+          next: own.filter((item) => item.state !== 'solved').slice(0, nextCount),
+        };
+      }),
+    });
   });
 
   router.get('/:id', async (req, res) => {
     const id = parseId(req.params.id, 'goal list');
+    const day = today();
     const list = await pool.query(
       `SELECT id, name, to_char(target_date, 'YYYY-MM-DD') AS "targetDate"
        FROM coding_goal_lists WHERE id = $1`,
       [id],
     );
     if (!list.rows[0]) return void res.status(404).json({ error: 'Goal list not found' });
-    const items = await pool.query(
-      `SELECT i.id, i.site, i.problem_key AS "problemKey", i.title, i.group_name AS "group", i.topic,
-              i.level, to_char(i.target_date, 'YYYY-MM-DD') AS "targetDate", i.position,
-              p.id AS "problemId"
-       FROM coding_goal_items i
-       LEFT JOIN coding_problems p ON p.site = i.site AND p.problem_key = i.problem_key
-       WHERE i.list_id = $1 ORDER BY i.position, i.id`,
-      [id],
-    );
-    res.json({ list: list.rows[0], items: items.rows });
+    const items = withState(await loadItems(pool, id), day);
+    res.json({ list: list.rows[0], progress: progressOf(items, day), today: day, items });
   });
 
   router.delete('/:id', async (req, res) => {

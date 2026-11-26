@@ -5,13 +5,15 @@ import {
   type CodingSummary,
   emptyAttempt,
   fallbackTitle,
+  type GoalItem,
+  type GoalListRow,
   languageChoices,
   minutePresets,
-  type NewProblem,
   parseNewProblem,
   type ProblemRow,
   type Result,
   resultLabels,
+  type Site,
   siteLabels,
   type SolvedProblem,
 } from './coding';
@@ -28,7 +30,10 @@ type Change = (
   done: string,
 ) => Promise<boolean>;
 
-type Picked = { kind: 'known'; problem: ProblemRow } | { kind: 'new'; problem: NewProblem };
+// A problem that is not in the log yet: the site and key, and a title when a goal list gave one.
+type NewOne = { site: Site; problemKey: string; title?: string };
+type Picked =
+  { kind: 'known'; problem: Pick<ProblemRow, 'id' | 'title'> } | { kind: 'new'; problem: NewOne };
 
 const resultOptions = (Object.keys(resultLabels) as Result[]).map((value) => ({
   value,
@@ -80,6 +85,32 @@ export function CodingQuickLog({
   );
   const candidates = found.data?.problems ?? [];
 
+  // The next problems of the goal lists come first while nothing is typed (#426).
+  const goals = useApiQuery<{ lists: GoalListRow[] }>(
+    apiKey('/api/coding', 'goals'),
+    '/api/coding/goals',
+    { staleTime: 0 },
+  );
+  const goalNext: GoalItem[] = search
+    ? []
+    : (goals.data?.lists ?? []).flatMap((list) => list.next.slice(0, 2)).slice(0, 4);
+  const goalKeys = new Set(goalNext.map((item) => `${item.site}:${item.problemKey}`));
+  const recent = candidates.filter((p) => !goalKeys.has(`${p.site}:${p.problemKey}`));
+  const pickGoal = (item: GoalItem) =>
+    setPicked(
+      item.problemId === null
+        ? {
+            kind: 'new',
+            problem: { site: item.site, problemKey: item.problemKey, title: item.title },
+          }
+        : { kind: 'known', problem: { id: item.problemId, title: item.title } },
+    );
+  const goalPicked = (item: GoalItem) =>
+    picked !== undefined &&
+    (picked.kind === 'known'
+      ? picked.problem.id === item.problemId
+      : picked.problem.site === item.site && picked.problem.problemKey === item.problemKey);
+
   const known = typed
     ? candidates.some((p) => p.site === typed.site && p.problemKey === typed.problemKey)
     : true;
@@ -109,9 +140,9 @@ export function CodingQuickLog({
     } else {
       // A new problem gets its real title from solved.ac when that answers, else a made-up one.
       setLooking(true);
-      let title = fallbackTitle(picked.problem);
+      let title = picked.problem.title ?? fallbackTitle(picked.problem);
       try {
-        if (picked.problem.site === 'baekjoon') {
+        if (!picked.problem.title && picked.problem.site === 'baekjoon') {
           const data = await requestJson<{ problem: SolvedProblem }>(
             `/api/coding/solvedac/problems/${encodeURIComponent(picked.problem.problemKey)}`,
           );
@@ -127,7 +158,12 @@ export function CodingQuickLog({
         {
           path: '/api/coding/problems',
           method: 'POST',
-          body: { ...picked.problem, title, attempt },
+          body: {
+            site: picked.problem.site,
+            problemKey: picked.problem.problemKey,
+            title,
+            attempt,
+          },
         },
         `Logged ${title}: ${resultLabels[result]}`,
       );
@@ -178,7 +214,19 @@ export function CodingQuickLog({
             New: {siteLabels[typed.site]} {typed.problemKey}
           </Button>
         )}
-        {candidates.map((problem) => (
+        {goalNext.map((item) => (
+          <Button
+            key={`goal-${item.id}`}
+            type="button"
+            variant="outline"
+            aria-pressed={goalPicked(item)}
+            disabled={busy}
+            onClick={() => pickGoal(item)}
+          >
+            Next: {item.title} ({item.problemKey})
+          </Button>
+        ))}
+        {recent.map((problem) => (
           <Button
             key={problem.id}
             type="button"
@@ -195,7 +243,7 @@ export function CodingQuickLog({
             Could not load the problems: {found.error.message}
           </p>
         )}
-        {found.data && candidates.length === 0 && !(typed && !known) && (
+        {found.data && candidates.length === 0 && goalNext.length === 0 && !(typed && !known) && (
           <p className="status">
             {search ? 'No recorded problem matches' : 'No problems yet. Type a number or a link'}
           </p>

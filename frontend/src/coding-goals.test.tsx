@@ -2,7 +2,7 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { useState } from 'react';
 import { describe, expect, test } from 'vitest';
 
-import { columnLabel, suggestedListName } from './coding';
+import { columnLabel, type GoalListRow, suggestedListName } from './coding';
 import { CodingGoals, type Notice } from './coding-goals';
 import { type Answer, fakeApi, type Sent } from './test/fake-api';
 import { render } from './test/render';
@@ -41,15 +41,7 @@ const plan = {
   ],
 };
 
-function server(
-  lists: {
-    id: number;
-    name: string;
-    targetDate: string | null;
-    total: number;
-    alreadyLogged: number;
-  }[] = [],
-) {
+function server(lists: GoalListRow[] = []) {
   const answer = ({ method, path }: Sent): Answer | undefined => {
     if (path === '/api/coding/goals' && method === 'GET') return { body: { lists } };
     if (path === '/api/coding/goals/inspect') return { body: { sheets } };
@@ -71,7 +63,7 @@ function Screen() {
     <>
       <p role="status">{notice?.kind === 'status' ? notice.text : ''}</p>
       {notice?.kind === 'alert' && <p role="alert">{notice.text}</p>}
-      <CodingGoals notify={setNotice} />
+      <CodingGoals notify={setNotice} onOpenProblem={() => undefined} />
     </>
   );
 }
@@ -179,7 +171,18 @@ describe('goal list import', () => {
 
   test('lists the goal lists with counts, and deletes one after confirming', async () => {
     server([
-      { id: 1, name: 'Baekjoon 500', targetDate: '2027-03-01', total: 500, alreadyLogged: 40 },
+      {
+        id: 1,
+        name: 'Baekjoon 500',
+        targetDate: '2027-03-01',
+        total: 500,
+        solved: 40,
+        late: 0,
+        weekPlanned: 0,
+        weekSolved: 0,
+        alreadyLogged: 40,
+        next: [],
+      },
     ]);
     render(<Screen />);
     const list = await screen.findByLabelText('Your goal lists');

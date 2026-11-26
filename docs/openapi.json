@@ -257,7 +257,7 @@
         }
       },
       "get": {
-        "summary": "Get a goal list with its items in order, linked to the problem log",
+        "summary": "Get a goal list with its progress and its items in order, each with its state (solved, late or left), its attempts and the latest solved date",
         "parameters": [
           {
             "name": "id",
@@ -2454,10 +2454,60 @@
     },
     "/api/coding/goals": {
       "get": {
-        "summary": "List the goal lists with their item counts",
+        "summary": "List the goal lists with their progress (solved, late, due this week) and the next problems to solve",
         "responses": {
           "200": {
             "description": "Success"
+          },
+          "401": {
+            "description": "Sign-in required (no session from the shared sign-in)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to an external service",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/coding/goals/today": {
+      "get": {
+        "summary": "Per goal list, the problems due on a day (default today), the ones solved on it and the next ones in order",
+        "parameters": [
+          {
+            "name": "date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "description": "Input validation failed or a referenced item does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
           },
           "401": {
             "description": "Sign-in required (no session from the shared sign-in)",

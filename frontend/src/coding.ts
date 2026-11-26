@@ -149,7 +149,7 @@ export function parseNewProblem(text: string): NewProblem | undefined {
 }
 
 // A title for a problem whose real one is not known: "two-sum" becomes "Two Sum".
-export function fallbackTitle({ site, problemKey }: NewProblem) {
+export function fallbackTitle({ site, problemKey }: { site: Site; problemKey: string }) {
   if (site === 'baekjoon') return `Baekjoon ${problemKey}`;
   return problemKey
     .split('-')
@@ -217,13 +217,56 @@ export type GoalPlan = {
   blank: number;
   sample: { site: Site; problemKey: string; title: string; topic: string; level: number | null }[];
 };
-export type GoalListRow = {
+export type GoalProgress = {
+  total: number;
+  solved: number;
+  late: number;
+  weekPlanned: number;
+  weekSolved: number;
+};
+export type GoalState = 'solved' | 'late' | 'left';
+// One problem of a goal list with the state of its problem in the log (#426).
+export type GoalItem = {
+  id: number;
+  listId: number;
+  site: Site;
+  problemKey: string;
+  title: string;
+  group: string;
+  topic: string;
+  level: number | null;
+  targetDate: string | null;
+  // The item's own target date, else the list's.
+  dueDate: string | null;
+  position: number;
+  // The problem's row in the log, once there is one.
+  problemId: number | null;
+  attemptCount: number;
+  // The day of the latest solved attempt: the item counts as solved.
+  solvedDate: string | null;
+  state: GoalState;
+};
+export type GoalListRow = GoalProgress & {
   id: number;
   name: string;
   targetDate: string | null;
-  total: number;
   alreadyLogged: number;
+  // The next problems to solve, in the list's order.
+  next: GoalItem[];
 };
+export type GoalDay = {
+  date: string;
+  lists: { id: number; name: string; planned: GoalItem[]; solved: GoalItem[]; next: GoalItem[] }[];
+};
+
+export const goalStateLabel = (item: GoalItem) =>
+  item.state === 'solved'
+    ? `Solved ${item.solvedDate}`
+    : item.state === 'late'
+      ? `Late, was due ${item.dueDate}`
+      : item.dueDate
+        ? `Due ${item.dueDate}`
+        : 'Left';
 
 // The column choices of a sheet: "A: Problem number" for each header cell.
 export function columnLabel(index: number, header: string | undefined) {

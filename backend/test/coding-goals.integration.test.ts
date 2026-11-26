@@ -51,9 +51,9 @@ test(
       [keys[1]],
     );
     rows = [
-      [keys[0], 'Problem A', 'O', '2098-06-01', 'easy'],
-      [keys[1], 'Problem B', '△', '2098-06-02', ''],
-      [keys[2], 'Problem C', 'X', '2098-06-03', ''],
+      [keys[0], 'Problem A', 'O', '2097-06-01', 'easy'],
+      [keys[1], 'Problem B', '△', '2097-06-02', ''],
+      [keys[2], 'Problem C', 'X', '2097-06-03', ''],
       ['', 'No key', '', '', ''],
       [keys[0], 'Again A', '', '', ''],
     ];
@@ -139,6 +139,97 @@ test(
         assert.equal((await call(`/api/coding/goals/${id}`)).status, 404);
       },
       { workbookReader: async () => sheets() },
+    );
+  },
+);
+
+test(
+  'progress counts solved, late and due items, and the day block lists what was planned and solved',
+  { skip: !url },
+  async (t) => {
+    const pool = new Pool({ connectionString: url });
+    const name = 'zz goal progress test';
+    const cleanup = async () => {
+      await pool.query(`DELETE FROM coding_goal_lists WHERE name = $1`, [name]);
+      await pool.query(`DELETE FROM coding_problems WHERE problem_key = ANY($1)`, [keys]);
+    };
+    await cleanup();
+    t.after(async () => {
+      await cleanup();
+      await pool.end();
+    });
+    // C was solved long before the list exists; D failed once, which does not make it solved.
+    const logged = await pool.query<{ id: number }>(
+      `INSERT INTO coding_problems (site, problem_key, title) VALUES ('other', $1, 'Logged C') RETURNING id`,
+      [keys[2]],
+    );
+    await pool.query(
+      `INSERT INTO coding_attempts (problem_id, attempt_date, result) VALUES ($1, '2097-01-02', 'solved')`,
+      [logged.rows[0].id],
+    );
+    const failed = await pool.query<{ id: number }>(
+      `INSERT INTO coding_problems (site, problem_key, title) VALUES ('other', $1, 'Logged D') RETURNING id`,
+      [keys[3]],
+    );
+    await pool.query(
+      `INSERT INTO coding_attempts (problem_id, attempt_date, result) VALUES ($1, '2097-06-01', 'failed')`,
+      [failed.rows[0].id],
+    );
+    rows = [
+      [keys[0], 'Problem A', 'O', '2097-06-01', ''],
+      [keys[1], 'Problem B', '', '', ''],
+      [keys[2], 'Problem C', '', '', ''],
+      [keys[3], 'Problem D', '', '', ''],
+    ];
+    await withApi(
+      pool,
+      async (call) => {
+        const imported = await call('/api/coding/goals/import', {
+          method: 'POST',
+          form: fields({ name, targetDate: '2097-06-05' }),
+          headers,
+        });
+        assert.equal(imported.status, 201);
+        const id = imported.data.id as number;
+
+        const detail = await call(`/api/coding/goals/${id}`);
+        const items = detail.data.items as Json[];
+        const state = (key: string) => items.find((item) => item.problemKey === key)?.state;
+        assert.equal(state(keys[0]), 'solved');
+        assert.equal(state(keys[1]), 'late');
+        assert.equal(state(keys[2]), 'solved');
+        assert.equal(state(keys[3]), 'late');
+        assert.equal(items.find((item) => item.problemKey === keys[2])?.solvedDate, '2097-01-02');
+        assert.equal(items.find((item) => item.problemKey === keys[3])?.attemptCount, 1);
+        assert.deepEqual(detail.data.progress, {
+          total: 4,
+          solved: 2,
+          late: 2,
+          weekPlanned: 0,
+          weekSolved: 0,
+        });
+
+        const lists = (await call('/api/coding/goals')).data.lists as Json[];
+        const own = lists.find((list) => list.id === id);
+        assert.equal(own?.solved, 2);
+        assert.deepEqual(
+          (own?.next as Json[]).map((item) => item.problemKey),
+          [keys[1], keys[3]],
+        );
+
+        // The due day: the list's target date is each item's due day.
+        const due = (await call('/api/coding/goals/today?date=2097-06-05')).data.lists as Json[];
+        assert.equal((due.find((list) => list.id === id)?.planned as Json[]).length, 4);
+        const solvedDay = (await call('/api/coding/goals/today?date=2097-06-01')).data
+          .lists as Json[];
+        assert.deepEqual(
+          (solvedDay.find((list) => list.id === id)?.solved as Json[]).map(
+            (item) => item.problemKey,
+          ),
+          [keys[0]],
+        );
+      },
+      { today: () => '2097-06-10', workbookReader: async () => sheets() },
     );
   },
 );
