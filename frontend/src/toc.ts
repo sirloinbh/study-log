@@ -1,3 +1,4 @@
+// korean-ok-file: the parser must recognise Korean chapter words (제1장, 부록) and Korean headings in pasted contents.
 // Turning a pasted table of contents into entries (#23). Each non-blank line is one entry; its
 // number decides how deep it goes, and a line without a number follows its indentation.
 

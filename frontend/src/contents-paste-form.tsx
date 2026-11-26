@@ -73,9 +73,9 @@ export function ContentsPasteForm({
       />
       <p id="toc-paste-hint" className="hint wide">
         Paste one entry per line or import from a PDF (its bookmarks if it has them, otherwise the
-        text of the first 20 pages). Levels are split by numbers such as 1, 1.1, Chapter 1, or 제1장
-        (Korean chapter); lines without a number follow their indentation. Page numbers are dropped.
-        If the preview is wrong, fix the text.
+        text of the first 20 pages). Levels are split by numbers such as 1, 1.1, Chapter 1, or
+        Korean chapter numbers; lines without a number follow their indentation. Page numbers are
+        dropped. If the preview is wrong, fix the text.
       </p>
       {entries.length > 0 && (
         <section className="toc-preview wide" aria-label="Contents preview">
