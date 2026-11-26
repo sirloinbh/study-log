@@ -12,6 +12,8 @@ import {
   settingsFromEnv,
   syncRunner,
 } from './calendar-sync.js';
+import { readWorkbook } from './coding-goal-xlsx.js';
+import { codingGoalRoutes, type WorkbookReader } from './coding-goals.js';
 import { leetCodeRoutes } from './coding-leetcode.js';
 import { codingRoutes } from './coding-problems.js';
 import { solvedAcRoutes } from './coding-solvedac.js';
@@ -73,6 +75,8 @@ export function createApp(
     leetCodeClient?: LeetCodeClient;
     // The LeetCode account to import from (LEETCODE_USERNAME) (#370).
     leetCodeUsername?: string;
+    // Reads the Excel file of a goal list (#425); a stand-in in tests.
+    workbookReader?: WorkbookReader;
     // Google Calendar sync (#366): a stand-in client in tests, the settings (else read from the env),
     // and how long a change waits before it syncs.
     googleCalendarClient?: GoogleCalendarClient;
@@ -157,6 +161,8 @@ export function createApp(
       () => options.leetCodeUsername ?? process.env.LEETCODE_USERNAME,
     ),
   );
+  // Before '/api/coding', where 'goals' would be read as a problem route.
+  app.use('/api/coding/goals', codingGoalRoutes(pool, options.workbookReader ?? readWorkbook));
   app.use('/api/coding', codingRoutes(pool, today));
   // Before the stats routes, so '/goal' is not looked up there.
   app.use('/api/stats/goal', studyGoalRoutes(pool, today));
