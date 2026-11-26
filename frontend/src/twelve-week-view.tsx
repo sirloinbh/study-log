@@ -26,31 +26,48 @@ export function TwelveWeekView({ today }: { today: string }) {
         <Loading label="Loading the 12 weeks" kind="text" />
       ) : (
         <ol className="m-0 grid list-none gap-1 p-0">
-          {weeks.map((week) => (
-            <li
-              key={week.start}
-              className="grid grid-cols-[96px_minmax(0,1fr)_96px] items-center gap-2 text-[13px]"
-            >
-              <span>
-                {week.start.slice(5)} – {week.end.slice(5)}
-              </span>
-              <span className="h-2.5 rounded-[3px] bg-muted" aria-hidden="true">
-                <span
-                  data-bar
-                  className="block h-full rounded-[3px] bg-ring"
-                  style={{
-                    width: barWidth(
-                      week.minutes,
-                      weeks.map((w) => w.minutes),
-                    ),
-                  }}
-                />
-              </span>
-              <span>
-                {formatMinutes(week.minutes)} · {week.studyDays}/7 d
-              </span>
-            </li>
-          ))}
+          {weeks.map((week, index) => {
+            // The year shows on the first row and wherever it changes; the current week is named.
+            const year = week.start.slice(0, 4);
+            const showYear = index === 0 || year !== weeks[index - 1].start.slice(0, 4);
+            const current = week.start <= today && today <= week.end;
+            return (
+              <li
+                key={week.start}
+                aria-current={current ? 'date' : undefined}
+                className="grid grid-cols-[112px_minmax(0,1fr)_92px] items-center gap-2 text-[13px]"
+              >
+                <span className="whitespace-nowrap">
+                  {week.start.slice(5)} – {week.end.slice(5)}
+                  {(showYear || current) && (
+                    <span className="block text-xs text-muted-foreground">
+                      {[showYear ? year : '', current ? 'This week' : '']
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </span>
+                  )}
+                </span>
+                <span className="h-2.5 rounded-[3px] bg-muted" aria-hidden="true">
+                  <span
+                    data-bar
+                    className="block h-full rounded-[3px] bg-ring"
+                    style={{
+                      width: barWidth(
+                        week.minutes,
+                        weeks.map((w) => w.minutes),
+                      ),
+                    }}
+                  />
+                </span>
+                <span className="whitespace-nowrap">
+                  {formatMinutes(week.minutes)}
+                  <span className="block text-xs text-muted-foreground">
+                    {week.studyDays} of 7 days
+                  </span>
+                </span>
+              </li>
+            );
+          })}
         </ol>
       )}
     </section>
