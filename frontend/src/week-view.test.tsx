@@ -116,3 +116,10 @@ test('the 12-week view shows one row per week', async () => {
   expect(await screen.findByText('2 h · 2/7 d')).toBeInTheDocument();
   expect(screen.getAllByRole('listitem')).toHaveLength(12);
 });
+
+test('the week card has its own landmark name, not the page name', async () => {
+  fakeApi({ 'GET /api/study-logs': { body: { studyLogs: [] } } });
+  render(<WeekView today={today} />);
+  expect(await screen.findByRole('region', { name: 'Days of the week' })).toBeInTheDocument();
+  expect(screen.queryByRole('region', { name: 'Week' })).toBeNull();
+});
