@@ -1,5 +1,5 @@
 {
-  "centralSha": "12e3639d9a8365e10c606aa7b17b3cce14658a79",
+  "centralSha": "477764dfe0cb55fbe271da8f7513b8a78e1d96a8",
   "profile": "app",
   "project": "study-log",
   "files": {
@@ -50,12 +50,12 @@
     },
     ".claude/skills/std-backlog/SKILL.md": {
       "mode": "full",
-      "sha256": "63535252af86e608e0c4de21ec9f14dbbc4d1133d438c43594829c046816ad46",
+      "sha256": "45ef839744ec4a1779da4c0b93137f34a0dbde11249f599529ff8d2f2b8785f5",
       "source": "templates/common/skills/std-backlog/SKILL.md"
     },
     ".claude/skills/std-code-review/SKILL.md": {
       "mode": "full",
-      "sha256": "618268c6357b19b80b1066664e1db03971dbb1ba896be5935fb906e26201d6f1",
+      "sha256": "1eac908e169abc985ac720f98069222895806860899447fec35234bd56157765",
       "source": "templates/common/skills/std-code-review/SKILL.md"
     },
     ".claude/skills/std-communication/SKILL.md": {
@@ -254,7 +254,7 @@
         "packageManager": "npm@11.19.0",
         "engines.node": "24.21.0",
         "engines.npm": "11.19.0",
-        "dependencies.@sirloinbh/auth-client": "1.0.0",
+        "dependencies.@sirloinbh/auth-client": "1.1.0",
         "devDependencies.@sirloinbh/tsconfig": "1.0.0",
         "dependencies.express": "5.3.0",
         "dependencies.express-rate-limit": "8.7.2",
@@ -360,7 +360,7 @@
     },
     "deploy/autodeploy.sh": {
       "mode": "full",
-      "sha256": "1db45aac05059bf1126be0ed6bacba02ca5266743f22a0fc5e91b3dca5b6cecd",
+      "sha256": "148703f70538fded7b11611a87af86d1b53353f656d4be4936c1fed1fcde25b0",
       "source": "templates/deploy/deploy/autodeploy.sh.tmpl"
     },
     "deploy/autodeploy.timer": {
@@ -489,7 +489,7 @@
         "packageManager": "npm@11.19.0",
         "engines.node": "24.21.0",
         "engines.npm": "11.19.0",
-        "dependencies.@sirloinbh/auth-client": "1.0.0",
+        "dependencies.@sirloinbh/auth-client": "1.1.0",
         "dependencies.@sirloinbh/design-tokens": "1.1.0",
         "devDependencies.@sirloinbh/tsconfig": "1.0.0",
         "dependencies.class-variance-authority": "0.7.1",
@@ -531,7 +531,7 @@
     },
     "frontend/public/sw.js": {
       "mode": "full",
-      "sha256": "11d02932a51d6a36fc3a0d7e1828af4e6dde030e5ec1d92df41611079a315ec3",
+      "sha256": "2f1fcd4cc1ff75fe95619ae5a9a86c2a91a4970119a41b4c56b2d8a30477fec7",
       "source": "templates/app/frontend/public/sw.js"
     },
     "frontend/public/theme-init.js": {
@@ -671,7 +671,7 @@
     },
     "frontend/src/components/ui/dialog.test.tsx": {
       "mode": "full",
-      "sha256": "a9372a86f998c695810fcfd64f33db99721d45a356a3032eb2c35287e4fc5409",
+      "sha256": "55f63af183726b48721282e0c4ef3b1fb2aeb595e75644ed211f5876119e21e3",
       "source": "templates/ui/frontend/src/components/ui/dialog.test.tsx"
     },
     "frontend/src/components/ui/dialog.tsx": {
@@ -681,7 +681,7 @@
     },
     "frontend/src/components/ui/drawer.test.tsx": {
       "mode": "full",
-      "sha256": "a502fe425c1eeb629392cc054147e9702e798ece6d3d9d86de05a8a69cb95f5e",
+      "sha256": "193cd2242b7fc41d383de36697bc81dfd8350e2408cf5e80d7393049715b0aa9",
       "source": "templates/ui/frontend/src/components/ui/drawer.test.tsx"
     },
     "frontend/src/components/ui/drawer.tsx": {
@@ -791,7 +791,7 @@
     },
     "frontend/src/components/ui/segmented-control.test.tsx": {
       "mode": "full",
-      "sha256": "53a3cd8c3a3fbea343198fd87d0673682997b24105fa2772e13fa7a20fbafa51",
+      "sha256": "ea504480f7b20c62833f4b1dc927c242414fb27fa7e8f89dea4dbb3abf8ae64f",
       "source": "templates/ui/frontend/src/components/ui/segmented-control.test.tsx"
     },
     "frontend/src/components/ui/segmented-control.tsx": {
@@ -811,7 +811,7 @@
     },
     "frontend/src/components/ui/sheet.test.tsx": {
       "mode": "full",
-      "sha256": "39e6add3358e7f1cb4e37933d6ce73e552ef13fa58cf719ff90274fddec2a334",
+      "sha256": "a18bb57b90a2d4bf292779f6ff843bc39ee6de95935138e73a6f55214ee876b9",
       "source": "templates/ui/frontend/src/components/ui/sheet.test.tsx"
     },
     "frontend/src/components/ui/sheet.tsx": {
@@ -861,7 +861,7 @@
     },
     "frontend/src/components/ui/switch.test.tsx": {
       "mode": "full",
-      "sha256": "cb5df74d3ab304cc2680494e83fb37704b735bf7316cd9cdcb7ab63223adf489",
+      "sha256": "15a58b145125328ca57dde45884a828594eab9f1f5192a24619e6c3446a0dd14",
       "source": "templates/ui/frontend/src/components/ui/switch.test.tsx"
     },
     "frontend/src/components/ui/switch.tsx": {
@@ -1120,12 +1120,12 @@
     },
     "skills/std-backlog/SKILL.md": {
       "mode": "full",
-      "sha256": "63535252af86e608e0c4de21ec9f14dbbc4d1133d438c43594829c046816ad46",
+      "sha256": "45ef839744ec4a1779da4c0b93137f34a0dbde11249f599529ff8d2f2b8785f5",
       "source": "templates/common/skills/std-backlog/SKILL.md"
     },
     "skills/std-code-review/SKILL.md": {
       "mode": "full",
-      "sha256": "618268c6357b19b80b1066664e1db03971dbb1ba896be5935fb906e26201d6f1",
+      "sha256": "1eac908e169abc985ac720f98069222895806860899447fec35234bd56157765",
       "source": "templates/common/skills/std-code-review/SKILL.md"
     },
     "skills/std-communication/SKILL.md": {
@@ -1174,7 +1174,7 @@
     "@sirloinbh/prettier-config": "1.0.0",
     "@sirloinbh/tsconfig": "1.0.0",
     "@sirloinbh/design-tokens": "1.1.0",
-    "@sirloinbh/auth-client": "1.0.0"
+    "@sirloinbh/auth-client": "1.1.0"
   },
   "registry": {
     "ports": {
