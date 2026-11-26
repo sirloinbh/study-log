@@ -2575,6 +2575,36 @@
         }
       }
     },
+    "/api/coding/summary": {
+      "get": {
+        "summary": "Today's and this week's attempts, the practice streak and the language last used",
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "401": {
+            "description": "Sign-in required (no session from the shared sign-in)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to an external service",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/exercise-files/{fileId}/content": {
       "get": {
         "summary": "Download the stored file itself",
