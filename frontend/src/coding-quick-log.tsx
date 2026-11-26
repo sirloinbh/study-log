@@ -193,7 +193,7 @@ export function CodingQuickLog({
         Find a problem
         <Input
           maxLength={200}
-          placeholder="Title, Baekjoon number or LeetCode link"
+          placeholder="Title, number or link"
           value={text}
           disabled={busy}
           onChange={(event) => {
