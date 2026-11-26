@@ -3,7 +3,7 @@ import { test } from 'node:test';
 
 import type { Pool } from 'pg';
 
-import type { ReminderEmail } from '../src/reminder-sender.js';
+import { type ReminderEmail, sesCredentials } from '../src/reminder-sender.js';
 import { buildReminder, reminderConfig, runReminder, serviceHour } from '../src/reminders.js';
 
 // 08:30 and 07:59 on 2026-11-24 in Asia/Seoul (UTC+9).
@@ -113,4 +113,16 @@ test('the job is configured only when both addresses are set', () => {
   });
   assert.equal(serviceHour(morning), 8);
   assert.equal(serviceHour(early), 7);
+});
+
+test('the SES sender uses its own key when both variables are set (#416)', () => {
+  assert.equal(sesCredentials({}), undefined);
+  assert.equal(sesCredentials({ SES_AWS_ACCESS_KEY_ID: 'id' }), undefined);
+  assert.deepEqual(
+    sesCredentials({ SES_AWS_ACCESS_KEY_ID: ' id ', SES_AWS_SECRET_ACCESS_KEY: 's' }),
+    {
+      accessKeyId: 'id',
+      secretAccessKey: 's',
+    },
+  );
 });
