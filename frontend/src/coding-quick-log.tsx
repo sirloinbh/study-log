@@ -67,7 +67,9 @@ export function CodingQuickLog({
     '/api/coding/summary',
     { staleTime: 0 },
   );
-  const search = text.trim();
+  const typed = parseNewProblem(text);
+  // A pasted link is searched by its problem key: the server accepts at most 50 characters.
+  const search = typed ? typed.problemKey : text.trim().slice(0, 50);
   const path = `/api/coding/problems?limit=6${search ? `&q=${encodeURIComponent(search)}` : ''}`;
   const found = useApiQuery<{ problems: ProblemRow[] }>(
     apiKey('/api/coding', 'quick', path),
@@ -78,14 +80,14 @@ export function CodingQuickLog({
   );
   const candidates = found.data?.problems ?? [];
 
-  const typed = parseNewProblem(text);
   const known = typed
     ? candidates.some((p) => p.site === typed.site && p.problemKey === typed.problemKey)
     : true;
 
   const lastLanguage = summary.data?.lastLanguage ?? '';
   const language = chosenLanguage ?? lastLanguage;
-  const languages = languageChoices(language || lastLanguage);
+  // The order stays while choosing: it follows the language used last, not the one just tapped.
+  const languages = languageChoices(lastLanguage);
   const languageOptions = languages.map((value) => ({ value, label: value }));
   const languageValue = language || languages[0] || '';
 
@@ -188,6 +190,11 @@ export function CodingQuickLog({
             {problem.title} ({problem.problemKey})
           </Button>
         ))}
+        {found.error && (
+          <p role="alert" className="error">
+            Could not load the problems: {found.error.message}
+          </p>
+        )}
         {found.data && candidates.length === 0 && !(typed && !known) && (
           <p className="status">
             {search ? 'No recorded problem matches' : 'No problems yet. Type a number or a link'}

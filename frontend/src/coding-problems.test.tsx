@@ -472,6 +472,27 @@ describe('quick log of a solve', () => {
     expect(within(quick).queryByRole('button', { name: 'New: Baekjoon 1000' })).toBeNull();
   });
 
+  test('a long pasted link is searched by its problem key and keeps the language order', async () => {
+    const api = server([{ problem: baekjoon, attempts: [first] }], stats);
+    render(<CodingProblems today={today} />);
+    const quick = await screen.findByLabelText('Log a solve');
+    const link = 'https://leetcode.com/problems/longest-substring-without-repeating-characters/';
+    fireEvent.change(within(quick).getByLabelText('Find a problem'), { target: { value: link } });
+    fireEvent.click(
+      await within(quick).findByRole('button', {
+        name: 'New: LeetCode longest-substring-without-repeating-characters',
+      }),
+    );
+    expect(
+      api.requests.some((r) => r.path.endsWith('q=longest-substring-without-repeating-characters')),
+    ).toBe(true);
+    fireEvent.click(within(quick).getByRole('radio', { name: 'Python' }));
+    const names = within(quick)
+      .getAllByRole('radio')
+      .map((radio) => radio.textContent);
+    expect(names.slice(3, 7)).toEqual(['C++', 'Python', 'Java', 'JavaScript']);
+  });
+
   test('reads a problem from a number or a link, and offers the usual languages', () => {
     expect(parseNewProblem(' 1000 ')).toEqual({ site: 'baekjoon', problemKey: '1000' });
     expect(parseNewProblem('https://www.acmicpc.net/problem/2557')).toEqual({
