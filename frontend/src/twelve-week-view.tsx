@@ -40,7 +40,7 @@ export function TwelveWeekView({ today }: { today: string }) {
                 <span className="whitespace-nowrap">
                   {week.start.slice(5)} – {week.end.slice(5)}
                   {(showYear || current) && (
-                    <span className="block text-xs text-muted-foreground">
+                    <span className="block text-[13px] text-muted-foreground">
                       {[showYear ? year : '', current ? 'This week' : '']
                         .filter(Boolean)
                         .join(' · ')}
@@ -61,7 +61,7 @@ export function TwelveWeekView({ today }: { today: string }) {
                 </span>
                 <span className="whitespace-nowrap">
                   {formatMinutes(week.minutes)}
-                  <span className="block text-xs text-muted-foreground">
+                  <span className="block text-[13px] text-muted-foreground">
                     {week.studyDays} of 7 days
                   </span>
                 </span>
