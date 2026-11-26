@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 
 import { useBusy } from './busy';
 import { Button } from './components/ui/button';
+import { Combobox } from './components/ui/combobox';
 import { Input } from './components/ui/input';
 import { DeleteConfirm } from './delete-confirm';
 import { Exercises } from './exercises';
@@ -65,6 +66,10 @@ export function Textbooks() {
   const client = useQueryClient();
   const listQuery = useApiQuery<{ textbooks: Textbook[] }>(textbooksKey, '/api/textbooks');
   const books = listQuery.data?.textbooks;
+  // Authors and editions already used are offered as suggestions; a new value can still be typed.
+  const used = (field: 'author' | 'edition') => [
+    ...new Set((books ?? []).map((book) => book[field].trim()).filter(Boolean)),
+  ];
   const loadError = listQuery.error?.message;
   const write = useApiMutation<unknown, ApiRequest>((request) => request);
   const reload = () => void client.invalidateQueries({ queryKey: textbooksKey });
@@ -171,24 +176,30 @@ export function Textbooks() {
               onChange={change('title')}
             />
           </label>
-          <label>
-            Author
-            <Input
+          <div className="combo-field">
+            <label htmlFor="textbook-author">Author</label>
+            <Combobox
+              id="textbook-author"
               maxLength={limits.author}
               disabled={busy}
               value={form.author}
-              onChange={change('author')}
+              onValueChange={(value) => change('author')({ target: { value } })}
+              options={used('author')}
+              listLabel="Authors already used"
             />
-          </label>
-          <label>
-            Edition
-            <Input
+          </div>
+          <div className="combo-field">
+            <label htmlFor="textbook-edition">Edition</label>
+            <Combobox
+              id="textbook-edition"
               maxLength={limits.edition}
               disabled={busy}
               value={form.edition}
-              onChange={change('edition')}
+              onValueChange={(value) => change('edition')({ target: { value } })}
+              options={used('edition')}
+              listLabel="Editions already used"
             />
-          </label>
+          </div>
           <div className="actions wide">
             <Button type="submit" disabled={busy}>
               <ButtonSpinner when={action === 'save'} />
