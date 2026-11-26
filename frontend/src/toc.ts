@@ -1,3 +1,4 @@
+// korean-ok-file: recognizes Korean chapter, section and contents headings in pasted tables of contents
 // Turning a pasted table of contents into entries (#23). Each non-blank line is one entry; its
 // number decides how deep it goes, and a line without a number follows its indentation.
 
