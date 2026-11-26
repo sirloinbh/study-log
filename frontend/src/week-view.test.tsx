@@ -135,3 +135,10 @@ test('the 12-week view shows the year again where it changes', async () => {
     .flatMap((row) => row.textContent?.match(/20\d\d/) ?? []);
   expect(years).toEqual(['2025', '2026']);
 });
+
+test('the week card has its own landmark name, not the page name', async () => {
+  fakeApi({ 'GET /api/study-logs': { body: { studyLogs: [] } } });
+  render(<WeekView today={today} />);
+  expect(await screen.findByRole('region', { name: 'Days of the week' })).toBeInTheDocument();
+  expect(screen.queryByRole('region', { name: 'Week' })).toBeNull();
+});

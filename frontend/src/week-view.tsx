@@ -20,8 +20,8 @@ export function WeekView({ today }: { today: string }) {
   const total = days?.reduce((sum, day) => sum + day.minutes, 0) ?? 0;
 
   return (
-    <section className="card min-w-0" aria-label="Week">
-      <div className="flex flex-wrap items-center gap-2">
+    <section className="card min-w-0" aria-label="Days of the week">
+      <div className="mb-3 flex flex-wrap items-center gap-2">
         <Button type="button" variant="outline" onClick={() => setStart(shiftDays(start, -7))}>
           Previous week
         </Button>
