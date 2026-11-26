@@ -55,6 +55,9 @@
 .log-form label {
   @apply grid gap-1.5 text-[13px] font-medium;
 }
+.log-form .combo-field {
+  @apply grid gap-1.5 text-[13px] font-medium;
+}
 .log-form textarea {
   @apply w-full resize-y rounded-[calc(var(--radius)-2px)] border border-border bg-card px-2.5 py-[9px] text-foreground;
 }
@@ -362,6 +365,7 @@
     @apply grid-cols-2;
   }
   .log-form label:first-child,
+  .log-form .combo-field:first-child,
   .keyword-form .keyword-field,
   .content-form .title {
     @apply col-span-full;

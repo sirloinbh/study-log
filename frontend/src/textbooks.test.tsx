@@ -88,6 +88,10 @@ const fill = (label: string, value: string) =>
   fireEvent.change(screen.getByLabelText(label), { target: { value } });
 const field = (label: string) => screen.getByLabelText<HTMLInputElement>(label).value;
 const form = () => document.querySelector('form')!;
+const fields = () => [
+  ...within(form()).getAllByRole('textbox'),
+  ...within(form()).getAllByRole('combobox'),
+];
 const submit = () => fireEvent.submit(form());
 // The register/edit card, the textbook list card and the detail card.
 const formCard = () => within(form().closest('section')!);
@@ -282,9 +286,10 @@ test('fields and buttons are locked while a save is in flight', async () => {
   fill('Title', '새 교재');
   submit();
   await waitFor(() => {
-    for (const input of within(form()).getAllByRole('textbox')) expect(input).toBeDisabled();
+    for (const input of fields()) expect(input).toBeDisabled();
   });
-  expect(within(form()).getAllByRole('textbox')).toHaveLength(3);
+  // The title, plus the author and edition pickers.
+  expect(fields()).toHaveLength(3);
   for (const name of [/Register/, /Edit textbook/, /Delete textbook/])
     expect(screen.getByRole('button', { name })).toBeDisabled();
   release();
@@ -409,4 +414,30 @@ test('a double submit in the same tick registers the textbook once', async () =>
   });
   await waitFor(() => expect(items()).toHaveLength(1));
   expect(calls(api, 'POST')).toHaveLength(1);
+});
+
+test('author and edition offer the values already used and still accept a new one', async () => {
+  const api = serve([
+    { id: 1, title: 'Calculus', author: 'Gilbert Strang', edition: '4th' },
+    { id: 2, title: 'Algebra', author: 'Gilbert Strang', edition: '2nd' },
+  ]);
+  await open();
+  const author = screen.getByLabelText('Author');
+  fireEvent.focus(author);
+  fireEvent.change(author, { target: { value: 'gil' } });
+  // One suggestion for two books: used values are listed once.
+  const option = await screen.findByRole('option', { name: 'Gilbert Strang' });
+  expect(screen.getAllByRole('option')).toHaveLength(1);
+  fireEvent.click(option);
+  expect(field('Author')).toBe('Gilbert Strang');
+
+  fill('Title', 'Topology');
+  fill('Edition', '1st');
+  submit();
+  await formCard().findByText('Registered');
+  expect(api.requests[1]?.body).toEqual({
+    title: 'Topology',
+    author: 'Gilbert Strang',
+    edition: '1st',
+  });
 });
