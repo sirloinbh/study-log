@@ -4,7 +4,7 @@ import { test } from 'node:test';
 import ExcelJS from 'exceljs';
 
 import { guessMapping, mapRows } from '../src/coding-goal-import.js';
-import { cellText, readWorkbook } from '../src/coding-goal-xlsx.js';
+import { cellText, checkZipSize, maxUnzippedBytes, readWorkbook } from '../src/coding-goal-xlsx.js';
 
 async function workbook(build: (book: ExcelJS.Workbook) => void) {
   const book = new ExcelJS.Workbook();
@@ -77,4 +77,33 @@ test('cell values of every kind give text, and errors give nothing', () => {
   assert.equal(cellText(true), 'true');
   assert.equal(cellText({ error: '#N/A' }), '');
   assert.equal(cellText({ text: 'link', hyperlink: 'https://x.test' }), 'link');
+});
+
+// A zip whose central directory declares `size` bytes for each of `entries` entries.
+function zipDeclaring(size: number, entries = 1) {
+  const name = Buffer.from('a.xml');
+  const central = Buffer.alloc(46 + name.length);
+  central.writeUInt32LE(0x02014b50, 0);
+  central.writeUInt32LE(size, 24);
+  central.writeUInt16LE(name.length, 28);
+  name.copy(central, 46);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(entries, 10);
+  end.writeUInt32LE(central.length * entries, 12);
+  end.writeUInt32LE(0, 16);
+  return Buffer.concat([...Array<Buffer>(entries).fill(central), end]);
+}
+
+test('a zip that declares too much unpacked data is refused before it is read', async () => {
+  assert.doesNotThrow(() => checkZipSize(zipDeclaring(1000)));
+  assert.throws(() => checkZipSize(zipDeclaring(maxUnzippedBytes + 1)), /too large once unpacked/);
+  assert.throws(() => checkZipSize(zipDeclaring(10, 201)), /more than 200 parts/);
+  assert.throws(() => checkZipSize(Buffer.from('PK not a zip')), /not a valid/);
+  await assert.rejects(readWorkbook(zipDeclaring(maxUnzippedBytes + 1)), /too large once unpacked/);
+});
+
+test('a real workbook passes the size check', async () => {
+  const file = await workbook((book) => book.addWorksheet('a').addRow(['x']));
+  assert.doesNotThrow(() => checkZipSize(file));
 });
