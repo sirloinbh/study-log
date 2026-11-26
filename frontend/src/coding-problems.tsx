@@ -138,7 +138,16 @@ export function CodingProblems({
         </p>
       )}
       <CodingQuickLog today={today} busy={busy} action={action} change={change} />
-      <CodingGoals onChange={onChange} notify={setNotice} />
+      <CodingGoals
+        onChange={onChange}
+        notify={setNotice}
+        onOpenProblem={(item) => {
+          // Shows just that problem with its attempts open, and brings the log into view.
+          setFilters({ site: item.site, result: '', q: item.problemKey });
+          setOpenId(item.problemId ?? undefined);
+          document.getElementById('coding-problems')?.scrollIntoView?.({ block: 'start' });
+        }}
+      />
       <section className="card" aria-label="Add a problem">
         <h2>Add a problem</h2>
         <CodingProblemForm
@@ -180,7 +189,7 @@ export function CodingProblems({
         </div>
       </section>
 
-      <section className="card" aria-label="Problems">
+      <section className="card" id="coding-problems" aria-label="Problems">
         <h2>Problems</h2>
         <div className="log-form coding-filters">
           <label>

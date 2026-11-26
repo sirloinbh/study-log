@@ -427,6 +427,28 @@
 .coding-plan p {
   @apply m-0 [overflow-wrap:anywhere];
 }
+/* Goal progress (#426) */
+.goal-progress {
+  @apply grid gap-1;
+}
+.goal-progress p {
+  @apply m-0;
+}
+.goal-bar {
+  @apply h-2.5 w-full overflow-hidden rounded-full bg-muted;
+}
+.goal-bar > div {
+  @apply h-full rounded-full bg-primary;
+}
+.coding-goal-list {
+  @apply mt-3 grid gap-3 border-t border-border pt-3;
+}
+.goal-state-late {
+  @apply font-medium text-destructive;
+}
+.goal-state-solved {
+  @apply font-medium;
+}
 /* Coding problem log (#368) */
 .coding-detail {
   @apply mt-3 border-t border-border pt-3;

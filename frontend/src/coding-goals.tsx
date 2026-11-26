@@ -7,6 +7,7 @@ import {
   type GoalField,
   goalFieldLabels,
   goalFields,
+  type GoalItem,
   type GoalListRow,
   type GoalMapping,
   type GoalPlan,
@@ -17,6 +18,7 @@ import {
   suggestedListName,
   tierLabel,
 } from './coding';
+import { CodingGoalList, ProgressBar } from './coding-goal-list';
 import { Button } from './components/ui/button';
 import { ConfirmDialog } from './components/ui/confirm-dialog';
 import { Input } from './components/ui/input';
@@ -36,8 +38,11 @@ const plural = (count: number, word: string) => `${count} ${word}${count === 1 ?
 export function CodingGoals({
   onChange,
   notify,
+  onOpenProblem,
 }: {
   onChange?: () => void;
+  // Shows a solved problem's attempts in the problem log.
+  onOpenProblem: (item: GoalItem) => void;
   // Messages go to the one status line at the top of the Coding screen.
   notify: (notice: Notice) => void;
 }) {
@@ -52,6 +57,7 @@ export function CodingGoals({
   const [site, setSite] = useState<Site>('baekjoon');
   const [targetDate, setTargetDate] = useState('');
   const [plan, setPlan] = useState<GoalPlan>();
+  const [openList, setOpenList] = useState<number>();
   const input = useRef<HTMLInputElement>(null);
 
   const lists = useApiQuery<{ lists: GoalListRow[] }>(
@@ -361,7 +367,22 @@ export function CodingGoals({
                     {list.targetDate && `, target ${list.targetDate}`}
                   </span>
                 </div>
+                <ProgressBar label={list.name} progress={list} />
+                {list.next.length > 0 && (
+                  <p className="log-memo">
+                    Next: {list.next.map((item) => `${item.title} (${item.problemKey})`).join(', ')}
+                  </p>
+                )}
                 <div className="log-actions">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    aria-expanded={openList === list.id}
+                    aria-label={`${list.name} problems`}
+                    onClick={() => setOpenList(openList === list.id ? undefined : list.id)}
+                  >
+                    {openList === list.id ? 'Hide problems' : 'Problems'}
+                  </Button>
                   <ConfirmDialog
                     title="Delete this goal list?"
                     description="The list is removed. Your problems and attempts stay."
@@ -378,6 +399,9 @@ export function CodingGoals({
                     }
                   />
                 </div>
+                {openList === list.id && (
+                  <CodingGoalList id={list.id} name={list.name} onOpenProblem={onOpenProblem} />
+                )}
               </li>
             ))}
           </ul>

@@ -162,7 +162,10 @@ export function createApp(
     ),
   );
   // Before '/api/coding', where 'goals' would be read as a problem route.
-  app.use('/api/coding/goals', codingGoalRoutes(pool, options.workbookReader ?? readWorkbook));
+  app.use(
+    '/api/coding/goals',
+    codingGoalRoutes(pool, options.workbookReader ?? readWorkbook, today),
+  );
   app.use('/api/coding', codingRoutes(pool, today));
   // Before the stats routes, so '/goal' is not looked up there.
   app.use('/api/stats/goal', studyGoalRoutes(pool, today));

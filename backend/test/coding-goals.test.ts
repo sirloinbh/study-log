@@ -148,7 +148,12 @@ test('an import with wrong fields, a missing column choice or a long sheet is re
         assert.equal(status, 400, JSON.stringify(fields));
         assert.match(String(data.error), message);
       }
-      for (const path of ['/api/coding/goals/01', '/api/coding/goals/x']) {
+      for (const path of [
+        '/api/coding/goals/01',
+        '/api/coding/goals/x',
+        '/api/coding/goals/today?date=2026-02-30',
+        '/api/coding/goals/today?date=tomorrow',
+      ]) {
         const { status } = await call(path);
         assert.equal(status, 400, path);
       }
