@@ -136,6 +136,18 @@ test('the 12-week view shows the year again where it changes', async () => {
   expect(years).toEqual(['2025', '2026']);
 });
 
+test('the 12-week captions are never smaller than 13px', async () => {
+  fakeApi({
+    'GET /api/stats/heatmap': {
+      body: { from: '2026-08-02', to: today, daily: [{ date: '2026-10-19', minutes: 90 }] },
+    },
+  });
+  render(<TwelveWeekView today={today} />);
+  await screen.findAllByRole('listitem');
+  expect(document.querySelectorAll('.text-xs')).toHaveLength(0);
+  expect(screen.getAllByText(/of 7 days/)[0]).toHaveClass('text-[13px]');
+});
+
 test('the week card has its own landmark name, not the page name', async () => {
   fakeApi({ 'GET /api/study-logs': { body: { studyLogs: [] } } });
   render(<WeekView today={today} />);
