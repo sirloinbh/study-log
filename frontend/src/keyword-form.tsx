@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 
 import { Button } from './components/ui/button';
+import { Combobox } from './components/ui/combobox';
 import { Input } from './components/ui/input';
 import { keywordLimits } from './keyword';
 import { ButtonSpinner } from './loading';
@@ -13,6 +14,7 @@ export function KeywordFormView({
   memo,
   keywordId,
   placeholder,
+  suggestions,
   memoLabel,
   submitLabel,
   spinning,
@@ -28,6 +30,8 @@ export function KeywordFormView({
   memo: string;
   keywordId: string;
   placeholder?: string;
+  // Keywords already used, offered as suggestions; a new one can still be typed.
+  suggestions: readonly string[];
   memoLabel: string;
   submitLabel: string;
   spinning: boolean;
@@ -50,18 +54,20 @@ export function KeywordFormView({
           onChange={(event) => onDate(event.target.value)}
         />
       </label>
-      <label className="keyword-field">
-        Keyword
-        <Input
+      <div className="keyword-field combo-field">
+        <label htmlFor={keywordId}>Keyword</label>
+        <Combobox
           id={keywordId}
           required
           maxLength={keywordLimits.keyword}
           placeholder={placeholder}
           disabled={busy}
           value={keyword}
-          onChange={(event) => onKeyword(event.target.value)}
+          onValueChange={onKeyword}
+          options={suggestions}
+          listLabel="Keywords already used"
         />
-      </label>
+      </div>
       <label className="wide">
         {memoLabel}
         <Input

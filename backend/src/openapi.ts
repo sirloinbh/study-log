@@ -186,6 +186,10 @@ export const operations: Record<string, Operation> = {
     query: keywordListQuery,
     status: [200, 400],
   },
+  'GET /api/keywords/used': {
+    summary: 'List the keywords already used, each once, most recently used first (at most 200)',
+    status: [200],
+  },
   'GET /api/keywords/:id': { summary: 'Get one keyword', status: [200, 400, 404] },
   'POST /api/keywords': {
     summary: 'Add a keyword; a left-out date means today',

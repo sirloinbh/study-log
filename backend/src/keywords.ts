@@ -54,6 +54,9 @@ export const keywordListQuery = z
     error: 'The start date cannot be after the end date',
   });
 
+// The most keywords the picker is offered.
+const usedLimit = 200;
+
 const columns = `id, keyword_date AS date, keyword, memo`;
 
 const notFound = { error: 'Keyword not found' };
@@ -90,6 +93,20 @@ export function keywordRoutes(pool: Pool, today: () => string) {
       params,
     );
     res.json({ keywords: rows });
+  });
+
+  // The keywords already used, each once (any case counts as the same), the most recently used
+  // first, for the keyword picker (#443). Must stay above `/:id`.
+  router.get('/used', async (_req, res) => {
+    const { rows } = await pool.query(
+      `SELECT keyword FROM (
+         SELECT DISTINCT ON (lower(keyword)) keyword, keyword_date, id
+         FROM keywords ORDER BY lower(keyword), keyword_date DESC, id DESC
+       ) latest
+       ORDER BY keyword_date DESC, id DESC LIMIT $1`,
+      [usedLimit],
+    );
+    res.json({ keywords: rows.map((row: { keyword: string }) => row.keyword) });
   });
 
   router.get('/:id', async (req, res) => {
