@@ -54,6 +54,12 @@ export function Keywords({ today }: { today: string }) {
     { staleTime: 0 },
   );
   const keywords = dayQuery.data?.keywords;
+  // Every keyword already used, for the keyword field's suggestions (#443).
+  const usedQuery = useApiQuery<{ keywords: string[] }>(
+    apiKey('/api/keywords', 'used'),
+    '/api/keywords/used',
+  );
+  const used = usedQuery.data?.keywords ?? [];
   const error = dayQuery.isFetching ? undefined : dayQuery.error?.message;
 
   // A search is a one-off request, not a cached read: its results are re-run by hand after a change.
@@ -96,6 +102,7 @@ export function Keywords({ today }: { today: string }) {
       }
     } finally {
       await client.invalidateQueries({ queryKey: apiKey('/api/keywords', 'day') });
+      await client.invalidateQueries({ queryKey: apiKey('/api/keywords', 'used') });
       if (results) await runSearch(results.path);
       end();
     }
@@ -193,6 +200,7 @@ export function Keywords({ today }: { today: string }) {
           memo={form.memo}
           keywordId="keyword-input"
           placeholder="e.g. eigenvalue"
+          suggestions={used}
           memoLabel="Memo (optional)"
           submitLabel="Add"
           spinning={action === 'add'}
@@ -246,6 +254,7 @@ export function Keywords({ today }: { today: string }) {
                     keyword={editor.form.keyword}
                     memo={editor.form.memo}
                     keywordId="keyword-edit-keyword"
+                    suggestions={used}
                     memoLabel="Memo"
                     submitLabel="Save changes"
                     spinning={action === 'save'}

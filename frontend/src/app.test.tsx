@@ -17,6 +17,7 @@ function server(health: { body: object; status?: number }) {
         '/api/calendar-sync/status',
         '/api/exercises/wrong',
         '/api/keywords',
+        '/api/keywords/used',
         '/api/retrospectives/period',
         '/api/retrospectives',
         '/api/reviews/today',

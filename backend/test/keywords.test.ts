@@ -147,3 +147,14 @@ test('an update without a date sends no date, so the stored one stays (#271)', a
   assert.match(calls[0].sql, /COALESCE\(\$2::date, keyword_date\)/);
   assert.equal(calls[0].params[1], null);
 });
+
+test('the used keywords answer as a plain list of names and are not read as an id', async () => {
+  const pool = {
+    query: async () => ({ rows: [{ keyword: 'Eigenvalue' }, { keyword: 'Basis' }], rowCount: 2 }),
+  } as unknown as Pool;
+  await withApi(pool, async (call) => {
+    const { status, data } = await call('/api/keywords/used');
+    assert.equal(status, 200);
+    assert.deepEqual(data, { keywords: ['Eigenvalue', 'Basis'] });
+  });
+});

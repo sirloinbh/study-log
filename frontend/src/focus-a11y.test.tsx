@@ -18,6 +18,7 @@ test('Edit on a keyword moves focus to the edit form', async () => {
     'GET /api/keywords': {
       body: { keywords: [{ id: 1, date: '2026-10-23', keyword: 'vector', memo: '' }] },
     },
+    'GET /api/keywords/used': { body: { keywords: ['vector'] } },
   });
   render(<Keywords today="2026-10-23" />);
   fireEvent.click(await screen.findByRole('button', { name: 'vector edit' }));

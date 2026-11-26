@@ -26,6 +26,14 @@ function server(initial: Keyword[] = [], options: Options = {}) {
     if (options.reject?.method === method)
       return { status: options.reject.status, body: { error: options.reject.error } };
     const [base, query = ''] = path.split('?');
+    if (base === '/api/keywords/used')
+      return {
+        body: {
+          keywords: [
+            ...new Set([...rows].sort((a, b) => (a.date < b.date ? 1 : -1)).map((r) => r.keyword)),
+          ],
+        },
+      };
     if (base === '/api/keywords' && method === 'GET') {
       const params = new URLSearchParams(query);
       const date = params.get('date');
@@ -80,7 +88,13 @@ function server(initial: Keyword[] = [], options: Options = {}) {
     if (request.method !== 'GET') await options.holdChange;
     return answer(request);
   });
-  return { requests: api.requests, rows };
+  // The picker's own read of the used keywords is left out, so tests list the page's requests.
+  return {
+    get requests() {
+      return api.requests.filter((request) => request.path !== '/api/keywords/used');
+    },
+    rows,
+  };
 }
 
 const stored: Keyword[] = [
@@ -427,5 +441,24 @@ describe('keywords', () => {
     await press('대각화 delete');
     await press('Delete');
     await lastFocus('keyword-day');
+  });
+
+  test('the keyword field offers the keywords already used, and a new one can still be typed', async () => {
+    const api = server(stored);
+    render(<Keywords today={today} />);
+    await expectListed(['고유값:Ax = λx', '대각화:']);
+    const field = entry().getByLabelText('Keyword');
+    fireEvent.change(field, { target: { value: '대각' } });
+    const option = await screen.findByRole('option', { name: '대각화' });
+    expect(screen.getAllByRole('option')).toHaveLength(1);
+    fireEvent.click(option);
+    expect(field).toHaveValue('대각화');
+    // Not in the list: kept as typed and added as a new keyword.
+    fillIn(entry(), 'Keyword', '새 키워드');
+    submitEntry();
+    await waitFor(() => expect(api.requests.some((r) => r.method === 'POST')).toBe(true));
+    expect(api.requests.find((r) => r.method === 'POST')?.body).toMatchObject({
+      keyword: '새 키워드',
+    });
   });
 });

@@ -93,6 +93,13 @@ test(
         });
         assert.equal(clash.status, 409);
 
+        // The used keywords: each once whatever its case, the most recently used first.
+        await add({ keyword: 'ZZ-Used', date: days[1] });
+        await add({ keyword: 'zz-used', date: days[2] });
+        const used = (await call('/api/keywords/used')).data.keywords as string[];
+        assert.equal(used.filter((name) => name.toLowerCase() === 'zz-used').length, 1);
+        assert.equal(used[0], 'zz-used');
+
         assert.equal((await call(`/api/keywords/${first.id}`, { method: 'DELETE' })).status, 204);
         assert.equal((await call(`/api/keywords/${first.id}`)).status, 404);
 
