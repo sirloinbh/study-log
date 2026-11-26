@@ -377,6 +377,33 @@
   }
 }
 
+/* Coding quick log (#427): big touch targets, the choices wrap on a phone. */
+.coding-quick {
+  @apply grid gap-3;
+}
+.coding-today {
+  @apply m-0 flex flex-wrap gap-x-4 gap-y-1 text-[13px] font-medium text-muted-foreground;
+}
+.coding-find {
+  @apply grid gap-1.5 text-[13px] font-medium;
+}
+.coding-pick,
+.coding-choices {
+  @apply flex flex-wrap gap-2;
+}
+.coding-pick button,
+.coding-choices button {
+  @apply min-h-12 max-w-full;
+}
+.coding-choices {
+  @apply flex-col items-stretch;
+}
+.coding-choices [role='group'] {
+  @apply w-full;
+}
+.coding-choices [role='radio'] {
+  @apply min-h-12 flex-1;
+}
 /* Coding problem log (#368) */
 .coding-detail {
   @apply mt-3 border-t border-border pt-3;

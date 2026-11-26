@@ -1,7 +1,7 @@
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, test } from 'vitest';
 
-import { tierLabel } from './coding';
+import { languageChoices, parseNewProblem, tierLabel } from './coding';
 import { CodingProblems } from './coding-problems';
 import { type Answer, fakeApi, type Sent } from './test/fake-api';
 import { render } from './test/render';
@@ -36,7 +36,15 @@ type Problem = {
 };
 
 // In-memory coding API: problems with attempts, the latest attempt decides the list's result.
-function server(initial: { problem: Problem; attempts: Attempt[] }[] = []) {
+function server(
+  initial: { problem: Problem; attempts: Attempt[] }[] = [],
+  stats = {
+    today: { attempts: 0, solved: 0, minutes: 0 },
+    week: { attempts: 0, solved: 0, minutes: 0 },
+    streak: 0,
+    lastLanguage: '',
+  },
+) {
   const rows = initial.map((row) => ({ ...row, attempts: [...row.attempts] }));
   let nextId = 100;
   const summary = (row: (typeof rows)[number]) => {
@@ -73,8 +81,10 @@ function server(initial: { problem: Problem; attempts: Attempt[] }[] = []) {
     if (base === '/api/coding/solvedac/import' && method === 'POST')
       return { body: { added: 2, skipped: 1, total: 3 } };
     const input = body as Record<string, unknown> | undefined;
+    if (base === '/api/coding/summary') return { body: stats };
     if (base === '/api/coding/problems' && method === 'GET') {
       const params = new URLSearchParams(query);
+      const q = params.get('q')?.toLowerCase();
       return {
         body: {
           problems: rows
@@ -82,8 +92,10 @@ function server(initial: { problem: Problem; attempts: Attempt[] }[] = []) {
             .filter(
               (p) =>
                 (!params.get('site') || p.site === params.get('site')) &&
-                (!params.get('result') || p.lastResult === params.get('result')),
-            ),
+                (!params.get('result') || p.lastResult === params.get('result')) &&
+                (!q || p.title.toLowerCase().includes(q) || p.problemKey.includes(q)),
+            )
+            .slice(0, Number(params.get('limit') ?? 50)),
         },
       };
     }
@@ -357,5 +369,124 @@ describe('coding problem log', () => {
       await screen.findByText('Imported from LeetCode: 4 added, 0 already recorded'),
     ).toBeTruthy();
     expect(api.requests.some((r) => r.path === '/api/coding/leetcode/import')).toBe(true);
+  });
+});
+
+describe('quick log of a solve', () => {
+  const week = { attempts: 4, solved: 3, minutes: 95 };
+  const stats = {
+    today: { attempts: 2, solved: 1, minutes: 40 },
+    week,
+    streak: 3,
+    lastLanguage: 'C++',
+  };
+
+  test('shows today, the week and the streak above the form', async () => {
+    server([{ problem: baekjoon, attempts: [first] }], stats);
+    render(<CodingProblems today={today} />);
+    expect(await screen.findByText('Today: 1 solve, 40 min')).toBeTruthy();
+    expect(screen.getByText('This week: 3 solves')).toBeTruthy();
+    expect(screen.getByText('Streak: 3 days')).toBeTruthy();
+  });
+
+  test('a recent problem is logged with one pick and one save, using the last language', async () => {
+    const api = server([{ problem: baekjoon, attempts: [first] }], stats);
+    render(<CodingProblems today={today} />);
+    const quick = await screen.findByLabelText('Log a solve');
+    expect(within(quick).queryByRole('button', { name: 'Save solve' })).toBeNull();
+    fireEvent.click(await within(quick).findByRole('button', { name: 'A+B (1000)' }));
+    expect(within(quick).getByRole('radio', { name: 'C++' }).getAttribute('aria-checked')).toBe(
+      'true',
+    );
+    fireEvent.click(within(quick).getByRole('button', { name: 'Save solve' }));
+    await waitFor(() => expect(screen.getByRole('status').textContent).toBe('Logged A+B: Solved'));
+    const post = api.requests.find((r) => r.method === 'POST');
+    expect(post?.path).toBe('/api/coding/problems/1/attempts');
+    expect(post?.body).toEqual({
+      date: today,
+      result: 'solved',
+      language: 'C++',
+      minutes: null,
+      notes: '',
+    });
+    // The pick is cleared so the next solve starts fresh.
+    expect(within(quick).queryByRole('button', { name: 'Save solve' })).toBeNull();
+  });
+
+  test('the result, language and minutes come from choices', async () => {
+    const api = server([{ problem: baekjoon, attempts: [first] }], stats);
+    render(<CodingProblems today={today} />);
+    const quick = await screen.findByLabelText('Log a solve');
+    fireEvent.click(await within(quick).findByRole('button', { name: 'A+B (1000)' }));
+    fireEvent.click(within(quick).getByRole('radio', { name: 'Not solved' }));
+    fireEvent.click(within(quick).getByRole('radio', { name: 'Python' }));
+    fireEvent.click(within(quick).getByRole('radio', { name: '45 min' }));
+    fireEvent.click(within(quick).getByRole('button', { name: 'Save solve' }));
+    await waitFor(() => expect(api.requests.some((r) => r.method === 'POST')).toBe(true));
+    expect(api.requests.find((r) => r.method === 'POST')?.body).toMatchObject({
+      result: 'failed',
+      language: 'Python',
+      minutes: 45,
+    });
+  });
+
+  test('a Baekjoon number that is not recorded yet is added with its solved.ac title', async () => {
+    const api = server([], stats);
+    render(<CodingProblems today={today} />);
+    const quick = await screen.findByLabelText('Log a solve');
+    fireEvent.change(within(quick).getByLabelText('Find a problem'), { target: { value: '1000' } });
+    fireEvent.click(await within(quick).findByRole('button', { name: 'New: Baekjoon 1000' }));
+    fireEvent.click(within(quick).getByRole('button', { name: 'Save solve' }));
+    await waitFor(() => expect(api.requests.some((r) => r.method === 'POST')).toBe(true));
+    expect(api.requests.find((r) => r.method === 'POST')?.body).toMatchObject({
+      site: 'baekjoon',
+      problemKey: '1000',
+      title: 'A+B',
+      attempt: { result: 'solved', language: 'C++' },
+    });
+  });
+
+  test('a LeetCode link makes a new problem with a title from the slug', async () => {
+    const api = server([], stats);
+    render(<CodingProblems today={today} />);
+    const quick = await screen.findByLabelText('Log a solve');
+    fireEvent.change(within(quick).getByLabelText('Find a problem'), {
+      target: { value: 'https://leetcode.com/problems/two-sum/description/' },
+    });
+    fireEvent.click(await within(quick).findByRole('button', { name: 'New: LeetCode two-sum' }));
+    fireEvent.click(within(quick).getByRole('button', { name: 'Save solve' }));
+    await waitFor(() => expect(api.requests.some((r) => r.method === 'POST')).toBe(true));
+    expect(api.requests.find((r) => r.method === 'POST')?.body).toMatchObject({
+      site: 'leetcode',
+      problemKey: 'two-sum',
+      title: 'Two Sum',
+    });
+  });
+
+  test('a number that is already recorded offers the recorded problem, not a new one', async () => {
+    server([{ problem: baekjoon, attempts: [first] }], stats);
+    render(<CodingProblems today={today} />);
+    const quick = await screen.findByLabelText('Log a solve');
+    fireEvent.change(within(quick).getByLabelText('Find a problem'), { target: { value: '1000' } });
+    expect(await within(quick).findByRole('button', { name: 'A+B (1000)' })).toBeTruthy();
+    expect(within(quick).queryByRole('button', { name: 'New: Baekjoon 1000' })).toBeNull();
+  });
+
+  test('reads a problem from a number or a link, and offers the usual languages', () => {
+    expect(parseNewProblem(' 1000 ')).toEqual({ site: 'baekjoon', problemKey: '1000' });
+    expect(parseNewProblem('https://www.acmicpc.net/problem/2557')).toEqual({
+      site: 'baekjoon',
+      problemKey: '2557',
+    });
+    expect(parseNewProblem('https://leetcode.com/problems/Two-Sum')?.problemKey).toBe('two-sum');
+    expect(parseNewProblem('https://leetcode.com/problems/two-sum/')).toEqual({
+      site: 'leetcode',
+      problemKey: 'two-sum',
+    });
+    expect(parseNewProblem('two sum')).toBeUndefined();
+    expect(parseNewProblem('0')).toBeUndefined();
+    expect(languageChoices('Go')).toEqual(['Go', 'Python', 'C++', 'Java', 'JavaScript']);
+    expect(languageChoices('Python')[0]).toBe('Python');
+    expect(languageChoices('')).toHaveLength(4);
   });
 });

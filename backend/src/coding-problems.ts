@@ -3,6 +3,7 @@ import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod/v4';
 
 import { auditChange } from './audit-log.js';
+import { codingSummary } from './coding-summary.js';
 import { calendarDate } from './dates.js';
 import { syncFirstReview } from './reviews.js';
 import { inTransaction, likePattern } from './sql.js';
@@ -275,6 +276,11 @@ export function codingRoutes(pool: Pool, today: () => string) {
       params,
     );
     res.json({ problems: rows });
+  });
+
+  // Today's and this week's attempts, the streak and the language last used (#427).
+  router.get('/summary', async (_req, res) => {
+    res.json(await codingSummary(pool, today()));
   });
 
   router.get('/problems/:id', async (req, res) => {

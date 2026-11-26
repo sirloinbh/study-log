@@ -16,6 +16,7 @@ import {
 } from './coding';
 import { CodingProblemDetail } from './coding-problem-detail';
 import { CodingProblemForm } from './coding-problem-form';
+import { CodingQuickLog } from './coding-quick-log';
 import { Button } from './components/ui/button';
 import { ConfirmDialog } from './components/ui/confirm-dialog';
 import { Input } from './components/ui/input';
@@ -126,6 +127,16 @@ export function CodingProblems({
 
   return (
     <div className="coding">
+      {/* Always mounted so screen readers announce each new message. */}
+      <p role="status" className="status">
+        {notice?.kind === 'status' ? notice.text : ''}
+      </p>
+      {notice?.kind === 'alert' && (
+        <p role="alert" className="error">
+          {notice.text}
+        </p>
+      )}
+      <CodingQuickLog today={today} busy={busy} action={action} change={change} />
       <section className="card" aria-label="Add a problem">
         <h2>Add a problem</h2>
         <CodingProblemForm
@@ -137,15 +148,6 @@ export function CodingProblems({
           onInvalid={invalid}
           onLookup={lookup}
         />
-        {/* Always mounted so screen readers announce each new message. */}
-        <p role="status" className="status">
-          {notice?.kind === 'status' ? notice.text : ''}
-        </p>
-        {notice?.kind === 'alert' && (
-          <p role="alert" className="error">
-            {notice.text}
-          </p>
-        )}
       </section>
 
       <section className="card" aria-label="Import">

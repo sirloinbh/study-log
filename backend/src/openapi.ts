@@ -228,6 +228,10 @@ export const operations: Record<string, Operation> = {
     query: problemListQuery,
     status: [200, 400],
   },
+  'GET /api/coding/summary': {
+    summary: "Today's and this week's attempts, the practice streak and the language last used",
+    status: [200],
+  },
   'GET /api/coding/problems/:id': {
     summary: 'Get a problem with its attempts',
     status: [200, 400, 404],
