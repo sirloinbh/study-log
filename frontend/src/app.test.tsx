@@ -1,4 +1,4 @@
-import { fireEvent, screen, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { expect, test } from 'vitest';
 
 import { App } from './app';
@@ -57,13 +57,15 @@ test('each page has its own address and is marked in the main menu', async () =>
   render(<App />);
   const menu = screen.getByRole('navigation', { name: 'Main menu' });
   for (const [label, path] of [
+    ['Week', '/week'],
+    ['12 weeks', '/weeks'],
     ['Schedules', '/schedules'],
     ['Reviews', '/reviews'],
     ['Textbooks', '/textbooks'],
     ['Keywords', '/keywords'],
     ['Wrong problems', '/wrong-exercises'],
-    ['Stats', '/stats'],
     ['Retrospectives', '/retrospectives'],
+    ['Dashboard', '/dashboard'],
     ['Settings', '/settings'],
   ]) {
     fireEvent.click(within(menu).getByRole('link', { name: label }));
@@ -135,4 +137,24 @@ test('an unknown address falls back to the study log', async () => {
   render(<App />);
   expect(await screen.findByRole('heading', { level: 1, name: 'Study log' })).toBeInTheDocument();
   expect(window.location.pathname).toBe('/');
+});
+
+test('the menu puts the day log first, then Week and 12 weeks, and Dashboard and Settings last', () => {
+  server({ body: { today: '2026-11-26' } });
+  window.history.replaceState(null, '', '/');
+  render(<App />);
+  const menu = screen.getByRole('navigation', { name: 'Main menu' });
+  const labels = within(menu)
+    .getAllByRole('link')
+    .map((link) => link.textContent);
+  expect(labels.slice(0, 3)).toEqual(['Study log', 'Week', '12 weeks']);
+  expect(labels.slice(-2)).toEqual(['Dashboard', 'Settings']);
+});
+
+test('the old Stats address redirects to the Dashboard', async () => {
+  server({ body: { today: '2026-11-26' } });
+  window.history.replaceState(null, '', '/stats');
+  render(<App />);
+  await waitFor(() => expect(window.location.pathname).toBe('/dashboard'));
+  expect(await screen.findByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument();
 });

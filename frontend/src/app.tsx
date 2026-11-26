@@ -3,10 +3,12 @@ import {
   BookOpen,
   CalendarCheck,
   CalendarDays,
+  CalendarRange,
   ChartColumn,
   CircleX,
   Code,
   Layers,
+  LayoutList,
   NotebookPen,
   NotebookText,
   Settings2,
@@ -33,11 +35,17 @@ import { AccountActions, SignInGate } from './sign-in';
 import { Stats } from './stats';
 import { StudyLogs } from './study-logs';
 import { Textbooks } from './textbooks';
+import { Week } from './week';
+import { Weeks } from './weeks';
 import { WrongExercises } from './wrong-exercises';
 
-// Every page URL lives here (central docs/directory-rules.md). The study log is the first page.
+// Every page URL lives here (central docs/directory-rules.md). The study log (the day log) is the first page.
+// The dashboard used to be '/stats'; the old address still redirects to it.
+const oldStatsPage = '/stats';
 const pages = {
   logs: '/',
+  week: '/week',
+  weeks: '/weeks',
   schedules: '/schedules',
   reviews: '/reviews',
   textbooks: '/textbooks',
@@ -45,7 +53,7 @@ const pages = {
   flashcards: '/flashcards',
   wrongExercises: '/wrong-exercises',
   coding: '/coding',
-  stats: '/stats',
+  dashboard: '/dashboard',
   retrospectives: '/retrospectives',
   settings: '/settings',
 } as const;
@@ -53,6 +61,8 @@ const pages = {
 // Main menu (LNB) items, in display order.
 const nav: NavItem[] = [
   { to: pages.logs, label: 'Study log', icon: NotebookPen },
+  { to: pages.week, label: 'Week', icon: CalendarRange },
+  { to: pages.weeks, label: '12 weeks', icon: LayoutList },
   { to: pages.schedules, label: 'Schedules', icon: CalendarDays },
   { to: pages.reviews, label: 'Reviews', icon: CalendarCheck },
   { to: pages.textbooks, label: 'Textbooks', icon: BookOpen },
@@ -60,8 +70,8 @@ const nav: NavItem[] = [
   { to: pages.flashcards, label: 'Flashcards', icon: Layers },
   { to: pages.wrongExercises, label: 'Wrong problems', icon: CircleX },
   { to: pages.coding, label: 'Coding', icon: Code },
-  { to: pages.stats, label: 'Stats', icon: ChartColumn },
   { to: pages.retrospectives, label: 'Retrospectives', icon: NotebookText },
+  { to: pages.dashboard, label: 'Dashboard', icon: ChartColumn },
   { to: pages.settings, label: 'Settings', icon: Settings2 },
 ];
 
@@ -131,6 +141,32 @@ function AppBody() {
                   today={today}
                 >
                   {(today) => <StudyLogs today={today} onChange={reviewsChanged} />}
+                </Page>
+              }
+            />
+            <Route
+              path={pages.week}
+              element={
+                <Page
+                  title="Week"
+                  description="See the study logs of each day of a week and the time studied"
+                  health={health}
+                  today={today}
+                >
+                  {(today) => <Week today={today} />}
+                </Page>
+              }
+            />
+            <Route
+              path={pages.weeks}
+              element={
+                <Page
+                  title="12 weeks"
+                  description="Compare the time studied in each of the last 12 weeks"
+                  health={health}
+                  today={today}
+                >
+                  {(today) => <Weeks today={today} />}
                 </Page>
               }
             />
@@ -226,10 +262,10 @@ function AppBody() {
               }
             />
             <Route
-              path={pages.stats}
+              path={pages.dashboard}
               element={
                 <Page
-                  title="Stats"
+                  title="Dashboard"
                   description="See study time by period and the daily average at a glance"
                   health={health}
                   today={today}
@@ -269,6 +305,7 @@ function AppBody() {
                 </Page>
               }
             />
+            <Route path={oldStatsPage} element={<Navigate to={pages.dashboard} replace />} />
             <Route path="*" element={<Navigate to={pages.logs} replace />} />
           </Routes>
         </AppShell>
