@@ -5,7 +5,7 @@ import { test } from 'node:test';
 import { Pool } from 'pg';
 
 import type { CalendarEvent, GoogleCalendarClient } from '../src/google-calendar.js';
-import { withApi } from './helpers.js';
+import { isolatedPool, withApi } from './helpers.js';
 
 const url = process.env.TEST_DATABASE_URL;
 const key = randomBytes(32);
@@ -60,21 +60,9 @@ test(
   'the calendar follows schedule items and reviews, and disconnecting stops it',
   { skip: !url },
   async (t) => {
-    const pool = new Pool({ connectionString: url });
-    const cleanup = async () => {
-      await pool.query('DELETE FROM calendar_events');
-      await pool.query('DELETE FROM calendar_connection');
-      await pool.query('DELETE FROM schedules WHERE title LIKE $1', [`${marker}%`]);
-      await pool.query('DELETE FROM textbooks WHERE title LIKE $1', [`${marker}%`]);
-      await pool.query(
-        `DELETE FROM study_logs WHERE study_date BETWEEN '7002-12-01' AND '7003-12-31'`,
-      );
-    };
-    await cleanup();
-    t.after(async () => {
-      await cleanup();
-      await pool.end();
-    });
+    // Its own schema: a sync reads every schedule item and review, and the test clears the
+    // calendar tables, so rows of files running at the same time would break it (#444).
+    const pool = await isolatedPool(url, t);
 
     const google = fakeGoogle();
     const settings = () => ({
