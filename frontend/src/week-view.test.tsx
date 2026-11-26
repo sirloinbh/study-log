@@ -113,6 +113,25 @@ test('the 12-week view shows one row per week', async () => {
     },
   });
   render(<TwelveWeekView today={today} />);
-  expect(await screen.findByText('2 h · 2/7 d')).toBeInTheDocument();
+  expect(await screen.findByText('2 of 7 days')).toBeInTheDocument();
+  expect(screen.getByText('2 h')).toBeInTheDocument();
   expect(screen.getAllByRole('listitem')).toHaveLength(12);
+  // The first row names its year, and the current week is named in text.
+  const rows = screen.getAllByRole('listitem');
+  expect(rows[0]).toHaveTextContent(/^\d\d-\d\d – \d\d-\d\d20\d\d/);
+  expect(rows[11]).toHaveTextContent('This week');
+  expect(rows[11]).toHaveAttribute('aria-current', 'date');
+  expect(rows.filter((row) => row.hasAttribute('aria-current'))).toHaveLength(1);
+});
+
+test('the 12-week view shows the year again where it changes', async () => {
+  fakeApi({
+    'GET /api/stats/heatmap': { body: { from: '2025-10-19', to: '2026-01-10', daily: [] } },
+  });
+  render(<TwelveWeekView today="2026-01-10" />);
+  await screen.findAllByRole('listitem');
+  const years = screen
+    .getAllByRole('listitem')
+    .flatMap((row) => row.textContent?.match(/20\d\d/) ?? []);
+  expect(years).toEqual(['2025', '2026']);
 });
