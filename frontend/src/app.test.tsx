@@ -57,13 +57,15 @@ test('each page has its own address and is marked in the main menu', async () =>
   render(<App />);
   const menu = screen.getByRole('navigation', { name: 'Main menu' });
   for (const [label, path] of [
+    ['Week', '/week'],
+    ['12 weeks', '/twelve-weeks'],
     ['Schedules', '/schedules'],
     ['Reviews', '/reviews'],
     ['Textbooks', '/textbooks'],
     ['Keywords', '/keywords'],
     ['Wrong problems', '/wrong-exercises'],
-    ['Stats', '/stats'],
     ['Retrospectives', '/retrospectives'],
+    ['Dashboard', '/dashboard'],
     ['Settings', '/settings'],
   ]) {
     fireEvent.click(within(menu).getByRole('link', { name: label }));
@@ -135,4 +137,23 @@ test('an unknown address falls back to the study log', async () => {
   render(<App />);
   expect(await screen.findByRole('heading', { level: 1, name: 'Study log' })).toBeInTheDocument();
   expect(window.location.pathname).toBe('/');
+});
+
+test('the menu lists the day log, Week, 12 weeks, the other pages, Dashboard, and Settings last', () => {
+  server({ body: { today: '2026-10-26' } });
+  render(<App />);
+  const menu = screen.getByRole('navigation', { name: 'Main menu' });
+  const labels = within(menu)
+    .getAllByRole('link')
+    .map((link) => link.textContent?.trim());
+  expect(labels.slice(0, 3)).toEqual(['Study log', 'Week', '12 weeks']);
+  expect(labels.slice(-2)).toEqual(['Dashboard', 'Settings']);
+});
+
+test('the old stats address goes to the dashboard', async () => {
+  server({ body: { today: '2026-10-26' } });
+  window.history.replaceState(null, '', '/stats');
+  render(<App />);
+  expect(await screen.findByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument();
+  expect(window.location.pathname).toBe('/dashboard');
 });
