@@ -1,4 +1,5 @@
 import { Button } from './components/ui/button';
+import { FileField } from './file-field';
 import { ButtonSpinner } from './loading';
 import { contentLabel } from './textbook';
 import { type TocEntry, tocLimits, type TocTree, tocTree } from './toc';
@@ -58,20 +59,18 @@ export function ContentsPasteForm({
           onChange={(event) => onText(event.target.value)}
         />
       </label>
-      <label className="wide">
-        Import from PDF
-        <input
-          type="file"
-          accept="application/pdf,.pdf"
-          disabled={busy || reading}
-          onChange={(event) => {
-            const file = event.target.files?.[0];
-            // Cleared so picking the same file again reads it again.
-            event.target.value = '';
-            if (file) onPdf(file);
-          }}
-        />
-      </label>
+      {/* No file is kept: a PDF is read as soon as it is picked, so picking the same one again reads it again. */}
+      <FileField
+        className="wide"
+        label="Import from PDF"
+        accept="application/pdf,.pdf"
+        file={undefined}
+        clearAfterPick
+        disabled={busy || reading}
+        onFile={(file) => {
+          if (file) onPdf(file);
+        }}
+      />
       <p id="toc-paste-hint" className="hint wide">
         Paste one entry per line or import from a PDF (its bookmarks if it has them, otherwise the
         text of the first 20 pages). Levels are split by numbers such as 1, 1.1, Chapter 1, or 제1장

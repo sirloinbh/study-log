@@ -1,5 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 
 import { useBusy } from './busy';
 import {
@@ -23,6 +23,7 @@ import { Button } from './components/ui/button';
 import { ConfirmDialog } from './components/ui/confirm-dialog';
 import { Input } from './components/ui/input';
 import { NativeSelect } from './components/ui/native-select';
+import { FileField } from './file-field';
 import { type RequestError, requestForm, requestJson } from './lib/api';
 import { apiKey, useApiQuery } from './lib/query';
 import { ButtonSpinner } from './loading';
@@ -58,7 +59,6 @@ export function CodingGoals({
   const [targetDate, setTargetDate] = useState('');
   const [plan, setPlan] = useState<GoalPlan>();
   const [openList, setOpenList] = useState<number>();
-  const input = useRef<HTMLInputElement>(null);
 
   const lists = useApiQuery<{ lists: GoalListRow[] }>(
     apiKey('/api/coding', 'goals'),
@@ -149,7 +149,6 @@ export function CodingGoals({
       setFile(undefined);
       setSheets([]);
       setPlan(undefined);
-      if (input.current) input.current.value = '';
       await client.invalidateQueries({ queryKey: apiKey('/api/coding') });
       onChange?.();
     });
@@ -180,16 +179,13 @@ export function CodingGoals({
         Attach an Excel file (.xlsx, at most 2 MB) of the problems you plan to solve. Importing the
         same list again updates it.
       </p>
-      <label>
-        Excel file
-        <Input
-          ref={input}
-          type="file"
-          accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-          disabled={busy}
-          onChange={(event) => void pickFile(event.target.files?.[0])}
-        />
-      </label>
+      <FileField
+        label="Excel file"
+        accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        file={file}
+        disabled={busy}
+        onFile={(picked) => void pickFile(picked)}
+      />
       {file && sheet && (
         <div className="log-form coding-goal-map">
           {sheets.length > 1 && (
