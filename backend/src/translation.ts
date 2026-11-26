@@ -16,7 +16,7 @@ export type TranslationSource = {
 export type Translated = { body: string; answer: string | null; model: string };
 export type Translator = (source: TranslationSource) => Promise<Translated>;
 
-// A translation that could not be made: the status and Korean message the API answers with.
+// A translation that could not be made: the status and English message the API answers with.
 export class TranslationError extends Error {
   constructor(
     readonly status: number,
