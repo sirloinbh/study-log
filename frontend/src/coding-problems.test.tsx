@@ -82,6 +82,7 @@ function server(
       return { body: { added: 2, skipped: 1, total: 3 } };
     const input = body as Record<string, unknown> | undefined;
     if (base === '/api/coding/summary') return { body: stats };
+    if (base === '/api/coding/goals') return { body: { lists: [] } };
     if (base === '/api/coding/problems' && method === 'GET') {
       const params = new URLSearchParams(query);
       const q = params.get('q')?.toLowerCase();

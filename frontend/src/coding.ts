@@ -164,3 +164,76 @@ const commonLanguages = ['Python', 'C++', 'Java', 'JavaScript'] as const;
 export function languageChoices(last: string) {
   return [...new Set([last, ...commonLanguages].filter(Boolean))];
 }
+
+// Goal lists imported from an Excel file (#425): the same shapes as /api/coding/goals.
+export const goalFields = [
+  'key',
+  'title',
+  'url',
+  'level',
+  'topic',
+  'group',
+  'order',
+  'targetDate',
+  'status',
+  'solvedDate',
+  'note',
+] as const;
+export type GoalField = (typeof goalFields)[number];
+export type GoalMapping = Partial<Record<GoalField, number>>;
+export const goalFieldLabels: Record<GoalField, string> = {
+  key: 'Problem number',
+  title: 'Title',
+  url: 'Link',
+  level: 'Difficulty tier',
+  topic: 'Topic',
+  group: 'Stage',
+  order: 'Order',
+  targetDate: 'Target date',
+  status: 'Done mark (O, △, X)',
+  solvedDate: 'Solved date',
+  note: 'Note',
+};
+export const maxGoalFileBytes = 2 * 1024 * 1024;
+
+export type InspectedSheet = {
+  name: string;
+  headers: string[];
+  rowCount: number;
+  tooLong: boolean;
+  preview: string[][];
+  mapping: GoalMapping;
+};
+export type GoalPlan = {
+  listExists: boolean;
+  total: number;
+  willAdd: number;
+  willUpdate: number;
+  unchanged: number;
+  notInFile: number;
+  alreadyLogged: number;
+  attemptsToAdd: number;
+  skipped: { row: number; reason: string }[];
+  blank: number;
+  sample: { site: Site; problemKey: string; title: string; topic: string; level: number | null }[];
+};
+export type GoalListRow = {
+  id: number;
+  name: string;
+  targetDate: string | null;
+  total: number;
+  alreadyLogged: number;
+};
+
+// The column choices of a sheet: "A: Problem number" for each header cell.
+export function columnLabel(index: number, header: string | undefined) {
+  const letter = String.fromCharCode(65 + (index % 26));
+  const name = (header ?? '').trim();
+  return name ? `${letter}: ${name}` : `${letter}: (no header)`;
+}
+
+// The list name suggested for a file and a sheet: "goals - 문제목록", or the file name alone for one sheet.
+export function suggestedListName(fileName: string, sheet: string, sheetCount: number) {
+  const base = fileName.replace(/\.xlsx$/i, '').trim() || 'Goal list';
+  return (sheetCount > 1 ? `${base} - ${sheet}` : base).slice(0, 100);
+}

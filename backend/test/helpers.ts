@@ -4,6 +4,7 @@ import type express from 'express';
 import { Client, type Pool, Pool as RealPool } from 'pg';
 
 import { createApp } from '../src/app.js';
+import type { WorkbookReader } from '../src/coding-goals.js';
 import type { Feedbacker } from '../src/exercise-feedback.js';
 import type { Extractor } from '../src/extraction.js';
 import type { FileStorage } from '../src/file-storage.js';
@@ -130,6 +131,7 @@ export async function withApi(
     solvedAcHandle?: string;
     leetCodeClient?: LeetCodeClient;
     leetCodeUsername?: string;
+    workbookReader?: WorkbookReader;
   } = {},
 ) {
   const { server, port } = await openFetchablePort(async () => {

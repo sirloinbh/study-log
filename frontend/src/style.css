@@ -408,6 +408,25 @@
 .coding-choices [role='radio'] {
   @apply min-h-12 flex-1;
 }
+/* Goal lists (#425): the column choices are one per row on a phone. */
+.coding-goals {
+  @apply grid gap-3;
+}
+.coding-goals label {
+  @apply grid gap-1.5 text-[13px] font-medium;
+}
+.coding-columns {
+  @apply m-0 grid grid-cols-1 gap-3 border-0 p-0 sm:grid-cols-2;
+}
+.coding-columns legend {
+  @apply mb-2 p-0 text-[13px] font-medium;
+}
+.coding-plan {
+  @apply grid gap-2 rounded-[calc(var(--radius)-2px)] border border-border p-3;
+}
+.coding-plan p {
+  @apply m-0 [overflow-wrap:anywhere];
+}
 /* Coding problem log (#368) */
 .coding-detail {
   @apply mt-3 border-t border-border pt-3;

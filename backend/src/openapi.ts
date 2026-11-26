@@ -228,6 +228,25 @@ export const operations: Record<string, Operation> = {
     query: problemListQuery,
     status: [200, 400],
   },
+  'POST /api/coding/goals/inspect': {
+    summary:
+      'Read an uploaded .xlsx file (at most 2 MB) and list its sheets with headers, a preview and guessed columns; multipart/form-data with field file, header X-Requested-With: study-log',
+    status: [200, 400, 413],
+  },
+  'POST /api/coding/goals/import': {
+    summary:
+      'Import one sheet as a goal list, or with dryRun only show what would change; a list of the same name is updated, and the sheet progress columns become attempts on the first import only; multipart/form-data with fields file, sheet, name, site, targetDate, mapping (JSON) and dryRun, header X-Requested-With: study-log',
+    status: [200, 201, 400, 413],
+  },
+  'GET /api/coding/goals': { summary: 'List the goal lists with their item counts', status: [200] },
+  'GET /api/coding/goals/:id': {
+    summary: 'Get a goal list with its items in order, linked to the problem log',
+    status: [200, 400, 404],
+  },
+  'DELETE /api/coding/goals/:id': {
+    summary: 'Delete a goal list and its items; the problem log stays',
+    status: [204, 400, 404],
+  },
   'GET /api/coding/summary': {
     summary: "Today's and this week's attempts, the practice streak and the language last used",
     status: [200],

@@ -14,6 +14,7 @@ import {
   type SolvedProblem,
   tierLabel,
 } from './coding';
+import { CodingGoals } from './coding-goals';
 import { CodingProblemDetail } from './coding-problem-detail';
 import { CodingProblemForm } from './coding-problem-form';
 import { CodingQuickLog } from './coding-quick-log';
@@ -137,6 +138,7 @@ export function CodingProblems({
         </p>
       )}
       <CodingQuickLog today={today} busy={busy} action={action} change={change} />
+      <CodingGoals onChange={onChange} notify={setNotice} />
       <section className="card" aria-label="Add a problem">
         <h2>Add a problem</h2>
         <CodingProblemForm
