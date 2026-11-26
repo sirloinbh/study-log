@@ -431,6 +431,15 @@ describe('quick log of a solve', () => {
     });
   });
 
+  test('the find hint is short enough for a 390px phone and the field keeps its label', async () => {
+    server([], stats);
+    render(<CodingProblems today={today} />);
+    const quick = await screen.findByLabelText('Log a solve');
+    const field = within(quick).getByLabelText('Find a problem');
+    // The 308px field shows about 30 characters at 16px; a longer hint was cut off on a phone.
+    expect((field.getAttribute('placeholder') ?? '').length).toBeLessThanOrEqual(28);
+  });
+
   test('a Baekjoon number that is not recorded yet is added with its solved.ac title', async () => {
     const api = server([], stats);
     render(<CodingProblems today={today} />);
