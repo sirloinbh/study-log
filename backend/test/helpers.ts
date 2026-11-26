@@ -1,4 +1,5 @@
 import type { Server } from 'node:http';
+import { fileURLToPath } from 'node:url';
 
 import type express from 'express';
 import { Client, type Pool, Pool as RealPool } from 'pg';
@@ -12,6 +13,7 @@ import type { HolidayFetcher } from '../src/holidays.js';
 import type { LeetCodeClient } from '../src/leetcode.js';
 import type { Drafter } from '../src/retrospective-draft.js';
 import type { SolvedAcClient } from '../src/solvedac.js';
+import { migrate, readMigrations } from '../src/standard/migrations.js';
 import type { Translator } from '../src/translation.js';
 
 // Ports the fetch standard refuses to connect to ("bad port"), as listed in the Fetch spec's
@@ -56,6 +58,54 @@ export async function holdExactTotalsLock(
     }
   });
   await client.query('SELECT pg_advisory_lock(424242)');
+}
+
+const migrationsDir = fileURLToPath(new URL('../../database/migrations/', import.meta.url));
+// Advisory lock key for these runs; the app uses 581_002 and migrations.integration 581_900.
+const isolatedLockKey = 581_901;
+let isolatedCount = 0;
+
+// A schema of its own with every migration applied (#444), for a test whose result depends on
+// every row of the DB (totals, "sync everything"). Other test files run in parallel on the same
+// DB, so rows they insert at the same moment would change that result. The returned connection
+// string makes every connection of a Pool use the new schema; `public` stays on the search path
+// for extensions. The schema is dropped when the test ends, after `finish` (close pools there).
+export async function isolatedSchema(
+  connectionString: string | undefined,
+  t: { after: (run: () => Promise<void>) => void },
+  finish: () => Promise<void> = async () => {},
+) {
+  const schema = `iso_${process.pid}_${++isolatedCount}`;
+  const client = new Client({ connectionString });
+  await client.connect();
+  t.after(async () => {
+    try {
+      await finish();
+      await client.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
+    } finally {
+      await client.end();
+    }
+  });
+  await client.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
+  await client.query(`CREATE SCHEMA ${schema}`);
+  await client.query(`SET search_path TO ${schema}, public`);
+  await migrate(client, await readMigrations(migrationsDir), isolatedLockKey);
+  const url = new URL(connectionString ?? '');
+  url.searchParams.set('options', `-c search_path=${schema},public`);
+  return url.toString();
+}
+
+// `isolatedSchema` plus a Pool on it, closed before the schema is dropped.
+export async function isolatedPool(
+  connectionString: string | undefined,
+  t: { after: (run: () => Promise<void>) => void },
+) {
+  const held: { pool?: RealPool } = {};
+  const isolated = await isolatedSchema(connectionString, t, async () => {
+    await held.pool?.end();
+  });
+  held.pool = new RealPool({ connectionString: isolated });
+  return held.pool;
 }
 
 const closeServer = (server: Server) =>

@@ -1,9 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 
-import { Pool } from 'pg';
-
-import { holdExactTotalsLock, withApi } from './helpers.js';
+import { isolatedPool, withApi } from './helpers.js';
 
 const url = process.env.TEST_DATABASE_URL;
 
@@ -30,17 +28,8 @@ test(
   'study time is summed by day, week, month and period against the real database',
   { skip: !url },
   async (t) => {
-    const pool = new Pool({ connectionString: url });
-    const cleanup = () =>
-      pool.query(
-        "DELETE FROM study_logs WHERE study_date BETWEEN '2096-01-01' AND '2096-12-31' OR study_date = '0001-01-01'",
-      );
-    // The all-time total below also counts rows of the other early-date test.
-    await holdExactTotalsLock(url, t, async () => {
-      await cleanup();
-      await pool.end();
-    });
-    await cleanup();
+    // Its own schema: the totals below count every row, and other files add logs at the same time (#444).
+    const pool = await isolatedPool(url, t);
     const today = '2096-05-16';
 
     await withApi(
@@ -198,19 +187,8 @@ test(
 // #180. One textbook's logs only: dates in 2095, which no other test file uses, and a book of its
 // own, so the all-time total of the book holds only what is added here.
 test('study time can be narrowed to one textbook', { skip: !url }, async (t) => {
-  const pool = new Pool({ connectionString: url });
   const books: number[] = [];
-  const cleanup = async () => {
-    await pool.query(
-      "DELETE FROM study_logs WHERE study_date BETWEEN '2095-01-01' AND '2095-12-31'",
-    );
-    if (books.length) await pool.query('DELETE FROM textbooks WHERE id = ANY($1)', [books]);
-  };
-  await holdExactTotalsLock(url, t, async () => {
-    await cleanup();
-    await pool.end();
-  });
-  await cleanup();
+  const pool = await isolatedPool(url, t);
   const today = '2095-08-17';
 
   await withApi(
