@@ -127,3 +127,40 @@ export type SolvedProblem = {
   url: string;
 };
 export type ImportResult = { added: number; skipped: number; total: number };
+
+// What the Coding screen shows at the top (#427): the same figures as GET /api/coding/summary.
+export type Period = { attempts: number; solved: number; minutes: number };
+export type CodingSummary = { today: Period; week: Period; streak: number; lastLanguage: string };
+
+// A problem typed or pasted into the quick log that is not recorded yet: a Baekjoon number, a
+// Baekjoon link or a LeetCode link. Anything else is searched for among the recorded problems.
+export type NewProblem = { site: 'baekjoon' | 'leetcode'; problemKey: string };
+
+export function parseNewProblem(text: string): NewProblem | undefined {
+  const value = text.trim();
+  if (/^[1-9]\d{0,6}$/.test(value)) return { site: 'baekjoon', problemKey: value };
+  const baekjoon = value.match(/^https?:\/\/(?:www\.)?acmicpc\.net\/problem\/([1-9]\d{0,6})\/?$/i);
+  if (baekjoon) return { site: 'baekjoon', problemKey: baekjoon[1] };
+  const leetcode = value.match(
+    /^https?:\/\/(?:www\.)?leetcode\.(?:com|cn)\/problems\/([a-z0-9]+(?:-[a-z0-9]+)*)(?:\/.*)?$/i,
+  );
+  if (leetcode) return { site: 'leetcode', problemKey: leetcode[1].toLowerCase() };
+  return undefined;
+}
+
+// A title for a problem whose real one is not known: "two-sum" becomes "Two Sum".
+export function fallbackTitle({ site, problemKey }: NewProblem) {
+  if (site === 'baekjoon') return `Baekjoon ${problemKey}`;
+  return problemKey
+    .split('-')
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
+export const minutePresets = ['10', '20', '30', '45', '60'] as const;
+const commonLanguages = ['Python', 'C++', 'Java', 'JavaScript'] as const;
+
+// The language choices: the one used last first, then the usual ones.
+export function languageChoices(last: string) {
+  return [...new Set([last, ...commonLanguages].filter(Boolean))];
+}

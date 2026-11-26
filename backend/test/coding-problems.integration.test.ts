@@ -3,6 +3,7 @@ import { test } from 'node:test';
 
 import { Pool } from 'pg';
 
+import { codingSummary } from '../src/coding-summary.js';
 import { withApi } from './helpers.js';
 
 const url = process.env.TEST_DATABASE_URL;
@@ -212,3 +213,39 @@ test('importing LeetCode submissions twice adds them once', { skip: !url }, asyn
     { leetCodeClient: client, leetCodeUsername: 'some_user' },
   );
 });
+
+test(
+  'the summary counts today and the week, the streak and the last language',
+  { skip: !url },
+  async (t) => {
+    const pool = new Pool({ connectionString: url });
+    const key = 'zz-summary-test';
+    const cleanup = () => pool.query(`DELETE FROM coding_problems WHERE problem_key = $1`, [key]);
+    await cleanup();
+    t.after(async () => {
+      await cleanup();
+      await pool.end();
+    });
+    // Far from the real data: the summary is read for a made-up "today" in 2098.
+    const { rows } = await pool.query<{ id: number }>(
+      `INSERT INTO coding_problems (site, problem_key, title) VALUES ('other', $1, 'Summary') RETURNING id`,
+      [key],
+    );
+    const attempt = (date: string, result: string, minutes: number | null, language: string) =>
+      pool.query(
+        `INSERT INTO coding_attempts (problem_id, attempt_date, result, language, minutes, notes)
+         VALUES ($1, $2, $3, $4, $5, '')`,
+        [rows[0]!.id, date, result, language, minutes],
+      );
+    // 2098-06-03 is a Wednesday: the week starts on Sunday 2098-05-31.
+    await attempt('2098-06-03', 'solved', 20, 'Python');
+    await attempt('2098-06-03', 'failed', 10, 'C++');
+    await attempt('2098-06-02', 'solved', null, '');
+    await attempt('2098-05-30', 'solved', 5, 'Go');
+    const summary = await codingSummary(pool, '2098-06-03');
+    assert.deepEqual(summary.today, { attempts: 2, solved: 1, minutes: 30 });
+    assert.deepEqual(summary.week, { attempts: 3, solved: 2, minutes: 30 });
+    assert.equal(summary.streak, 2);
+    assert.equal(summary.lastLanguage, 'C++');
+  },
+);
