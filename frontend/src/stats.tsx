@@ -116,7 +116,10 @@ export function Stats() {
             <h2 className="m-0 mb-2 text-[13px] font-medium text-muted-foreground">
               Total study time
             </h2>
-            <p className="m-0 mb-1.5 text-[26px] font-semibold" data-metric-value>
+            <p
+              className="m-0 mb-1.5 text-[20px] font-semibold whitespace-nowrap sm:text-[26px]"
+              data-metric-value
+            >
               {formatMinutes(stats.cumulativeMinutes)}
             </p>
             <p className="status m-0 text-[13px] [word-break:keep-all]">
@@ -126,14 +129,20 @@ export function Stats() {
           </article>
           <article className="card" data-metric>
             <h2 className="m-0 mb-2 text-[13px] font-medium text-muted-foreground">Today</h2>
-            <p className="m-0 mb-1.5 text-[26px] font-semibold" data-metric-value>
+            <p
+              className="m-0 mb-1.5 text-[20px] font-semibold whitespace-nowrap sm:text-[26px]"
+              data-metric-value
+            >
               {formatMinutes(stats.todayMinutes)}
             </p>
             <p className="status m-0 text-[13px] [word-break:keep-all]">{stats.to}</p>
           </article>
           <article className="card" data-metric>
             <h2 className="m-0 mb-2 text-[13px] font-medium text-muted-foreground">{label}</h2>
-            <p className="m-0 mb-1.5 text-[26px] font-semibold" data-metric-value>
+            <p
+              className="m-0 mb-1.5 text-[20px] font-semibold whitespace-nowrap sm:text-[26px]"
+              data-metric-value
+            >
               {formatMinutes(stats.totalMinutes)}
             </p>
             {/* Breaks only around "~", never inside a date. */}
@@ -149,7 +158,10 @@ export function Stats() {
             <h2 className="m-0 mb-2 text-[13px] font-medium text-muted-foreground">
               Daily average
             </h2>
-            <p className="m-0 mb-1.5 text-[26px] font-semibold" data-metric-value>
+            <p
+              className="m-0 mb-1.5 text-[20px] font-semibold whitespace-nowrap sm:text-[26px]"
+              data-metric-value
+            >
               {formatMinutes(stats.averageMinutesPerDay)}
             </p>
             <p className="status m-0 text-[13px] [word-break:keep-all]">Based on {label}</p>

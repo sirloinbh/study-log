@@ -186,6 +186,15 @@ test('the dashboard opens on this week with the four metric cards', async () => 
   );
 });
 
+test('metric values stay on one line and shrink on a phone (#436)', async () => {
+  await openStats();
+  const values = document.querySelectorAll('[data-metric-value]');
+  expect(values.length).toBeGreaterThan(0);
+  for (const value of values) {
+    expect(value).toHaveClass('whitespace-nowrap', 'text-[20px]', 'sm:text-[26px]');
+  }
+});
+
 test('picking a period asks for it and relabels the period card', async () => {
   const api = await openStats();
   pick('This month');

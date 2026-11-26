@@ -72,7 +72,10 @@ export function ReviewRateChart({ period }: { period: StatPeriod }) {
         <p className="status">No reviews were scheduled for {periodLabels[period].toLowerCase()}</p>
       ) : (
         <>
-          <p className="m-0 mb-1.5 text-[26px] font-semibold" data-metric-value>
+          <p
+            className="m-0 mb-1.5 text-[20px] font-semibold whitespace-nowrap sm:text-[26px]"
+            data-metric-value
+          >
             {stats.completionRate}%
           </p>
           <p className="status">
