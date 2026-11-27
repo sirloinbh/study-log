@@ -1,8 +1,8 @@
 import { Button } from './components/ui/button';
-import { Input } from './components/ui/input';
 import { NativeSelect } from './components/ui/native-select';
 import { ButtonSpinner } from './loading';
 import { Memo } from './memo';
+import { DateInput, TimeInput } from './picker-fields';
 import {
   crossesMidnight,
   formatMinutes,
@@ -44,37 +44,28 @@ export function StudyLogFormView({
   const idOf = (value: string) => (value === '' ? null : Number(value));
   return (
     <form className="log-form" onSubmit={onSubmit}>
-      <label>
-        Study date
-        <Input
-          id="study-log-date"
-          type="date"
-          required
-          disabled={busy}
-          value={form.studyDate}
-          onChange={(event) => onPatch({ studyDate: event.target.value })}
-        />
-      </label>
-      <label>
-        Start
-        <Input
-          type="time"
-          required
-          disabled={busy}
-          value={form.startTime}
-          onChange={(event) => onPatch({ startTime: event.target.value })}
-        />
-      </label>
-      <label>
-        End
-        <Input
-          type="time"
-          required
-          disabled={busy}
-          value={form.endTime}
-          onChange={(event) => onPatch({ endTime: event.target.value })}
-        />
-      </label>
+      <DateInput
+        text="Study date"
+        id="study-log-date"
+        required
+        disabled={busy}
+        value={form.studyDate}
+        onChange={(event) => onPatch({ studyDate: event.target.value })}
+      />
+      <TimeInput
+        text="Start"
+        required
+        disabled={busy}
+        value={form.startTime}
+        onChange={(event) => onPatch({ startTime: event.target.value })}
+      />
+      <TimeInput
+        text="End"
+        required
+        disabled={busy}
+        value={form.endTime}
+        onChange={(event) => onPatch({ endTime: event.target.value })}
+      />
       <label>
         Status
         <NativeSelect

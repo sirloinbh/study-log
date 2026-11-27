@@ -2,12 +2,12 @@ import React, { useCallback, useEffect, useState } from 'react';
 
 import { useBusy } from './busy';
 import { Button } from './components/ui/button';
-import { Input } from './components/ui/input';
 import { ExerciseReviewList } from './exercise-review-list';
 import type { RequestError } from './lib/api';
 import { apiKey, useApiMutation, useApiQuery } from './lib/query';
 import { ButtonSpinner, Loading } from './loading';
 import { Memo } from './memo';
+import { DateInput } from './picker-fields';
 import { plural } from './plural';
 import {
   type ExerciseReview,
@@ -291,19 +291,17 @@ export function Reviews({ onChange }: { onChange?: () => void }) {
                   {review.memo.trim() && <Memo text={review.memo} clamp />}
                   {editor?.id === review.id ? (
                     <form className="log-form" onSubmit={(event) => saveDate(event, review)}>
-                      <label className="half">
-                        New due date
-                        <Input
-                          id={dateInputId}
-                          type="date"
-                          required
-                          disabled={busy}
-                          value={editor.dueDate}
-                          onChange={(event) =>
-                            setEditor({ id: review.id, dueDate: event.target.value })
-                          }
-                        />
-                      </label>
+                      <DateInput
+                        text="New due date"
+                        className="half"
+                        id={dateInputId}
+                        required
+                        disabled={busy}
+                        value={editor.dueDate}
+                        onChange={(event) =>
+                          setEditor({ id: review.id, dueDate: event.target.value })
+                        }
+                      />
                       <div className="actions wide">
                         <Button
                           type="submit"

@@ -5,6 +5,7 @@ import { Combobox } from './components/ui/combobox';
 import { Input } from './components/ui/input';
 import { keywordLimits } from './keyword';
 import { ButtonSpinner } from './loading';
+import { DateInput } from './picker-fields';
 
 // The form for one keyword, used both to add a keyword and to edit one: a date, the keyword and a
 // memo, a submit button, and whatever other buttons the caller puts after it (`children`).
@@ -44,16 +45,13 @@ export function KeywordFormView({
 }) {
   return (
     <form className="log-form keyword-form" onSubmit={onSubmit}>
-      <label>
-        Date
-        <Input
-          type="date"
-          required
-          disabled={busy}
-          value={date}
-          onChange={(event) => onDate(event.target.value)}
-        />
-      </label>
+      <DateInput
+        text="Date"
+        required
+        disabled={busy}
+        value={date}
+        onChange={(event) => onDate(event.target.value)}
+      />
       <div className="keyword-field combo-field">
         <label htmlFor={keywordId}>Keyword</label>
         <Combobox

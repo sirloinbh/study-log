@@ -2,6 +2,7 @@ import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
 import { type Keyword, keywordLimits, type KeywordSearch } from './keyword';
 import { ButtonSpinner } from './loading';
+import { DateInput } from './picker-fields';
 
 // The search over all dates: a term and a date range, and the matches, each with a button that
 // opens its day. The parent runs the search.
@@ -39,27 +40,22 @@ export function KeywordSearchCard({
             onChange={onChange('q')}
           />
         </label>
-        <label className="half">
-          Start date
-          {/* The browser refuses a start after the end before asking the server. */}
-          <Input
-            type="date"
-            disabled={busy}
-            max={search.to || undefined}
-            value={search.from}
-            onChange={onChange('from')}
-          />
-        </label>
-        <label className="half">
-          End date
-          <Input
-            type="date"
-            disabled={busy}
-            min={search.from || undefined}
-            value={search.to}
-            onChange={onChange('to')}
-          />
-        </label>
+        <DateInput
+          text="Start date"
+          className="half"
+          disabled={busy}
+          max={search.to || undefined}
+          value={search.from}
+          onChange={onChange('from')}
+        />
+        <DateInput
+          text="End date"
+          className="half"
+          disabled={busy}
+          min={search.from || undefined}
+          value={search.to}
+          onChange={onChange('to')}
+        />
         <div className="actions wide">
           <Button type="submit" disabled={busy}>
             <ButtonSpinner when={action === 'search'} />

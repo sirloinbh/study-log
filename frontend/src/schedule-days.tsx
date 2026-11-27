@@ -1,6 +1,6 @@
 import { Button } from './components/ui/button';
-import { Input } from './components/ui/input';
 import { ButtonSpinner } from './loading';
+import { DateInput } from './picker-fields';
 import { dayLabel, type ScheduleDetail } from './schedule';
 import { formatMinutes } from './study-logs-data';
 import { contentLabel } from './textbook';
@@ -82,18 +82,15 @@ export function ScheduleDays({
                 onMove(moving);
               }}
             >
-              <label>
-                Move to
-                <Input
-                  type="date"
-                  id={`schedule-day-date-${item.id}`}
-                  required
-                  min={today}
-                  disabled={busy}
-                  value={moving.date}
-                  onChange={(event) => onChangeMove({ ...moving, date: event.target.value })}
-                />
-              </label>
+              <DateInput
+                text="Move to"
+                id={`schedule-day-date-${item.id}`}
+                required
+                min={today}
+                disabled={busy}
+                value={moving.date}
+                onChange={(event) => onChangeMove({ ...moving, date: event.target.value })}
+              />
               <label className="schedule-later">
                 <input
                   type="checkbox"
