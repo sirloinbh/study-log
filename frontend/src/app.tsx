@@ -1,3 +1,6 @@
+// Installs the English required-field messages once for every form (#462).
+import './validation-messages';
+
 import { QueryClientProvider } from '@tanstack/react-query';
 import {
   BookOpen,
