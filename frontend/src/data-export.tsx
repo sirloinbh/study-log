@@ -1,8 +1,8 @@
 import { useState } from 'react';
 
 import { buttonVariants } from './components/ui/button';
-import { Input } from './components/ui/input';
 import { exportPath } from './export-path';
+import { DateInput } from './picker-fields';
 
 const downloads = [
   { path: '/api/export/study-logs.csv', label: 'Download study logs (CSV)' },
@@ -26,14 +26,18 @@ export function DataExport() {
         of their period.
       </p>
       <div className="log-form">
-        <label className="half">
-          From
-          <Input type="date" value={from} onChange={(event) => setFrom(event.target.value)} />
-        </label>
-        <label className="half">
-          To
-          <Input type="date" value={to} onChange={(event) => setTo(event.target.value)} />
-        </label>
+        <DateInput
+          text="From"
+          className="half"
+          value={from}
+          onChange={(event) => setFrom(event.target.value)}
+        />
+        <DateInput
+          text="To"
+          className="half"
+          value={to}
+          onChange={(event) => setTo(event.target.value)}
+        />
         {invalid && (
           <p role="alert" className="error wide">
             The start date cannot be after the end date

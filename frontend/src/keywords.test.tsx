@@ -362,12 +362,19 @@ describe('keywords', () => {
     expect(api.requests.filter((r) => r.path.includes('q='))).toHaveLength(2);
   });
 
-  test('the search dates cannot cross', async () => {
+  test('the search dates cannot cross in the calendar', async () => {
     await openKeywords();
     fillIn(searchCard(), 'Start date', '2026-10-10');
     fillIn(searchCard(), 'End date', '2026-10-20');
-    expect(searchCard().getByLabelText('Start date')).toHaveAttribute('max', '2026-10-20');
-    expect(searchCard().getByLabelText('End date')).toHaveAttribute('min', '2026-10-10');
+    const day = (iso: string) =>
+      document.querySelector<HTMLButtonElement>(`button[data-day="${iso}"]`)!;
+    fireEvent.click(searchCard().getByRole('button', { name: 'Pick end date from a calendar' }));
+    expect(day('2026-10-09')).toBeDisabled();
+    expect(day('2026-10-10')).toBeEnabled();
+    fireEvent.keyDown(screen.getByRole('grid'), { key: 'Escape' });
+    fireEvent.click(searchCard().getByRole('button', { name: 'Pick start date from a calendar' }));
+    expect(day('2026-10-20')).toBeEnabled();
+    expect(day('2026-10-21')).toBeDisabled();
   });
 
   test('after an edit, a cancel or a delete the day heading takes focus', async () => {

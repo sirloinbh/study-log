@@ -8,6 +8,7 @@ import { NativeSelect } from './components/ui/native-select';
 import { apiKey, useApiQuery } from './lib/query';
 import { ButtonSpinner } from './loading';
 import { Memo } from './memo';
+import { DateInput } from './picker-fields';
 import {
   emptySearch,
   formatMinutes,
@@ -102,26 +103,20 @@ export function StudyLogSearch({
             onChange={change('q')}
           />
         </label>
-        <label>
-          Start date
-          <Input
-            type="date"
-            disabled={busy}
-            max={search.to || undefined}
-            value={search.from}
-            onChange={change('from')}
-          />
-        </label>
-        <label>
-          End date
-          <Input
-            type="date"
-            disabled={busy}
-            min={search.from || undefined}
-            value={search.to}
-            onChange={change('to')}
-          />
-        </label>
+        <DateInput
+          text="Start date"
+          disabled={busy}
+          max={search.to || undefined}
+          value={search.from}
+          onChange={change('from')}
+        />
+        <DateInput
+          text="End date"
+          disabled={busy}
+          min={search.from || undefined}
+          value={search.to}
+          onChange={change('to')}
+        />
         <label className="half">
           Textbook
           <NativeSelect disabled={busy} value={search.textbookId} onChange={change('textbookId')}>

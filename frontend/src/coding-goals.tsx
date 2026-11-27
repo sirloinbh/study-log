@@ -27,6 +27,7 @@ import { FileField } from './file-field';
 import { type RequestError, requestForm, requestJson } from './lib/api';
 import { apiKey, useApiQuery } from './lib/query';
 import { ButtonSpinner } from './loading';
+import { DateInput } from './picker-fields';
 
 export type Notice = { kind: 'status' | 'alert'; text: string } | undefined;
 const header = { 'x-requested-with': 'study-log' };
@@ -236,18 +237,15 @@ export function CodingGoals({
               ))}
             </NativeSelect>
           </label>
-          <label>
-            Target date for the whole list (optional)
-            <Input
-              type="date"
-              disabled={busy}
-              value={targetDate}
-              onChange={(event) => {
-                setTargetDate(event.target.value);
-                setPlan(undefined);
-              }}
-            />
-          </label>
+          <DateInput
+            text="Target date for the whole list (optional)"
+            disabled={busy}
+            value={targetDate}
+            onChange={(event) => {
+              setTargetDate(event.target.value);
+              setPlan(undefined);
+            }}
+          />
           <fieldset className="wide coding-columns">
             <legend>Which column holds what</legend>
             {goalFields.map((field) => (

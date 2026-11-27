@@ -5,6 +5,7 @@ import { Input } from './components/ui/input';
 import { NativeSelect } from './components/ui/native-select';
 import { apiKey, useApiQuery } from './lib/query';
 import { ButtonSpinner } from './loading';
+import { DateInput } from './picker-fields';
 import { defaultEnd, defaultHours, hoursToMinutes } from './schedule';
 import { contentLabel, type ContentNode, type Textbook } from './textbook';
 
@@ -129,28 +130,22 @@ export function ScheduleCreateForm({
             onChange={typed(setTitle)}
           />
         </label>
-        <label>
-          Start date
-          <Input
-            type="date"
-            required
-            min={today}
-            disabled={busy}
-            value={startDate}
-            onChange={typed(setStartDate)}
-          />
-        </label>
-        <label>
-          End date
-          <Input
-            type="date"
-            required
-            min={startDate}
-            disabled={busy}
-            value={endDate}
-            onChange={typed(setEndDate)}
-          />
-        </label>
+        <DateInput
+          text="Start date"
+          required
+          min={today}
+          disabled={busy}
+          value={startDate}
+          onChange={typed(setStartDate)}
+        />
+        <DateInput
+          text="End date"
+          required
+          min={startDate}
+          disabled={busy}
+          value={endDate}
+          onChange={typed(setEndDate)}
+        />
         <label>
           Weekdays (hours)
           <Input

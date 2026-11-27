@@ -58,6 +58,10 @@
 .log-form .combo-field {
   @apply grid gap-1.5 text-[13px] font-medium;
 }
+/* A date or time field with its text above it (picker-fields.tsx, #447). */
+.picker-field {
+  @apply grid gap-1.5 text-[13px] font-medium;
+}
 .log-form textarea {
   @apply w-full resize-y rounded-[calc(var(--radius)-2px)] border border-border bg-card px-2.5 py-[9px] text-foreground;
 }
@@ -267,7 +271,6 @@
 .schedule-rename label {
   @apply grid gap-1.5 text-[13px] font-medium;
 }
-.schedule-move input[type='date'],
 .schedule-rename input {
   @apply rounded-[calc(var(--radius)-2px)] border border-border bg-card px-2.5 py-[9px] text-foreground;
 }
@@ -365,6 +368,8 @@
     @apply grid-cols-2;
   }
   .log-form label:first-child,
+  .log-form .picker-field:first-child,
+  .log-form .picker-date,
   .log-form .combo-field:first-child,
   .keyword-form .keyword-field,
   .content-form .title {
@@ -378,6 +383,14 @@
   }
   .book-title {
     @apply min-h-11;
+  }
+}
+
+/* The date and time fields hold a button beside the text (#447): beside the menu a four-column form
+   leaves them under 60px between 761 and 960px, so those widths use two columns too. */
+@media (min-width: 761px) and (max-width: 960px) {
+  .log-form {
+    @apply grid-cols-2;
   }
 }
 

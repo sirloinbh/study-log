@@ -2,6 +2,7 @@ import { type AttemptDraft, codingLimits, type Result, resultLabels } from './co
 import { Checkbox } from './components/ui/checkbox';
 import { Input } from './components/ui/input';
 import { NativeSelect } from './components/ui/native-select';
+import { DateInput, TimeInput } from './picker-fields';
 
 // The fields of one attempt, shared by the new-problem form, the add-attempt form and the editor.
 // `idPrefix` keeps the ids of two forms on one screen apart. A study log can only be asked for
@@ -21,16 +22,13 @@ export function AttemptFields({
 }) {
   return (
     <>
-      <label>
-        Date
-        <Input
-          type="date"
-          required
-          disabled={busy}
-          value={draft.date}
-          onChange={(event) => onChange({ date: event.target.value })}
-        />
-      </label>
+      <DateInput
+        text="Date"
+        required
+        disabled={busy}
+        value={draft.date}
+        onChange={(event) => onChange({ date: event.target.value })}
+      />
       <label>
         Result
         <NativeSelect
@@ -85,15 +83,12 @@ export function AttemptFields({
             <label htmlFor={`${idPrefix}-log`}>Also record a study log</label>
           </div>
           {draft.logOn && (
-            <label>
-              Study log start time
-              <Input
-                type="time"
-                disabled={busy}
-                value={draft.startTime}
-                onChange={(event) => onChange({ startTime: event.target.value })}
-              />
-            </label>
+            <TimeInput
+              text="Study log start time"
+              disabled={busy}
+              value={draft.startTime}
+              onChange={(event) => onChange({ startTime: event.target.value })}
+            />
           )}
         </div>
       )}
