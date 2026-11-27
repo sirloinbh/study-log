@@ -130,12 +130,13 @@ const dateField = () => entry().getByLabelText<HTMLInputElement>('Date');
 const submitEntry = () => fireEvent.submit(regionEl('Keyword entry').querySelector('form')!);
 const submitSearch = () => fireEvent.submit(regionEl('Keyword search').querySelector('form')!);
 
-// Records the ids of focused elements (an id with no element never records anything).
+// Records the ids of focused elements. Only the screen's own focus targets have an id; a button that
+// gets its focus back after a request (#461) has none and is not a focus step of the screen.
 const recordFocus = () => {
   const focused: string[] = [];
   vi.spyOn(HTMLElement.prototype, 'focus').mockImplementation(function (this: HTMLElement) {
     // The dialog moves its own focus around; only the screen's focus steps are of interest.
-    if (!this.closest('[role="dialog"]')) focused.push(this.id);
+    if (this.id && !this.closest('[role="dialog"]')) focused.push(this.id);
   });
   return focused;
 };
