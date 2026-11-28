@@ -3606,57 +3606,6 @@
         }
       }
     },
-    "/api/flashcards": {
-      "get": {
-        "summary": "Keyword flashcards of a review day: keywords noted on the study dates of due reviews",
-        "parameters": [
-          {
-            "name": "date",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success"
-          },
-          "400": {
-            "description": "Input validation failed or a referenced item does not exist",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Sign-in required (no session from the shared sign-in)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too many requests to an external service",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/health": {
       "get": {
         "summary": "Check the server and database connection",
@@ -6785,87 +6734,6 @@
         }
       }
     },
-    "/api/flashcards/{keywordId}": {
-      "put": {
-        "summary": "Record whether a keyword was known on a day; answering again replaces it",
-        "parameters": [
-          {
-            "name": "keywordId",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "minimum": 1
-            }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/FlashcardAnswer"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "Success"
-          },
-          "400": {
-            "description": "Input validation failed or a referenced item does not exist",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Sign-in required (no session from the shared sign-in)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No target",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "Request size limit exceeded",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too many requests to an external service",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/reviews/{id}/due-date": {
       "put": {
         "summary": "Set the due date of an open review round",
@@ -7846,21 +7714,6 @@
         },
         "required": [
           "body"
-        ]
-      },
-      "FlashcardAnswer": {
-        "type": "object",
-        "properties": {
-          "date": {
-            "type": "string",
-            "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
-          },
-          "known": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "known"
         ]
       },
       "Retrospective": {

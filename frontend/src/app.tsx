@@ -10,7 +10,6 @@ import {
   CircleX,
   Code,
   Grid3x3,
-  Layers,
   NotebookPen,
   NotebookText,
   Rows3,
@@ -26,7 +25,6 @@ import { AppShell, type NavItem } from './components/layout/app-shell';
 import { Toaster } from './components/ui/sonner';
 import { DataExport } from './data-export';
 import { useServiceDate } from './date';
-import { Flashcards } from './flashcards';
 import { type Health, healthText, useHealth } from './health';
 import { Keywords } from './keywords';
 import { createQueryClient } from './lib/query';
@@ -51,7 +49,6 @@ const pages = {
   reviews: '/reviews',
   textbooks: '/textbooks',
   keywords: '/keywords',
-  flashcards: '/flashcards',
   wrongExercises: '/wrong-exercises',
   coding: '/coding',
   retrospectives: '/retrospectives',
@@ -69,7 +66,6 @@ const nav: NavItem[] = [
   { to: pages.reviews, label: 'Reviews', icon: CalendarCheck },
   { to: pages.textbooks, label: 'Textbooks', icon: BookOpen },
   { to: pages.keywords, label: 'Keywords', icon: Tags },
-  { to: pages.flashcards, label: 'Flashcards', icon: Layers },
   { to: pages.wrongExercises, label: 'Wrong problems', icon: CircleX },
   { to: pages.coding, label: 'Coding', icon: Code },
   { to: pages.retrospectives, label: 'Retrospectives', icon: NotebookText },
@@ -221,19 +217,6 @@ function AppBody() {
                   today={today}
                 >
                   {(today) => <Keywords today={today} />}
-                </Page>
-              }
-            />
-            <Route
-              path={pages.flashcards}
-              element={
-                <Page
-                  title="Flashcards"
-                  description="Quiz yourself on the keywords of the study days whose review is due"
-                  health={health}
-                  today={today}
-                >
-                  {(today) => <Flashcards today={today} />}
                 </Page>
               }
             />
