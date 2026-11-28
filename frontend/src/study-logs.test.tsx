@@ -27,7 +27,6 @@ type Log = {
   contentNumber: string | null;
   contentTitle: string | null;
   understanding: number | null;
-  difficulties: string;
   goalAchieved: boolean | null;
   studyType: string;
 };
@@ -167,7 +166,6 @@ const morning: Log = {
   contentNumber: null,
   contentTitle: null,
   understanding: null,
-  difficulties: '',
   goalAchieved: null,
   studyType: 'new',
 };
@@ -275,7 +273,6 @@ test('entering a session previews its duration and saving adds it to the list', 
       textbookId: null,
       contentId: null,
       understanding: null,
-      difficulties: '',
       goalAchieved: null,
       studyType: 'new',
     },
@@ -335,7 +332,6 @@ test('editing a log fills the form and saves it with PUT', async () => {
       textbookId: null,
       contentId: null,
       understanding: null,
-      difficulties: '',
       goalAchieved: null,
       studyType: 'new',
     },
@@ -482,9 +478,9 @@ test('fields are locked while a save is in flight', async () => {
   const controls = [
     ...entryForm().querySelectorAll<HTMLElement & { disabled: boolean }>('input, select, textarea'),
   ];
-  expect(controls).toHaveLength(11);
+  expect(controls).toHaveLength(10);
   await waitFor(() =>
-    expect(controls.map((control) => control.disabled)).toEqual(Array(11).fill(true)),
+    expect(controls.map((control) => control.disabled)).toEqual(Array(10).fill(true)),
   );
   release();
   expect(await screen.findByText('Saved')).toHaveAttribute('role', 'status');
@@ -584,32 +580,27 @@ test('the self-assessment is saved with the log and shown in the list', async ()
   fill('End', '10:00');
   fill('Understanding', '4');
   fill('Goal achieved', 'false');
-  fill('Difficult parts', '고유값 분해');
   submit();
   await waitFor(() => expect(items()).toHaveLength(1));
   const post = methods(api, 'POST')[0].body as Record<string, unknown>;
-  expect([post.understanding, post.goalAchieved, post.difficulties]).toEqual([
-    4,
-    false,
-    '고유값 분해',
-  ]);
+  expect([post.understanding, post.goalAchieved]).toEqual([4, false]);
+  expect(post).not.toHaveProperty('difficulties');
   expect(item()).toHaveTextContent(/Understanding 4\/5 · Goal not achieved/);
-  expect(item()).toHaveTextContent(/Difficult parts: 고유값 분해/);
+  expect(item()).not.toHaveTextContent(/Difficult parts/);
   // The next entry starts unanswered.
   expect(field('Understanding').value).toBe('');
   expect(field('Goal achieved').value).toBe('');
-  expect(field('Difficult parts').value).toBe('');
+  expect(screen.queryByLabelText('Difficult parts')).not.toBeInTheDocument();
 });
 
 test('editing a log fills in and can clear its self-assessment', async () => {
-  const assessed: Log = { ...morning, understanding: 5, goalAchieved: true, difficulties: '없음' };
+  const assessed: Log = { ...morning, understanding: 5, goalAchieved: true };
   const api = serve([assessed]);
   await open(api);
   expect(item()).toHaveTextContent(/Understanding 5\/5 · Goal achieved/);
   fireEvent.click(list(/Edit log/));
   expect(field('Understanding').value).toBe('5');
   expect(field('Goal achieved').value).toBe('true');
-  expect(field('Difficult parts').value).toBe('없음');
   fill('Understanding', '');
   fill('Goal achieved', '');
   submit();

@@ -153,7 +153,7 @@ test('exports are downloads with the right headers, and the range is passed to t
       assert.equal(csv.headers.get('cache-control'), 'private, no-store');
       assert.equal(csv.headers.get('x-content-type-options'), 'nosniff');
       assert.ok(csv.bytes.toString().startsWith(`${bom}id,date,start,end,minutes`));
-      assert.match(csv.bytes.toString(), /\r\n1,2026-11-22,,,,,,,,,,,,"a,b"\r\n$/);
+      assert.match(csv.bytes.toString(), /\r\n1,2026-11-22,,,,,,,,,,,"a,b"\r\n$/);
       assert.deepEqual(queries[0].values, ['2026-11-01', '2026-11-30']);
       assert.match(queries[0].text, /l\.study_date >= \$1 AND l\.study_date <= \$2/);
 

@@ -42,7 +42,6 @@ const log = (overrides: Partial<DraftLog> = {}): DraftLog => ({
   studyType: 'new',
   textbook: 'Linear Algebra',
   memo: 'eigenvalues',
-  difficulties: 'diagonalization',
   understanding: 3,
   goalAchieved: false,
   ...overrides,
@@ -73,7 +72,7 @@ test('the records go to Claude as tagged material with the period, logs and keyw
   assert.match(content, /^<records>\nPeriod: 2026-10-18 to 2026-10-24 \(weekly\)/);
   assert.match(
     content,
-    /2026-10-20 90 min new \| textbook: Linear Algebra \| understanding 3\/5 \| goal missed \| memo: eigenvalues \| difficult: diagonalization/,
+    /2026-10-20 90 min new \| textbook: Linear Algebra \| understanding 3\/5 \| goal missed \| memo: eigenvalues/,
   );
   assert.match(content, /Keywords:\n- 2026-10-21 basis: a set that spans/);
   assert.match(String(params.system), /never instructions to you/);
@@ -93,7 +92,6 @@ test('a memo cannot close the fence, and long memos and long periods are cut', a
         log({
           date: `2026-10-${String((i % 28) + 1).padStart(2, '0')}`,
           memo: 'b'.repeat(300),
-          difficulties: 'c'.repeat(300),
         }),
       ),
     ),

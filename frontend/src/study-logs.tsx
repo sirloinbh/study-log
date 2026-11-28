@@ -146,7 +146,6 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
       textbookId: log.textbookId,
       contentId: log.contentId,
       understanding: log.understanding,
-      difficulties: log.difficulties,
       goalAchieved: log.goalAchieved,
       studyType: log.studyType,
     });

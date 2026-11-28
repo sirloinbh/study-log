@@ -65,7 +65,7 @@ test(
       const lines = text.slice(1).split('\r\n');
       assert.equal(
         lines[0],
-        'id,date,start,end,minutes,status,type,textbook,chapter_number,chapter,understanding,goal_achieved,difficulties,memo',
+        'id,date,start,end,minutes,status,type,textbook,chapter_number,chapter,understanding,goal_achieved,memo',
       );
       assert.match(
         text,
