@@ -1,10 +1,9 @@
 import { Router } from 'express';
-import type { Pool, PoolClient } from 'pg';
+import type { Pool } from 'pg';
 import { z } from 'zod/v4';
 
 import { calendarDate } from './dates.js';
 import { inSnapshot } from './sql.js';
-import { studyTypes } from './study-logs.js';
 
 export const statPeriods = ['week', 'month', '3months', 'all'] as const;
 export type StatPeriod = (typeof statPeriods)[number];
@@ -20,14 +19,6 @@ const textbookIdParam = z
   .regex(/^[1-9]\d{0,14}$/, 'Invalid textbook ID')
   .transform(Number)
   .optional();
-
-// Study time can be narrowed to one kind of study (#52) and to the logs of one textbook (#180).
-export const studyTimeQuery = statsPeriodQuery.extend({
-  type: z
-    .enum(['all', ...studyTypes], { error: 'The study type must be all, new, or review' })
-    .default('all'),
-  textbookId: textbookIdParam,
-});
 
 // Calendar arithmetic on YYYY-MM-DD strings in UTC, so no local time zone shifts a day.
 const toDate = (day: string) => new Date(`${day}T00:00:00Z`);
@@ -65,19 +56,6 @@ export function periodStart(period: StatPeriod, today: string, firstLog?: string
   return addDays(toDay(back), 1);
 }
 
-type Day = { date: string; minutes: number };
-
-// Sums of the daily series by week (keyed by its Sunday) and by month (YYYY-MM), in order. The
-// first and last buckets may cover only part of their week or month.
-export function bucket(daily: Day[], keyOf: (date: string) => string) {
-  const sums = new Map<string, number>();
-  for (const { date, minutes } of daily) {
-    const key = keyOf(date);
-    sums.set(key, (sums.get(key) ?? 0) + minutes);
-  }
-  return [...sums].map(([key, minutes]) => ({ key, minutes }));
-}
-
 export const finishedContentsQuery = statsPeriodQuery.extend({ textbookId: textbookIdParam });
 
 type FinishedDay = { date: string; chapters: number; sections: number };
@@ -113,27 +91,6 @@ export function bucketFinished(daily: FinishedDay[], keyOf: (date: string) => st
 
 // Planned sessions have not been studied yet, so they do not count; later dates neither.
 export const counted = `status <> 'planned' AND study_date <= $1`;
-
-// Minutes studied on every day from `from` to `to`, a day without study as 0; only one kind of
-// study when `studyType` is given, and only one textbook's logs when `textbookId` is.
-const dailyMinutes = async (
-  pool: Pick<Pool | PoolClient, 'query'>,
-  from: string,
-  to: string,
-  studyType: string | null = null,
-  textbookId: number | null = null,
-) =>
-  (
-    await pool.query<Day>(
-      `SELECT day::date AS date, COALESCE(sum(l.duration_minutes), 0)::int AS minutes
-       FROM generate_series($2::date, $1::date, interval '1 day') AS day
-       LEFT JOIN study_logs l ON l.study_date = day::date AND l.status <> 'planned'
-         AND ($3::text IS NULL OR l.study_type = $3)
-         AND ($4::bigint IS NULL OR l.textbook_id = $4)
-       GROUP BY day ORDER BY day`,
-      [to, from, studyType, textbookId],
-    )
-  ).rows;
 
 // The heatmap's weeks (#50): this week and the 52 before it, each from Sunday.
 export const heatmapWeeks = 53;
@@ -200,58 +157,9 @@ export const textbookQuery = z.object({ textbookId: textbookIdParam });
 export const percentDown = (part: number, whole: number) =>
   whole ? Math.floor((part * 100) / whole) : null;
 
-// Study time statistics (#47):
-// /api/stats/study-time?period=week|month|3months|all&type=all|new|review&textbookId=
+// Statistics: finished chapters and sections (#480, #481), reviews (#46), textbooks (#51), patterns (#20).
 export function statsRoutes(pool: Pool, today: () => string) {
   const router = Router();
-
-  router.get('/study-time', async (req, res) => {
-    const { period, type, textbookId } = studyTimeQuery.parse(req.query);
-    const studyType = type === 'all' ? null : type;
-    const bookId = textbookId ?? null;
-    const to = today();
-    const result = await inSnapshot(pool, async (db) => {
-      // A book with no logs shows zeros; one that does not exist is not that.
-      if (bookId !== null) {
-        const book = await db.query('SELECT 1 FROM textbooks WHERE id = $1', [bookId]);
-        if (!book.rowCount) return null;
-      }
-      const totals = await db.query<{ first: string | null; cumulative: number }>(
-        `SELECT min(study_date) AS first, COALESCE(sum(duration_minutes), 0)::int AS cumulative
-         FROM study_logs WHERE ${counted} AND ($2::text IS NULL OR study_type = $2)
-           AND ($3::bigint IS NULL OR textbook_id = $3)`,
-        [to, studyType, bookId],
-      );
-      const { first, cumulative } = totals.rows[0];
-      const from = periodStart(period, to, first ?? undefined);
-      return { from, cumulative, daily: await dailyMinutes(db, from, to, studyType, bookId) };
-    });
-    if (!result) return void res.status(404).json({ error: 'Textbook not found' });
-    const { from, cumulative, daily } = result;
-    const totalMinutes = daily.reduce((sum, day) => sum + day.minutes, 0);
-    const studyDays = daily.filter((day) => day.minutes > 0).length;
-    res.json({
-      period,
-      type,
-      textbookId: bookId,
-      from,
-      to,
-      totalMinutes,
-      todayMinutes: daily.at(-1)?.minutes ?? 0,
-      cumulativeMinutes: cumulative,
-      days: daily.length,
-      studyDays,
-      // Over every day of the period, studied or not; and over the studied days only.
-      averageMinutesPerDay: Math.round(totalMinutes / daily.length),
-      averageMinutesPerStudyDay: studyDays ? Math.round(totalMinutes / studyDays) : 0,
-      daily,
-      weekly: bucket(daily, weekStart).map(({ key, minutes }) => ({ weekStart: key, minutes })),
-      monthly: bucket(daily, (date) => date.slice(0, 7)).map(({ key, minutes }) => ({
-        month: key,
-        minutes,
-      })),
-    });
-  });
 
   // Chapters and sections finished (#480): /api/stats/finished-contents?period=&textbookId=
   // A top-level entry of a textbook is a chapter; any entry below one is a section. An entry counts
@@ -343,13 +251,6 @@ export function statsRoutes(pool: Pool, today: () => string) {
       [todayDate, from, to],
     );
     res.json({ from, to, daily: finishedPerDay(rows, from, to) });
-  });
-
-  // Every day of the heatmap's weeks up to today (#50): /api/stats/heatmap
-  router.get('/heatmap', async (_req, res) => {
-    const to = today();
-    const from = heatmapStart(to);
-    res.json({ from, to, daily: await dailyMinutes(pool, from, to) });
   });
 
   // How well reviews were kept (#46, docs/decisions/review-rules.md section 5): /api/stats/reviews?period=

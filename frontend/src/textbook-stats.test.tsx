@@ -1,7 +1,7 @@
 import { act, fireEvent, screen, within } from '@testing-library/react';
 import { expect, test } from 'vitest';
 
-import { chapterPercent, type TextbookStats as Stats, textbookStatsPath } from './study-stats';
+import { type TextbookStats as Stats, textbookStatsPath } from './study-stats';
 import { fakeApi } from './test/fake-api';
 import { render } from './test/render';
 import { TextbookStats } from './textbook-stats';
@@ -50,12 +50,9 @@ const server = () => {
 };
 const card = () => within(screen.getByRole('region', { name: 'Textbooks and schedules' }));
 
-test('the path names the book, and a percent of chapters rounds down', () => {
+test('the path names the book', () => {
   expect(textbookStatsPath('')).toBe('/api/stats/textbooks');
   expect(textbookStatsPath('7')).toBe('/api/stats/textbooks?textbookId=7');
-  expect(chapterPercent({ completedChapters: 1, totalChapters: 3 })).toBe(33);
-  expect(chapterPercent({ completedChapters: 2, totalChapters: 3 })).toBe(66);
-  expect(chapterPercent({ completedChapters: 0, totalChapters: 0 })).toBe(0);
 });
 
 test('sections finished per book and how schedules were kept are shown', async () => {

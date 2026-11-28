@@ -186,7 +186,7 @@ test('a missing value and a value of the wrong type keep their own messages (#15
     ],
     [
       'GET',
-      '/api/stats/study-time?period=day',
+      '/api/stats/finished-contents?period=day',
       undefined,
       'The period must be this week, this month, last 3 months, or all',
     ],

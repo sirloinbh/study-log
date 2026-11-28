@@ -25,9 +25,6 @@ test('an unknown study type is an English 400 before touching the DB', async () 
       assert.equal(status, 400, String(studyType));
       assert.match(String(data.error), /The study type must be new or review/);
     }
-    const stats = await call('/api/stats/study-time?type=exam');
-    assert.equal(stats.status, 400);
-    assert.match(String(stats.data.error), /The study type must be all, new, or review/);
   });
 });
 

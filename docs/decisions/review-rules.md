@@ -63,7 +63,7 @@ User decision (#46, 2026-11-01):
 
 Detailed rules:
 
-- The periods are the same as the study time statistics: this week, this month, the last 3 months, and all time, and the end is today. Rounds scheduled for the future are not counted.
+- The periods are the same as the finished-entries statistics on the dashboard: this week, this month, the last 3 months, and all time, and the end is today. Rounds scheduled for the future are not counted.
 - An incomplete round whose original due date is today is included in due but is not late yet.
 - The completion rate is rounded to a whole percent.
 - A round completed earlier than due still belongs to the period of its original due date.
@@ -71,14 +71,13 @@ Detailed rules:
 
 ## 6. Study type
 
-User decision (#52, 2026-11-01): **When you write a study record, pick between new and review yourself.** The default is new, and all existing records start as new. The filter applies to the study time metrics and charts on the statistics screen.
+User decision (#52, 2026-11-01): **When you write a study record, pick between new and review yourself.** The default is new, and all existing records start as new. Since #481 the statistics screen counts finished chapters and sections, which have no type, so it has no type filter.
 
 Detailed rules:
 
-- The type is a mark that splits study time. Completing a review round does not create a study record, and saving a record whose type is review does not complete a round.
+- The type is a mark on the record. Completing a review round does not create a study record, and saving a record whose type is review does not complete a round.
 - A record whose type is review also creates review round 1 when it is completed, as in chapter 1.
-- When you pick a filter, even the total study time is calculated for that type. The review completion rate and the heatmap are independent of the filter.
-- The start of the all-time period is the first record date of the chosen type. So the daily average for all time can divide by a different number of days for each type. The card shows the period too.
+- The review completion rate is independent of the record type.
 
 ## 7. Reviews of exercises I got wrong
 

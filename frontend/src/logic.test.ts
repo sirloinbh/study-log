@@ -2,16 +2,7 @@ import { describe, expect, test } from 'vitest';
 
 import { calendarCells, monthTitle, shiftMonth, shortMinutes } from './month-calendar';
 import { outlineText, pageText } from './pdf-toc';
-import {
-  barWidth,
-  busiestBar,
-  chartBars,
-  heatLevel,
-  heatWeeks,
-  hourLabel,
-  monthLabel,
-  type StudyTimeStats,
-} from './study-stats';
+import { barWidth, heatWeeks, hourLabel, monthLabel } from './study-stats';
 import { parseToc, tocLimits, tocProblems, tocTree } from './toc';
 
 describe('month-calendar', () => {
@@ -120,44 +111,17 @@ describe('pdf-toc', () => {
 });
 
 describe('study-stats', () => {
-  test('heat levels keep fixed bands', () => {
-    expect([0, 1, 29, 30, 59, 60, 119, 120].map(heatLevel)).toEqual([0, 1, 1, 2, 2, 3, 3, 4]);
-  });
-
   test('days become week columns of seven, the rest of this week empty', () => {
     const daily = Array.from({ length: 9 }, (_, i) => ({
       date: `2026-09-${String(20 + i)}`,
-      minutes: 0,
+      chapters: 0,
+      sections: 0,
     }));
     const weeks = heatWeeks(daily);
     expect(weeks.map((week) => week.length)).toEqual([7, 7]);
     expect(weeks[1].slice(2)).toEqual([null, null, null, null, null]);
-    expect(monthLabel([{ date: '2026-10-01', minutes: 0 }, null])).toBe('Oct');
-    expect(monthLabel([{ date: '2026-10-02', minutes: 0 }, null])).toBe('');
-  });
-
-  const stats = {
-    daily: [
-      { date: '2026-10-19', minutes: 0 },
-      { date: '2026-10-20', minutes: 90 },
-    ],
-    weekly: [{ weekStart: '2026-10-18', minutes: 90 }],
-    monthly: [{ month: '2026-10', minutes: 90 }],
-  } as StudyTimeStats;
-
-  test('chart bars are labelled for their unit', () => {
-    expect(chartBars(stats, 'day').map((bar) => [bar.label, bar.hours])).toEqual([
-      ['10/19', 0],
-      ['10/20', 1.5],
-    ]);
-    expect(chartBars(stats, 'week')[0].label).toBe('10/18~');
-    expect(chartBars(stats, 'month')[0].label).toBe('26.10');
-  });
-
-  test('the busiest bar is the earliest on a tie, none without study', () => {
-    const [empty, full] = chartBars(stats, 'day');
-    expect(busiestBar([empty, full, { ...full, key: 'later' }])).toBe(full);
-    expect(busiestBar([empty])).toBeUndefined();
+    expect(monthLabel([{ date: '2026-10-01' }, null])).toBe('Oct');
+    expect(monthLabel([{ date: '2026-10-02' }, null])).toBe('');
   });
 
   test('small labels and bar widths', () => {

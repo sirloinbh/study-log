@@ -168,7 +168,7 @@ function AppBody() {
               element={
                 <Page
                   title="12 weeks"
-                  description="Compare the study time of the last 12 weeks"
+                  description="Compare the chapters and sections finished in the last 12 weeks"
                   health={health}
                   today={today}
                 >
@@ -233,7 +233,7 @@ function AppBody() {
               element={
                 <Page
                   title="Dashboard"
-                  description="See study time by period and the daily average at a glance"
+                  description="See the chapters and sections finished by period, and today's goal, at a glance"
                   health={health}
                   today={today}
                 >
