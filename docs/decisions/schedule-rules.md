@@ -10,7 +10,7 @@ User decision: **Edit it for each schedule.**
 
 Detailed rules:
 
-- The schedule creation screen is pre-filled with 2 hours for weekdays and 5 hours for weekends and holidays.
+- The schedule creation screen is pre-filled with 2 hours for weekdays, weekends and holidays alike (#479: the daily study goal is 2 hours every day). The two amounts stay editable for each schedule.
 - The amount you enter is saved with that schedule. Do not create a separate global setting.
 - The amount is 0 to 24 hours per day. If the target time for the whole period is 0 after holidays are determined, that is, if no day gets an item, reject the creation.
 - Do not create items on the kind of day whose amount is 0. For example, if you set weekdays to 0, items are created only on weekends and holidays.
