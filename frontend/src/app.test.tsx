@@ -55,8 +55,6 @@ test('each page has its own address and is marked in the main menu', async () =>
   render(<App />);
   const menu = screen.getByRole('navigation', { name: 'Main menu' });
   for (const [label, path] of [
-    ['Week', '/week'],
-    ['12 weeks', '/twelve-weeks'],
     ['Schedules', '/schedules'],
     ['Reviews', '/reviews'],
     ['Textbooks', '/textbooks'],
@@ -136,14 +134,16 @@ test('an unknown address falls back to the study log', async () => {
   expect(window.location.pathname).toBe('/');
 });
 
-test('the menu lists the day log, History, Week, 12 weeks, the other pages, Dashboard, and Settings last', () => {
+test('the menu has no Week or 12 weeks item: the day log, History, the other pages, Dashboard, and Settings last', () => {
   server({ body: { today: '2026-10-26' } });
   render(<App />);
   const menu = screen.getByRole('navigation', { name: 'Main menu' });
   const labels = within(menu)
     .getAllByRole('link')
     .map((link) => link.textContent?.trim());
-  expect(labels.slice(0, 4)).toEqual(['Study log', 'History', 'Week', '12 weeks']);
+  expect(labels.slice(0, 3)).toEqual(['Study log', 'History', 'Schedules']);
+  expect(labels).not.toContain('Week');
+  expect(labels).not.toContain('12 weeks');
   expect(labels).toContain('Algorithms');
   expect(labels.slice(-2)).toEqual(['Dashboard', 'Settings']);
 });
@@ -219,4 +219,18 @@ test('every menu entry has its own icon', () => {
     );
   expect(icons.every(Boolean)).toBe(true);
   expect(new Set(icons).size).toBe(icons.length);
+});
+
+test('the old Week and 12-week addresses open the Dashboard on that view (#504)', async () => {
+  server({ body: { today: '2026-10-26' } });
+  window.history.pushState({}, '', '/week');
+  const { unmount } = render(<App />);
+  expect(await screen.findByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument();
+  expect(window.location.pathname + window.location.search).toBe('/dashboard?view=week');
+  expect(screen.getByRole('radio', { name: 'Week' })).toBeChecked();
+  unmount();
+  window.history.pushState({}, '', '/twelve-weeks');
+  render(<App />);
+  expect(await screen.findByRole('radio', { name: '12 weeks' })).toBeChecked();
+  expect(window.location.search).toBe('?view=12weeks');
 });

@@ -8,11 +8,9 @@ import {
   CalendarDays,
   ChartColumn,
   Code,
-  Grid3x3,
   History as HistoryIcon,
   NotebookPen,
   NotebookText,
-  Rows3,
   Settings2,
 } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
@@ -22,6 +20,7 @@ import { CalendarSync } from './calendar-sync';
 import { CodingProblems } from './coding-problems';
 import { AppShell, type NavItem } from './components/layout/app-shell';
 import { Toaster } from './components/ui/sonner';
+import { DashboardPage } from './dashboard-page';
 import { DataExport } from './data-export';
 import { useServiceDate } from './date';
 import { type Health, healthText, useHealth } from './health';
@@ -31,18 +30,13 @@ import { ReviewBadge } from './review-badge';
 import { Reviews } from './reviews';
 import { Schedules } from './schedules';
 import { AccountActions, SignInGate } from './sign-in';
-import { Stats } from './stats';
 import { StudyHistoryPage, StudyLogPage } from './study-log-pages';
 import { Textbooks } from './textbooks';
-import { TwelveWeekView } from './twelve-week-view';
-import { WeekView } from './week-view';
 
 // Every page URL lives here (central docs/directory-rules.md). The study log is the start page.
 const pages = {
   logs: '/',
   history: '/history',
-  week: '/week',
-  twelveWeeks: '/twelve-weeks',
   schedules: '/schedules',
   reviews: '/reviews',
   textbooks: '/textbooks',
@@ -53,12 +47,11 @@ const pages = {
 } as const;
 
 // Main menu (LNB) items, in display order (central menu rule, sirloinbh/project-standards#1128):
-// the day log, Week, 12 weeks, the app's other pages, Dashboard, Settings last.
+// the day log, the app's other pages, Dashboard, Settings last. The week and 12-week views are
+// part of the Dashboard (#504).
 const nav: NavItem[] = [
   { to: pages.logs, label: 'Study log', icon: NotebookPen },
   { to: pages.history, label: 'History', icon: HistoryIcon },
-  { to: pages.week, label: 'Week', icon: Rows3 },
-  { to: pages.twelveWeeks, label: '12 weeks', icon: Grid3x3 },
   { to: pages.schedules, label: 'Schedules', icon: CalendarDays },
   { to: pages.reviews, label: 'Reviews', icon: CalendarCheck },
   { to: pages.textbooks, label: 'Textbooks', icon: BookOpen },
@@ -151,30 +144,12 @@ function AppBody() {
               }
             />
             <Route
-              path={pages.week}
-              element={
-                <Page
-                  title="Week"
-                  description="See each day of a week: the time studied and the sessions"
-                  health={health}
-                  today={today}
-                >
-                  {(today) => <WeekView today={today} />}
-                </Page>
-              }
+              path="/week"
+              element={<Navigate to={`${pages.dashboard}?view=week`} replace />}
             />
             <Route
-              path={pages.twelveWeeks}
-              element={
-                <Page
-                  title="12 weeks"
-                  description="Compare the study time of the last 12 weeks"
-                  health={health}
-                  today={today}
-                >
-                  {(today) => <TwelveWeekView today={today} />}
-                </Page>
-              }
+              path="/twelve-weeks"
+              element={<Navigate to={`${pages.dashboard}?view=12weeks`} replace />}
             />
             <Route
               path={pages.schedules}
@@ -237,7 +212,7 @@ function AppBody() {
                   health={health}
                   today={today}
                 >
-                  {() => <Stats />}
+                  {(today) => <DashboardPage today={today} />}
                 </Page>
               }
             />
