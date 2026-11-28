@@ -64,12 +64,10 @@ const backgroundAnswers: Record<string, Answer> = {
   '/api/coding/goals/today': { body: { date: '', lists: [] } },
   '/api/stats/goal': {
     body: {
-      weekStart: '2026-10-18',
-      weekEnd: '2026-10-24',
-      goalMinutes: null,
-      goalSince: null,
+      date: '2026-10-18',
+      goalMinutes: 120,
       studiedMinutes: 0,
-      achievementRate: null,
+      achievementRate: 0,
       streakDays: 0,
       studiedToday: false,
     },
