@@ -14,7 +14,7 @@ The user does not want the Keywords feature. Part of epic #468.
 
 ## Data decision
 
-The user decided to drop old data of removed features (D1). `database/migrations/040_drop_keywords.sql` drops `keywords` (`keyword_cards` went in 038). No old migration was edited.
+The user decided to drop old data of removed features (D1). `database/migrations/041_drop_keywords.sql` drops `keywords` (`keyword_cards` went in 038). No old migration was edited.
 
 ## Verification
 
