@@ -224,7 +224,7 @@ describe('quick log with goal lists', () => {
   });
 });
 
-describe('algorithm goals in the day log', () => {
+describe('algorithm goals on the Algorithms page', () => {
   const day = (lists: unknown[]) => ({
     '/api/coding/goals/today': { body: { date: '2026-11-26', lists } },
   });
@@ -247,6 +247,37 @@ describe('algorithm goals in the day log', () => {
     expect(card.textContent).toContain('Solved today: Problem 1');
     expect(card.textContent).toContain('Next: Problem 3 (1003)');
     expect(card.textContent).toContain('Still to do today: Problem 2');
+  });
+
+  test('the Algorithms page shows the goal block above the quick log (#477)', async () => {
+    fakeApi(({ path, method }: Sent): Answer | undefined => {
+      if (path.startsWith('/api/coding/goals/today'))
+        return {
+          body: {
+            date: '2026-11-26',
+            lists: [
+              { id: 1, name: 'Baekjoon 500', planned: [items[0]], solved: [], next: [items[2]] },
+            ],
+          },
+        };
+      if (path === '/api/coding/summary')
+        return {
+          body: {
+            today: { attempts: 0, solved: 0, minutes: 0 },
+            week: { attempts: 0, solved: 0, minutes: 0 },
+            streak: 0,
+            lastLanguage: 'Python',
+          },
+        };
+      if (path === '/api/coding/goals') return { body: { lists: [] } };
+      if (path.split('?')[0] === '/api/coding/problems' && method === 'GET')
+        return { body: { problems: [] } };
+      return undefined;
+    });
+    render(<CodingProblems today="2026-11-26" />);
+    const card = await screen.findByLabelText('Algorithm goals today');
+    const quick = await screen.findByRole('region', { name: 'Log a solve' });
+    expect(card.compareDocumentPosition(quick) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   test('shows nothing without a goal list', async () => {

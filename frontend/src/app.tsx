@@ -71,7 +71,7 @@ const nav: NavItem[] = [
   { to: pages.keywords, label: 'Keywords', icon: Tags },
   { to: pages.flashcards, label: 'Flashcards', icon: Layers },
   { to: pages.wrongExercises, label: 'Wrong problems', icon: CircleX },
-  { to: pages.coding, label: 'Coding', icon: Code },
+  { to: pages.coding, label: 'Algorithms', icon: Code },
   { to: pages.retrospectives, label: 'Retrospectives', icon: NotebookText },
   { to: pages.dashboard, label: 'Dashboard', icon: ChartColumn },
   { to: pages.settings, label: 'Settings', icon: Settings2 },
@@ -241,8 +241,8 @@ function AppBody() {
               path={pages.coding}
               element={
                 <Page
-                  title="Coding"
-                  description="Record the coding problems you solve and every attempt at them"
+                  title="Algorithms"
+                  description="Record the algorithm problems you solve and every attempt at them"
                   health={health}
                   today={today}
                 >

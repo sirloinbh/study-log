@@ -40,8 +40,6 @@ describe('study logs', () => {
     let logs = start;
     return fakeApi(({ method, path, body }) => {
       if (path.startsWith('/api/textbooks')) return { body: { textbooks: [] } };
-      // The algorithm goals card of the day log (#426): no goal list.
-      if (path.startsWith('/api/coding/goals')) return { body: { date: today, lists: [] } };
       if (path.startsWith('/api/study-logs/calendar')) {
         const month = new URL(path, 'http://test').searchParams.get('month');
         return { body: { month, days: [{ date: `${month}-01`, minutes: 0, logs: 0 }] } };
@@ -60,6 +58,14 @@ describe('study logs', () => {
       return { status: 201, body: { studyLog: saved } };
     });
   }
+
+  test('the page shows nothing about algorithm problems (#477)', async () => {
+    const api = server([log]);
+    render(<StudyLogs today={today} />);
+    await screen.findByRole('button', { name: /Delete log/ });
+    expect(screen.queryByLabelText('Algorithm goals today')).toBeNull();
+    expect(api.requests.some((request) => request.path.startsWith('/api/coding'))).toBe(false);
+  });
 
   test('the list shows each log with its time, length and status', async () => {
     server([log]);
