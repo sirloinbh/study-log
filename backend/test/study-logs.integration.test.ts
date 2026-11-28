@@ -53,6 +53,7 @@ test(
           understanding: null,
           goalAchieved: null,
           studyType: 'new',
+          finishedContentIds: [],
         },
       );
 
