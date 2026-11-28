@@ -11,7 +11,7 @@ export const dailyGoalMinutes = 120;
 // the streak of study days. A study day is a day with a log that is not planned, the same rule as
 // the dashboard's study days. The streak ends on today, or on yesterday while today has no study
 // yet, so it only breaks when a whole day passes without any. The old weekly_goals table is dropped by
-// migration 037.
+// migration 038.
 export function studyGoalRoutes(pool: Pool, today: () => string) {
   const router = Router();
 
