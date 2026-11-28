@@ -83,6 +83,18 @@ test('a redirect inside the stores is followed, with a limit', async () => {
   );
 });
 
+test('a page in EUC-KR is decoded by its declared charset', async () => {
+  const bytes = new Uint8Array([0xb1, 0xb3, 0xba, 0xb8]); // 교보 in EUC-KR
+  const fetcher = storeFetcher(
+    async () =>
+      new Response(bytes, {
+        status: 200,
+        headers: { 'content-type': 'text/html; charset=euc-kr' },
+      }),
+  );
+  assert.equal(await fetcher(new URL('https://www.yes24.com/a')), '교보');
+});
+
 test('a page that is too large, not html, or an error is refused', async () => {
   const big = storeFetcher(async () => html('x'.repeat(maxPageBytes + 1)));
   await assert.rejects(

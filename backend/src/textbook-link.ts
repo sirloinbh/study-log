@@ -118,7 +118,15 @@ export function storeFetcher(fetchImpl: FetchImpl = fetch): LinkFetcher {
           }
           chunks.push(value);
         }
-        return new TextDecoder('utf-8').decode(Buffer.concat(chunks));
+        // Korean stores may still answer in EUC-KR; an unknown label falls back to UTF-8.
+        const label = /charset\s*=\s*["']?([\w-]+)/i.exec(type)?.[1] ?? 'utf-8';
+        let decoder: TextDecoder;
+        try {
+          decoder = new TextDecoder(label);
+        } catch {
+          decoder = new TextDecoder('utf-8');
+        }
+        return decoder.decode(Buffer.concat(chunks));
       }
       throw new LinkError(502, 'The store link redirected too many times');
     } catch (error) {
