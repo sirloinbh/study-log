@@ -87,8 +87,8 @@ for (const viewport of [
       await expect(items).toContainText('2 of 4 solved (50%)');
       expect(await overflow(page)).toBeLessThanOrEqual(0);
 
-      // The day log shows the goal and what was solved today.
-      await page.goto('/');
+      // The page shows the goal and what was solved today, at its top.
+      await page.goto('/coding');
       const day = page.getByRole('region', { name: 'Algorithm goals today' });
       await expect(day).toContainText(listName);
       await expect(day).toContainText('Solved today: E2E goal two');
