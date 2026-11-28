@@ -7,9 +7,9 @@ import {
   finishedLabel,
   finishedTotal,
 } from './finished-stats';
+import { plural } from './lib/format';
 import { apiKey, useApiQuery } from './lib/query';
 import { Loading } from './loading';
-import { plural } from './plural';
 import { heatCellStyle, heatWeeks, monthLabel } from './study-stats';
 
 const cellBase = 'block size-[11px] rounded-[2px]';

@@ -2,9 +2,9 @@ import React, { useState } from 'react';
 
 import { Button } from './components/ui/button';
 import { NativeSelect } from './components/ui/native-select';
+import { plural } from './lib/format';
 import { apiKey, useApiQuery } from './lib/query';
 import { Loading } from './loading';
-import { plural } from './plural';
 import { formatMinutes } from './study-logs-data';
 import { type TextbookStats as Stats, textbookStatsPath } from './study-stats';
 

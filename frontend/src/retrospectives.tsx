@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import React, { useEffect, useState } from 'react';
 
 import { useBusy } from './busy';
+import { addDays } from './components/period-nav/periods';
 import { Button } from './components/ui/button';
 import { ConfirmDialog } from './components/ui/confirm-dialog';
 import { DeleteConfirm } from './delete-confirm';
@@ -15,7 +16,6 @@ import {
   type RetrospectiveKind,
   retrospectiveLimit,
   type RetrospectivePeriod,
-  shiftDays,
   shiftPeriod,
 } from './retrospective';
 import { formatMinutes } from './study-logs-data';
@@ -86,7 +86,7 @@ export function Retrospectives({ today }: { today: string }) {
   // week falls in; for a month, today when it is this month, otherwise its 1st.
   const switchDate = (shown: RetrospectivePeriod) =>
     shown.kind === 'weekly'
-      ? shiftDays(shown.from, 3)
+      ? addDays(shown.from, 3)
       : today >= shown.from && today <= shown.to
         ? today
         : shown.from;

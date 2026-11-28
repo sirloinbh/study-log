@@ -1,8 +1,8 @@
 import { useState } from 'react';
 
 import { Button } from './components/ui/button';
+import { plural } from './lib/format';
 import { useApiMutation } from './lib/query';
-import { plural } from './plural';
 import type { ExerciseReview } from './review';
 import { overdueDays } from './review';
 

@@ -4,11 +4,11 @@ import { useBusy } from './busy';
 import { Button } from './components/ui/button';
 import { ExerciseReviewList } from './exercise-review-list';
 import type { RequestError } from './lib/api';
+import { plural } from './lib/format';
 import { apiKey, useApiMutation, useApiQuery } from './lib/query';
 import { ButtonSpinner, Loading } from './loading';
 import { Memo } from './memo';
 import { DateInput } from './picker-fields';
-import { plural } from './plural';
 import {
   type ExerciseReview,
   overdueDays,

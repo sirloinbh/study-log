@@ -3,8 +3,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Link, useLocation } from 'react-router';
 
 import { Badge } from './components/ui/badge';
+import { plural } from './lib/format';
 import { apiKey, useApiQuery } from './lib/query';
-import { plural } from './plural';
 
 // The top bar link to the reviews page, shown while reviews are due (#44). It sits in the top bar
 // because on a phone the menu is folded away. It counts again on each page change, after a change

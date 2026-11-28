@@ -1,7 +1,7 @@
 import { Button } from './components/ui/button';
 import { DeleteConfirm } from './delete-confirm';
+import { plural } from './lib/format';
 import { Loading } from './loading';
-import { plural } from './plural';
 import type { Schedule } from './schedule';
 import type { Notice } from './schedule-create-form';
 import { formatMinutes } from './study-logs-data';

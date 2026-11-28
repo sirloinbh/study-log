@@ -1,5 +1,5 @@
-import { plural } from './plural';
-import { shiftDays } from './retrospective';
+import { addDays } from './components/period-nav/periods';
+import { plural } from './lib/format';
 import type { ChartUnit, StatPeriod } from './study-stats';
 import { twelveWeeks, weekStartOf } from './week-data';
 
@@ -89,16 +89,16 @@ export function finishedWeeks(daily: FinishedDay[], today: string): FinishedWeek
   const byDate = new Map(daily.map((day) => [day.date, day]));
   const thisWeek = weekStartOf(today);
   return Array.from({ length: twelveWeeks }, (_, index) => {
-    const start = shiftDays(thisWeek, -7 * (twelveWeeks - 1 - index));
+    const start = addDays(thisWeek, -7 * (twelveWeeks - 1 - index));
     let chapters = 0;
     let sections = 0;
     let finishedDays = 0;
     for (let offset = 0; offset < 7; offset += 1) {
-      const day = byDate.get(shiftDays(start, offset));
+      const day = byDate.get(addDays(start, offset));
       chapters += day?.chapters ?? 0;
       sections += day?.sections ?? 0;
       if (day && finishedTotal(day) > 0) finishedDays += 1;
     }
-    return { start, end: shiftDays(start, 6), chapters, sections, finishedDays };
+    return { start, end: addDays(start, 6), chapters, sections, finishedDays };
   });
 }

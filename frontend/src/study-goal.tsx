@@ -1,8 +1,8 @@
 import React from 'react';
 
+import { plural } from './lib/format';
 import { apiKey, useApiQuery } from './lib/query';
 import { Loading } from './loading';
-import { plural } from './plural';
 import { formatMinutes } from './study-logs-data';
 
 type Goal = {

@@ -1,22 +1,14 @@
 import { useEffect, useState } from 'react';
 
+import { serviceToday } from './lib/format';
+
 // The service date is the calendar date in Asia/Seoul (AGENTS.md), whatever the browser's own time
 // zone is. The pages compute it here instead of waiting for /api/health, and recompute it when the
 // tab is used again and at midnight, so a tab left open overnight does not keep yesterday.
-const zone = 'Asia/Seoul';
 const seoulOffsetMs = 9 * 60 * 60 * 1000; // no daylight saving time
 
-const format = new Intl.DateTimeFormat('en-CA', {
-  timeZone: zone,
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-});
-
 // "YYYY-MM-DD" in Asia/Seoul.
-export function serviceDate(now: Date = new Date()): string {
-  return format.format(now);
-}
+export const serviceDate = (now: Date = new Date()): string => serviceToday(now);
 
 // Milliseconds from `now` until the next midnight in Asia/Seoul.
 export function msUntilMidnight(now: Date = new Date()): number {
