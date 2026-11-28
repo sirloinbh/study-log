@@ -20,11 +20,6 @@ export function DataExport() {
   return (
     <section className="card" aria-label="Data export">
       <h2>Export your data</h2>
-      <p className="status">
-        Download a copy of your records (exercises come with their answers). Leave the dates empty
-        for everything. Exercises are picked by the day they were added, retrospectives by the start
-        of their period.
-      </p>
       <div className="log-form">
         <DateInput
           text="From"

@@ -250,7 +250,7 @@ test('a memo is written in Markdown with a preview and shown rendered in the lis
 
   const preview = () => screen.queryByRole('region', { name: 'Memo preview' });
   expect(preview()).toBeNull();
-  expect(screen.getByText(/You can use Markdown/)).toBeInTheDocument();
+  expect(screen.queryByText(/You can use Markdown/)).toBeNull();
   fill('Memo', '## 오늘\n**굵게**');
   const shown = preview();
   expect(shown).not.toBeNull();

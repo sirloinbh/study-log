@@ -248,12 +248,6 @@ export function ExerciseExtraction({
       )}
       {review && review.rows.length > 0 && (
         <div className="extraction-review">
-          {review.kind === 'answers' && (
-            <p className="hint">
-              Each answer goes to the problem with the same number. Saving replaces an answer
-              already entered.
-            </p>
-          )}
           <ol className="log-list">
             {review.kind === 'problems'
               ? review.rows.map((row, index) => {

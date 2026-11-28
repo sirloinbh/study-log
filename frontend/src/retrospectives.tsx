@@ -262,7 +262,6 @@ export function Retrospectives({ today }: { today: string }) {
                   rows={8}
                   required
                   maxLength={retrospectiveLimit}
-                  placeholder="What went well, what did not, what to try next"
                   disabled={busy}
                   value={text}
                   onChange={(event) => {

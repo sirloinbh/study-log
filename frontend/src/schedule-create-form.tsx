@@ -124,7 +124,6 @@ export function ScheduleCreateForm({
           <Input
             required
             maxLength={200}
-            placeholder="e.g. Algorithms textbook, first pass"
             disabled={busy}
             value={title}
             onChange={typed(setTitle)}

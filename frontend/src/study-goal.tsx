@@ -52,9 +52,6 @@ export function StudyGoal() {
           </div>
           <p className="m-0 mt-3" data-streak>
             Study streak: <strong>{plural(goal.streakDays, 'day')}</strong>
-            {goal.streakDays > 0 && !goal.studiedToday && (
-              <span className="status"> · study today to keep it</span>
-            )}
           </p>
         </>
       )}

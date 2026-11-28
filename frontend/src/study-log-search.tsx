@@ -97,7 +97,6 @@ export function StudyLogSearch({
           <Input
             type="search"
             maxLength={50}
-            placeholder="Part of a memo"
             disabled={busy}
             value={search.q}
             onChange={change('q')}

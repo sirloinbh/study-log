@@ -203,7 +203,6 @@ export function Textbooks() {
                   type="url"
                   inputMode="url"
                   maxLength={2000}
-                  placeholder="https://www.yes24.com/Product/Goods/…"
                   disabled={busy}
                   value={link}
                   onChange={(event) => {

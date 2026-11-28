@@ -176,10 +176,6 @@ export function CodingGoals({
   return (
     <section className="card coding-goals" aria-label="Goal lists">
       <h2>Goal lists</h2>
-      <p className="status">
-        Attach an Excel file (.xlsx, at most 2 MB) of the problems you plan to solve. Importing the
-        same list again updates it.
-      </p>
       <FileField
         label="Excel file"
         accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"

@@ -41,11 +41,11 @@ test('beyond the goal the bar stops at 100 and the rate keeps counting', async (
   expect(document.querySelector('[data-goal-rate]')).toHaveTextContent('250%');
 });
 
-test('the streak shows the days, and a hint while today has no study yet', async () => {
+test('the streak shows the days and no encouragement while today has no study yet', async () => {
   server({ streakDays: 4, studiedToday: false });
   render(<StudyGoal />);
   expect(await screen.findByText('4 days')).toBeInTheDocument();
-  expect(screen.getByText(/study today to keep it/)).toBeInTheDocument();
+  expect(screen.queryByText(/study today to keep it/)).toBeNull();
 });
 
 test('a failed load is reported', async () => {
