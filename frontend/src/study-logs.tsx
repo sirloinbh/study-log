@@ -3,7 +3,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 
 import { useBusy } from './busy';
 import { Calendar } from './calendar';
-import { CodingGoalDay } from './coding-goal-day';
 import type { RequestError } from './lib/api';
 import { apiKey, useApiMutation, useApiQuery } from './lib/query';
 import { Loading } from './loading';
@@ -176,7 +175,6 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
 
   return (
     <div className="study-logs">
-      <CodingGoalDay date={today} />
       <section className="card">
         <h2>{editingId === undefined ? 'Add a study log' : 'Edit the study log'}</h2>
         <StudyLogFormView

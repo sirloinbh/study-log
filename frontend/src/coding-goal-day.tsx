@@ -1,9 +1,9 @@
 import { type GoalDay } from './coding';
 import { apiKey, useApiQuery } from './lib/query';
 
-// Today's algorithm goals for the day log (#426): per goal list, what is due today, what was solved
+// Today's algorithm goals at the top of the Algorithms page (#426, moved from the day log in #477): per goal list, what is due today, what was solved
 // today and what comes next. Nothing is shown without a goal list, or while it loads or fails: the
-// day log does not depend on it.
+// page does not depend on it.
 export function CodingGoalDay({ date }: { date: string }) {
   const day = useApiQuery<GoalDay>(
     apiKey('/api/coding', 'goals', 'today', date),
