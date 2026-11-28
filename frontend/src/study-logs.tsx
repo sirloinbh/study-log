@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 import { useBusy } from './busy';
+import { Button } from './components/ui/button';
 import type { RequestError } from './lib/api';
 import { apiKey, useApiMutation, useApiQuery } from './lib/query';
 import { StudyLogFormView } from './study-log-form';
@@ -153,6 +154,23 @@ export function StudyLogs({
   }, [editId, loadedLog]);
   const loadFailure = editId !== undefined && !loadedLog ? target.error : null;
 
+  // A log that cannot be loaded gets no form: saving it would add a new log under an edit address.
+  if (loadFailure) {
+    return (
+      <div className="study-logs">
+        <section className="card">
+          <h2>Edit the study log</h2>
+          <p role="alert" className="error">
+            Could not load the study log to edit: {loadFailure.message}
+          </p>
+          <Button type="button" variant="outline" onClick={() => onEditEnd?.()}>
+            Back to History
+          </Button>
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div className="study-logs">
       <section className="card">
@@ -168,11 +186,6 @@ export function StudyLogs({
           onSubmit={(event) => void save(event)}
           onCancel={leaveEdit}
         />
-        {loadFailure && (
-          <p role="alert" className="error">
-            Could not load the study log to edit: {loadFailure.message}
-          </p>
-        )}
         {/* Always mounted so screen readers announce each new message. */}
         <p role="status" className="status">
           {notice?.kind === 'status' ? notice.text : ''}
