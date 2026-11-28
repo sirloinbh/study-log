@@ -21,7 +21,6 @@ test(
     const cleanup = async () => {
       await pool.query('DELETE FROM study_logs WHERE textbook_id = ANY($1)', [ids]);
       await pool.query('DELETE FROM textbooks WHERE id = ANY($1)', [ids]);
-      await pool.query('DELETE FROM keywords WHERE id = ANY($1)', [ids]);
     };
     await cleanup();
     t.after(async () => {
@@ -44,11 +43,6 @@ test(
           `INSERT INTO exercises (id, textbook_id, content_id, body)
            OVERRIDING SYSTEM VALUE VALUES ($1, $1, $1, '문제')`,
           [id],
-        );
-        await pool.query(
-          `INSERT INTO keywords (id, keyword_date, keyword)
-           OVERRIDING SYSTEM VALUE VALUES ($1, '2097-02-01', $2)`,
-          [id, `큰ID${id}`],
         );
 
         const book = await call(`/api/textbooks/${id}`);
@@ -95,10 +89,6 @@ test(
         assert.equal(log.status, 201, `study log ${id}`);
         const saved = log.data.studyLog as { textbookId: number; contentId: number };
         assert.deepEqual([saved.textbookId, saved.contentId], [id, id]);
-
-        const keyword = await call(`/api/keywords/${id}`);
-        assert.equal(keyword.status, 200, `keyword ${id}`);
-        assert.equal((keyword.data.keyword as { id: number }).id, id);
       }
     });
   },

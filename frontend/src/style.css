@@ -32,13 +32,13 @@
 .error {
   @apply rounded-[var(--radius)] bg-destructive/10 px-4 py-3;
 }
-:is(.study-logs, .textbooks, .keywords, .stats, .retrospectives, .schedules, .reviews) {
+:is(.study-logs, .textbooks, .stats, .retrospectives, .schedules, .reviews) {
   @apply grid max-w-[960px] grid-cols-[minmax(0,1fr)] gap-5;
 }
-:is(.study-logs, .textbooks, .keywords, .stats, .retrospectives, .schedules, .reviews) h2 {
+:is(.study-logs, .textbooks, .stats, .retrospectives, .schedules, .reviews) h2 {
   @apply mt-0 mb-4 text-[16px];
 }
-:is(.study-logs, .textbooks, .keywords, .retrospectives, .schedules, .reviews) {
+:is(.study-logs, .textbooks, .retrospectives, .schedules, .reviews) {
   :is([role='status'], [role='alert']) {
     @apply mt-4 mb-0;
   }
@@ -168,7 +168,6 @@
 .exercise-answer {
   @apply mt-2 grid justify-items-start gap-1.5 border-t border-dashed border-border pt-2;
 }
-.keyword-list .keyword-form,
 .exercise-answer .answer-form {
   @apply w-full;
 }
@@ -212,10 +211,6 @@
 .log-memo {
   @apply m-0 line-clamp-3 [overflow-wrap:anywhere] whitespace-pre-wrap text-muted-foreground;
 }
-.keyword-form .keyword-field {
-  @apply col-span-3;
-}
-.keyword-results .log-head,
 .schedules .log-head {
   @apply justify-between;
 }
@@ -371,7 +366,6 @@
   .log-form .picker-field:first-child,
   .log-form .picker-date,
   .log-form .combo-field:first-child,
-  .keyword-form .keyword-field,
   .content-form .title {
     @apply col-span-full;
   }
