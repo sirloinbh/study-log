@@ -160,8 +160,9 @@ export function StudyLogFormView({
       <label className="wide">
         Memo
         <textarea
-          rows={3}
-          maxLength={10000}
+          rows={16}
+          maxLength={50000}
+          className="field-sizing-content min-h-96 md:min-h-[60vh]"
           disabled={busy}
           value={form.memo}
           onChange={(event) => onPatch({ memo: event.target.value })}
