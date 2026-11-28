@@ -633,7 +633,7 @@ test('the form starts with the suggested dates and hours', async () => {
   expect(screen.getByLabelText('Start date')).toHaveValue(today);
   expect(screen.getByLabelText('End date')).toHaveValue('2026-03-31');
   expect(screen.getByLabelText('Weekdays (hours)')).toHaveValue(2);
-  expect(screen.getByLabelText('Weekends and holidays (hours)')).toHaveValue(5);
+  expect(screen.getByLabelText('Weekends and holidays (hours)')).toHaveValue(2);
   expect(screen.queryByRole('region', { name: 'Schedule by date' })).toBeNull();
 });
 

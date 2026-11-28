@@ -22,7 +22,6 @@ import {
   textbookListQuery,
 } from './exercises.js';
 import { exportQuery } from './export.js';
-import { keywordInput, keywordListQuery } from './keywords.js';
 import {
   bodyInput as retrospectiveInput,
   listQuery as retrospectiveListQuery,
@@ -39,7 +38,6 @@ import {
   studyTimeQuery,
   textbookQuery,
 } from './stats.js';
-import { goalInput } from './study-goal.js';
 import { studyLogInput, studyLogListQuery } from './study-logs.js';
 import {
   contentBulkInput,
@@ -116,18 +114,13 @@ export const operations: Record<string, Operation> = {
 
   'GET /api/stats/goal': {
     summary:
-      "This week's goal, the minutes studied so far, the achievement rate and the streak of study days",
+      'The fixed daily goal of 120 minutes, the minutes studied today, the achievement rate and the streak of study days',
     status: [200],
-  },
-  'PUT /api/stats/goal': {
-    summary: "Set this week's goal in minutes; later weeks keep it until it is changed",
-    body: ['WeeklyGoal', goalInput],
-    status: [200, 400],
   },
 
   'POST /api/retrospectives/:kind/:start/draft': {
     summary:
-      'Ask Claude for a draft retrospective of the period from its study logs and keywords; nothing is saved',
+      'Ask Claude for a draft retrospective of the period from its study logs; nothing is saved',
     status: [200, 400, 409, 415, 422, 429, 502, 503],
   },
 
@@ -168,28 +161,6 @@ export const operations: Record<string, Operation> = {
     query: exportQuery,
     status: [200, 400],
   },
-
-  'GET /api/keywords': {
-    summary: 'List keywords for one day, or search the latest ones',
-    query: keywordListQuery,
-    status: [200, 400],
-  },
-  'GET /api/keywords/used': {
-    summary: 'List the keywords already used, each once, most recently used first (at most 200)',
-    status: [200],
-  },
-  'GET /api/keywords/:id': { summary: 'Get one keyword', status: [200, 400, 404] },
-  'POST /api/keywords': {
-    summary: 'Add a keyword; a left-out date means today',
-    body: ['Keyword', keywordInput],
-    status: [201, 400, 409],
-  },
-  'PUT /api/keywords/:id': {
-    summary: 'Replace a keyword; a left-out date keeps the stored date',
-    body: ['Keyword', keywordInput],
-    status: [200, 400, 404, 409],
-  },
-  'DELETE /api/keywords/:id': { summary: 'Delete a keyword', status: [204, 400, 404] },
 
   'GET /api/coding/solvedac/problems/:number': {
     summary: 'Look up a Baekjoon problem on solved.ac (title, tier, tags) to fill in the form',
