@@ -4,7 +4,7 @@
 
 - The goal is a fixed 120 minutes for every day, with no weekday, weekend or holiday difference (user request, epic #469).
 - Study time is entered by hand, so today's progress is the minutes of today's logs that are not planned (the dashboard's `counted` rule). The streak keeps its meaning.
-- Choice for implementation (D1, answered by the user 2026-11-28): the user decided to drop the old data, so `database/migrations/038_drop_weekly_goals.sql` drops `weekly_goals` (migration 029 created it). The number is the next free one on origin/main at push time.
+- Choice for implementation (D1, answered by the user 2026-11-28): the user decided to drop the old data, so `database/migrations/039_drop_weekly_goals.sql` drops `weekly_goals` (migration 029 created it). The number is the next free one on origin/main at push time.
 - Schedules keep their two per-schedule amounts, so a person can still override them, but both default to 2 hours. Holidays are still read, so schedules still skip no day; `HOLIDAY_API_KEY` stays.
 
 ## What changed
