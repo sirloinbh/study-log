@@ -34,6 +34,8 @@ export function Textbooks() {
   // The unsaved new textbook, restored after an edit is saved or cancelled.
   const [draft, setDraft] = useState<TextbookForm | undefined>(undefined);
   const [notice, setNotice] = useState<Notice>(undefined);
+  // The store link the person pasted to fill the form (#482).
+  const [link, setLink] = useState('');
   // One request at a time: fields and action buttons are disabled while a save or delete is pending.
   const { busy, action, nameNext, begin, end } = useBusy();
   const [selectedId, setSelectedId] = useState<number | undefined>(undefined);
@@ -122,6 +124,33 @@ export function Textbooks() {
     }
   };
 
+  // Asks the server to read a Yes24 or Kyobo link with Claude. Nothing is saved: the answer fills
+  // the form, and the person fixes it and presses Register.
+  const fillFromLink = async () => {
+    if (!link.trim()) return;
+    nameNext('link');
+    if (!begin()) return;
+    setNotice(undefined);
+    try {
+      const data = (await write.mutateAsync({
+        path: '/api/textbooks/from-link',
+        method: 'POST',
+        body: { url: link.trim() },
+      })) as { textbook: TextbookForm };
+      setForm({
+        title: data.textbook.title,
+        author: data.textbook.author,
+        edition: data.textbook.edition,
+      });
+      setLink('');
+      setNotice({ kind: 'status', text: 'Filled in from the link. Check it, then register' });
+    } catch (error) {
+      setNotice({ kind: 'alert', text: (error as RequestError).message });
+    } finally {
+      end();
+    }
+  };
+
   const select = (id: number) => {
     setSelectedId(id);
     setConfirmingDelete(false);
@@ -165,6 +194,40 @@ export function Textbooks() {
       <section className="card">
         <h2>{editingId === undefined ? 'Register a textbook' : 'Edit the textbook'}</h2>
         <form className="log-form textbook-form" onSubmit={(event) => void save(event)}>
+          {editingId === undefined && (
+            <div className="wide">
+              <label htmlFor="textbook-link">Fill in from a Yes24 or Kyobo Book Centre link</label>
+              <div className="flex flex-wrap items-center gap-2">
+                <Input
+                  id="textbook-link"
+                  type="url"
+                  inputMode="url"
+                  maxLength={2000}
+                  placeholder="https://www.yes24.com/Product/Goods/…"
+                  disabled={busy}
+                  value={link}
+                  onChange={(event) => {
+                    setNotice(undefined);
+                    setLink(event.target.value);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key !== 'Enter') return;
+                    event.preventDefault();
+                    void fillFromLink();
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={busy || !link.trim()}
+                  onClick={() => void fillFromLink()}
+                >
+                  <ButtonSpinner when={action === 'link'} />
+                  Fill in
+                </Button>
+              </div>
+            </div>
+          )}
           <label className="title">
             Title
             <Input
