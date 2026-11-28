@@ -208,7 +208,7 @@ function AppBody() {
               element={
                 <Page
                   title="Dashboard"
-                  description="See study time by period and the daily average at a glance"
+                  description="See the chapters and sections finished by period, and today's goal, at a glance"
                   health={health}
                   today={today}
                 >

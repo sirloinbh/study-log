@@ -5,7 +5,7 @@ import { fakeApi } from './test/fake-api';
 import { finishedDays } from './test/finished';
 import { render } from './test/render';
 import { TwelveWeekView } from './twelve-week-view';
-import { weekDays, weekStartOf, weekTotals } from './week-data';
+import { weekDays, weekStartOf } from './week-data';
 import { WeekView } from './week-view';
 
 const today = '2026-10-23'; // a Friday; its week is Sunday 10-18 to Saturday 10-24
@@ -52,26 +52,6 @@ test('weekDays sums each day, leaves planned logs out of the minutes and keeps e
   expect(days[1].minutes).toBe(90);
   expect(days[1].logs).toHaveLength(3);
   expect(days[0]).toMatchObject({ minutes: 0, logs: [] });
-});
-
-test('weekTotals gives 12 weeks ending with this one and counts study days', () => {
-  const totals = weekTotals(
-    [
-      { date: '2026-10-18', minutes: 30 },
-      { date: '2026-10-19', minutes: 60 },
-      { date: '2026-10-20', minutes: 0 },
-    ],
-    today,
-  );
-  expect(totals).toHaveLength(12);
-  expect(totals.at(-1)).toEqual({
-    start: '2026-10-18',
-    end: '2026-10-24',
-    minutes: 90,
-    studyDays: 2,
-  });
-  expect(totals[0].start).toBe('2026-08-02');
-  expect(totals[0].minutes).toBe(0);
 });
 
 test('the week view lists the days with their finished counts and moves between weeks', async () => {

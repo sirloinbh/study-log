@@ -3843,36 +3843,6 @@
         }
       }
     },
-    "/api/stats/heatmap": {
-      "get": {
-        "summary": "Get the study heatmap for the last 53 weeks",
-        "responses": {
-          "200": {
-            "description": "Success"
-          },
-          "401": {
-            "description": "Sign-in required (no session from the shared sign-in)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too many requests to an external service",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/stats/patterns": {
       "get": {
         "summary": "Get the study pattern by weekday and hour; the period is at most 10 years",
@@ -3969,96 +3939,6 @@
           },
           "401": {
             "description": "Sign-in required (no session from the shared sign-in)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too many requests to an external service",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/stats/study-time": {
-      "get": {
-        "summary": "Get study time series and totals for a period, by study type or textbook",
-        "parameters": [
-          {
-            "name": "period",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "default": "week",
-              "type": "string",
-              "enum": [
-                "week",
-                "month",
-                "3months",
-                "all"
-              ]
-            }
-          },
-          {
-            "name": "type",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "default": "all",
-              "type": "string",
-              "enum": [
-                "all",
-                "new",
-                "review"
-              ]
-            }
-          },
-          {
-            "name": "textbookId",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string",
-              "pattern": "^[1-9]\\d{0,14}$"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "Success"
-          },
-          "400": {
-            "description": "Input validation failed or a referenced item does not exist",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Sign-in required (no session from the shared sign-in)",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Error"
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "No target",
             "content": {
               "application/json": {
                 "schema": {
