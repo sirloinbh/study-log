@@ -468,6 +468,8 @@
 }
 .coding-checkbox label {
   @apply inline;
+  /* A touch target of 44px: the label toggles the box too (#500). */
+  @apply pointer-coarse:inline-flex pointer-coarse:min-h-11 pointer-coarse:items-center;
 }
 /* Attempts at one exercise (#356). */
 .attempt-list {
