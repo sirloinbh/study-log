@@ -14,6 +14,7 @@ import type { LeetCodeClient } from '../src/leetcode.js';
 import type { Drafter } from '../src/retrospective-draft.js';
 import type { SolvedAcClient } from '../src/solvedac.js';
 import { migrate, readMigrations } from '../src/standard/migrations.js';
+import type { LinkFetcher, LinkReader } from '../src/textbook-link.js';
 import type { Translator } from '../src/translation.js';
 
 // Ports the fetch standard refuses to connect to ("bad port"), as listed in the Fetch spec's
@@ -170,6 +171,8 @@ export async function withApi(
     today?: () => string;
     translator?: Translator;
     drafter?: Drafter;
+    linkFetcher?: LinkFetcher;
+    linkReader?: LinkReader;
     extractor?: Extractor;
     feedbacker?: Feedbacker;
     holidayFetcher?: HolidayFetcher;
@@ -200,6 +203,17 @@ export async function withApi(
     // Nor for reading files (#30).
     const extractor: Extractor =
       options.extractor ??
+      (async () => {
+        throw new Error('tests must not call the Claude API');
+      });
+    // Nor the store pages or the book reading of a link (#482).
+    const linkFetcher: LinkFetcher =
+      options.linkFetcher ??
+      (async () => {
+        throw new Error('tests must not fetch a store page');
+      });
+    const linkReader: LinkReader =
+      options.linkReader ??
       (async () => {
         throw new Error('tests must not call the Claude API');
       });
@@ -248,6 +262,8 @@ export async function withApi(
       leetCodeClient: leetCode,
       translator,
       drafter,
+      linkFetcher,
+      linkReader,
       extractor,
       feedbacker,
       holidayFetcher,
