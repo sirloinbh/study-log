@@ -11,7 +11,7 @@ import {
   problemListQuery,
   problemUpdateInput,
 } from './coding-problems.js';
-import { attemptInput, wrongListQuery } from './exercise-attempts.js';
+import { attemptInput } from './exercise-attempts.js';
 import { feedbackInput } from './exercise-feedback-routes.js';
 import {
   answerInput,
@@ -422,12 +422,6 @@ export const operations: Record<string, Operation> = {
   'GET /api/exercise-files/:fileId/content': {
     summary: 'Download the stored file itself',
     status: [200, 400, 404, 502, 503],
-  },
-  'GET /api/exercises/wrong': {
-    summary:
-      'List exercises whose latest attempt was wrong or used a hint, across textbooks, newest attempt first',
-    query: wrongListQuery,
-    status: [200, 400],
   },
   'GET /api/exercises/:id/attempts': {
     summary: 'List the attempts at an exercise, newest first',

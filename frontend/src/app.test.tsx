@@ -15,7 +15,6 @@ function server(health: { body: object; status?: number }) {
     ...Object.fromEntries(
       [
         '/api/calendar-sync/status',
-        '/api/exercises/wrong',
         '/api/retrospectives/period',
         '/api/retrospectives',
         '/api/reviews/today',
@@ -61,7 +60,6 @@ test('each page has its own address and is marked in the main menu', async () =>
     ['Schedules', '/schedules'],
     ['Reviews', '/reviews'],
     ['Textbooks', '/textbooks'],
-    ['Wrong problems', '/wrong-exercises'],
     ['Retrospectives', '/retrospectives'],
     ['Dashboard', '/dashboard'],
     ['Settings', '/settings'],
