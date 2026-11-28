@@ -31,7 +31,13 @@ import {
 import { dueDateInput } from './reviews.js';
 import { moveInput, scheduleCreateInput, scheduleUpdateInput } from './schedules.js';
 import { buildOpenApi, type Operation } from './standard/openapi.js';
-import { patternQuery, statsPeriodQuery, studyTimeQuery, textbookQuery } from './stats.js';
+import {
+  finishedContentsQuery,
+  patternQuery,
+  statsPeriodQuery,
+  studyTimeQuery,
+  textbookQuery,
+} from './stats.js';
 import { studyLogInput, studyLogListQuery } from './study-logs.js';
 import {
   contentBulkInput,
@@ -244,6 +250,12 @@ export const operations: Record<string, Operation> = {
   'GET /api/stats/study-time': {
     summary: 'Get study time series and totals for a period, by study type or textbook',
     query: studyTimeQuery,
+    status: [200, 400, 404],
+  },
+  'GET /api/stats/finished-contents': {
+    summary:
+      'Get chapters and sections finished per day, week and month for a period or one textbook, each entry counted once',
+    query: finishedContentsQuery,
     status: [200, 400, 404],
   },
   'GET /api/stats/heatmap': {

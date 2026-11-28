@@ -78,6 +78,39 @@ export function bucket(daily: Day[], keyOf: (date: string) => string) {
   return [...sums].map(([key, minutes]) => ({ key, minutes }));
 }
 
+export const finishedContentsQuery = statsPeriodQuery.extend({ textbookId: textbookIdParam });
+
+type FinishedDay = { date: string; chapters: number; sections: number };
+
+// The entries finished per day from `from` to `to`, a day with none as 0. `firsts` has one row per
+// entry: the date of its first finishing log and whether it is a chapter.
+export function finishedPerDay(
+  firsts: { date: string; chapter: boolean }[],
+  from: string,
+  to: string,
+): FinishedDay[] {
+  const days = new Map<string, FinishedDay>();
+  for (let day = from; day <= to; day = addDays(day, 1))
+    days.set(day, { date: day, chapters: 0, sections: 0 });
+  for (const row of firsts) {
+    const day = days.get(row.date);
+    if (day) day[row.chapter ? 'chapters' : 'sections'] += 1;
+  }
+  return [...days.values()];
+}
+
+// Sums of the finished-entry series by week or month, in order, like `bucket`.
+export function bucketFinished(daily: FinishedDay[], keyOf: (date: string) => string) {
+  const sums = new Map<string, { chapters: number; sections: number }>();
+  for (const { date, chapters, sections } of daily) {
+    const sum = sums.get(keyOf(date)) ?? { chapters: 0, sections: 0 };
+    sum.chapters += chapters;
+    sum.sections += sections;
+    sums.set(keyOf(date), sum);
+  }
+  return [...sums].map(([key, sum]) => ({ key, ...sum }));
+}
+
 // Planned sessions have not been studied yet, so they do not count; later dates neither.
 export const counted = `status <> 'planned' AND study_date <= $1`;
 
@@ -216,6 +249,75 @@ export function statsRoutes(pool: Pool, today: () => string) {
       monthly: bucket(daily, (date) => date.slice(0, 7)).map(({ key, minutes }) => ({
         month: key,
         minutes,
+      })),
+    });
+  });
+
+  // Chapters and sections finished (#480): /api/stats/finished-contents?period=&textbookId=
+  // A top-level entry of a textbook is a chapter; any entry below one is a section. An entry counts
+  // once, on the date of the first done log that finished it (not after today); a log finishes the
+  // entries listed in study_log_contents. A book with no finished entries shows zeros.
+  router.get('/finished-contents', async (req, res) => {
+    const { period, textbookId } = finishedContentsQuery.parse(req.query);
+    const bookId = textbookId ?? null;
+    const to = today();
+    const result = await inSnapshot(pool, async (db) => {
+      if (bookId !== null) {
+        const book = await db.query('SELECT 1 FROM textbooks WHERE id = $1', [bookId]);
+        if (!book.rowCount) return null;
+      }
+      const firsts = (
+        await db.query<{ date: string; chapter: boolean }>(
+          `SELECT min(l.study_date) AS date, (c.parent_id IS NULL) AS chapter
+           FROM study_log_contents f
+           JOIN study_logs l ON l.id = f.study_log_id
+           JOIN textbook_contents c ON c.id = f.content_id
+           WHERE l.status = 'done' AND l.study_date <= $1::date
+             AND ($2::bigint IS NULL OR c.textbook_id = $2)
+           GROUP BY f.content_id, c.parent_id`,
+          [to, bookId],
+        )
+      ).rows;
+      const totals = (
+        await db.query<{ chapters: number; sections: number }>(
+          `SELECT count(*) FILTER (WHERE parent_id IS NULL)::int AS chapters,
+             count(*) FILTER (WHERE parent_id IS NOT NULL)::int AS sections
+           FROM textbook_contents WHERE ($1::bigint IS NULL OR textbook_id = $1)`,
+          [bookId],
+        )
+      ).rows[0];
+      return { firsts, totals };
+    });
+    if (!result) return void res.status(404).json({ error: 'Textbook not found' });
+    const first = result.firsts.reduce<string | undefined>(
+      (min, row) => (min === undefined || row.date < min ? row.date : min),
+      undefined,
+    );
+    const from = periodStart(period, to, first);
+    const daily = finishedPerDay(result.firsts, from, to);
+    const sum = (key: 'chapters' | 'sections') => daily.reduce((total, day) => total + day[key], 0);
+    res.json({
+      period,
+      textbookId: bookId,
+      from,
+      to,
+      totalChapters: result.totals.chapters,
+      totalSections: result.totals.sections,
+      chapters: sum('chapters'),
+      sections: sum('sections'),
+      todayChapters: daily.at(-1)?.chapters ?? 0,
+      todaySections: daily.at(-1)?.sections ?? 0,
+      cumulativeChapters: result.firsts.filter((row) => row.chapter).length,
+      cumulativeSections: result.firsts.filter((row) => !row.chapter).length,
+      days: daily.length,
+      daily,
+      weekly: bucketFinished(daily, weekStart).map(({ key, ...counts }) => ({
+        weekStart: key,
+        ...counts,
+      })),
+      monthly: bucketFinished(daily, (date) => date.slice(0, 7)).map(({ key, ...counts }) => ({
+        month: key,
+        ...counts,
       })),
     });
   });

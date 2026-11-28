@@ -6,7 +6,9 @@ import type { Pool } from 'pg';
 import {
   addDays,
   bucket,
+  bucketFinished,
   completionRate,
+  finishedPerDay,
   heatmapStart,
   heatmapWeeks,
   maxSeriesDays,
@@ -282,4 +284,27 @@ test('the textbook stats read today once and on one snapshot (#269)', async () =
   );
   assert.deepEqual(dates, ['2026-10-23', '2026-10-23']);
   assert.equal(statements[1], 'SET TRANSACTION ISOLATION LEVEL REPEATABLE READ READ ONLY');
+});
+
+test('finished entries are laid on every day of the range, chapters and sections apart', () => {
+  const daily = finishedPerDay(
+    [
+      { date: '2026-11-03', chapter: true },
+      { date: '2026-11-03', chapter: false },
+      { date: '2026-11-03', chapter: false },
+      { date: '2026-11-08', chapter: false },
+      // Before the range: not in the days.
+      { date: '2026-10-30', chapter: true },
+    ],
+    '2026-11-01',
+    '2026-11-09',
+  );
+  assert.equal(daily.length, 9);
+  assert.deepEqual(daily[2], { date: '2026-11-03', chapters: 1, sections: 2 });
+  assert.deepEqual(daily[0], { date: '2026-11-01', chapters: 0, sections: 0 });
+  // Weeks start on Sunday: 11-01 is a Sunday, 11-08 the next one.
+  assert.deepEqual(bucketFinished(daily, weekStart), [
+    { key: '2026-11-01', chapters: 1, sections: 2 },
+    { key: '2026-11-08', chapters: 0, sections: 1 },
+  ]);
 });

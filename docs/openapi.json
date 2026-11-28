@@ -3677,6 +3677,82 @@
         }
       }
     },
+    "/api/stats/finished-contents": {
+      "get": {
+        "summary": "Get chapters and sections finished per day, week and month for a period or one textbook, each entry counted once",
+        "parameters": [
+          {
+            "name": "period",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "default": "week",
+              "type": "string",
+              "enum": [
+                "week",
+                "month",
+                "3months",
+                "all"
+              ]
+            }
+          },
+          {
+            "name": "textbookId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[1-9]\\d{0,14}$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "400": {
+            "description": "Input validation failed or a referenced item does not exist",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Sign-in required (no session from the shared sign-in)",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "No target",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to an external service",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Error"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/stats/goal": {
       "get": {
         "summary": "The fixed daily goal of 120 minutes, the minutes studied today, the achievement rate and the streak of study days",
@@ -6796,6 +6872,15 @@
                 "type": "null"
               }
             ]
+          },
+          "finishedContentIds": {
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 999999999999999
+            }
           },
           "understanding": {
             "default": null,

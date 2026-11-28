@@ -88,6 +88,7 @@ test('saving a log and completing a review update the badge, and the pages stay 
           textbookTitle: null,
           contentNumber: null,
           contentTitle: null,
+          finishedContentIds: [],
         })),
       },
     }),

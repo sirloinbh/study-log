@@ -34,6 +34,17 @@ test('textbook and chapter references are checked in English before touching the
     [{ ...valid, textbookId: '1' }, /Invalid textbook ID/],
     [{ ...valid, textbookId: 0 }, /Invalid textbook ID/],
     [{ ...valid, textbookId: 1, contentId: 2.5 }, /Invalid contents entry ID/],
+    [
+      { ...valid, finishedContentIds: [3] },
+      /Choose a textbook before marking contents entries as finished/,
+    ],
+    [{ ...valid, textbookId: 1, finishedContentIds: [0] }, /Invalid contents entry ID/],
+    [{ ...valid, textbookId: 1, finishedContentIds: ['2'] }, /Invalid contents entry ID/],
+    [{ ...valid, textbookId: 1, finishedContentIds: 2 }, /The finished contents format is invalid/],
+    [
+      { ...valid, textbookId: 1, finishedContentIds: Array.from({ length: 501 }, (_, i) => i + 1) },
+      /At most 500 contents entries/,
+    ],
   ];
   await withApi(untouchedPool, async (call) => {
     for (const [body, message] of cases) {

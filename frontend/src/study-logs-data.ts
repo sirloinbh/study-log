@@ -16,6 +16,8 @@ export type StudyLog = {
   contentId: number | null;
   contentNumber: string | null;
   contentTitle: string | null;
+  // The chapters and sections of the textbook finished in this log (#480).
+  finishedContentIds: number[];
   understanding: number | null;
   goalAchieved: boolean | null;
   studyType: StudyType;
@@ -30,6 +32,7 @@ export type StudyLogForm = Pick<
   | 'status'
   | 'textbookId'
   | 'contentId'
+  | 'finishedContentIds'
   | 'understanding'
   | 'goalAchieved'
   | 'studyType'
@@ -78,6 +81,7 @@ export const emptyForm = (studyDate: string): StudyLogForm => ({
   status: 'planned',
   textbookId: null,
   contentId: null,
+  finishedContentIds: [],
   understanding: null,
   goalAchieved: null,
   studyType: 'new',
