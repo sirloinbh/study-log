@@ -98,7 +98,10 @@ export function Calendar({ today, reloadKey }: { today: string; reloadKey?: numb
       {!days ? (
         !error && <Loading label="Loading the calendar" kind="text" />
       ) : (
-        <div className="grid grid-cols-[repeat(7,minmax(0,1fr))] gap-1" data-calendar-grid>
+        <div
+          className="grid grid-cols-[repeat(7,minmax(0,1fr))] gap-1 max-sm:-mx-3"
+          data-calendar-grid
+        >
           {weekdays.map((name) => (
             <span
               key={name}
