@@ -31,13 +31,7 @@ import {
 import { dueDateInput } from './reviews.js';
 import { moveInput, scheduleCreateInput, scheduleUpdateInput } from './schedules.js';
 import { buildOpenApi, type Operation } from './standard/openapi.js';
-import {
-  finishedContentsQuery,
-  patternQuery,
-  statsPeriodQuery,
-  studyTimeQuery,
-  textbookQuery,
-} from './stats.js';
+import { finishedContentsQuery, patternQuery, statsPeriodQuery, textbookQuery } from './stats.js';
 import { studyLogInput, studyLogListQuery } from './study-logs.js';
 import {
   contentBulkInput,
@@ -247,11 +241,6 @@ export const operations: Record<string, Operation> = {
   },
   'DELETE /api/coding/attempts/:id': { summary: 'Delete an attempt', status: [204, 400, 404] },
 
-  'GET /api/stats/study-time': {
-    summary: 'Get study time series and totals for a period, by study type or textbook',
-    query: studyTimeQuery,
-    status: [200, 400, 404],
-  },
   'GET /api/stats/finished-contents': {
     summary:
       'Get chapters and sections finished per day, week and month for a period or one textbook, each entry counted once',
@@ -263,10 +252,6 @@ export const operations: Record<string, Operation> = {
       'Get chapters and sections finished per day from a start to an end date, all textbooks; by default the last 53 weeks',
     query: patternQuery,
     status: [200, 400],
-  },
-  'GET /api/stats/heatmap': {
-    summary: 'Get the study heatmap for the last 53 weeks',
-    status: [200],
   },
   'GET /api/stats/reviews': {
     summary: 'Get review completion statistics for a period',

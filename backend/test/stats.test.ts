@@ -5,7 +5,6 @@ import type { Pool } from 'pg';
 
 import {
   addDays,
-  bucket,
   bucketFinished,
   completionRate,
   finishedPerDay,
@@ -76,28 +75,6 @@ test('days add across month and year ends', () => {
   assert.equal(addDays('2096-03-01', -1), '2096-02-29');
 });
 
-test('daily minutes are summed by key in order', () => {
-  const daily = [
-    { date: '2026-10-18', minutes: 10 },
-    { date: '2026-10-19', minutes: 20 },
-    { date: '2026-10-25', minutes: 30 },
-    { date: '2026-11-01', minutes: 40 },
-  ];
-  // Sundays 10-18, 10-25 and 11-01 each open a week.
-  assert.deepEqual(bucket(daily, weekStart), [
-    { key: '2026-10-18', minutes: 30 },
-    { key: '2026-10-25', minutes: 30 },
-    { key: '2026-11-01', minutes: 40 },
-  ]);
-  assert.deepEqual(
-    bucket(daily, (date) => date.slice(0, 7)),
-    [
-      { key: '2026-10', minutes: 60 },
-      { key: '2026-11', minutes: 40 },
-    ],
-  );
-});
-
 test('an unknown period is an English 400 before touching the DB', async () => {
   const untouchedPool = {
     query: async () => {
@@ -105,7 +82,7 @@ test('an unknown period is an English 400 before touching the DB', async () => {
     },
   } as unknown as Pool;
   await withApi(untouchedPool, async (call) => {
-    const { status, data } = await call('/api/stats/study-time?period=year');
+    const { status, data } = await call('/api/stats/finished-contents?period=year');
     assert.equal(status, 400);
     assert.match(
       String(data.error),
@@ -114,48 +91,24 @@ test('an unknown period is an English 400 before touching the DB', async () => {
   });
 });
 
-test('without any logs the totals are zero and averages do not divide by zero', async () => {
-  const pool = snapshotPool(async (sql: string, params: string[]) =>
-    sql.includes('generate_series')
-      ? { rows: [{ date: params[0], minutes: 0 }] }
-      : { rows: [{ first: null, cumulative: 0 }] },
-  );
+// The queries of /api/stats/finished-contents without any finished entry: no rows to place, and the
+// textbooks' totals count.
+const emptyFinished = async (sql: string) =>
+  sql.includes('count(*) FILTER')
+    ? { rows: [{ chapters: 0, sections: 0 }] }
+    : { rows: [] as unknown[] };
+
+test('without any finished entry the counts are zero and the period starts today', async () => {
   await withApi(
-    pool,
+    snapshotPool(emptyFinished),
     async (call) => {
-      const { status, data } = await call('/api/stats/study-time?period=all');
+      const { status, data } = await call('/api/stats/finished-contents?period=all');
       assert.equal(status, 200);
       assert.equal(data.from, '2026-10-23');
-      assert.equal(data.totalMinutes, 0);
-      assert.equal(data.averageMinutesPerDay, 0);
-      assert.equal(data.averageMinutesPerStudyDay, 0);
-    },
-    { today: () => '2026-10-23' },
-  );
-});
-
-test('all time of a study type without logs is just today, and the type reaches the queries (#52)', async () => {
-  const sent: unknown[][] = [];
-  const pool = snapshotPool(async (sql: string, params: unknown[]) => {
-    sent.push(params);
-    return sql.includes('generate_series')
-      ? { rows: [{ date: params[0], minutes: 0 }] }
-      : { rows: [{ first: null, cumulative: 0 }] };
-  });
-  await withApi(
-    pool,
-    async (call) => {
-      const { status, data } = await call('/api/stats/study-time?period=all&type=review');
-      assert.equal(status, 200);
       assert.deepEqual(
-        [data.type, data.from, data.days, data.averageMinutesPerDay],
-        ['review', '2026-10-23', 1, 0],
+        [data.chapters, data.sections, data.cumulativeChapters, data.days],
+        [0, 0, 0, 1],
       );
-      // No textbook asked for, so none is looked up and none narrows the sums (#180).
-      assert.deepEqual(sent, [
-        ['2026-10-23', 'review', null],
-        ['2026-10-23', '2026-10-23', 'review', null],
-      ]);
     },
     { today: () => '2026-10-23' },
   );
@@ -242,17 +195,12 @@ test('without dates the pattern covers the last 3 months', async () => {
   );
 });
 
-test('study-time reads every query of one response on one REPEATABLE READ snapshot (#269)', async () => {
+test('finished-contents reads every query of one response on one REPEATABLE READ snapshot (#269)', async () => {
   statements.length = 0;
-  const pool = snapshotPool(async (sql, params: unknown[]) =>
-    sql.includes('generate_series')
-      ? { rows: [{ date: params[0], minutes: 0 }] }
-      : { rows: [{ first: null, cumulative: 0 }] },
-  );
   await withApi(
-    pool,
+    snapshotPool(emptyFinished),
     async (call) => {
-      assert.equal((await call('/api/stats/study-time?period=all')).status, 200);
+      assert.equal((await call('/api/stats/finished-contents?period=all')).status, 200);
     },
     { today: () => '2026-10-23' },
   );

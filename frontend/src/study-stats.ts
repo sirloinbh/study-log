@@ -8,38 +8,6 @@ export const periodLabels: Record<StatPeriod, string> = {
   all: 'All',
 };
 
-// What the study time figures cover (#52).
-export const statStudyTypes = ['all', 'new', 'review'] as const;
-export type StatStudyType = (typeof statStudyTypes)[number];
-export const statStudyTypeLabels: Record<StatStudyType, string> = {
-  all: 'All',
-  new: 'New',
-  review: 'Review',
-};
-
-// `textbookId` '' for every log, or one textbook's (#180).
-export const studyTimePath = (period: StatPeriod, type: StatStudyType, textbookId = '') =>
-  `/api/stats/study-time?period=${period}${type === 'all' ? '' : `&type=${type}`}${
-    textbookId ? `&textbookId=${textbookId}` : ''
-  }`;
-
-// The response of GET /api/stats/study-time (#47).
-export type StudyTimeStats = {
-  period: StatPeriod;
-  from: string;
-  to: string;
-  totalMinutes: number;
-  todayMinutes: number;
-  cumulativeMinutes: number;
-  days: number;
-  studyDays: number;
-  averageMinutesPerDay: number;
-  averageMinutesPerStudyDay: number;
-  daily: { date: string; minutes: number }[];
-  weekly: { weekStart: string; minutes: number }[];
-  monthly: { month: string; minutes: number }[];
-};
-
 // GET /api/stats/reviews (#46). `completionRate` is a whole percent, null with nothing scheduled.
 export type ReviewStats = {
   period: StatPeriod;
@@ -62,27 +30,6 @@ export const reviewBars = (stats: ReviewStats) =>
       ['Delayed', stats.delayed],
     ] as const
   ).map(([name, count]) => ({ label: `${name} ${count}`, count }));
-
-export type DayMinutes = { date: string; minutes: number };
-
-// Intensity levels of the heatmap (#50), by fixed bands rather than relative to the busiest day,
-// so a level means the same thing every week: 0 none, 1 under 30 minutes, 2 under an hour,
-// 3 under two hours, 4 two hours or more.
-export const heatBands = [
-  { level: 0, label: '0 min' },
-  { level: 1, label: 'Under 30 min' },
-  { level: 2, label: '30 min–1 h' },
-  { level: 3, label: '1–2 h' },
-  { level: 4, label: '2 h or more' },
-] as const;
-
-export function heatLevel(minutes: number) {
-  if (minutes <= 0) return 0;
-  if (minutes < 30) return 1;
-  if (minutes < 60) return 2;
-  if (minutes < 120) return 3;
-  return 4;
-}
 
 // The days as week columns of seven (Sunday first, #96). `daily` starts on a Sunday; the days after
 // the last one (the rest of this week) are null.
@@ -141,10 +88,6 @@ export type TextbookStats = {
 export const textbookStatsPath = (textbookId: string) =>
   `/api/stats/textbooks${textbookId ? `?textbookId=${textbookId}` : ''}`;
 
-// Rounded down, so nearly all is not shown as all.
-export const chapterPercent = (book: { completedChapters: number; totalChapters: number }) =>
-  book.totalChapters ? Math.floor((book.completedChapters * 100) / book.totalChapters) : 0;
-
 export const weekdayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 // "20:00–21:00" for the hour starting at 20.
@@ -157,7 +100,7 @@ export const barWidth = (value: number, values: number[]) => {
   return most > 0 ? `${Math.round((value / most) * 100)}%` : '0%';
 };
 
-// Study time chart (#49): one bar per day, week (from its Sunday) or month.
+// The chart of finished chapters and sections (#49, #481): one bar per day, week (from its Sunday) or month.
 export const chartUnits = ['day', 'week', 'month'] as const;
 export type ChartUnit = (typeof chartUnits)[number];
 export const chartUnitLabels: Record<ChartUnit, string> = {
@@ -173,33 +116,6 @@ export const defaultChartUnit: Record<StatPeriod, ChartUnit> = {
   '3months': 'week',
   all: 'month',
 };
-
-export type ChartBar = { key: string; label: string; minutes: number; hours: number };
-
-const monthDay = (date: string) => `${Number(date.slice(5, 7))}/${Number(date.slice(8, 10))}`;
-
-export function chartBars(stats: StudyTimeStats, unit: ChartUnit): ChartBar[] {
-  const bar = (key: string, label: string, minutes: number) => ({
-    key,
-    label,
-    minutes,
-    hours: Math.round((minutes / 60) * 10) / 10,
-  });
-  if (unit === 'day') return stats.daily.map((d) => bar(d.date, monthDay(d.date), d.minutes));
-  if (unit === 'week')
-    return stats.weekly.map((w) => bar(w.weekStart, `${monthDay(w.weekStart)}~`, w.minutes));
-  return stats.monthly.map((m) =>
-    bar(m.month, `${m.month.slice(2, 4)}.${m.month.slice(5, 7)}`, m.minutes),
-  );
-}
-
-// The bar with the most study time, the earliest on a tie; none when nothing was studied.
-export function busiestBar(bars: ChartBar[]) {
-  return bars.reduce<ChartBar | undefined>(
-    (best, bar) => (bar.minutes > (best?.minutes ?? 0) ? bar : best),
-    undefined,
-  );
-}
 
 // What each cell looks like by level (#347): empty, two tints of the text colour, then the ring and primary
 // colours. A level that is in the future draws nothing. The tests check that every level has its own look.
