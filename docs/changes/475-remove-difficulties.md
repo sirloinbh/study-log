@@ -9,7 +9,7 @@ A study log no longer has a Difficult parts field in the form, the list, search,
 
 ## Choice for implementation
 
-The user decided (D1, 2026-11-28) to drop the old data. `database/migrations/037_drop_study_log_difficulties.sql` drops `study_logs.difficulties` (and with it the `study_logs_difficulties_length` constraint) with `DROP COLUMN IF EXISTS`, so it is safe to re-run. The old text is gone after deploy; export, retrospective draft, AI tool and audit log stopped reading it in the same PR.
+The user decided (D1, 2026-11-28) to drop the old data. `database/migrations/038_drop_study_log_difficulties.sql` drops `study_logs.difficulties` (and with it the `study_logs_difficulties_length` constraint) with `DROP COLUMN IF EXISTS`, so it is safe to re-run. The old text is gone after deploy; export, retrospective draft, AI tool and audit log stopped reading it in the same PR.
 
 ## Changes
 
