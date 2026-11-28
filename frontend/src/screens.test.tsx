@@ -40,7 +40,6 @@ describe('study logs', () => {
     let logs = start;
     return fakeApi(({ method, path, body }) => {
       if (path.startsWith('/api/textbooks')) return { body: { textbooks: [] } };
-      if (path === '/api/study-timer') return { body: { timer: null } };
       // The algorithm goals card of the day log (#426): no goal list.
       if (path.startsWith('/api/coding/goals')) return { body: { date: today, lists: [] } };
       if (path.startsWith('/api/study-logs/calendar')) {
