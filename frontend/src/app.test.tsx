@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { expect, test } from 'vitest';
 
 import { App } from './app';
@@ -55,8 +55,6 @@ test('each page has its own address and is marked in the main menu', async () =>
   render(<App />);
   const menu = screen.getByRole('navigation', { name: 'Main menu' });
   for (const [label, path] of [
-    ['Week', '/week'],
-    ['12 weeks', '/twelve-weeks'],
     ['Schedules', '/schedules'],
     ['Reviews', '/reviews'],
     ['Textbooks', '/textbooks'],
@@ -136,14 +134,16 @@ test('an unknown address falls back to the study log', async () => {
   expect(window.location.pathname).toBe('/');
 });
 
-test('the menu lists the day log, History, Week, 12 weeks, the other pages, Dashboard, and Settings last', () => {
+test('the menu lists the day log, History, the other pages, Dashboard, and Settings last, with no Week or 12 weeks item', () => {
   server({ body: { today: '2026-10-26' } });
   render(<App />);
   const menu = screen.getByRole('navigation', { name: 'Main menu' });
   const labels = within(menu)
     .getAllByRole('link')
     .map((link) => link.textContent?.trim());
-  expect(labels.slice(0, 4)).toEqual(['Study log', 'History', 'Week', '12 weeks']);
+  expect(labels.slice(0, 3)).toEqual(['Study log', 'History', 'Schedules']);
+  expect(labels).not.toContain('Week');
+  expect(labels).not.toContain('12 weeks');
   expect(labels).toContain('Algorithms');
   expect(labels.slice(-2)).toEqual(['Dashboard', 'Settings']);
 });
@@ -202,6 +202,53 @@ test('the old stats address goes to the dashboard', async () => {
   render(<App />);
   expect(await screen.findByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument();
   expect(window.location.pathname).toBe('/dashboard');
+});
+
+test('the old Week and 12 weeks addresses open those views of the Dashboard (#504)', async () => {
+  server({ body: { today: '2026-10-26' } });
+  for (const [old, view, region] of [
+    ['/week', 'week', 'Days of the week'],
+    ['/twelve-weeks', 'twelve-weeks', 'Last 12 weeks'],
+  ]) {
+    window.history.replaceState(null, '', old);
+    const { unmount } = render(<App />);
+    expect(await screen.findByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument();
+    expect([window.location.pathname, window.location.search]).toEqual([
+      '/dashboard',
+      `?view=${view}`,
+    ]);
+    expect(await screen.findByRole('region', { name: region })).toBeInTheDocument();
+    unmount();
+  }
+});
+
+test('the Dashboard switches between the overview, Week and 12 weeks and keeps the view in the address', async () => {
+  server({ body: { today: '2026-10-26' } });
+  window.history.replaceState(null, '', '/dashboard');
+  render(<App />);
+  const views = await screen.findByRole('radiogroup', { name: 'Dashboard view' });
+  const pressed = () =>
+    within(views)
+      .getAllByRole('radio')
+      .filter((item) => item.getAttribute('aria-checked') === 'true')
+      .map((item) => item.textContent);
+  expect(pressed()).toEqual(['Overview']);
+  fireEvent.click(within(views).getByRole('radio', { name: 'Week' }));
+  expect(await screen.findByRole('region', { name: 'Days of the week' })).toBeInTheDocument();
+  expect(window.location.search).toBe('?view=week');
+  expect(pressed()).toEqual(['Week']);
+  fireEvent.click(within(views).getByRole('radio', { name: '12 weeks' }));
+  expect(await screen.findByRole('region', { name: 'Last 12 weeks' })).toBeInTheDocument();
+  expect(window.location.search).toBe('?view=twelve-weeks');
+  fireEvent.click(within(views).getByRole('radio', { name: 'Overview' }));
+  await waitFor(() => expect(window.location.search).toBe(''));
+  expect(screen.queryByRole('region', { name: 'Last 12 weeks' })).toBeNull();
+  // An unknown view opens the overview.
+  cleanup();
+  window.history.replaceState(null, '', '/dashboard?view=nope');
+  render(<App />);
+  const again = await screen.findByRole('radiogroup', { name: 'Dashboard view' });
+  expect(within(again).getByRole('radio', { name: 'Overview' })).toBeChecked();
 });
 
 test('every menu entry has its own icon', () => {
