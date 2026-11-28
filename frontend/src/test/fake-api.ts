@@ -60,7 +60,7 @@ function toHandler(source: Handler | Routes): Handler {
 }
 
 const backgroundAnswers: Record<string, Answer> = {
-  // The algorithm goals of the day log (#426): none.
+  // The algorithm goals on the Algorithms page (#426): none.
   '/api/coding/goals/today': { body: { date: '', lists: [] } },
   '/api/stats/goal': {
     body: {
