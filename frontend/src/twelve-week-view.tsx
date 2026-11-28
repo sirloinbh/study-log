@@ -1,9 +1,9 @@
 import React from 'react';
 
 import { type FinishedDay, finishedTotal, finishedWeeks } from './finished-stats';
+import { plural } from './lib/format';
 import { apiKey, useApiQuery } from './lib/query';
 import { Loading } from './loading';
-import { plural } from './plural';
 import { barWidth } from './study-stats';
 
 // The last 12 weeks (#420, #481): one row per week with the chapters and sections finished and the

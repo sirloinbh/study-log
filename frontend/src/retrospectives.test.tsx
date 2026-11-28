@@ -1,7 +1,8 @@
 import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, test, vi } from 'vitest';
 
-import { periodTitle, shiftDays, shiftPeriod } from './retrospective';
+import { addDays } from './components/period-nav/periods';
+import { periodTitle, shiftPeriod } from './retrospective';
 import { Retrospectives } from './retrospectives';
 import { barWidth, hourLabel } from './study-stats';
 import { type Answer, fakeApi, type Sent } from './test/fake-api';
@@ -20,8 +21,8 @@ type Retro = {
 
 const periodOf = (kind: string, date: string) => {
   if (kind === 'weekly') {
-    const from = shiftDays(date, -new Date(`${date}T00:00:00Z`).getUTCDay());
-    return { from, to: shiftDays(from, 6) };
+    const from = addDays(date, -new Date(`${date}T00:00:00Z`).getUTCDay());
+    return { from, to: addDays(from, 6) };
   }
   const [year, month] = date.split('-').map(Number);
   const last = new Date(Date.UTC(year, month, 0)).getUTCDate();

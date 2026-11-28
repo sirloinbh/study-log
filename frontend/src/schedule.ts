@@ -1,4 +1,4 @@
-import { shiftDays } from './retrospective';
+import { addDays } from './components/period-nav/periods';
 
 // The responses of /api/schedules (#34).
 export type Schedule = {
@@ -37,7 +37,7 @@ export type ScheduleDetail = { schedule: Schedule; items: ScheduleItem[] };
 export const defaultHours = { weekday: '2', restDay: '2' };
 
 // Thirty days from the start, both ends counted.
-export const defaultEnd = (start: string) => shiftDays(start, 29);
+export const defaultEnd = (start: string) => addDays(start, 29);
 
 // Hours as typed into minutes, or undefined when they are not 0 to 24. The API stores minutes.
 export function hoursToMinutes(text: string) {

@@ -1,10 +1,10 @@
 import React, { useState } from 'react';
 
+import { addDays } from './components/period-nav/periods';
 import { Button } from './components/ui/button';
 import { type FinishedDay, finishedLabel } from './finished-stats';
 import { apiKey, useApiQuery } from './lib/query';
 import { Loading } from './loading';
-import { shiftDays } from './retrospective';
 import { studiedLabel, type StudyLog } from './study-logs-data';
 import { weekdayNames } from './study-stats';
 import { weekDays, weekStartOf } from './week-data';
@@ -13,7 +13,7 @@ import { weekDays, weekStartOf } from './week-data';
 // (#481) and the sessions of each day.
 export function WeekView({ today }: { today: string }) {
   const [start, setStart] = useState(() => weekStartOf(today));
-  const end = shiftDays(start, 6);
+  const end = addDays(start, 6);
   const query = useApiQuery<{ studyLogs: StudyLog[] }>(
     apiKey('/api/study-logs', 'week', start),
     `/api/study-logs?from=${start}&to=${end}&limit=100`,
@@ -33,7 +33,7 @@ export function WeekView({ today }: { today: string }) {
   return (
     <section className="card min-w-0" aria-label="Days of the week">
       <div className="mb-3 flex flex-wrap items-center gap-2">
-        <Button type="button" variant="outline" onClick={() => setStart(shiftDays(start, -7))}>
+        <Button type="button" variant="outline" onClick={() => setStart(addDays(start, -7))}>
           Previous week
         </Button>
         <Button
@@ -44,7 +44,7 @@ export function WeekView({ today }: { today: string }) {
         >
           This week
         </Button>
-        <Button type="button" variant="outline" onClick={() => setStart(shiftDays(start, 7))}>
+        <Button type="button" variant="outline" onClick={() => setStart(addDays(start, 7))}>
           Next week
         </Button>
       </div>

@@ -1,3 +1,4 @@
+import { addDays } from './components/period-nav/periods';
 export type RetrospectiveKind = 'weekly' | 'monthly';
 
 export type Retrospective = {
@@ -34,15 +35,9 @@ export const kindLabels: Record<RetrospectiveKind, string> = {
 // Same limit as the API; the server still validates.
 export const retrospectiveLimit = 20000;
 
-export const shiftDays = (day: string, days: number) => {
-  const date = new Date(`${day}T00:00:00Z`);
-  date.setUTCDate(date.getUTCDate() + days);
-  return date.toISOString().slice(0, 10);
-};
-
 // A date in the period `delta` periods away from the one starting at `from`.
 export function shiftPeriod(kind: RetrospectiveKind, from: string, delta: number) {
-  if (kind === 'weekly') return shiftDays(from, 7 * delta);
+  if (kind === 'weekly') return addDays(from, 7 * delta);
   const [year, month] = from.split('-').map(Number);
   return new Date(Date.UTC(year, month - 1 + delta, 1)).toISOString().slice(0, 10);
 }
