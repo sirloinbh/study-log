@@ -3,9 +3,9 @@ import { expect, test } from 'vitest';
 
 import { Calendar } from './calendar';
 import { calendarCells, monthTitle, shiftMonth, shortMinutes } from './month-calendar';
-import { StudyLogs } from './study-logs';
 import { type Api, fakeApi } from './test/fake-api';
 import { render } from './test/render';
+import { StudyLogScreen } from './test/study-log-screen';
 
 const today = '2026-10-22';
 
@@ -36,7 +36,7 @@ function server(
 ) {
   const logs = [...initial];
   const failed = { status: 500, body: { error: 'Server error' } };
-  return fakeApi(({ method, path, body }) => {
+  return fakeApi(({ method, path }) => {
     if (path === '/api/textbooks') return { body: { textbooks: [] } };
     const month = path.match(/^\/api\/study-logs\/calendar\?month=(\d{4}-\d{2})$/);
     if (month) {
@@ -62,10 +62,13 @@ function server(
       return { body: { studyLogs: logs.filter((l) => l.studyDate === day[1]) } };
     }
     if (path.startsWith('/api/study-logs?limit=')) return { body: { studyLogs: logs } };
-    if (path === '/api/study-logs' && method === 'POST') {
-      const saved = log(100 + logs.length, (body as { studyDate: string }).studyDate, 60);
-      logs.push(saved);
-      return { status: 201, body: { studyLog: saved } };
+    const removed = path.match(/^\/api\/study-logs\/(\d+)$/);
+    if (removed && method === 'DELETE') {
+      logs.splice(
+        logs.findIndex((l) => l.id === Number(removed[1])),
+        1,
+      );
+      return { status: 204 };
     }
     return undefined;
   });
@@ -148,23 +151,19 @@ test('months move back and forth and 이번 달 returns to today', async () => {
   );
 });
 
-test('saving a log on the page reloads the calendar', async () => {
+test('deleting a log on the History page reloads the calendar', async () => {
   const api = server(logs);
-  render(<StudyLogs today={today} />);
+  render(<StudyLogScreen today={today} />);
   await within(card()).findByText('Memo 2');
   const before = calendarOf(api).length;
-  fireEvent.change(screen.getByLabelText('Start'), { target: { value: '13:00' } });
-  fireEvent.change(screen.getByLabelText('End'), { target: { value: '14:00' } });
-  fireEvent.submit(document.querySelector('form')!);
-  expect(
-    await within(card()).findByRole('button', {
-      name: '2026-10-22, studied 2 h 30 min, 3 logs',
-    }),
-  ).toBeInTheDocument();
-  expect(calendarOf(api).slice(before)).toEqual([
-    '/api/study-logs/calendar?month=2026-10',
-    '/api/study-logs?date=2026-10-22',
-  ]);
+  fireEvent.click(await screen.findByRole('button', { name: /Delete log: 2026-09-30/ }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+  await waitFor(() =>
+    expect(calendarOf(api).slice(before)).toEqual([
+      '/api/study-logs/calendar?month=2026-10',
+      '/api/study-logs?date=2026-10-22',
+    ]),
+  );
 });
 
 test('a failed calendar load is reported', async () => {

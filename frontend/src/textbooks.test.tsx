@@ -288,8 +288,8 @@ test('fields and buttons are locked while a save is in flight', async () => {
   await waitFor(() => {
     for (const input of fields()) expect(input).toBeDisabled();
   });
-  // The title, plus the author and edition pickers.
-  expect(fields()).toHaveLength(3);
+  // The link, the title, plus the author and edition pickers.
+  expect(fields()).toHaveLength(4);
   for (const name of [/Register/, /Edit textbook/, /Delete textbook/])
     expect(screen.getByRole('button', { name })).toBeDisabled();
   release();

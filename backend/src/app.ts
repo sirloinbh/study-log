@@ -42,6 +42,13 @@ import { statsRoutes } from './stats.js';
 import { studyGoalRoutes } from './study-goal.js';
 import { studyLogRoutes } from './study-logs.js';
 import { textbookContentRoutes } from './textbook-contents.js';
+import {
+  claudeLinkReader,
+  type LinkFetcher,
+  type LinkReader,
+  storeFetcher,
+  textbookLinkRoutes,
+} from './textbook-link.js';
 import { textbookRoutes } from './textbooks.js';
 import { claudeTranslator, type Translator } from './translation.js';
 
@@ -57,6 +64,9 @@ export function createApp(
     today?: () => string;
     translator?: Translator;
     drafter?: Drafter;
+    // Reads a store page and the book details out of it (#482); stand-ins in tests.
+    linkFetcher?: LinkFetcher;
+    linkReader?: LinkReader;
     extractor?: Extractor;
     feedbacker?: Feedbacker;
     holidayFetcher?: HolidayFetcher;
@@ -185,6 +195,14 @@ export function createApp(
   app.use(
     '/api/exercises',
     exerciseRoutes(pool, options.translator ?? claudeTranslator(), fileStorage),
+  );
+  // Before the textbook routes, so 'from-link' is not read as an id.
+  app.use(
+    '/api/textbooks/from-link',
+    textbookLinkRoutes(
+      options.linkFetcher ?? storeFetcher(),
+      options.linkReader ?? claudeLinkReader(),
+    ),
   );
   app.use('/api/textbooks', textbookRoutes(pool, fileStorage));
   // #711: shared-ai calls the AI tools here with a signed token. Outside /api, so the proxy never reaches it.

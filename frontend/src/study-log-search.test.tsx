@@ -1,10 +1,10 @@
 import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { expect, test } from 'vitest';
 
-import { StudyLogs } from './study-logs';
 import { studyLogSearchPath } from './study-logs-data';
 import { type Api, fakeApi } from './test/fake-api';
 import { render } from './test/render';
+import { StudyLogScreen } from './test/study-log-screen';
 
 type Log = {
   id: number;
@@ -51,15 +51,18 @@ const stored = [
 // The study log API filtering like the server.
 function server(initial: Log[], options: { failSearch?: boolean } = {}) {
   const logs = [...initial];
-  return fakeApi(({ method, path, body }) => {
+  return fakeApi(({ method, path }) => {
     if (path === '/api/textbooks')
       return { body: { textbooks: [{ id: 1, title: '선형대수', author: '', edition: '' }] } };
     if (path.startsWith('/api/study-logs/calendar'))
       return { body: { month: '2026-10', days: [] } };
-    if (path === '/api/study-logs' && method === 'POST') {
-      const posted = body as { studyDate: string; memo: string };
-      logs.push(log(100 + logs.length, posted.studyDate, posted.memo));
-      return { status: 201, body: { studyLog: logs.at(-1) } };
+    const removed = path.match(/^\/api\/study-logs\/(\d+)$/);
+    if (removed && method === 'DELETE') {
+      logs.splice(
+        logs.findIndex((l) => l.id === Number(removed[1])),
+        1,
+      );
+      return { status: 204 };
     }
     const [base, query = ''] = path.split('?');
     if (base !== '/api/study-logs') return undefined;
@@ -97,7 +100,7 @@ const search = () => fireEvent.submit(card().querySelector('form')!);
 
 async function open(...args: Parameters<typeof server>) {
   const api = server(...args);
-  render(<StudyLogs today="2026-10-22" />);
+  render(<StudyLogScreen today="2026-10-22" />);
   await within(card()).findByRole('option', { name: '선형대수' });
   return api;
 }
@@ -144,17 +147,14 @@ test('no match says so and a failed search is reported without old results', asy
   expect(results()).toHaveLength(0);
 });
 
-test('saving a log searches the shown results again', async () => {
+test('deleting a log on the History page searches the shown results again', async () => {
   const api = await open(stored);
   fillIn('Search term', '고유');
   search();
   await waitFor(() => expect(results()).toHaveLength(2));
-  // The entry form is the page's first form.
-  fireEvent.change(screen.getByLabelText('Start'), { target: { value: '13:00' } });
-  fireEvent.change(screen.getByLabelText('End'), { target: { value: '14:00' } });
-  fireEvent.change(screen.getByLabelText('Memo'), { target: { value: '고유값 복습' } });
-  fireEvent.submit(document.querySelector('form')!);
-  await waitFor(() => expect(results()).toHaveLength(3));
+  fireEvent.click(screen.getByRole('button', { name: /Delete log: 2026-10-20/ }));
+  fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
+  await waitFor(() => expect(results()).toHaveLength(1));
   expect(searchesOf(api)).toHaveLength(2);
 });
 

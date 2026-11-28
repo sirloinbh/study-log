@@ -45,6 +45,7 @@ import {
   contentOrderInput,
   contentUpdateInput,
 } from './textbook-contents.js';
+import { textbookLinkInput } from './textbook-link.js';
 import { textbookInput } from './textbooks.js';
 
 // The retrospective period is a kind and a start date; every other path parameter is an id.
@@ -334,6 +335,12 @@ export const operations: Record<string, Operation> = {
     summary: 'Add a textbook',
     body: ['Textbook', textbookInput],
     status: [201, 400],
+  },
+  'POST /api/textbooks/from-link': {
+    summary:
+      'Read a Yes24 or Kyobo Book Centre product link with Claude and return its title, author and edition without saving; only https links on those stores are fetched',
+    body: ['TextbookLink', textbookLinkInput],
+    status: [200, 400, 413, 422, 429, 502, 503, 504],
   },
   'PUT /api/textbooks/:id': {
     summary: 'Replace a textbook',

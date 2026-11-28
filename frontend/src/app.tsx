@@ -9,6 +9,7 @@ import {
   ChartColumn,
   Code,
   Grid3x3,
+  History as HistoryIcon,
   NotebookPen,
   NotebookText,
   Rows3,
@@ -31,7 +32,7 @@ import { Reviews } from './reviews';
 import { Schedules } from './schedules';
 import { AccountActions, SignInGate } from './sign-in';
 import { Stats } from './stats';
-import { StudyLogs } from './study-logs';
+import { StudyHistoryPage, StudyLogPage } from './study-log-pages';
 import { Textbooks } from './textbooks';
 import { TwelveWeekView } from './twelve-week-view';
 import { WeekView } from './week-view';
@@ -39,6 +40,7 @@ import { WeekView } from './week-view';
 // Every page URL lives here (central docs/directory-rules.md). The study log is the start page.
 const pages = {
   logs: '/',
+  history: '/history',
   week: '/week',
   twelveWeeks: '/twelve-weeks',
   schedules: '/schedules',
@@ -54,6 +56,7 @@ const pages = {
 // the day log, Week, 12 weeks, the app's other pages, Dashboard, Settings last.
 const nav: NavItem[] = [
   { to: pages.logs, label: 'Study log', icon: NotebookPen },
+  { to: pages.history, label: 'History', icon: HistoryIcon },
   { to: pages.week, label: 'Week', icon: Rows3 },
   { to: pages.twelveWeeks, label: '12 weeks', icon: Grid3x3 },
   { to: pages.schedules, label: 'Schedules', icon: CalendarDays },
@@ -126,11 +129,24 @@ function AppBody() {
               element={
                 <Page
                   title="Study log"
-                  description="Record the time and topics you studied today and review recent logs"
+                  description="Record the time and topics you studied"
                   health={health}
                   today={today}
                 >
-                  {(today) => <StudyLogs today={today} onChange={reviewsChanged} />}
+                  {(today) => <StudyLogPage today={today} onChange={reviewsChanged} />}
+                </Page>
+              }
+            />
+            <Route
+              path={pages.history}
+              element={
+                <Page
+                  title="History"
+                  description="Recent study logs, search and the calendar"
+                  health={health}
+                  today={today}
+                >
+                  {(today) => <StudyHistoryPage today={today} onChange={reviewsChanged} />}
                 </Page>
               }
             />
