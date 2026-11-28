@@ -103,7 +103,6 @@ const studyLogColumns = [
   'chapter',
   'understanding',
   'goal_achieved',
-  'difficulties',
   'memo',
 ];
 
@@ -125,7 +124,7 @@ export function exportRoutes(pool: Pool, today: () => string) {
       `SELECT l.id, l.study_date AS date, to_char(l.start_time, 'HH24:MI') AS start,
          to_char(l.end_time, 'HH24:MI') AS "end", l.duration_minutes AS minutes, l.status,
          l.study_type AS type, t.title AS textbook, c.number AS chapter_number, c.title AS chapter,
-         l.understanding, l.goal_achieved, l.difficulties, l.memo
+         l.understanding, l.goal_achieved, l.memo
        FROM study_logs l
        LEFT JOIN textbooks t ON t.id = l.textbook_id
        LEFT JOIN textbook_contents c ON c.id = l.content_id

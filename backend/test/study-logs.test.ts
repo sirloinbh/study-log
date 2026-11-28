@@ -194,6 +194,6 @@ test('search conditions combine, and wildcards in the words are plain characters
         '&from=2026-10-01&to=2026-10-31&textbookId=7&limit=100',
     );
     assert.deepEqual(sent[0].params, [7, '%50\\%\\_%', '2026-10-01', '2026-10-31', 100]);
-    assert.match(sent[0].sql, /l\.memo ILIKE \$2 OR l\.difficulties ILIKE \$2/);
+    assert.match(sent[0].sql, /l\.memo ILIKE \$2/);
   });
 });

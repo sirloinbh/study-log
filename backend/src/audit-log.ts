@@ -5,7 +5,7 @@ import { auditContext, type AuditDb, writeAudit } from './standard/audit.js';
 // One audit_log row for a change made through the HTTP API (#263), written with the client of the
 // change's own transaction. Callers pass a short summary (ids, titles), never memo or answer text;
 // `omit` drops those keys if one slips in.
-const privateText = ['memo', 'body', 'difficulties', 'understanding', 'answer', 'translation'];
+const privateText = ['memo', 'body', 'understanding', 'answer', 'translation'];
 
 export const auditChange = (
   req: Request,

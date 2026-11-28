@@ -36,7 +36,7 @@ test(
           })
         ).data.textbook as { id: number }
       ).id;
-      const add = (studyDate: string, memo: string, difficulties = '', textbookId?: number) =>
+      const add = (studyDate: string, memo: string, textbookId?: number) =>
         call('/api/study-logs', {
           method: 'POST',
           body: {
@@ -45,14 +45,13 @@ test(
             endTime: '10:00',
             status: 'done',
             memo,
-            difficulties,
             textbookId: textbookId ?? null,
           },
         });
-      await add('2101-03-01', 'Eigenvalue 정리', '', book);
-      await add('2101-03-15', '미적분 복습', '고유값 계산이 어려웠다');
-      await add('2101-04-02', '고유벡터 연습', '', book);
-      await add('2101-05-20', '50% 할인 문제', '');
+      await add('2101-03-01', 'Eigenvalue 정리', book);
+      await add('2101-03-15', '미적분 복습 고유값');
+      await add('2101-04-02', '고유벡터 연습', book);
+      await add('2101-05-20', '50% 할인 문제');
 
       const memos = async (query: string) =>
         (
@@ -60,8 +59,8 @@ test(
             .studyLogs as { memo: string }[]
         ).map((log) => log.memo);
 
-      // Words in the memo or the difficulties, any case, newest first.
-      assert.deepEqual(await memos('&q=고유'), ['고유벡터 연습', '미적분 복습']);
+      // Words in the memo, any case, newest first.
+      assert.deepEqual(await memos('&q=고유'), ['고유벡터 연습', '미적분 복습 고유값']);
       assert.deepEqual(await memos('&q=EIGEN'), ['Eigenvalue 정리']);
       assert.deepEqual(await memos(`&q=${encodeURIComponent('50%')}`), ['50% 할인 문제']);
       assert.deepEqual(await memos(`&q=${encodeURIComponent('%')}`), ['50% 할인 문제']);
@@ -73,7 +72,7 @@ test(
           memo: string;
         }[]
       ).map((log) => log.memo);
-      assert.deepEqual(march, ['미적분 복습', 'Eigenvalue 정리']);
+      assert.deepEqual(march, ['미적분 복습 고유값', 'Eigenvalue 정리']);
       assert.deepEqual(
         (
           (await call('/api/study-logs?q=고유&from=2101-04-01&to=2101-12-31')).data.studyLogs as {

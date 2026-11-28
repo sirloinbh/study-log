@@ -17,7 +17,6 @@ export type StudyLog = {
   contentNumber: string | null;
   contentTitle: string | null;
   understanding: number | null;
-  difficulties: string;
   goalAchieved: boolean | null;
   studyType: StudyType;
 };
@@ -32,7 +31,6 @@ export type StudyLogForm = Pick<
   | 'textbookId'
   | 'contentId'
   | 'understanding'
-  | 'difficulties'
   | 'goalAchieved'
   | 'studyType'
 >;
@@ -81,7 +79,6 @@ export const emptyForm = (studyDate: string): StudyLogForm => ({
   textbookId: null,
   contentId: null,
   understanding: null,
-  difficulties: '',
   goalAchieved: null,
   studyType: 'new',
 });

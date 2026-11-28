@@ -158,16 +158,6 @@ export function StudyLogFormView({
         </NativeSelect>
       </label>
       <label className="wide">
-        Difficult parts
-        <textarea
-          rows={2}
-          maxLength={2000}
-          disabled={busy}
-          value={form.difficulties}
-          onChange={(event) => onPatch({ difficulties: event.target.value })}
-        />
-      </label>
-      <label className="wide">
         Memo
         <textarea
           rows={3}

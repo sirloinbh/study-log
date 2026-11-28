@@ -55,7 +55,6 @@ test("a draft is built from the period's records and is not saved", { skip: !url
             endTime: '10:00',
             status,
             memo,
-            difficulties: 'hard part',
           },
         });
 
@@ -83,8 +82,8 @@ test("a draft is built from the period's records and is not saved", { skip: !url
       const [input] = seen;
       assert.deepEqual([input.kind, input.from, input.to], ['weekly', '2093-05-03', '2093-05-09']);
       assert.deepEqual(
-        input.logs.map((entry) => [entry.date, entry.memo, entry.difficulties]),
-        [['2093-05-04', 'limits', 'hard part']],
+        input.logs.map((entry) => [entry.date, entry.memo]),
+        [['2093-05-04', 'limits']],
       );
       assert.deepEqual(input.keywords, [{ date: '2093-05-04', keyword: 'epsilon', memo: 'delta' }]);
 

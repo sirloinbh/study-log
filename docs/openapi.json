@@ -5777,7 +5777,7 @@
     },
     "/api/retrospectives/{kind}/{start}/draft": {
       "post": {
-        "summary": "Ask Claude for a draft retrospective of the period from its study logs, difficult parts and keywords; nothing is saved",
+        "summary": "Ask Claude for a draft retrospective of the period from its study logs and keywords; nothing is saved",
         "parameters": [
           {
             "name": "kind",
@@ -7242,10 +7242,6 @@
                 "type": "null"
               }
             ]
-          },
-          "difficulties": {
-            "default": "",
-            "type": "string"
           },
           "goalAchieved": {
             "default": null,
