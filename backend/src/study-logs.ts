@@ -64,13 +64,6 @@ export const studyLogInput = z
         .max(5, 'Understanding must be a whole number from 1 to 5')
         .nullable()
         .default(null),
-      difficulties: z
-        .string({ error: 'The difficult-parts format is invalid' })
-        .refine(
-          (value) => value.length <= 2000,
-          'The difficult parts must be at most 2000 characters',
-        )
-        .default(''),
       goalAchieved: z
         .boolean({ error: 'The goal-achieved flag format is invalid' })
         .nullable()
@@ -91,7 +84,7 @@ export const studyLogInput = z
   });
 
 // ?date for one day in time order; otherwise the most recent logs, narrowed by ?textbookId, ?q
-// (memo or difficulties, any case) and ?from/?to (#18). Every given condition applies.
+// (memo, any case) and ?from/?to (#18). Every given condition applies.
 export const studyLogListQuery = z
   .object({
     date: studyDate.optional(),
@@ -125,7 +118,7 @@ const select = (source: string) => `SELECT l.id, l.study_date AS "studyDate",
   l.duration_minutes AS "durationMinutes", l.memo, l.status,
   l.textbook_id AS "textbookId", t.title AS "textbookTitle",
   l.content_id AS "contentId", c.number AS "contentNumber", c.title AS "contentTitle",
-  l.understanding, l.difficulties, l.goal_achieved AS "goalAchieved",
+  l.understanding, l.goal_achieved AS "goalAchieved",
   l.study_type AS "studyType"
   FROM ${source} l
   LEFT JOIN textbooks t ON t.id = l.textbook_id
@@ -147,7 +140,7 @@ export async function listStudyLogs(db: Db, query: StudyLogListQuery) {
   if (textbookId !== undefined) where.push(`l.textbook_id = ${ph(textbookId)}`);
   if (q) {
     const pattern = ph(likePattern(q));
-    where.push(`(l.memo ILIKE ${pattern} OR l.difficulties ILIKE ${pattern})`);
+    where.push(`l.memo ILIKE ${pattern}`);
   }
   if (from) where.push(`l.study_date >= ${ph(from)}`);
   if (to) where.push(`l.study_date <= ${ph(to)}`);
@@ -200,8 +193,8 @@ export function studyLogRoutes(pool: Pool) {
         const { rows } = await client.query<{ id: number }>(
           `WITH saved AS (
              INSERT INTO study_logs (study_date, start_time, end_time, duration_minutes, memo,
-               status, textbook_id, content_id, understanding, difficulties, goal_achieved, study_type)
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) RETURNING *)
+               status, textbook_id, content_id, understanding, goal_achieved, study_type)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *)
            ${select('saved')}`,
           [
             log.studyDate,
@@ -213,7 +206,6 @@ export function studyLogRoutes(pool: Pool) {
             log.textbookId,
             log.contentId,
             log.understanding,
-            log.difficulties,
             log.goalAchieved,
             log.studyType,
           ],
@@ -247,7 +239,7 @@ export function studyLogRoutes(pool: Pool) {
           `WITH saved AS (
              UPDATE study_logs SET study_date = $2, start_time = $3, end_time = $4,
                duration_minutes = $5, memo = $6, status = $7, textbook_id = $8, content_id = $9,
-               understanding = $10, difficulties = $11, goal_achieved = $12, study_type = $13,
+               understanding = $10, goal_achieved = $11, study_type = $12,
                updated_at = now()
              WHERE id = $1 RETURNING *)
            ${select('saved')}`,
@@ -262,7 +254,6 @@ export function studyLogRoutes(pool: Pool) {
             log.textbookId,
             log.contentId,
             log.understanding,
-            log.difficulties,
             log.goalAchieved,
             log.studyType,
           ],

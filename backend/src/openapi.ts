@@ -22,7 +22,6 @@ import {
   textbookListQuery,
 } from './exercises.js';
 import { exportQuery } from './export.js';
-import { flashcardAnswer, flashcardQuery } from './keyword-flashcards.js';
 import { keywordInput, keywordListQuery } from './keywords.js';
 import {
   bodyInput as retrospectiveInput,
@@ -122,7 +121,7 @@ export const operations: Record<string, Operation> = {
 
   'POST /api/retrospectives/:kind/:start/draft': {
     summary:
-      'Ask Claude for a draft retrospective of the period from its study logs, difficult parts and keywords; nothing is saved',
+      'Ask Claude for a draft retrospective of the period from its study logs and keywords; nothing is saved',
     status: [200, 400, 409, 415, 422, 429, 502, 503],
   },
 
@@ -185,16 +184,6 @@ export const operations: Record<string, Operation> = {
     status: [200, 400, 404, 409],
   },
   'DELETE /api/keywords/:id': { summary: 'Delete a keyword', status: [204, 400, 404] },
-  'GET /api/flashcards': {
-    summary: 'Keyword flashcards of a review day: keywords noted on the study dates of due reviews',
-    query: flashcardQuery,
-    status: [200, 400],
-  },
-  'PUT /api/flashcards/:keywordId': {
-    summary: 'Record whether a keyword was known on a day; answering again replaces it',
-    body: ['FlashcardAnswer', flashcardAnswer],
-    status: [200, 400, 404],
-  },
 
   'GET /api/coding/solvedac/problems/:number': {
     summary: 'Look up a Baekjoon problem on solved.ac (title, tier, tags) to fill in the form',

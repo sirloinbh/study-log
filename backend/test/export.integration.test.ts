@@ -65,13 +65,13 @@ test(
       const lines = text.slice(1).split('\r\n');
       assert.equal(
         lines[0],
-        'id,date,start,end,minutes,status,type,textbook,chapter_number,chapter,understanding,goal_achieved,difficulties,memo',
+        'id,date,start,end,minutes,status,type,textbook,chapter_number,chapter,understanding,goal_achieved,memo',
       );
       assert.match(
         text,
-        /7002-03-01,09:00,10:30,90,done,new,export364-textbook,1,Vectors,,,,"first, ""quoted""\nsecond"\r\n/,
+        /7002-03-01,09:00,10:30,90,done,new,export364-textbook,1,Vectors,,,"first, ""quoted""\nsecond"\r\n/,
       );
-      assert.match(text, /7002-03-02,09:00,09:30,30,done,new,,,,,,,'=1\+1\r\n$/);
+      assert.match(text, /7002-03-02,09:00,09:30,30,done,new,,,,,,'=1\+1\r\n$/);
 
       const narrow = await call('/api/export/study-logs.csv?from=7002-03-02&to=7002-03-02');
       assert.equal(
