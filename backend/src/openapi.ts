@@ -125,23 +125,6 @@ export const operations: Record<string, Operation> = {
     status: [200, 400, 409, 415, 422, 429, 502, 503],
   },
 
-  'GET /api/study-timer': {
-    summary: 'Get the running timer with its studied seconds, or null',
-    status: [200],
-  },
-  'POST /api/study-timer/start': { summary: 'Start the timer', status: [201, 409] },
-  'POST /api/study-timer/pause': { summary: 'Pause the running timer', status: [200, 409] },
-  'POST /api/study-timer/resume': { summary: 'Resume a paused timer', status: [200, 409] },
-  'POST /api/study-timer/stop': {
-    summary:
-      'Stop the timer and create a done study log on its start day, leaving the paused time out of the duration',
-    status: [201, 400, 404],
-  },
-  'DELETE /api/study-timer': {
-    summary: 'Cancel the timer without a study log',
-    status: [204, 404],
-  },
-
   'GET /api/calendar-sync/status': {
     summary: 'Get whether Google Calendar sync is set up and connected, and how the last sync went',
     status: [200],

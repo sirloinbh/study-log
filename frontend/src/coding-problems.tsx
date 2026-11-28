@@ -14,6 +14,7 @@ import {
   type SolvedProblem,
   tierLabel,
 } from './coding';
+import { CodingGoalDay } from './coding-goal-day';
 import { CodingGoals } from './coding-goals';
 import { CodingProblemDetail } from './coding-problem-detail';
 import { CodingProblemForm } from './coding-problem-form';
@@ -137,6 +138,7 @@ export function CodingProblems({
           {notice.text}
         </p>
       )}
+      <CodingGoalDay date={today} />
       <CodingQuickLog today={today} busy={busy} action={action} change={change} />
       <CodingGoals
         onChange={onChange}

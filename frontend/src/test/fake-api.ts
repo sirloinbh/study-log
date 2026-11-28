@@ -60,9 +60,8 @@ function toHandler(source: Handler | Routes): Handler {
 }
 
 const backgroundAnswers: Record<string, Answer> = {
-  // The algorithm goals of the day log (#426): none.
+  // The algorithm goals on the Algorithms page (#426): none.
   '/api/coding/goals/today': { body: { date: '', lists: [] } },
-  '/api/study-timer': { body: { timer: null } },
   '/api/stats/goal': {
     body: {
       weekStart: '2026-10-18',
@@ -116,7 +115,7 @@ export function fakeApi(source: Handler | Routes): Api {
         api.requests.push(request);
         if (method !== 'GET') api.sent.push(request);
         // Cards that sit on a page next to what a test is about: a test with no handler for them sees
-        // no timer and no goal.
+        // no goal.
         const answer =
           (await handle(request)) ??
           (method === 'GET'
