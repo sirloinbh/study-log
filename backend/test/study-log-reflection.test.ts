@@ -41,7 +41,8 @@ test('the answers are optional and the edges of the scale are accepted', async (
     connect: async () => ({
       // BEGIN and COMMIT carry no parameters.
       query: async (_sql: string, params?: unknown[]) => {
-        if (params) sent.push(params);
+        // Only the INSERT of the log has many parameters; the finished-entry queries have one.
+        if (params && params.length > 3) sent.push(params);
         return { rows: [{}], rowCount: 1 };
       },
       release: () => {},

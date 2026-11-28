@@ -20,6 +20,7 @@ const log = {
   contentId: null,
   contentNumber: null,
   contentTitle: null,
+  finishedContentIds: [],
   understanding: null,
   goalAchieved: null,
   studyType: 'new',

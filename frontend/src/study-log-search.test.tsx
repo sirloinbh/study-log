@@ -19,6 +19,7 @@ type Log = {
   contentId: null;
   contentNumber: null;
   contentTitle: null;
+  finishedContentIds: number[];
   understanding: null;
   goalAchieved: null;
 };
@@ -36,6 +37,7 @@ const log = (id: number, studyDate: string, memo: string, book?: number): Log =>
   contentId: null,
   contentNumber: null,
   contentTitle: null,
+  finishedContentIds: [],
   understanding: null,
   goalAchieved: null,
 });

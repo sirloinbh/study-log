@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import type { Pool } from 'pg';
+import type { Pool, PoolClient } from 'pg';
 import { z } from 'zod/v4';
 
 import { auditChange } from './audit-log.js';
@@ -57,6 +57,19 @@ export const studyLogInput = z
         .default('planned'),
       textbookId: referenceId('textbook'),
       contentId: referenceId('contents entry'),
+      // The chapters and sections of the textbook finished in this log (#480).
+      finishedContentIds: z
+        .array(
+          z
+            .number({ error: 'Invalid contents entry ID' })
+            .int('Invalid contents entry ID')
+            .min(1, 'Invalid contents entry ID')
+            .max(999_999_999_999_999, 'Invalid contents entry ID'),
+          { error: 'The finished contents format is invalid' },
+        )
+        .max(500, 'At most 500 contents entries can be marked as finished')
+        .transform((ids) => [...new Set(ids)])
+        .default([]),
       understanding: z
         .number({ error: 'Understanding must be a whole number from 1 to 5' })
         .int('Understanding must be a whole number from 1 to 5')
@@ -81,6 +94,10 @@ export const studyLogInput = z
   .refine((log) => log.contentId === null || log.textbookId !== null, {
     error: 'Choose a textbook before choosing a contents entry',
     path: ['contentId'],
+  })
+  .refine((log) => log.finishedContentIds.length === 0 || log.textbookId !== null, {
+    error: 'Choose a textbook before marking contents entries as finished',
+    path: ['finishedContentIds'],
   });
 
 // ?date for one day in time order; otherwise the most recent logs, narrowed by ?textbookId, ?q
@@ -119,7 +136,9 @@ const select = (source: string) => `SELECT l.id, l.study_date AS "studyDate",
   l.textbook_id AS "textbookId", t.title AS "textbookTitle",
   l.content_id AS "contentId", c.number AS "contentNumber", c.title AS "contentTitle",
   l.understanding, l.goal_achieved AS "goalAchieved",
-  l.study_type AS "studyType"
+  l.study_type AS "studyType",
+  COALESCE((SELECT array_agg(f.content_id::float8 ORDER BY f.content_id)
+    FROM study_log_contents f WHERE f.study_log_id = l.id), '{}') AS "finishedContentIds"
   FROM ${source} l
   LEFT JOIN textbooks t ON t.id = l.textbook_id
   LEFT JOIN textbook_contents c ON c.id = l.content_id`;
@@ -127,6 +146,7 @@ const select = (source: string) => `SELECT l.id, l.study_date AS "studyDate",
 const notFound = { error: 'Study log not found' };
 
 export type Db = Pick<Pool, 'query'>;
+export type StudyLogInput = z.output<typeof studyLogInput>;
 export type StudyLogListQuery = z.output<typeof studyLogListQuery>;
 
 /** The list of GET /api/study-logs, also read by the AI tool. */
@@ -159,7 +179,25 @@ export async function listStudyLogs(db: Db, query: StudyLogListQuery) {
 const missingReference: Record<string, string> = {
   study_logs_textbook_fkey: 'Textbook not found',
   study_logs_content_fkey: 'Contents entry not found',
+  study_log_contents_content_fkey: 'Contents entry not found',
 };
+
+// The entries a log finished are rewritten as a whole with the log, in the log's transaction. The
+// composite foreign key keeps each one inside the log's textbook.
+async function saveFinished(
+  client: Pick<PoolClient, 'query'>,
+  logId: number,
+  textbookId: number | null,
+  contentIds: number[],
+) {
+  await client.query('DELETE FROM study_log_contents WHERE study_log_id = $1', [logId]);
+  if (textbookId === null || contentIds.length === 0) return;
+  await client.query(
+    `INSERT INTO study_log_contents (study_log_id, textbook_id, content_id)
+     SELECT $1, $2, unnest($3::bigint[])`,
+    [logId, textbookId, contentIds],
+  );
+}
 
 async function write<T>(run: () => Promise<T>) {
   try {
@@ -170,6 +208,17 @@ async function write<T>(run: () => Promise<T>) {
     if (!message) throw error;
     return { ok: false as const, error: message };
   }
+}
+
+// Saves the finished entries of a log just written and reads the whole log back.
+async function readOne(
+  client: Pick<PoolClient, 'query'>,
+  id: number,
+  log: Pick<StudyLogInput, 'textbookId' | 'finishedContentIds'>,
+) {
+  await saveFinished(client, id, log.textbookId, log.finishedContentIds);
+  const { rows } = await client.query(`${select('study_logs')} WHERE l.id = $1`, [id]);
+  return rows[0];
 }
 
 export function studyLogRoutes(pool: Pool) {
@@ -216,7 +265,7 @@ export function studyLogRoutes(pool: Pool) {
           status: log.status,
           textbookId: log.textbookId,
         });
-        return rows[0];
+        return readOne(client, rows[0].id, log);
       }),
     );
     if (!result.ok) return void res.status(400).json({ error: result.error });
@@ -235,7 +284,7 @@ export function studyLogRoutes(pool: Pool) {
         );
         const previous = before.rows[0];
         if (!previous) return undefined;
-        const { rows } = await client.query(
+        await client.query(
           `WITH saved AS (
              UPDATE study_logs SET study_date = $2, start_time = $3, end_time = $4,
                duration_minutes = $5, memo = $6, status = $7, textbook_id = $8, content_id = $9,
@@ -264,7 +313,7 @@ export function studyLogRoutes(pool: Pool) {
           status: log.status,
           textbookId: log.textbookId,
         });
-        return rows[0];
+        return readOne(client, id, log);
       }),
     );
     if (!result.ok) return void res.status(400).json({ error: result.error });

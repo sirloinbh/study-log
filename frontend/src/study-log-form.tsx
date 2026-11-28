@@ -1,4 +1,5 @@
 import { Button } from './components/ui/button';
+import { Checkbox } from './components/ui/checkbox';
 import { NativeSelect } from './components/ui/native-select';
 import { ButtonSpinner } from './loading';
 import { Memo } from './memo';
@@ -86,7 +87,13 @@ export function StudyLogFormView({
           disabled={busy}
           value={form.textbookId ?? ''}
           // Picking another textbook clears the chapter, which belonged to the previous one.
-          onChange={(event) => onPatch({ textbookId: idOf(event.target.value), contentId: null })}
+          onChange={(event) =>
+            onPatch({
+              textbookId: idOf(event.target.value),
+              contentId: null,
+              finishedContentIds: [],
+            })
+          }
         >
           <option value="">None</option>
           {textbooks.map((book) => (
@@ -111,6 +118,36 @@ export function StudyLogFormView({
           ))}
         </NativeSelect>
       </label>
+      {form.textbookId !== null && chapters.length > 0 && (
+        <fieldset className="finished-contents wide" disabled={busy}>
+          <legend>Finished chapters and sections</legend>
+          <div className="max-h-60 overflow-y-auto rounded-md border border-border p-2">
+            {chapters.map((chapter) => {
+              const id = `finished-content-${chapter.id}`;
+              const checked = form.finishedContentIds.includes(chapter.id);
+              return (
+                <div key={chapter.id} className="flex items-center gap-2 py-1">
+                  <Checkbox
+                    id={id}
+                    checked={checked}
+                    onCheckedChange={(on) =>
+                      onPatch({
+                        finishedContentIds:
+                          on === true
+                            ? [...form.finishedContentIds, chapter.id]
+                            : form.finishedContentIds.filter((value) => value !== chapter.id),
+                      })
+                    }
+                  />
+                  <label htmlFor={id} className="whitespace-pre-wrap">
+                    {chapter.label}
+                  </label>
+                </div>
+              );
+            })}
+          </div>
+        </fieldset>
+      )}
       <label>
         Type
         <NativeSelect

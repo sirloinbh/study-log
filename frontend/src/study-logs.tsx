@@ -143,6 +143,7 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
       status: log.status,
       textbookId: log.textbookId,
       contentId: log.contentId,
+      finishedContentIds: log.finishedContentIds,
       understanding: log.understanding,
       goalAchieved: log.goalAchieved,
       studyType: log.studyType,

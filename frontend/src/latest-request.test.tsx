@@ -25,6 +25,7 @@ const log = (id: number, memo: string): StudyLog => ({
   contentId: null,
   contentNumber: null,
   contentTitle: null,
+  finishedContentIds: [],
   understanding: null,
   goalAchieved: null,
   studyType: 'new',

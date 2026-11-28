@@ -26,9 +26,17 @@ type Log = {
   contentId: number | null;
   contentNumber: string | null;
   contentTitle: string | null;
+  finishedContentIds: number[];
   understanding: number | null;
   goalAchieved: boolean | null;
   studyType: string;
+};
+
+// jsdom has no ResizeObserver; the Radix checkbox in the form measures itself with one.
+globalThis.ResizeObserver ??= class {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
 };
 
 const today = '2026-10-22';
@@ -165,6 +173,7 @@ const morning: Log = {
   contentId: null,
   contentNumber: null,
   contentTitle: null,
+  finishedContentIds: [],
   understanding: null,
   goalAchieved: null,
   studyType: 'new',
@@ -280,6 +289,7 @@ test('entering a session previews its duration and saving adds it to the list', 
       status: 'in_progress',
       textbookId: null,
       contentId: null,
+      finishedContentIds: [],
       understanding: null,
       goalAchieved: null,
       studyType: 'new',
@@ -339,6 +349,7 @@ test('editing a log fills the form and saves it with PUT', async () => {
       status: 'done',
       textbookId: null,
       contentId: null,
+      finishedContentIds: [],
       understanding: null,
       goalAchieved: null,
       studyType: 'new',
@@ -532,6 +543,42 @@ test('a log can be linked to a textbook and one of its chapters', async () => {
   // The next entry keeps neither link.
   expect(field('Textbook').value).toBe('');
   expect(field('Chapter/section').value).toBe('');
+});
+
+test('several finished chapters and sections are picked, saved and shown again (#480)', async () => {
+  const api = serve();
+  await open(api);
+  // Nothing to tick without a textbook.
+  expect(screen.queryByRole('group', { name: 'Finished chapters and sections' })).toBeNull();
+  fill('Textbook', '1');
+  const group = () => screen.getByRole('group', { name: 'Finished chapters and sections' });
+  await waitFor(() => expect(within(group()).getAllByRole('checkbox')).toHaveLength(2));
+  fireEvent.click(within(group()).getByRole('checkbox', { name: /1 벡터/ }));
+  fireEvent.click(within(group()).getByRole('checkbox', { name: /1\.2 내적/ }));
+  expect(within(group()).getByRole('checkbox', { name: /1 벡터/ })).toBeChecked();
+  // Unticking removes one again.
+  fireEvent.click(within(group()).getByRole('checkbox', { name: /1 벡터/ }));
+  fireEvent.click(within(group()).getByRole('checkbox', { name: /1 벡터/ }));
+  fill('Start', '09:00');
+  fill('End', '10:00');
+  submit();
+  await waitFor(() => expect(items()).toHaveLength(1));
+  const post = methods(api, 'POST')[0].body as { finishedContentIds: number[] };
+  expect(post.finishedContentIds).toEqual([12, 11]);
+  // The next entry starts with nothing ticked.
+  expect(screen.queryByRole('group', { name: 'Finished chapters and sections' })).toBeNull();
+
+  // Editing the saved log shows what it finished.
+  fireEvent.click(list(/Edit log/));
+  await waitFor(() => expect(field('Textbook').value).toBe('1'));
+  await waitFor(() =>
+    expect(within(group()).getByRole('checkbox', { name: /1\.2 내적/ })).toBeChecked(),
+  );
+  expect(within(group()).getByRole('checkbox', { name: /1 벡터/ })).toBeChecked();
+  // Picking another textbook drops the ticks of the first.
+  fill('Textbook', '2');
+  await waitFor(() => expect(within(group()).getAllByRole('checkbox')).toHaveLength(1));
+  expect(within(group()).getByRole('checkbox')).not.toBeChecked();
 });
 
 test('picking another textbook clears the chapter of the previous one', async () => {
