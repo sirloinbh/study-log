@@ -34,7 +34,7 @@ export type ScheduleItem = {
 export type ScheduleDetail = { schedule: Schedule; items: ScheduleItem[] };
 
 // Filled in on the form; each schedule keeps its own (docs/decisions/schedule-rules.md section 1).
-export const defaultHours = { weekday: '2', restDay: '5' };
+export const defaultHours = { weekday: '2', restDay: '2' };
 
 // Thirty days from the start, both ends counted.
 export const defaultEnd = (start: string) => shiftDays(start, 29);
