@@ -43,7 +43,6 @@ import { registerToolRoutes } from './standard/tools.js';
 import { statsRoutes } from './stats.js';
 import { studyGoalRoutes } from './study-goal.js';
 import { studyLogRoutes } from './study-logs.js';
-import { studyTimerRoutes } from './study-timer.js';
 import { textbookContentRoutes } from './textbook-contents.js';
 import { textbookRoutes } from './textbooks.js';
 import { claudeTranslator, type Translator } from './translation.js';
@@ -121,7 +120,6 @@ export function createApp(
       '/api/schedules',
       '/api/reviews',
       '/api/study-logs',
-      '/api/study-timer',
       '/api/exercises',
       '/api/exercise-attempts',
     ],
@@ -140,7 +138,6 @@ export function createApp(
   // Before the study log routes, where 'calendar' would be read as a log id.
   app.use('/api/study-logs/calendar', calendarRoutes(pool, today));
   app.use('/api/study-logs', studyLogRoutes(pool));
-  app.use('/api/study-timer', studyTimerRoutes(pool));
   app.use('/api/reviews', reviewRoutes(pool, today));
   app.use('/api/export', exportRoutes(pool, today));
   app.use('/api/keywords', keywordRoutes(pool, today));
