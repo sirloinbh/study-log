@@ -35,15 +35,6 @@ export type AttemptFeedback = {
   createdAt: string;
 };
 
-// A row of the wrong-exercise list (#357).
-export type WrongExercise = Exercise & {
-  textbookTitle: string;
-  contentTitle: string;
-  lastAttemptDate: string;
-  lastResult: 'correct' | 'wrong';
-  hintUsed: boolean;
-};
-
 export type ExerciseAnswer = { exerciseId: number; body: string };
 
 // The Korean translation of an exercise and its answer (#31). `stale`: the exercise or its answer
