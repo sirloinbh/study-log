@@ -28,7 +28,6 @@ import { claudeExtractor, type Extractor } from './extraction.js';
 import { type FileStorage, s3Storage } from './file-storage.js';
 import { type GoogleCalendarClient, googleCalendarClient } from './google-calendar.js';
 import { dataPortalHolidays, type HolidayFetcher } from './holidays.js';
-import { flashcardRoutes } from './keyword-flashcards.js';
 import { keywordRoutes } from './keywords.js';
 import { type LeetCodeClient, leetCodeClient } from './leetcode.js';
 import { claudeDrafter, type Drafter } from './retrospective-draft.js';
@@ -141,7 +140,6 @@ export function createApp(
   app.use('/api/reviews', reviewRoutes(pool, today));
   app.use('/api/export', exportRoutes(pool, today));
   app.use('/api/keywords', keywordRoutes(pool, today));
-  app.use('/api/flashcards', flashcardRoutes(pool, today));
   app.use(
     '/api/coding/solvedac',
     solvedAcRoutes(
