@@ -167,8 +167,9 @@ export function pageDigest(html: string) {
       metas.push(`${key}: ${decode(value)}`);
   }
   const title = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(html)?.[1];
-  const structured = (html.match(/<script[^>]*ld\+json[^>]*>[\s\S]*?<\/script>/gi) ?? [])
-    .map((block) => block.replace(/<\/?script[^>]*>/gi, '').trim())
+  // The JSON-LD blocks are taken by their content, so no tag is stripped by hand here.
+  const structured = [...html.matchAll(/<script[^>]*ld\+json[^>]*>([\s\S]*?)<\/script>/gi)]
+    .map((block) => block[1].trim())
     .join('\n');
   const visible = decode(
     html

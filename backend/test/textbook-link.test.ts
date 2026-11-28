@@ -262,3 +262,11 @@ test('the route maps failures to their message and status', async () => {
       },
     );
 });
+
+test('the page digest keeps JSON-LD content without its script tags', () => {
+  const digest = pageDigest(
+    '<head><script type="application/ld+json">{"@type":"Book","name":"Clean Code"}</script></head>',
+  );
+  assert.match(digest, /"name":"Clean Code"/);
+  assert.doesNotMatch(digest, /<script/i);
+});
