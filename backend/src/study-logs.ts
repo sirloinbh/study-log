@@ -50,7 +50,7 @@ export const studyLogInput = z
       endTime: clock('end time'),
       memo: z
         .string({ error: 'The memo format is invalid' })
-        .refine((value) => value.length <= 10000, 'The memo must be at most 10000 characters')
+        .refine((value) => value.length <= 50000, 'The memo must be at most 50000 characters')
         .default(''),
       status: z
         .enum(studyStatuses, { error: 'The status must be planned, in progress, done, or stopped' })
