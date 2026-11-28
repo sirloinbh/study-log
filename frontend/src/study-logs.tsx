@@ -11,7 +11,6 @@ import { StudyLogFormView } from './study-log-form';
 import { StudyLogItem } from './study-log-item';
 import { StudyLogSearch } from './study-log-search';
 import { emptyForm, type StudyLog, type StudyLogForm } from './study-logs-data';
-import { StudyTimer } from './study-timer';
 import { type ContentNode, contentOptions, type Textbook } from './textbook';
 
 type Notice = { kind: 'status' | 'alert'; text: string } | undefined;
@@ -178,12 +177,6 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
 
   return (
     <div className="study-logs">
-      <StudyTimer
-        onStopped={() => {
-          reloadAll();
-          onChange?.();
-        }}
-      />
       <CodingGoalDay date={today} />
       <section className="card">
         <h2>{editingId === undefined ? 'Add a study log' : 'Edit the study log'}</h2>
