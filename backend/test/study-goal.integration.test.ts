@@ -72,7 +72,7 @@ test('the daily goal, achievement rate and streak of study days', { skip: !url }
       assert.equal(today.achievementRate, 50);
 
       await add('2098-06-17', '09:00', '11:00');
-      assert.equal((await get()).achievementRate, 175);
+      assert.equal((await get()).achievementRate, 150); // 60 + 120 minutes of 120
     },
     { today: () => '2098-06-17' },
   );
