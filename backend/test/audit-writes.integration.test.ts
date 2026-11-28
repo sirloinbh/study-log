@@ -20,9 +20,6 @@ test('each change through the API leaves one audit row', { skip: !url }, async (
       "DELETE FROM study_logs WHERE study_date BETWEEN '8053-01-01' AND '8053-12-31'",
     );
     await pool.query(
-      "DELETE FROM keywords WHERE keyword_date BETWEEN '8053-01-01' AND '8053-12-31'",
-    );
-    await pool.query(
       "DELETE FROM retrospectives WHERE period_start BETWEEN '8053-01-01' AND '8053-12-31'",
     );
     await pool.query(
@@ -268,32 +265,7 @@ test('each change through the API leaves one audit row', { skip: !url }, async (
         await change('study_log', 'delete', `/api/study-logs/${log}`, { method: 'DELETE' }, 204);
       });
 
-      await t.test('keywords and retrospectives', async () => {
-        const keyword = idOf(
-          await change(
-            'keyword',
-            'create',
-            '/api/keywords',
-            {
-              method: 'POST',
-              body: { keyword: '감사', date: '8053-03-10' },
-            },
-            201,
-          ),
-          'keyword',
-        );
-        await change(
-          'keyword',
-          'update',
-          `/api/keywords/${keyword}`,
-          {
-            method: 'PUT',
-            body: { keyword: '감사 2' },
-          },
-          200,
-        );
-        await change('keyword', 'delete', `/api/keywords/${keyword}`, { method: 'DELETE' }, 204);
-
+      await t.test('retrospectives', async () => {
         const period = (await call('/api/retrospectives/period?kind=weekly&date=8053-03-10'))
           .data as {
           from: string;

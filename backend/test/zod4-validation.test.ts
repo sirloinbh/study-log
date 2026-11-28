@@ -80,16 +80,8 @@ test('left-out fields get their defaults, and fields sent are kept (#151)', asyn
       assert.deepEqual(params[0], ['T', '', '']);
 
       params.length = 0;
-      await call('/api/keywords', { method: 'POST', body: { keyword: ' k ' } });
-      assert.deepEqual(params[0], ['2026-10-23', 'k', '']);
-
-      params.length = 0;
       await call('/api/exercises/1', { method: 'PUT', body: { body: ' b ' } });
       assert.deepEqual(params[0], [1, '', ' b ', false]);
-
-      params.length = 0;
-      await call('/api/keywords');
-      assert.deepEqual(params[0], [50]);
 
       params.length = 0;
       await call('/api/study-logs');
@@ -121,7 +113,6 @@ test('a missing value and a value of the wrong type keep their own messages (#15
       { title: 't', author: Array(201).fill(1) },
       'The author format is invalid',
     ],
-    ['POST', '/api/keywords', { keyword: [] }, 'The keyword format is invalid'],
     ['POST', '/api/textbooks/1/contents', { title: [] }, 'The contents title format is invalid'],
     [
       'POST',
@@ -142,8 +133,6 @@ test('a missing value and a value of the wrong type keep their own messages (#15
       { title: '😀'.repeat(101) },
       'The title must be at most 200 characters',
     ],
-    ['POST', '/api/keywords', {}, 'Enter a keyword'],
-    ['POST', '/api/keywords', { keyword: null }, 'The keyword format is invalid'],
     ['PATCH', '/api/exercises/1/important', {}, 'Send the important flag'],
     [
       'PATCH',
@@ -195,7 +184,6 @@ test('a missing value and a value of the wrong type keep their own messages (#15
       { ids: [1, 1] },
       'Contents entry IDs are duplicated',
     ],
-    ['GET', '/api/keywords?limit=abc', undefined, 'The limit is invalid'],
     [
       'GET',
       '/api/stats/study-time?period=day',

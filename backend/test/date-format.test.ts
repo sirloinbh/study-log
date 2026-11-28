@@ -25,8 +25,6 @@ const studyLog = { studyDate: '2026-10-21', startTime: '09:00', endTime: '10:30'
 // that does not exist gets only that, not also the later range check.
 test('a wrong date says one thing: its format, or that the day does not exist', async () => {
   const cases: [string, string, unknown, string][] = [
-    ['POST', '/api/keywords', { keyword: '고유값', date: '2026/11/02' }, 'date'],
-    ['GET', '/api/keywords?from=2026.11.02', undefined, 'date'],
     ['GET', '/api/retrospectives/period?date=20261102', undefined, 'date'],
     ['PUT', '/api/retrospectives/weekly/2026-1-02', { body: '회고' }, 'date'],
     ['PUT', '/api/reviews/1/due-date', { dueDate: '2026/11/02' }, 'due date'],
@@ -39,7 +37,6 @@ test('a wrong date says one thing: its format, or that the day does not exist', 
     ['GET', '/api/study-logs?from=2026/11/02', undefined, 'study date'],
   ];
   const noSuchDay: [string, string, unknown][] = [
-    ['POST', '/api/keywords', { keyword: '고유값', date: '2026-02-30' }],
     ['GET', '/api/retrospectives/period?date=0000-01-01', undefined],
     ['PUT', '/api/reviews/1/due-date', { dueDate: '8044-02-31' }],
     ['POST', '/api/schedules', { ...schedule, endDate: '2026-11-31' }],
