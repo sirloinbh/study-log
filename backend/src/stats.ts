@@ -322,6 +322,29 @@ export function statsRoutes(pool: Pool, today: () => string) {
     });
   });
 
+  // Entries finished per day from ?from to ?to (#481), all textbooks; by default the heatmap's
+  // weeks up to today. An entry is on the date of its first done log, as in finished-contents.
+  router.get('/finished-days', async (req, res) => {
+    const query = patternQuery.parse(req.query);
+    const todayDate = today();
+    const to = query.to ?? todayDate;
+    const from = query.from ?? heatmapStart(to);
+    if (toDate(to).getTime() - toDate(from).getTime() >= maxSeriesDays * 86_400_000)
+      return void res.status(400).json({ error: 'The period must be within 10 years' });
+    const { rows } = await pool.query<{ date: string; chapter: boolean }>(
+      `SELECT date, chapter FROM (
+         SELECT min(l.study_date) AS date, (c.parent_id IS NULL) AS chapter
+         FROM study_log_contents f
+         JOIN study_logs l ON l.id = f.study_log_id
+         JOIN textbook_contents c ON c.id = f.content_id
+         WHERE l.status = 'done' AND l.study_date <= $1::date
+         GROUP BY f.content_id, c.parent_id) firsts
+       WHERE date BETWEEN $2::date AND $3::date`,
+      [todayDate, from, to],
+    );
+    res.json({ from, to, daily: finishedPerDay(rows, from, to) });
+  });
+
   // Every day of the heatmap's weeks up to today (#50): /api/stats/heatmap
   router.get('/heatmap', async (_req, res) => {
     const to = today();
@@ -385,7 +408,14 @@ export function statsRoutes(pool: Pool, today: () => string) {
          (SELECT count(DISTINCT t.chapter_id)::int FROM tree t
           JOIN study_logs l ON l.textbook_id = t.textbook_id AND l.content_id = t.id
           WHERE t.textbook_id = b.id AND l.status = 'done' AND l.study_date <= $2::date)
-           AS "completedChapters"
+           AS "completedChapters",
+         (SELECT count(*)::int FROM textbook_contents c
+          WHERE c.textbook_id = b.id AND c.parent_id IS NOT NULL) AS "totalSections",
+         (SELECT count(DISTINCT f.content_id)::int FROM study_log_contents f
+          JOIN study_logs l ON l.id = f.study_log_id
+          JOIN textbook_contents c ON c.id = f.content_id
+          WHERE c.textbook_id = b.id AND c.parent_id IS NOT NULL
+            AND l.status = 'done' AND l.study_date <= $2::date) AS "completedSections"
        FROM textbooks b WHERE ($1::bigint IS NULL OR b.id = $1)
        ORDER BY b.title, b.id`,
         [id, day],

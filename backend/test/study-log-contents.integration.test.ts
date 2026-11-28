@@ -166,6 +166,25 @@ test(
           },
         );
 
+        await t.test('sections finished show per textbook and per day', async () => {
+          const books = await call(`/api/stats/textbooks?textbookId=${book}`);
+          assert.equal(books.status, 200, JSON.stringify(books.data));
+          const row = (
+            books.data.textbooks as { completedSections: number; totalSections: number }[]
+          )[0];
+          assert.deepEqual([row.completedSections, row.totalSections], [2, 2]);
+          const days = await call('/api/stats/finished-days?from=8060-03-01&to=8060-03-10');
+          assert.equal(days.status, 200, JSON.stringify(days.data));
+          const daily = days.data.daily as { date: string; chapters: number; sections: number }[];
+          assert.equal(daily.length, 10);
+          assert.deepEqual(
+            daily.find((day) => day.date === '8060-03-03'),
+            { date: '8060-03-03', chapters: 1, sections: 1 },
+          );
+          const bad = await call('/api/stats/finished-days?from=8060-03-10&to=8060-03-01');
+          assert.equal(bad.status, 400);
+        });
+
         await t.test('a log on a date still to come does not count yet', async () => {
           await save({ studyDate: '8060-03-20', textbookId: book, finishedContentIds: [ch2] });
           assert.equal((await stats(book)).cumulativeChapters, 1);

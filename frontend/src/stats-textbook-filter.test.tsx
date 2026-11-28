@@ -3,6 +3,7 @@ import { expect, test, vi } from 'vitest';
 
 import { Stats } from './stats';
 import { type Answer, fakeApi } from './test/fake-api';
+import { finishedDays, finishedStats } from './test/finished';
 import { render } from './test/render';
 
 // As in stats-review.test.tsx: the chart library draws nothing here, and the page is slow to query.
@@ -24,28 +25,19 @@ const books = [
   { id: 8, title: '미적분', author: '', edition: '' },
 ];
 
-// Every log, 300 minutes; 선형대수 90; 미적분 none. Each answer names the minutes in the total.
-const studyTime = (url: string) => {
-  const minutes = url.includes('textbookId=7') ? 90 : url.includes('textbookId=8') ? 0 : 300;
-  return {
-    period: 'week',
-    from: '2026-10-25',
-    to: '2026-10-31',
-    totalMinutes: minutes,
-    todayMinutes: minutes,
-    cumulativeMinutes: minutes,
-    days: 7,
-    studyDays: minutes ? 1 : 0,
-    averageMinutesPerDay: 0,
-    averageMinutesPerStudyDay: 0,
-    daily: [],
-    weekly: [],
-    monthly: [],
-  };
+// Every textbook, 5 chapters finished; 선형대수 2; 미적분 none. Each answer names the chapters.
+const finished = (url: string) => {
+  const chapters = url.includes('textbookId=7') ? 2 : url.includes('textbookId=8') ? 0 : 5;
+  return finishedStats({
+    chapters,
+    todayChapters: chapters,
+    cumulativeChapters: chapters,
+    totalChapters: 10,
+  });
 };
 
 function server(
-  answers: { textbooks?: number; studyTime?: (path: string) => Answer | undefined } = {},
+  answers: { textbooks?: number; finished?: (path: string) => Answer | undefined } = {},
 ) {
   return fakeApi({
     'GET /api/textbooks': answers.textbooks
@@ -62,7 +54,7 @@ function server(
         completionRate: null,
       },
     },
-    'GET /api/stats/heatmap': { body: { from: '2026-10-25', to: '2026-10-31', daily: [] } },
+    'GET /api/stats/finished-days': { body: finishedDays() },
     'GET /api/stats/textbooks': {
       body: {
         textbooks: [],
@@ -76,23 +68,23 @@ function server(
         },
       },
     },
-    'GET /api/stats/study-time': ({ path }) =>
-      answers.studyTime?.(path) ?? { body: studyTime(path) },
+    'GET /api/stats/finished-contents': ({ path }) =>
+      answers.finished?.(path) ?? { body: finished(path) },
   });
 }
 
-const metrics = () => within(screen.getByRole('region', { name: 'Study time metrics' }));
+const metrics = () => within(screen.getByRole('region', { name: 'Finished metrics' }));
 const totalCard = () =>
-  within(metrics().getByRole('heading', { name: 'Total study time' }).closest('article')!);
+  within(metrics().getByRole('heading', { name: 'Finished so far' }).closest('article')!);
 // The metric cards are taken away while the next answer loads.
 const seeTotal = (text: string) =>
   waitFor(() => expect(totalCard().getByText(text)).toBeInTheDocument());
-const picker = () => screen.getByRole('combobox', { name: 'Study time textbook' });
+const picker = () => screen.getByRole('combobox', { name: 'Finished counts textbook' });
 
-test('picking a textbook narrows the study time to its logs, and All brings all back', async () => {
+test('picking a textbook narrows the finished counts to it, and All brings all back', async () => {
   const api = server();
   render(<Stats />);
-  await seeTotal('5 h');
+  await seeTotal('5 chapters');
   await waitFor(() =>
     expect(
       within(picker())
@@ -102,47 +94,40 @@ test('picking a textbook narrows the study time to its logs, and All brings all 
   );
 
   fireEvent.change(picker(), { target: { value: '7' } });
-  await seeTotal('1 h 30 min');
-  expect(totalCard().getByText('Recorded so far: All · 선형대수')).toBeInTheDocument();
+  await seeTotal('2 chapters');
+  expect(totalCard().getByText('Of 10 chapters and 6 sections · 선형대수')).toBeInTheDocument();
   expect(api.requests.map((r) => r.path)).toContain(
-    '/api/stats/study-time?period=week&textbookId=7',
+    '/api/stats/finished-contents?period=week&textbookId=7',
   );
 
-  // With the study type and the period as well.
-  fireEvent.click(
-    within(screen.getByRole('group', { name: 'Study type' })).getByRole('button', {
-      name: 'Review',
-    }),
-  );
+  // With the period as well.
   fireEvent.click(
     within(screen.getByRole('group', { name: 'Period' })).getByRole('button', {
       name: 'This month',
     }),
   );
-  await api.requested(
-    (r) => r.path === '/api/stats/study-time?period=month&type=review&textbookId=7',
-  );
+  await api.requested((r) => r.path === '/api/stats/finished-contents?period=month&textbookId=7');
 
   fireEvent.change(picker(), { target: { value: '' } });
-  await seeTotal('Recorded so far: Review');
+  await seeTotal('5 chapters');
   expect(api.requests.at(-1)?.path).not.toContain('textbookId');
 });
 
 test('a textbook without logs shows zeros, not the last one picked', async () => {
   server();
   render(<Stats />);
-  await seeTotal('5 h');
+  await seeTotal('5 chapters');
   await waitFor(() => expect(within(picker()).getAllByRole('option')).toHaveLength(3));
   fireEvent.change(picker(), { target: { value: '8' } });
-  await seeTotal('Recorded so far: All · 미적분');
-  expect(totalCard().getByText('0 min')).toBeInTheDocument();
+  await seeTotal('0 chapters');
+  expect(totalCard().getByText('Of 10 chapters and 6 sections · 미적분')).toBeInTheDocument();
 });
 
 test('the filter is named apart from the one of "Textbooks and schedules"', async () => {
   server();
   render(<Stats />);
-  await seeTotal('5 h');
-  expect(screen.getAllByRole('combobox', { name: 'Study time textbook' })).toHaveLength(1);
+  await seeTotal('5 chapters');
+  expect(screen.getAllByRole('combobox', { name: 'Finished counts textbook' })).toHaveLength(1);
   const cardPicker = within(
     screen.getByRole('region', { name: 'Textbooks and schedules' }),
   ).getByRole('combobox', { name: 'Textbook' });
@@ -152,7 +137,7 @@ test('the filter is named apart from the one of "Textbooks and schedules"', asyn
 test('without the textbook list, only every log can be seen, and it says why', async () => {
   server({ textbooks: 500 });
   render(<Stats />);
-  await seeTotal('5 h');
+  await seeTotal('5 chapters');
   expect(
     await screen.findByText(
       'Could not load the textbook list, so the view cannot be narrowed by textbook',
@@ -163,19 +148,19 @@ test('without the textbook list, only every log can be seen, and it says why', a
 
 test('a textbook deleted elsewhere is reported, and All still works', async () => {
   server({
-    studyTime: (path) =>
+    finished: (path) =>
       path.includes('textbookId=7')
         ? { status: 404, body: { error: 'Textbook not found' } }
         : undefined,
   });
   render(<Stats />);
-  await seeTotal('5 h');
+  await seeTotal('5 chapters');
   await waitFor(() => expect(within(picker()).getAllByRole('option')).toHaveLength(3));
   fireEvent.change(picker(), { target: { value: '7' } });
   expect(await screen.findByRole('alert')).toHaveTextContent(
     'Could not load the stats: Textbook not found',
   );
   fireEvent.change(picker(), { target: { value: '' } });
-  await seeTotal('5 h');
+  await seeTotal('5 chapters');
   expect(screen.queryByRole('alert')).toBeNull();
 });

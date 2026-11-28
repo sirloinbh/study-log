@@ -258,6 +258,12 @@ export const operations: Record<string, Operation> = {
     query: finishedContentsQuery,
     status: [200, 400, 404],
   },
+  'GET /api/stats/finished-days': {
+    summary:
+      'Get chapters and sections finished per day from a start to an end date, all textbooks; by default the last 53 weeks',
+    query: patternQuery,
+    status: [200, 400],
+  },
   'GET /api/stats/heatmap': {
     summary: 'Get the study heatmap for the last 53 weeks',
     status: [200],
