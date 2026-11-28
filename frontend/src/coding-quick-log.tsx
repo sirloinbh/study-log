@@ -193,7 +193,6 @@ export function CodingQuickLog({
         Find a problem
         <Input
           maxLength={200}
-          placeholder="Title, number or link"
           value={text}
           disabled={busy}
           onChange={(event) => {
@@ -245,7 +244,7 @@ export function CodingQuickLog({
         )}
         {found.data && candidates.length === 0 && goalNext.length === 0 && !(typed && !known) && (
           <p className="status">
-            {search ? 'No recorded problem matches' : 'No problems yet. Type a number or a link'}
+            {search ? 'No recorded problem matches' : 'No problems to pick from yet'}
           </p>
         )}
       </div>

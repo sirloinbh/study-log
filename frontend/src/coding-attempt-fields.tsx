@@ -47,7 +47,6 @@ export function AttemptFields({
         Language
         <Input
           maxLength={codingLimits.language}
-          placeholder="e.g. Python"
           disabled={busy}
           value={draft.language}
           onChange={(event) => onChange({ language: event.target.value })}

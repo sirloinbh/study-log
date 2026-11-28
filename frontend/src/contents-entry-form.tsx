@@ -29,13 +29,7 @@ export function ContentsEntryForm({
       <p className="wide content-form-heading">{heading}</p>
       <label>
         Number
-        <Input
-          maxLength={20}
-          placeholder="e.g. 1.2"
-          disabled={busy}
-          value={number}
-          onChange={onChange('number')}
-        />
+        <Input maxLength={20} disabled={busy} value={number} onChange={onChange('number')} />
       </label>
       <label className="title">
         Contents title

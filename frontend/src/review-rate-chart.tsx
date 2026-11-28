@@ -80,8 +80,7 @@ export function ReviewRateChart({ period }: { period: StatPeriod }) {
           </p>
           <p className="status">
             {periodLabels[period]}: {stats.completed} of {stats.scheduled} scheduled reviews
-            completed, {stats.delayed} delayed. Delayed means completed late, or past due and not
-            yet completed.
+            completed, {stats.delayed} delayed.
           </p>
           <ReviewBars stats={stats} />
         </>

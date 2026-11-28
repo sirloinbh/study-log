@@ -30,7 +30,6 @@ export function ExerciseFormView({
         Problem number
         <Input
           maxLength={exerciseLimits.number}
-          placeholder="e.g. 3"
           disabled={busy}
           value={form.number}
           onChange={onChange('number')}

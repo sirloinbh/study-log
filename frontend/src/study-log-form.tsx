@@ -203,12 +203,8 @@ export function StudyLogFormView({
           disabled={busy}
           value={form.memo}
           onChange={(event) => onPatch({ memo: event.target.value })}
-          aria-describedby="memo-hint"
         />
       </label>
-      <p id="memo-hint" className="hint wide">
-        You can use Markdown: # heading, - list, **bold**, `code`, [link](url)
-      </p>
       {form.memo.trim() && (
         <section className="memo-preview wide" aria-label="Memo preview">
           <h3>Preview</h3>

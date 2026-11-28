@@ -17,12 +17,6 @@ import { Input } from './components/ui/input';
 import { NativeSelect } from './components/ui/native-select';
 import { ButtonSpinner } from './loading';
 
-const keyHint: Record<Site, string> = {
-  baekjoon: 'e.g. 1000',
-  leetcode: 'e.g. two-sum',
-  other: 'e.g. A-12',
-};
-
 // Adds a problem together with its first attempt. `onSubmit` resolves when the problem is saved and
 // rejects with the server's message; the form is emptied only after it resolves.
 export function CodingProblemForm({
@@ -106,7 +100,6 @@ export function CodingProblemForm({
           id="coding-key"
           required
           maxLength={codingLimits.key}
-          placeholder={keyHint[site]}
           disabled={busy}
           value={problemKey}
           onChange={(event) => {

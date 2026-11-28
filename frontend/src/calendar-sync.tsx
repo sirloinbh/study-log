@@ -62,11 +62,6 @@ export function CalendarSync({
   return (
     <section className="card" aria-label="Google Calendar">
       <h2>Google Calendar</h2>
-      <p className="status">
-        Copies your schedule days and review due dates to a separate “Study log” calendar as all-day
-        events. They move or disappear when you change them here. Changes made in Google Calendar
-        are not read back.
-      </p>
       {query.isError && !status ? (
         <p role="alert" className="error">
           Could not load the sync status: {query.error?.message}

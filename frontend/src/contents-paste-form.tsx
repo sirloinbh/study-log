@@ -55,7 +55,6 @@ export function ContentsPasteForm({
           maxLength={tocLimits.text}
           disabled={busy || reading}
           value={text}
-          aria-describedby="toc-paste-hint"
           onChange={(event) => onText(event.target.value)}
         />
       </label>
@@ -71,12 +70,6 @@ export function ContentsPasteForm({
           if (file) onPdf(file);
         }}
       />
-      <p id="toc-paste-hint" className="hint wide">
-        Paste one entry per line or import from a PDF (its bookmarks if it has them, otherwise the
-        text of the first 20 pages). Levels are split by numbers such as 1, 1.1, Chapter 1, or a
-        Korean chapter heading; lines without a number follow their indentation. Page numbers are
-        dropped. If the preview is wrong, fix the text.
-      </p>
       {entries.length > 0 && (
         <section className="toc-preview wide" aria-label="Contents preview">
           <h4>

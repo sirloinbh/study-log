@@ -65,13 +65,11 @@ const nav: NavItem[] = [
 // The body keeps the app's own styles (style.css, scoped to .legacy).
 function Page({
   title,
-  description,
   health,
   today,
   children,
 }: {
   title: string;
-  description: string;
   health: Health;
   today: string;
   children: (today: string) => ReactNode;
@@ -80,7 +78,6 @@ function Page({
     <section aria-labelledby="page-title" className="flex flex-col gap-6">
       <header className="flex flex-col gap-2">
         <h1 id="page-title">{title}</h1>
-        <p className="text-body text-muted-foreground">{description}</p>
         {health.state === 'error' ? (
           <p role="alert" className="text-body-sm text-destructive">
             {healthText(health)}
@@ -119,12 +116,7 @@ function AppBody() {
             <Route
               path={pages.logs}
               element={
-                <Page
-                  title="Study log"
-                  description="Record the time and topics you studied"
-                  health={health}
-                  today={today}
-                >
+                <Page title="Study log" health={health} today={today}>
                   {(today) => <StudyLogPage today={today} onChange={reviewsChanged} />}
                 </Page>
               }
@@ -132,12 +124,7 @@ function AppBody() {
             <Route
               path={pages.history}
               element={
-                <Page
-                  title="History"
-                  description="Recent study logs, search and the calendar"
-                  health={health}
-                  today={today}
-                >
+                <Page title="History" health={health} today={today}>
                   {(today) => <StudyHistoryPage today={today} onChange={reviewsChanged} />}
                 </Page>
               }
@@ -145,12 +132,7 @@ function AppBody() {
             <Route
               path={pages.schedules}
               element={
-                <Page
-                  title="Schedules"
-                  description="Set a period and a daily amount to make a study goal for each day"
-                  health={health}
-                  today={today}
-                >
+                <Page title="Schedules" health={health} today={today}>
                   {(today) => <Schedules today={today} />}
                 </Page>
               }
@@ -158,12 +140,7 @@ function AppBody() {
             <Route
               path={pages.reviews}
               element={
-                <Page
-                  title="Reviews"
-                  description="Check what to review by period, then mark it done or change its date"
-                  health={health}
-                  today={today}
-                >
+                <Page title="Reviews" health={health} today={today}>
                   {() => <Reviews onChange={reviewsChanged} />}
                 </Page>
               }
@@ -171,12 +148,7 @@ function AppBody() {
             <Route
               path={pages.textbooks}
               element={
-                <Page
-                  title="Textbooks"
-                  description="Register textbooks and manage the title, author, and edition"
-                  health={health}
-                  today={today}
-                >
+                <Page title="Textbooks" health={health} today={today}>
                   {() => <Textbooks />}
                 </Page>
               }
@@ -184,12 +156,7 @@ function AppBody() {
             <Route
               path={pages.coding}
               element={
-                <Page
-                  title="Algorithms"
-                  description="Record the algorithm problems you solve and every attempt at them"
-                  health={health}
-                  today={today}
-                >
+                <Page title="Algorithms" health={health} today={today}>
                   {(today) => <CodingProblems today={today} onChange={reviewsChanged} />}
                 </Page>
               }
@@ -197,12 +164,7 @@ function AppBody() {
             <Route
               path={pages.dashboard}
               element={
-                <Page
-                  title="Dashboard"
-                  description="See the chapters and sections finished by period, by week and over 12 weeks, and today's goal"
-                  health={health}
-                  today={today}
-                >
+                <Page title="Dashboard" health={health} today={today}>
                   {(today) => <Dashboard today={today} />}
                 </Page>
               }
@@ -210,12 +172,7 @@ function AppBody() {
             <Route
               path={pages.retrospectives}
               element={
-                <Page
-                  title="Retrospectives"
-                  description="Look back on a week or a month of study and write a retrospective"
-                  health={health}
-                  today={today}
-                >
+                <Page title="Retrospectives" health={health} today={today}>
                   {(today) => <Retrospectives today={today} />}
                 </Page>
               }
@@ -223,12 +180,7 @@ function AppBody() {
             <Route
               path={pages.settings}
               element={
-                <Page
-                  title="Settings"
-                  description="App settings and data management"
-                  health={health}
-                  today={today}
-                >
+                <Page title="Settings" health={health} today={today}>
                   {() => (
                     <>
                       <CalendarSync />
