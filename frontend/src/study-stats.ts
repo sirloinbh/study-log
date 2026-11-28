@@ -86,10 +86,10 @@ export function heatLevel(minutes: number) {
 
 // The days as week columns of seven (Sunday first, #96). `daily` starts on a Sunday; the days after
 // the last one (the rest of this week) are null.
-export function heatWeeks(daily: DayMinutes[]) {
-  const weeks: (DayMinutes | null)[][] = [];
+export function heatWeeks<T extends { date: string }>(daily: T[]) {
+  const weeks: (T | null)[][] = [];
   for (let start = 0; start < daily.length; start += 7) {
-    const week: (DayMinutes | null)[] = daily.slice(start, start + 7);
+    const week: (T | null)[] = daily.slice(start, start + 7);
     while (week.length < 7) week.push(null);
     weeks.push(week);
   }
@@ -97,7 +97,7 @@ export function heatWeeks(daily: DayMinutes[]) {
 }
 
 // "Oct" above the first week that holds the 1st of a month, otherwise nothing.
-export function monthLabel(week: (DayMinutes | null)[]) {
+export function monthLabel<T extends { date: string }>(week: (T | null)[]) {
   const first = week.find((day) => day?.date.endsWith('-01'));
   return first
     ? new Date(`${first.date}T00:00:00Z`).toLocaleDateString('en-US', {
@@ -120,7 +120,14 @@ export type StudyPattern = {
 
 // The response of GET /api/stats/textbooks (#51).
 export type TextbookStats = {
-  textbooks: { id: number; title: string; completedChapters: number; totalChapters: number }[];
+  textbooks: {
+    id: number;
+    title: string;
+    completedChapters: number;
+    totalChapters: number;
+    completedSections: number;
+    totalSections: number;
+  }[];
   schedule: {
     plannedMinutes: number;
     achievedMinutes: number;

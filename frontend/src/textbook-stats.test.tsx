@@ -6,8 +6,31 @@ import { fakeApi } from './test/fake-api';
 import { render } from './test/render';
 import { TextbookStats } from './textbook-stats';
 
-const algebra = { id: 7, title: '선형대수', completedChapters: 1, totalChapters: 4 };
-const analysis = { id: 8, title: '해석학', completedChapters: 0, totalChapters: 0 };
+const algebra = {
+  id: 7,
+  title: '선형대수',
+  completedChapters: 1,
+  totalChapters: 4,
+  completedSections: 3,
+  totalSections: 12,
+};
+// A book of chapters only shows its chapters; one without contents has nothing to count.
+const geometry = {
+  id: 9,
+  title: '기하학',
+  completedChapters: 1,
+  totalChapters: 2,
+  completedSections: 0,
+  totalSections: 0,
+};
+const analysis = {
+  id: 8,
+  title: '해석학',
+  completedChapters: 0,
+  totalChapters: 0,
+  completedSections: 0,
+  totalSections: 0,
+};
 const schedule = {
   plannedMinutes: 300,
   achievedMinutes: 120,
@@ -16,7 +39,7 @@ const schedule = {
   onTimeDays: 1,
   adherenceRate: 25,
 };
-const all: Stats = { textbooks: [algebra, analysis], schedule };
+const all: Stats = { textbooks: [algebra, geometry, analysis], schedule };
 const one: Stats = {
   textbooks: [algebra],
   schedule: { ...schedule, achievementRate: 90, adherenceRate: 75 },
@@ -35,16 +58,22 @@ test('the path names the book, and a percent of chapters rounds down', () => {
   expect(chapterPercent({ completedChapters: 0, totalChapters: 0 })).toBe(0);
 });
 
-test('chapters per book and how schedules were kept are shown', async () => {
+test('sections finished per book and how schedules were kept are shown', async () => {
   server();
   render(<TextbookStats />);
-  const bar = await card().findByRole('progressbar', { name: '선형대수 completed chapters' });
+  const bar = await card().findByRole('progressbar', { name: '선형대수 sections finished' });
   expect(bar).toHaveAttribute('aria-valuenow', '25');
   expect(bar.firstElementChild).toHaveStyle({ width: '25%' });
-  expect(card().getByText('1 / 4 chapters')).toBeInTheDocument();
+  expect(card().getByText('3 / 12 sections')).toBeInTheDocument();
+  // Without sections the chapters are shown.
+  expect(card().getByText('1 / 2 chapters')).toBeInTheDocument();
+  expect(card().getByRole('progressbar', { name: '기하학 chapters finished' })).toHaveAttribute(
+    'aria-valuenow',
+    '50',
+  );
   // A book with no contents has nothing to count.
   expect(card().getByText('No contents')).toBeInTheDocument();
-  expect(card().queryByRole('progressbar', { name: '해석학 completed chapters' })).toBeNull();
+  expect(card().queryByRole('progressbar', { name: /해석학/ })).toBeNull();
   expect(card().getByText('40%')).toBeInTheDocument();
   expect(card().getByText(/2 h \/ 5 h/)).toBeInTheDocument();
   expect(card().getByText('25%')).toBeInTheDocument();

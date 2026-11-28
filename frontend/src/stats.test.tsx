@@ -2,9 +2,17 @@ import { cleanup, fireEvent, screen, waitFor, within } from '@testing-library/re
 import React from 'react';
 import { expect, test, vi } from 'vitest';
 
+import {
+  busiestFinished,
+  finishedBars,
+  finishedHeatLevel,
+  finishedLabel,
+  perDay,
+} from './finished-stats';
 import { Stats } from './stats';
-import { busiestBar, chartBars, heatLevel, heatWeeks, monthLabel } from './study-stats';
+import { heatWeeks, monthLabel } from './study-stats';
 import { type Api, fakeApi } from './test/fake-api';
+import { finishedStats } from './test/finished';
 import { render } from './test/render';
 
 // Recharts draws nothing without a real layout, so a stand-in writes what it was given into the
@@ -16,7 +24,7 @@ vi.mock('recharts', () => {
     chartDownload.fails = false;
     throw new Error('Failed to fetch dynamically imported module');
   }
-  type Row = { label: string; minutes: number; hours: number };
+  type Row = { label: string; chapters: number; sections: number; total: number };
   const Part = () => null;
   const Group = ({ children }: { children?: React.ReactNode }) => <div>{children}</div>;
   const BarChart = ({
@@ -32,7 +40,7 @@ vi.mock('recharts', () => {
       <div data-testid="bar-chart" data-accessibility-layer={String(accessibilityLayer)}>
         {data.map((row) => (
           <span key={row.label} data-testid="bar">
-            {`${row.label}:${row.hours}:${row.minutes}`}
+            {`${row.label}:${row.chapters}:${row.sections}`}
           </span>
         ))}
         {children}
@@ -45,30 +53,28 @@ vi.mock('recharts', () => {
     CartesianGrid: Part,
     XAxis: ({ fontSize }: { fontSize?: number }) => <span data-testid="axis-font">{fontSize}</span>,
     YAxis: ({ fontSize }: { fontSize?: number }) => <span data-testid="axis-font">{fontSize}</span>,
-    Tooltip: ({ formatter }: { formatter: (v: number, n: string, i: unknown) => unknown }) => (
-      <span data-testid="tooltip">
-        {JSON.stringify(formatter(2.5, 'hours', { payload: { minutes: 150 } }))}
-      </span>
+    Tooltip: Part,
+    Bar: ({ dataKey, stackId }: { dataKey: string; stackId?: string }) => (
+      <span data-testid="bar-key">{`${dataKey}:${stackId}`}</span>
     ),
-    Bar: ({ dataKey }: { dataKey: string }) => <span data-testid="bar-key">{dataKey}</span>,
   };
 });
 
-const statsFor = (period: string, totalMinutes: number) => ({
-  period,
-  from: period === 'week' ? '2026-10-19' : '2026-10-01',
-  to: '2026-10-23',
-  totalMinutes,
-  todayMinutes: 90,
-  cumulativeMinutes: 665,
-  days: period === 'week' ? 5 : 23,
-  studyDays: period === 'week' ? 3 : 5,
-  averageMinutesPerDay: period === 'week' ? 57 : 21,
-  averageMinutesPerStudyDay: period === 'week' ? 95 : 97,
-  daily: [] as { date: string; minutes: number }[],
-  weekly: [] as { weekStart: string; minutes: number }[],
-  monthly: [] as { month: string; minutes: number }[],
-});
+const statsFor = (period: string, chapters: number) =>
+  finishedStats({
+    period,
+    from: period === 'week' ? '2026-10-19' : '2026-10-01',
+    to: '2026-10-23',
+    chapters,
+    sections: chapters * 2,
+    todayChapters: 1,
+    todaySections: 2,
+    cumulativeChapters: 7,
+    cumulativeSections: 11,
+    totalChapters: 9,
+    totalSections: 20,
+    days: period === 'week' ? 5 : 23,
+  });
 
 type Options = {
   // Answers per period; a missing one is a 500.
@@ -78,12 +84,16 @@ type Options = {
   // The series every period answers with (#49); empty by default.
   series?: Pick<ReturnType<typeof statsFor>, 'daily' | 'weekly' | 'monthly'>;
   // The heatmap's days, from a Sunday; undefined answers a 500.
-  heatmap?: { from: string; to: string; daily: { date: string; minutes: number }[] } | null;
+  heatmap?: {
+    from: string;
+    to: string;
+    daily: { date: string; chapters: number; sections: number }[];
+  } | null;
 };
 
 // The stats API.
 function server(options: Options = {}) {
-  const totals = options.totals ?? { week: 285, month: 485, '3months': 665, all: 665 };
+  const totals = options.totals ?? { week: 3, month: 8, '3months': 12, all: 12 };
   const hold = options.hold;
   return fakeApi(({ path }) => {
     if (path.startsWith('/api/study-logs')) return { body: { studyLogs: [] } };
@@ -102,7 +112,7 @@ function server(options: Options = {}) {
           },
         },
       };
-    if (path === '/api/stats/heatmap')
+    if (path === '/api/stats/finished-days')
       return options.heatmap === null
         ? { status: 500, body: { error: 'Server error' } }
         : { body: options.heatmap ?? { from: '2026-10-19', to: '2026-10-19', daily: [] } };
@@ -118,7 +128,7 @@ function server(options: Options = {}) {
           completionRate: null,
         },
       };
-    const match = path.match(/^\/api\/stats\/study-time\?period=(.+)$/);
+    const match = path.match(/^\/api\/stats\/finished-contents\?period=(.+)$/);
     if (!match) return undefined;
     const period = match[1];
     // A held period answers late, when the test releases it.
@@ -131,7 +141,9 @@ function server(options: Options = {}) {
 
 // The periods asked for, in order.
 const askedOf = (api: Api) =>
-  api.requests.flatMap((r) => r.path.match(/^\/api\/stats\/study-time\?period=(.+)$/)?.[1] ?? []);
+  api.requests.flatMap(
+    (r) => r.path.match(/^\/api\/stats\/finished-contents\?period=(.+)$/)?.[1] ?? [],
+  );
 
 // Each metric card as "title:value".
 const cards = () =>
@@ -152,18 +164,42 @@ const pick = (label: string) =>
 async function openStats(options?: Options) {
   const api = server(options);
   render(<Stats />);
-  await screen.findByRole('region', { name: 'Study time metrics' });
+  await screen.findByRole('region', { name: 'Finished metrics' });
   return api;
 }
+
+// The finished-trend chart's card; the review chart's card has the same class.
+const chart = () =>
+  within(document.querySelector<HTMLElement>('section[aria-labelledby="finished-chart-heading"]')!);
+// The stand-in chart writes each bar as "label:chapters:sections".
+const bars = () =>
+  chart()
+    .queryAllByTestId('bar')
+    .map((b) => b.textContent);
+
+// The chapters and sections finished on each day of the chart (#481).
+const series = {
+  daily: [
+    { date: '2026-10-19', chapters: 0, sections: 0 },
+    { date: '2026-10-20', chapters: 1, sections: 1 },
+    { date: '2026-10-21', chapters: 2, sections: 1 },
+    { date: '2026-10-22', chapters: 0, sections: 1 },
+  ],
+  weekly: [
+    { weekStart: '2026-10-11', chapters: 1, sections: 2 },
+    { weekStart: '2026-10-18', chapters: 3, sections: 4 },
+  ],
+  monthly: [{ month: '2026-10', chapters: 4, sections: 6 }],
+};
 
 // A chart that fails to load says so; it runs first because the failed import is the first one.
 test('a chart that fails to load says so and keeps the summary sentence', async () => {
   // Recharts comes from a separate file; a failed download rejects the dynamic import.
   server({ series });
   render(<Stats />);
-  await screen.findByRole('heading', { name: 'Study time trend' });
+  await screen.findByRole('heading', { name: 'Finished trend' });
   expect(await chart().findByText(/Could not load the chart:/)).toBeVisible();
-  expect(chart().getByText(/Busiest day of 4 days: 10\/21/)).toBeVisible();
+  expect(chart().getByText(/Most finished in a day of 4 days: 10\/21/)).toBeVisible();
 });
 
 test('the dashboard opens on this week with the four metric cards', async () => {
@@ -171,19 +207,25 @@ test('the dashboard opens on this week with the four metric cards', async () => 
   expect(askedOf(api)).toEqual(['week']);
   expect(pressed()).toEqual(['This week']);
   expect(cards()).toEqual([
-    'Total study time:11 h 5 min',
-    'Today:1 h 30 min',
-    'This week:4 h 45 min',
-    'Daily average:57 min',
+    'Finished so far:7 chapters',
+    'Today:1 chapter',
+    'This week:3 chapters',
+    'Daily average:1.8 a day',
   ]);
   const page = document.body;
+  expect(page).toHaveTextContent(/11 sections/);
+  expect(page).toHaveTextContent(/Of 9 chapters and 20 sections/);
+  expect(page).toHaveTextContent(/6 sections/);
   expect(page).toHaveTextContent(/2026-10-19 ~ 2026-10-23/);
-  expect(page).toHaveTextContent(/3 of 5 days studied/);
-  expect(page).toHaveTextContent(/Study days only: 1 h 35 min/);
   // The cards hold more than the period (the all-time total), so their group is named neutrally.
-  expect(screen.getByRole('region', { name: 'Study time metrics' })).toHaveAccessibleName(
-    'Study time metrics',
+  expect(screen.getByRole('region', { name: 'Finished metrics' })).toHaveAccessibleName(
+    'Finished metrics',
   );
+  // Study time is not shown here; it lives in the daily goal card only.
+  expect(screen.getByRole('region', { name: 'Finished metrics' })).not.toHaveTextContent(
+    /time|\d h\b/i,
+  );
+  expect(chart().getByRole('heading', { name: 'Finished trend' })).toBeInTheDocument();
 });
 
 test('metric values stay on one line and shrink on a phone (#436)', async () => {
@@ -198,14 +240,14 @@ test('metric values stay on one line and shrink on a phone (#436)', async () => 
 test('picking a period asks for it and relabels the period card', async () => {
   const api = await openStats();
   pick('This month');
-  await waitFor(() => expect(cards()[2]).toBe('This month:8 h 5 min'));
+  await waitFor(() => expect(cards()[2]).toBe('This month:8 chapters'));
   expect(askedOf(api)).toEqual(['week', 'month']);
   expect(pressed()).toEqual(['This month']);
   expect(cards()).toEqual([
-    'Total study time:11 h 5 min',
-    'Today:1 h 30 min',
-    'This month:8 h 5 min',
-    'Daily average:21 min',
+    'Finished so far:7 chapters',
+    'Today:1 chapter',
+    'This month:8 chapters',
+    'Daily average:1 a day',
   ]);
   expect(document.body).toHaveTextContent(/Based on This month/);
   for (const [label, period] of [
@@ -225,18 +267,18 @@ test("a slow answer for the previous period is not shown as the new one's", asyn
   // Announced while waiting, so the change to the cards is not silent.
   await waitFor(() => expect(screen.getAllByRole('status').at(-1)).toHaveTextContent(/Loading/));
   pick('This month');
-  await waitFor(() => expect(cards()[2]).toBe('This month:8 h 5 min'));
+  await waitFor(() => expect(cards()[2]).toBe('This month:8 chapters'));
   // The late answer arrives. Picking another period afterwards and seeing its cards proves the
   // late one was handled before them, and it left no trace.
   release();
   await until;
   pick('All');
-  await waitFor(() => expect(cards()[2]).toBe('All:11 h 5 min'));
+  await waitFor(() => expect(cards()[2]).toBe('All:12 chapters'));
   expect(pressed()).toEqual(['All']);
 });
 
 test('a failed load is reported instead of empty cards', async () => {
-  await openStats({ totals: { week: 285 } });
+  await openStats({ totals: { week: 3 } });
   pick('This month');
   expect(await screen.findByText(/Could not load the stats: Server error/)).toBeVisible();
   expect(cards()).toEqual([]);
@@ -247,13 +289,15 @@ test('a failed load is reported instead of empty cards', async () => {
 });
 
 // Two weeks from Sunday 2026-10-04 to Tuesday 2026-10-13 (#96), one day in each band and one future
-// slot short of a full second week.
+// slot short of a full second week. Entries finished per day: 0, 1, 2, 3, 4, 5, 9, 0, 0, 2.
 const twoWeeks = {
   from: '2026-10-04',
   to: '2026-10-13',
-  daily: [0, 10, 30, 59, 60, 119, 120, 0, 0, 45].map((minutes, index) => ({
+  daily: [0, 1, 2, 3, 4, 5, 9, 0, 0, 2].map((count, index) => ({
     date: `2026-10-${String(4 + index).padStart(2, '0')}`,
-    minutes,
+    // The ninth entry of the seventh day is a chapter, the rest are sections.
+    chapters: count === 9 ? 1 : 0,
+    sections: count === 9 ? 8 : count,
   })),
 };
 
@@ -292,21 +336,22 @@ test('the heatmap shows each day in its band with a tooltip, by week columns', a
   expect(weeks).toHaveLength(2);
   const cells = (week: Element) =>
     Array.from(week.querySelectorAll('[data-level]')).map((n) => n.getAttribute('data-level'));
-  expect(cells(weeks[0])).toEqual(['0', '1', '2', '2', '3', '3', '4']);
+  expect(cells(weeks[0])).toEqual(['0', '1', '2', '3', '3', '4', '4']);
   // Sunday to Tuesday, then the rest of this week is empty.
   expect(cells(weeks[1])).toEqual(['0', '0', '2', 'future', 'future', 'future', 'future']);
-  expect(document.querySelector('[title="2026-10-09: 1 h 59 min"]')).not.toBeNull();
+  expect(document.querySelector('[title="2026-10-09: 0 chapters · 5 sections"]')).not.toBeNull();
+  expect(document.querySelector('[title="2026-10-10: 1 chapter · 8 sections"]')).not.toBeNull();
   // One summary for screen readers.
   expect(screen.getByRole('img')).toHaveAccessibleName(
-    '2026-10-04 to 2026-10-13: 7 study days, total 7 h 23 min',
+    '2026-10-04 to 2026-10-13: 7 days with a finish · 1 chapter · 25 sections',
   );
-  expect(document.body).toHaveTextContent(/7 study days · total 7 h 23 min/);
+  expect(document.body).toHaveTextContent(/7 days with a finish · 1 chapter · 25 sections/);
   const legend = screen.getByRole('list', { name: 'Intensity levels' });
   expect(
     within(legend)
       .getAllByRole('listitem')
       .map((n) => n.textContent),
-  ).toEqual(['0 min', 'Under 30 min', '30 min–1 h', '1–2 h', '2 h or more']);
+  ).toEqual(['None', '1 finished', '2 finished', '3–4 finished', '5 or more']);
 });
 
 test('a failed heatmap load is reported and the metric cards stay', async () => {
@@ -316,66 +361,37 @@ test('a failed heatmap load is reported and the metric cards stay', async () => 
 });
 
 test('heatmap levels, weeks and month labels', () => {
-  expect([0, 1, 29, 30, 59, 60, 119, 120, 600].map(heatLevel)).toEqual([0, 1, 1, 2, 2, 3, 3, 4, 4]);
+  expect([0, 1, 2, 3, 4, 5, 600].map(finishedHeatLevel)).toEqual([0, 1, 2, 3, 3, 4, 4]);
   const days = (from: number, count: number) =>
     Array.from({ length: count }, (_, i) => ({
       date: `2026-09-${String(from + i).padStart(2, '0')}`,
-      minutes: 0,
+      chapters: 0,
+      sections: 0,
     }));
   const weeks = heatWeeks(days(21, 9));
   expect(weeks.map((week) => week.filter((day) => day !== null).length)).toEqual([7, 2]);
-  expect(
-    monthLabel([
-      { date: '2026-09-28', minutes: 0 },
-      { date: '2026-10-01', minutes: 0 },
-    ]),
-  ).toBe('Oct');
-  expect(monthLabel([{ date: '2026-09-21', minutes: 0 }, null])).toBe('');
+  expect(monthLabel([{ date: '2026-09-28' }, { date: '2026-10-01' }])).toBe('Oct');
+  expect(monthLabel([{ date: '2026-09-21' }, null])).toBe('');
 });
-
-// #49: the study time chart.
-const series = {
-  daily: [
-    { date: '2026-10-19', minutes: 0 },
-    { date: '2026-10-20', minutes: 90 },
-    { date: '2026-10-21', minutes: 150 },
-    { date: '2026-10-22', minutes: 45 },
-  ],
-  weekly: [
-    { weekStart: '2026-10-11', minutes: 200 },
-    { weekStart: '2026-10-18', minutes: 285 },
-  ],
-  monthly: [{ month: '2026-10', minutes: 485 }],
-};
-// The study time chart's card; the review chart's card has the same class.
-const chart = () =>
-  within(document.querySelector<HTMLElement>('section[aria-labelledby="study-chart-heading"]')!);
-// The stand-in chart writes each bar as "label:hours:minutes".
-const bars = () =>
-  chart()
-    .queryAllByTestId('bar')
-    .map((b) => b.textContent);
 
 test('the chart shows the period by day, with a sentence naming the busiest day', async () => {
   await openStats({ series });
   await chart().findAllByTestId('bar');
+  expect(bars()).toEqual(['10/19:0:0', '10/20:1:1', '10/21:2:1', '10/22:0:1']);
   expect(
-    chart()
-      .getAllByTestId('bar')
-      .map((b) => b.textContent.split(':').slice(0, 2).join(':')),
-  ).toEqual(['10/19:0', '10/20:1.5', '10/21:2.5', '10/22:0.8']);
-  expect(chart().getByText(/Busiest day of 4 days: 10\/21 \(2 h 30 min\)/)).toBeVisible();
+    chart().getByText(/Most finished in a day of 4 days: 10\/21 \(2 chapters · 1 section\)/),
+  ).toBeVisible();
   // The chart sits in an aria-hidden wrapper, so its own keyboard layer must be off (#404).
   expect(chart().getByTestId('bar-chart')).toHaveAttribute('data-accessibility-layer', 'false');
   // Axis labels are at least 13px (#406).
   for (const axis of chart().getAllByTestId('axis-font'))
     expect(Number(axis.textContent)).toBeGreaterThanOrEqual(13);
-  // Bars show hours; the tooltip shows the exact minutes.
-  expect(chart().getByTestId('bar-key')).toHaveTextContent('hours');
-  expect(JSON.parse(chart().getByTestId('tooltip').textContent)).toEqual([
-    '2 h 30 min',
-    'Study time',
-  ]);
+  // Chapters and sections stack in one bar.
+  expect(
+    chart()
+      .getAllByTestId('bar-key')
+      .map((key) => key.textContent),
+  ).toEqual(['chapters:finished', 'sections:finished']);
 });
 
 test('the chart switches between days, weeks and months and remembers it per period', async () => {
@@ -390,12 +406,14 @@ test('the chart switches between days, weeks and months and remembers it per per
   expect(unitPressed()).toEqual(['Day']);
   unit('Week');
   expect(unitPressed()).toEqual(['Week']);
-  expect(bars()).toEqual(['10/11~:3.3:200', '10/18~:4.8:285']);
-  expect(chart().getByText(/Busiest week of 2 weeks: 10\/18~/)).toBeVisible();
+  expect(bars()).toEqual(['10/11~:1:2', '10/18~:3:4']);
+  expect(chart().getByText(/Most finished in a week of 2 weeks: 10\/18~/)).toBeVisible();
   unit('Month');
   // A single bar still draws and is named.
-  expect(bars()).toEqual(['26.10:8.1:485']);
-  expect(chart().getByText(/Busiest month of 1 month: 26\.10 \(8 h 5 min\)/)).toBeVisible();
+  expect(bars()).toEqual(['26.10:4:6']);
+  expect(
+    chart().getByText(/Most finished in a month of 1 month: 26\.10 \(4 chapters · 6 sections\)/),
+  ).toBeVisible();
   // Another period starts at its own unit; coming back keeps the pick.
   pick('Last 3 months');
   await waitFor(() => expect(unitPressed()).toEqual(['Week']));
@@ -403,28 +421,39 @@ test('the chart switches between days, weeks and months and remembers it per per
   await waitFor(() => expect(unitPressed()).toEqual(['Month']));
 });
 
-test('a period without study says so instead of an empty chart', async () => {
+test('a period without a finished entry says so instead of an empty chart', async () => {
   await openStats();
-  expect(chart().getByText(/There are no study logs in this period/)).toBeVisible();
+  expect(chart().getByText(/No chapters or sections were finished in this period/)).toBeVisible();
   expect(chart().queryByTestId('bar-chart')).toBeNull();
   cleanup();
   await openStats({
-    series: { daily: [{ date: '2026-10-19', minutes: 0 }], weekly: [], monthly: [] },
+    series: { daily: [{ date: '2026-10-19', chapters: 0, sections: 0 }], weekly: [], monthly: [] },
   });
-  expect(chart().getByText(/There are no study logs in this period/)).toBeVisible();
+  expect(chart().getByText(/No chapters or sections were finished in this period/)).toBeVisible();
 });
 
-test('chart bars, labels and the busiest bar', () => {
-  const stats = { ...statsFor('all', 0), ...series, monthly: [{ month: '2025-12', minutes: 61 }] };
-  expect(chartBars(stats as never, 'month')).toEqual([
-    { key: '2025-12', label: '25.12', minutes: 61, hours: 1 },
+test('chart bars, labels, the busiest bar and the daily average', () => {
+  const stats = {
+    ...statsFor('all', 0),
+    ...series,
+    monthly: [{ month: '2025-12', chapters: 1, sections: 3 }],
+  };
+  expect(finishedBars(stats as never, 'month')).toEqual([
+    { key: '2025-12', label: '25.12', chapters: 1, sections: 3, total: 4 },
   ]);
-  // A tie goes to the earlier bar; nothing studied has no busiest bar.
-  const tie = busiestBar([
-    { minutes: 30, key: 'a' },
-    { minutes: 30, key: 'b' },
+  // A tie goes to the earlier bar; nothing finished has no busiest bar.
+  const tie = busiestFinished([
+    { total: 3, key: 'a' },
+    { total: 3, key: 'b' },
   ] as never);
   expect(tie?.key).toBe('a');
-  expect(busiestBar([{ minutes: 0 }] as never)).toBeUndefined();
-  expect(busiestBar([])).toBeUndefined();
+  expect(busiestFinished([{ total: 0 }] as never)).toBeUndefined();
+  expect(busiestFinished([])).toBeUndefined();
+  expect(finishedLabel({ chapters: 1, sections: 2 })).toBe('1 chapter · 2 sections');
+  expect([perDay(9, 5), perDay(1, 3), perDay(0, 0), perDay(6, 3)]).toEqual([
+    '1.8',
+    '0.3',
+    '0',
+    '2',
+  ]);
 });

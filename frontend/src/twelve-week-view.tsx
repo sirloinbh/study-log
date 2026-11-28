@@ -1,19 +1,19 @@
 import React from 'react';
 
+import { type FinishedDay, finishedTotal, finishedWeeks } from './finished-stats';
 import { apiKey, useApiQuery } from './lib/query';
 import { Loading } from './loading';
-import { formatMinutes } from './study-logs-data';
-import { barWidth, type DayMinutes } from './study-stats';
-import { weekTotals } from './week-data';
+import { plural } from './plural';
+import { barWidth } from './study-stats';
 
-// The last 12 weeks of study (#420): one row per week with its minutes and the days studied, read
-// from the same daily series as the heatmap.
+// The last 12 weeks (#420, #481): one row per week with the chapters and sections finished and the
+// days with a finish, read from the same daily series as the heatmap.
 export function TwelveWeekView({ today }: { today: string }) {
-  const query = useApiQuery<{ from: string; to: string; daily: DayMinutes[] }>(
-    apiKey('/api/stats/heatmap'),
-    '/api/stats/heatmap',
+  const query = useApiQuery<{ from: string; to: string; daily: FinishedDay[] }>(
+    apiKey('/api/stats/finished-days'),
+    '/api/stats/finished-days',
   );
-  const weeks = query.data ? weekTotals(query.data.daily, today) : undefined;
+  const weeks = query.data ? finishedWeeks(query.data.daily, today) : undefined;
 
   return (
     <section className="card min-w-0" aria-label="Last 12 weeks">
@@ -35,7 +35,7 @@ export function TwelveWeekView({ today }: { today: string }) {
               <li
                 key={week.start}
                 aria-current={current ? 'date' : undefined}
-                className="grid grid-cols-[112px_minmax(0,1fr)_92px] items-center gap-2 text-[13px]"
+                className="grid grid-cols-[112px_minmax(0,1fr)_96px] items-center gap-2 text-[13px]"
               >
                 <span className="whitespace-nowrap">
                   {week.start.slice(5)} – {week.end.slice(5)}
@@ -53,16 +53,17 @@ export function TwelveWeekView({ today }: { today: string }) {
                     className="block h-full rounded-[3px] bg-ring"
                     style={{
                       width: barWidth(
-                        week.minutes,
-                        weeks.map((w) => w.minutes),
+                        finishedTotal(week),
+                        weeks.map((w) => finishedTotal(w)),
                       ),
                     }}
                   />
                 </span>
                 <span className="whitespace-nowrap">
-                  {formatMinutes(week.minutes)}
+                  {plural(week.chapters, 'chapter')}
+                  <span className="block">{plural(week.sections, 'section')}</span>
                   <span className="block text-[13px] text-muted-foreground">
-                    {week.studyDays} of 7 days
+                    {week.finishedDays} of 7 days
                   </span>
                 </span>
               </li>

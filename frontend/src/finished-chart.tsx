@@ -1,37 +1,35 @@
 import React from 'react';
 
 import { Button } from './components/ui/button';
+import { busiestFinished, finishedBars, finishedLabel, type FinishedStats } from './finished-stats';
 import { Loading } from './loading';
-import { formatMinutes } from './study-logs-data';
 import {
-  busiestBar,
-  chartBars,
   type ChartUnit,
   chartUnitLabels,
   chartUnits,
   defaultChartUnit,
   type StatPeriod,
-  type StudyTimeStats,
 } from './study-stats';
 import { useRecharts } from './use-recharts';
 
-// Study time over the picked period as bars by day, week or month (#49). The unit starts at what
-// suits the period; the units picked per period are kept by the dashboard, which stays mounted
-// while another period loads. A sentence names the busiest bar for those who cannot see the chart.
-export function StudyTimeChart({
+// Chapters and sections finished over the picked period as stacked bars by day, week or month
+// (#481). The unit starts at what suits the period; the units picked per period are kept by the
+// dashboard, which stays mounted while another period loads. A sentence names the busiest bar for
+// those who cannot see the chart.
+export function FinishedChart({
   stats,
   picked,
   onPick,
 }: {
-  stats: StudyTimeStats;
+  stats: FinishedStats;
   picked: Partial<Record<StatPeriod, ChartUnit>>;
   onPick: (period: StatPeriod, unit: ChartUnit) => void;
 }) {
   const { charts: R, chartError } = useRecharts();
 
   const unit = picked[stats.period] ?? defaultChartUnit[stats.period];
-  const bars = chartBars(stats, unit);
-  const busiest = busiestBar(bars);
+  const bars = finishedBars(stats, unit);
+  const busiest = busiestFinished(bars);
   const [noun, topic] = {
     day: ['days', 'day'],
     week: ['weeks', 'week'],
@@ -39,10 +37,10 @@ export function StudyTimeChart({
   }[unit];
 
   return (
-    <section className="card grid min-w-0 gap-2.5" aria-labelledby="study-chart-heading">
+    <section className="card grid min-w-0 gap-2.5" aria-labelledby="finished-chart-heading">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 id="study-chart-heading" className="m-0">
-          Study time trend
+        <h2 id="finished-chart-heading" className="m-0">
+          Finished trend
         </h2>
         <div className="flex flex-wrap gap-2" role="group" aria-label="Chart unit">
           {chartUnits.map((key) => (
@@ -59,12 +57,12 @@ export function StudyTimeChart({
         </div>
       </div>
       {!busiest ? (
-        <p className="status">There are no study logs in this period</p>
+        <p className="status">No chapters or sections were finished in this period</p>
       ) : (
         <>
           <p className="status">
-            Busiest {topic} of {bars.length} {bars.length === 1 ? topic : noun}: {busiest.label} (
-            {formatMinutes(busiest.minutes)}).
+            Most finished in a {topic} of {bars.length} {bars.length === 1 ? topic : noun}:{' '}
+            {busiest.label} ({finishedLabel(busiest)}).
           </p>
           {chartError ? (
             <p role="alert" className="error">
@@ -85,22 +83,36 @@ export function StudyTimeChart({
                 >
                   <R.CartesianGrid vertical={false} stroke="var(--border)" />
                   <R.XAxis dataKey="label" tickLine={false} minTickGap={12} fontSize={13} />
-                  <R.YAxis allowDecimals={false} unit="h" tickLine={false} fontSize={13} />
-                  <R.Tooltip
-                    cursor={{ fill: 'var(--muted)' }}
-                    formatter={(_value, _name, item) => [
-                      formatMinutes((item.payload as { minutes: number }).minutes),
-                      'Study time',
-                    ]}
+                  <R.YAxis allowDecimals={false} tickLine={false} fontSize={13} />
+                  <R.Tooltip cursor={{ fill: 'var(--muted)' }} />
+                  <R.Bar
+                    dataKey="chapters"
+                    name="Chapters"
+                    stackId="finished"
+                    fill="currentColor"
+                    maxBarSize={40}
                   />
                   <R.Bar
-                    dataKey="hours"
-                    fill="currentColor"
+                    dataKey="sections"
+                    name="Sections"
+                    stackId="finished"
+                    fill="var(--ring)"
                     radius={[3, 3, 0, 0]}
                     maxBarSize={40}
                   />
                 </R.BarChart>
               </R.ResponsiveContainer>
+              <ul
+                className="m-0 mt-2 flex list-none gap-4 p-0 text-[13px] text-muted-foreground"
+                aria-label="Bar colours"
+              >
+                <li className="flex items-center gap-1.5">
+                  <span className="size-2.5 rounded-[2px] bg-primary" /> Chapters
+                </li>
+                <li className="flex items-center gap-1.5">
+                  <span className="size-2.5 rounded-[2px] bg-ring" /> Sections
+                </li>
+              </ul>
             </div>
           )}
         </>

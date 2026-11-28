@@ -2,6 +2,7 @@ import { fireEvent, screen } from '@testing-library/react';
 import { expect, test } from 'vitest';
 
 import { fakeApi } from './test/fake-api';
+import { finishedDays } from './test/finished';
 import { render } from './test/render';
 import { TwelveWeekView } from './twelve-week-view';
 import { weekDays, weekStartOf, weekTotals } from './week-data';
@@ -73,14 +74,26 @@ test('weekTotals gives 12 weeks ending with this one and counts study days', () 
   expect(totals[0].minutes).toBe(0);
 });
 
-test('the week view lists the days and moves between weeks', async () => {
-  fakeApi({
+test('the week view lists the days with their finished counts and moves between weeks', async () => {
+  const api = fakeApi({
     'GET /api/study-logs': () => ({ body: { studyLogs: [log(1, '2026-10-19', 60)] } }),
+    'GET /api/stats/finished-days': () => ({
+      body: finishedDays([
+        { date: '2026-10-19', chapters: 1, sections: 3 },
+        { date: '2026-10-21', chapters: 0, sections: 1 },
+      ]),
+    }),
   });
   render(<WeekView today={today} />);
-  expect(await screen.findByText('Total 1 h')).toBeInTheDocument();
-  expect(screen.getByText('Mon 2026-10-19 · 1 h')).toBeInTheDocument();
-  expect(screen.getByText(/09:00–10:00 \(1 h\) · Linear Algebra/)).toBeInTheDocument();
+  expect(await screen.findByText('Finished 1 chapter · 4 sections')).toBeInTheDocument();
+  expect(screen.getByText('Mon 2026-10-19 · 1 chapter · 3 sections')).toBeInTheDocument();
+  expect(screen.getByText('Tue 2026-10-20 · 0 chapters · 0 sections')).toBeInTheDocument();
+  // No duration in hours on the week rows; the goal card is the only place for time.
+  expect(screen.getByText(/09:00–10:00 · Linear Algebra/)).toBeInTheDocument();
+  expect(document.body).not.toHaveTextContent(/\d h\b/);
+  expect(api.requests.map((r) => r.path)).toContain(
+    '/api/stats/finished-days?from=2026-10-18&to=2026-10-24',
+  );
   expect(screen.getByRole('heading', { name: '2026-10-18 – 2026-10-24' })).toBeInTheDocument();
 
   fireEvent.click(screen.getByRole('button', { name: 'Previous week' }));
@@ -94,27 +107,41 @@ test('the week view lists the days and moves between weeks', async () => {
 });
 
 test('the week view shows a load error as an alert', async () => {
-  fakeApi({ 'GET /api/study-logs': { status: 500, body: { error: 'Test server' } } });
+  fakeApi({
+    'GET /api/study-logs': { status: 500, body: { error: 'Test server' } },
+    'GET /api/stats/finished-days': { body: finishedDays() },
+  });
   render(<WeekView today={today} />);
   expect(await screen.findByRole('alert')).toHaveTextContent('Could not load the week');
 });
 
+test('the week view also reports a failed finished-counts load', async () => {
+  fakeApi({
+    'GET /api/study-logs': { body: { studyLogs: [] } },
+    'GET /api/stats/finished-days': { status: 500, body: { error: 'Counts down' } },
+  });
+  render(<WeekView today={today} />);
+  expect(await screen.findByRole('alert')).toHaveTextContent('Counts down');
+});
+
 test('the 12-week view shows one row per week', async () => {
   fakeApi({
-    'GET /api/stats/heatmap': {
+    'GET /api/stats/finished-days': {
       body: {
         from: '2026-08-02',
         to: today,
         daily: [
-          { date: '2026-10-19', minutes: 90 },
-          { date: '2026-10-20', minutes: 30 },
+          { date: '2026-10-19', chapters: 1, sections: 2 },
+          { date: '2026-10-20', chapters: 0, sections: 3 },
         ],
       },
     },
   });
   render(<TwelveWeekView today={today} />);
   expect(await screen.findByText('2 of 7 days')).toBeInTheDocument();
-  expect(screen.getByText('2 h')).toBeInTheDocument();
+  expect(screen.getByText('1 chapter')).toBeInTheDocument();
+  expect(screen.getByText('5 sections')).toBeInTheDocument();
+  expect(document.body).not.toHaveTextContent(/\d h\b/);
   expect(screen.getAllByRole('listitem')).toHaveLength(12);
   // The first row names its year, and the current week is named in text.
   const rows = screen.getAllByRole('listitem');
@@ -126,7 +153,7 @@ test('the 12-week view shows one row per week', async () => {
 
 test('the 12-week view shows the year again where it changes', async () => {
   fakeApi({
-    'GET /api/stats/heatmap': { body: { from: '2025-10-19', to: '2026-01-10', daily: [] } },
+    'GET /api/stats/finished-days': { body: { from: '2025-10-19', to: '2026-01-10', daily: [] } },
   });
   render(<TwelveWeekView today="2026-01-10" />);
   await screen.findAllByRole('listitem');
@@ -138,8 +165,12 @@ test('the 12-week view shows the year again where it changes', async () => {
 
 test('the 12-week captions are never smaller than 13px', async () => {
   fakeApi({
-    'GET /api/stats/heatmap': {
-      body: { from: '2026-08-02', to: today, daily: [{ date: '2026-10-19', minutes: 90 }] },
+    'GET /api/stats/finished-days': {
+      body: {
+        from: '2026-08-02',
+        to: today,
+        daily: [{ date: '2026-10-19', chapters: 1, sections: 0 }],
+      },
     },
   });
   render(<TwelveWeekView today={today} />);
@@ -149,7 +180,10 @@ test('the 12-week captions are never smaller than 13px', async () => {
 });
 
 test('the week card has its own landmark name, not the page name', async () => {
-  fakeApi({ 'GET /api/study-logs': { body: { studyLogs: [] } } });
+  fakeApi({
+    'GET /api/study-logs': { body: { studyLogs: [] } },
+    'GET /api/stats/finished-days': { body: finishedDays() },
+  });
   render(<WeekView today={today} />);
   expect(await screen.findByRole('region', { name: 'Days of the week' })).toBeInTheDocument();
   expect(screen.queryByRole('region', { name: 'Week' })).toBeNull();

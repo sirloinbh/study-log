@@ -1,9 +1,11 @@
 import { fireEvent, screen, within } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 
+import { finishedPath } from './finished-stats';
 import { Stats } from './stats';
-import { reviewBars, studyTimePath } from './study-stats';
-import { type Api, fakeApi } from './test/fake-api';
+import { reviewBars } from './study-stats';
+import { fakeApi } from './test/fake-api';
+import { finishedDays, finishedStats } from './test/finished';
 import { render } from './test/render';
 
 // The chart library is slow to load and draws nothing without a real layout; the page is checked
@@ -32,22 +34,6 @@ vi.mock('recharts', () => {
   };
 });
 
-const studyTime = (totalMinutes: number) => ({
-  period: 'week',
-  from: '2026-10-25',
-  to: '2026-10-31',
-  totalMinutes,
-  todayMinutes: 0,
-  cumulativeMinutes: totalMinutes,
-  days: 7,
-  studyDays: 1,
-  averageMinutesPerDay: 0,
-  averageMinutesPerStudyDay: 0,
-  daily: [],
-  weekly: [],
-  monthly: [],
-});
-
 const reviews = {
   period: 'week',
   from: '2026-10-25',
@@ -64,7 +50,7 @@ function server(answers: { reviews?: unknown; reviewsStatus?: number } = {}) {
     'GET /api/stats/reviews': answers.reviewsStatus
       ? { status: answers.reviewsStatus, body: { error: 'Server error' } }
       : { body: answers.reviews ?? reviews },
-    'GET /api/stats/heatmap': { body: { from: '2026-10-25', to: '2026-10-31', daily: [] } },
+    'GET /api/stats/finished-days': { body: finishedDays() },
     'GET /api/stats/textbooks': {
       body: {
         textbooks: [],
@@ -78,14 +64,9 @@ function server(answers: { reviews?: unknown; reviewsStatus?: number } = {}) {
         },
       },
     },
-    'GET /api/stats/study-time': ({ path }) => ({
-      body: studyTime(path.includes('type=review') ? 40 : 100),
-    }),
+    'GET /api/stats/finished-contents': { body: finishedStats({ chapters: 2, sections: 3 }) },
   });
 }
-
-const asks = (api: Api, prefix: string) =>
-  api.requests.filter((r) => r.path.startsWith(prefix)).length;
 
 const reviewCard = () =>
   within(document.querySelector<HTMLElement>('section[aria-labelledby="review-chart-heading"]')!);
@@ -138,32 +119,12 @@ test('a failed review load stays inside its card', async () => {
   server({ reviewsStatus: 500 });
   render(<Stats />);
   expect(await reviewCard().findByRole('alert')).toBeTruthy();
-  expect(await screen.findByRole('region', { name: 'Study time metrics' })).toBeTruthy();
+  expect(await screen.findByRole('region', { name: 'Finished metrics' })).toBeTruthy();
 });
 
-test('the study type filter narrows study time and leaves reviews alone', async () => {
-  const api = server();
-  render(<Stats />);
-  const metrics = await screen.findByRole('region', { name: 'Study time metrics' });
-  await within(metrics).findAllByText('1 h 40 min');
-  await reviewCard().findByText('75%');
-  const reviewAsks = asks(api, '/api/stats/reviews');
-
-  const types = within(screen.getByRole('group', { name: 'Study type' }));
-  expect(types.getByRole('button', { name: 'All' }).getAttribute('aria-pressed')).toBe('true');
-  fireEvent.click(types.getByRole('button', { name: 'Review' }));
-
-  await api.requested((r) => r.path === '/api/stats/study-time?period=week&type=review');
-  const narrowed = await screen.findByRole('region', { name: 'Study time metrics' });
-  expect((await within(narrowed).findAllByText('40 min')).length).toBeGreaterThan(0);
-  expect(within(narrowed).getByText('Recorded so far: Review')).toBeTruthy();
-  expect(asks(api, '/api/stats/reviews')).toBe(reviewAsks);
-  expect(reviewCard().getByText('75%')).toBeTruthy();
-});
-
-test('the request leaves out the type when everything is wanted', () => {
-  expect(studyTimePath('week', 'all')).toBe('/api/stats/study-time?period=week');
-  expect(studyTimePath('all', 'new')).toBe('/api/stats/study-time?period=all&type=new');
+test('the request asks for the period and leaves out the textbook when all are wanted', () => {
+  expect(finishedPath('week')).toBe('/api/stats/finished-contents?period=week');
+  expect(finishedPath('all', '7')).toBe('/api/stats/finished-contents?period=all&textbookId=7');
 });
 
 test('the bars are the three counts, in order', () => {

@@ -6,11 +6,27 @@ import { apiKey, useApiQuery } from './lib/query';
 import { Loading } from './loading';
 import { plural } from './plural';
 import { formatMinutes } from './study-logs-data';
-import { chapterPercent, type TextbookStats as Stats, textbookStatsPath } from './study-stats';
+import { type TextbookStats as Stats, textbookStatsPath } from './study-stats';
+
+type Book = Stats['textbooks'][number];
+
+// Progress is the sections finished of all sections (#481); a book whose contents are chapters
+// only (no sections) shows its chapters instead.
+const bySections = (book: Book) => book.totalSections > 0;
+const progressNoun = (book: Book) => (bySections(book) ? 'sections' : 'chapters');
+const progressTotal = (book: Book) => (bySections(book) ? book.totalSections : book.totalChapters);
+const progressDone = (book: Book) =>
+  bySections(book) ? book.completedSections : book.completedChapters;
+const progressPercent = (book: Book) =>
+  Math.floor((progressDone(book) * 100) / progressTotal(book));
+const progressLabel = (book: Book) =>
+  progressTotal(book) === 0
+    ? 'No contents'
+    : `${progressDone(book)} / ${progressTotal(book)} ${progressNoun(book)}`;
 
 const shownRate = (rate: number | null) => (rate === null ? '—' : `${rate}%`);
 
-// Textbooks and schedules (#51), from GET /api/stats/textbooks: chapters done per book, and how
+// Textbooks and schedules (#51), from GET /api/stats/textbooks: sections finished per book, and how
 // schedules were kept, for all of them or for one book.
 export function TextbookStats() {
   const [textbookId, setTextbookId] = useState('');
@@ -89,24 +105,20 @@ export function TextbookStats() {
                 <li key={book.id}>
                   <p className="m-0 mb-1.5 flex flex-wrap justify-between gap-x-3 gap-y-1">
                     <span className="log-studied">{book.title}</span>
-                    <span className="status">
-                      {book.totalChapters === 0
-                        ? 'No contents'
-                        : `${book.completedChapters} / ${book.totalChapters} chapters`}
-                    </span>
+                    <span className="status">{progressLabel(book)}</span>
                   </p>
-                  {book.totalChapters > 0 && (
+                  {progressTotal(book) > 0 && (
                     <div
                       role="progressbar"
                       className="h-2 overflow-hidden rounded-[4px] bg-muted"
-                      aria-label={`${book.title} completed chapters`}
+                      aria-label={`${book.title} ${progressNoun(book)} finished`}
                       aria-valuemin={0}
                       aria-valuemax={100}
-                      aria-valuenow={chapterPercent(book)}
+                      aria-valuenow={progressPercent(book)}
                     >
                       <div
                         className="h-full bg-primary"
-                        style={{ width: `${chapterPercent(book)}%` }}
+                        style={{ width: `${progressPercent(book)}%` }}
                       />
                     </div>
                   )}
