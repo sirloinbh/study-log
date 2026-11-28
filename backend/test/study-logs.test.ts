@@ -40,7 +40,7 @@ test('invalid study logs are rejected with English messages before touching the 
     [{ ...valid, endTime: '9:5' }, /end time must be in HH:MM/],
     [{ ...valid, endTime: '09:00' }, /The end time must differ from the start time/],
     [{ ...valid, status: 'finished' }, /planned, in progress, done, or stopped/],
-    [{ ...valid, memo: 'a'.repeat(10001) }, /at most 10000 characters/],
+    [{ ...valid, memo: 'a'.repeat(50001) }, /at most 50000 characters/],
   ];
   await withApi(untouchedPool, async (call) => {
     for (const [body, message] of cases) {

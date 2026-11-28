@@ -253,6 +253,14 @@ test('a memo is written in Markdown with a preview and shown rendered in the lis
   expect(preview()).toBeNull();
 });
 
+test('the memo box is large, grows with the text and takes long notes (#476)', async () => {
+  await open(serve([]));
+  const memo = field('Memo') as HTMLTextAreaElement;
+  expect(memo.rows).toBe(16);
+  expect(memo.maxLength).toBe(50000);
+  expect(memo).toHaveClass('min-h-96', 'md:min-h-[60vh]', 'field-sizing-content');
+});
+
 test('an empty history says so instead of showing an empty list', async () => {
   await open(serve());
   expect(screen.getByText(/No study logs yet/)).toBeInTheDocument();
