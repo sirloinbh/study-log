@@ -26,6 +26,7 @@ test('Edit on a study log moves focus to the date field', async () => {
     contentId: null,
     contentNumber: null,
     contentTitle: null,
+    finishedContentIds: [],
     understanding: null,
     goalAchieved: null,
     studyType: 'new',
