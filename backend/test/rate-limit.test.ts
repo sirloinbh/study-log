@@ -21,9 +21,9 @@ test('requests over the limit get an English 429 and never reach the database', 
   await withApi(
     pool,
     async (call) => {
-      assert.equal((await call('/api/keywords')).status, 200);
-      assert.equal((await call('/api/keywords')).status, 200);
-      const refused = await call('/api/keywords');
+      assert.equal((await call('/api/textbooks')).status, 200);
+      assert.equal((await call('/api/textbooks')).status, 200);
+      const refused = await call('/api/textbooks');
       assert.equal(refused.status, 429);
       assert.equal(refused.data.error, 'Too many requests. Try again in a minute.');
     },
@@ -37,8 +37,8 @@ test('a refused request is not parsed, so a bad body still answers 429', async (
   await withApi(
     pool,
     async (call) => {
-      await call('/api/keywords');
-      const refused = await call('/api/keywords', { method: 'POST', rawBody: '{broken' });
+      await call('/api/textbooks');
+      const refused = await call('/api/textbooks', { method: 'POST', rawBody: '{broken' });
       assert.equal(refused.status, 429);
     },
     { requestsPerMinute: 1 },
@@ -51,8 +51,8 @@ test('health is neither counted nor refused, so busy pages cannot make the API l
     pool,
     async (call) => {
       for (let i = 0; i < 3; i++) assert.equal((await call('/api/health')).status, 200);
-      assert.equal((await call('/api/keywords')).status, 200);
-      assert.equal((await call('/api/keywords')).status, 429);
+      assert.equal((await call('/api/textbooks')).status, 200);
+      assert.equal((await call('/api/textbooks')).status, 429);
       assert.equal((await call('/api/health')).status, 200);
     },
     { requestsPerMinute: 1 },
@@ -67,9 +67,9 @@ test('the client address nginx appends decides the bucket (the last X-Forwarded-
       const from = (address: string) => ({
         headers: { 'x-forwarded-for': `10.9.9.9, ${address}` },
       });
-      assert.equal((await call('/api/keywords', from('1.2.3.4'))).status, 200);
-      assert.equal((await call('/api/keywords', from('1.2.3.4'))).status, 429);
-      assert.equal((await call('/api/keywords', from('5.6.7.8'))).status, 200);
+      assert.equal((await call('/api/textbooks', from('1.2.3.4'))).status, 200);
+      assert.equal((await call('/api/textbooks', from('1.2.3.4'))).status, 429);
+      assert.equal((await call('/api/textbooks', from('5.6.7.8'))).status, 200);
     },
     { requestsPerMinute: 1 },
   );
@@ -78,7 +78,7 @@ test('the client address nginx appends decides the bucket (the last X-Forwarded-
 test('the default limit leaves room for a page opening many requests at once', async () => {
   const { pool } = counting();
   await withApi(pool, async (call) => {
-    const answers = await Promise.all(Array.from({ length: 100 }, () => call('/api/keywords')));
+    const answers = await Promise.all(Array.from({ length: 100 }, () => call('/api/textbooks')));
     assert.deepEqual([...new Set(answers.map((answer) => answer.status))], [200]);
   });
 });

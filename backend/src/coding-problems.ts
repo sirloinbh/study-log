@@ -396,7 +396,7 @@ export function codingRoutes(pool: Pool, today: () => string) {
     res.status(201).json({ attempt });
   });
 
-  // A left-out date keeps the stored one, as for keywords.
+  // A left-out date keeps the stored one.
   router.put('/attempts/:id', async (req, res) => {
     const id = parseId(req.params.id, 'attempt');
     const input = attemptUpdateInput.parse(req.body);

@@ -138,7 +138,7 @@ export function retrospectiveRoutes(pool: Pool, today: () => string, drafter: Dr
     res.json({ retrospectives: rows });
   });
 
-  // A draft for the period from its study logs, difficult parts and keywords (#362). Nothing is
+  // A draft for the period from its study logs and difficult parts (#362). Nothing is
   // saved: the person edits the draft and saves it with the normal save.
   router.post('/:kind/:start/draft', async (req, res) => {
     // Only a JSON request, which another site's page cannot send without a CORS preflight this server
@@ -177,17 +177,11 @@ export function retrospectiveRoutes(pool: Pool, today: () => string, drafter: Dr
       if (!res.writableFinished) stop.abort();
     });
     try {
-      const keywords = await pool.query(
-        `SELECT to_char(keyword_date, 'YYYY-MM-DD') AS date, keyword, memo FROM keywords
-         WHERE keyword_date BETWEEN $1 AND $2 ORDER BY keyword_date, id LIMIT 100`,
-        [period.from, period.to],
-      );
       const drafted = await drafter({
         kind: period.kind,
         from: period.from,
         to: period.to,
         logs: logs.rows,
-        keywords: keywords.rows,
         signal: stop.signal,
         requestId: requestIdOf(res),
       });

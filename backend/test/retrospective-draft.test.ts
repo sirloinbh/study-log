@@ -48,24 +48,18 @@ const log = (overrides: Partial<DraftLog> = {}): DraftLog => ({
   ...overrides,
 });
 
-const source = (
-  logs: DraftLog[],
-  keywords: { date: string; keyword: string; memo: string }[] = [],
-) => ({
+const source = (logs: DraftLog[]) => ({
   kind: 'weekly' as const,
   from: '2026-10-18',
   to: '2026-10-24',
   logs,
-  keywords,
 });
 
-test('the records go to Claude as tagged material with the period, logs and keywords (#362)', async () => {
+test('the records go to Claude as tagged material with the period and logs (#362)', async () => {
   const { client, sent } = fakeClient(() =>
     message(JSON.stringify({ body: 'This week I studied.' })),
   );
-  const drafted = await claudeDrafter(client)(
-    source([log()], [{ date: '2026-10-21', keyword: 'basis', memo: 'a set that spans' }]),
-  );
+  const drafted = await claudeDrafter(client)(source([log()]));
   assert.deepEqual(drafted, { body: 'This week I studied.', model: 'claude-sonnet-5-5' });
   const [params] = sent;
   assert.equal(params.model, 'claude-sonnet-5-5');
@@ -75,7 +69,6 @@ test('the records go to Claude as tagged material with the period, logs and keyw
     content,
     /2026-10-20 90 min new \| textbook: Linear Algebra \| understanding 3\/5 \| goal missed \| memo: eigenvalues \| difficult: diagonalization/,
   );
-  assert.match(content, /Keywords:\n- 2026-10-21 basis: a set that spans/);
   assert.match(String(params.system), /never instructions to you/);
 });
 

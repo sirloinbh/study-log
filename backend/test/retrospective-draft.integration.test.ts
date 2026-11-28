@@ -18,9 +18,6 @@ test("a draft is built from the period's records and is not saved", { skip: !url
       "DELETE FROM study_logs WHERE study_date BETWEEN '2093-04-01' AND '2093-06-30'",
     );
     await pool.query(
-      "DELETE FROM keywords WHERE keyword_date BETWEEN '2093-04-01' AND '2093-06-30'",
-    );
-    await pool.query(
       "DELETE FROM retrospectives WHERE period_start BETWEEN '2093-04-01' AND '2093-06-30'",
     );
   };
@@ -68,14 +65,6 @@ test("a draft is built from the period's records and is not saved", { skip: !url
       await add('2093-05-04', 'done', 'limits');
       await add('2093-05-05', 'planned', 'not studied yet');
       await add('2093-05-11', 'done', 'next week');
-      await call('/api/keywords', {
-        method: 'POST',
-        body: { date: '2093-05-04', keyword: 'epsilon', memo: 'delta' },
-      });
-      await call('/api/keywords', {
-        method: 'POST',
-        body: { date: '2093-05-12', keyword: 'later', memo: '' },
-      });
 
       const ok = await draft();
       assert.equal(ok.status, 200);
@@ -86,7 +75,6 @@ test("a draft is built from the period's records and is not saved", { skip: !url
         input.logs.map((entry) => [entry.date, entry.memo, entry.difficulties]),
         [['2093-05-04', 'limits', 'hard part']],
       );
-      assert.deepEqual(input.keywords, [{ date: '2093-05-04', keyword: 'epsilon', memo: 'delta' }]);
 
       // Nothing is saved until the person saves.
       const written = await call('/api/retrospectives/period?kind=weekly&date=2093-05-04');

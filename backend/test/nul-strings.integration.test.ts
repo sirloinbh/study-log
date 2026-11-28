@@ -20,7 +20,6 @@ test(
     const cleanup = async () => {
       await pool.query("DELETE FROM textbooks WHERE title LIKE '[NUL 테스트]%'");
       await pool.query("DELETE FROM study_logs WHERE study_date = '2097-01-01'");
-      await pool.query("DELETE FROM keywords WHERE keyword_date = '2097-01-01'");
     };
     await cleanup();
     const logged: unknown[] = [];
@@ -47,8 +46,6 @@ test(
             },
           },
         ],
-        ['/api/keywords', { method: 'POST', body: { date: '2097-01-01', keyword: '행\u0000렬' } }],
-        ['/api/keywords?q=%00', {}],
       ] as const) {
         const { status, data } = await call(path, init);
         assert.equal(status, 400, path);

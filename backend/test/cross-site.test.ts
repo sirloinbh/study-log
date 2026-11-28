@@ -36,7 +36,7 @@ test('a state-changing request from another site is refused before the database 
           assert.equal(data.error, 'This request came from another site');
         }
         for (const method of ['PUT', 'PATCH', 'DELETE']) {
-          const { status } = await call('/api/keywords/1', {
+          const { status } = await call('/api/textbooks/1', {
             method,
             headers: { 'sec-fetch-site': site },
           });
@@ -57,7 +57,7 @@ test('the app itself (same-origin), a script without the header, and reads still
     async (call) => {
       // Same-origin and no header both reach the route (here a 404: nothing is stored).
       for (const headers of [{ 'sec-fetch-site': 'same-origin' }, {}] as Record<string, string>[]) {
-        const { status } = await call('/api/keywords/1', { method: 'DELETE', headers });
+        const { status } = await call('/api/textbooks/1', { method: 'DELETE', headers });
         assert.equal(status, 404, JSON.stringify(headers));
       }
       // A read from another site is not a write.
