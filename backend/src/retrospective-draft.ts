@@ -15,13 +15,11 @@ export type DraftLog = {
   understanding: number | null;
   goalAchieved: boolean | null;
 };
-export type DraftKeyword = { date: string; keyword: string; memo: string };
 export type DraftSource = {
   kind: 'weekly' | 'monthly';
   from: string;
   to: string;
   logs: DraftLog[];
-  keywords: DraftKeyword[];
   signal?: AbortSignal;
   requestId?: string;
 };
@@ -45,7 +43,6 @@ export const draftLimit = 20000;
 // a long month stays a small, predictable call.
 export const promptLimit = 24000;
 const fieldLimit = 300;
-const keywordLimit = 100;
 const logLimit = 200;
 
 const cut = (text: string) => {
@@ -69,11 +66,7 @@ export function draftInput(source: DraftSource) {
     ];
     return `- ${parts.filter(Boolean).join(' | ')}`;
   });
-  const keywords = source.keywords
-    .slice(0, keywordLimit)
-    .map((item) => `- ${item.date} ${cut(item.keyword)}${item.memo ? `: ${cut(item.memo)}` : ''}`);
-  let text = `Period: ${source.from} to ${source.to} (${source.kind})\n\nStudy logs:\n${logs.join('\n')}`;
-  if (keywords.length) text += `\n\nKeywords:\n${keywords.join('\n')}`;
+  const text = `Period: ${source.from} to ${source.to} (${source.kind})\n\nStudy logs:\n${logs.join('\n')}`;
   return text.length > promptLimit
     ? `${text.slice(0, promptLimit)}\n[cut: too many records]`
     : text;

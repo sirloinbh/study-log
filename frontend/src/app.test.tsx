@@ -16,8 +16,6 @@ function server(health: { body: object; status?: number }) {
       [
         '/api/calendar-sync/status',
         '/api/exercises/wrong',
-        '/api/keywords',
-        '/api/keywords/used',
         '/api/retrospectives/period',
         '/api/retrospectives',
         '/api/reviews/today',
@@ -63,7 +61,6 @@ test('each page has its own address and is marked in the main menu', async () =>
     ['Schedules', '/schedules'],
     ['Reviews', '/reviews'],
     ['Textbooks', '/textbooks'],
-    ['Keywords', '/keywords'],
     ['Wrong problems', '/wrong-exercises'],
     ['Retrospectives', '/retrospectives'],
     ['Dashboard', '/dashboard'],

@@ -15,7 +15,6 @@ import {
   NotebookText,
   Rows3,
   Settings2,
-  Tags,
 } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
@@ -27,7 +26,6 @@ import { Toaster } from './components/ui/sonner';
 import { DataExport } from './data-export';
 import { useServiceDate } from './date';
 import { type Health, healthText, useHealth } from './health';
-import { Keywords } from './keywords';
 import { createQueryClient } from './lib/query';
 import { Retrospectives } from './retrospectives';
 import { ReviewBadge } from './review-badge';
@@ -50,7 +48,6 @@ const pages = {
   schedules: '/schedules',
   reviews: '/reviews',
   textbooks: '/textbooks',
-  keywords: '/keywords',
   wrongExercises: '/wrong-exercises',
   coding: '/coding',
   retrospectives: '/retrospectives',
@@ -68,7 +65,6 @@ const nav: NavItem[] = [
   { to: pages.schedules, label: 'Schedules', icon: CalendarDays },
   { to: pages.reviews, label: 'Reviews', icon: CalendarCheck },
   { to: pages.textbooks, label: 'Textbooks', icon: BookOpen },
-  { to: pages.keywords, label: 'Keywords', icon: Tags },
   { to: pages.wrongExercises, label: 'Wrong problems', icon: CircleX },
   { to: pages.coding, label: 'Algorithms', icon: Code },
   { to: pages.retrospectives, label: 'Retrospectives', icon: NotebookText },
@@ -220,19 +216,6 @@ function AppBody() {
                   today={today}
                 >
                   {() => <Textbooks />}
-                </Page>
-              }
-            />
-            <Route
-              path={pages.keywords}
-              element={
-                <Page
-                  title="Keywords"
-                  description="Save important keywords you meet while studying by date and find them again"
-                  health={health}
-                  today={today}
-                >
-                  {(today) => <Keywords today={today} />}
                 </Page>
               }
             />
