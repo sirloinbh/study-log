@@ -24,7 +24,8 @@ export function StudyLogs({
   today: string;
   onChange?: () => void;
   editId?: number;
-  onEditEnd?: () => void;
+  // `saved` is the status text when the edit ended with a save.
+  onEditEnd?: (saved?: string) => void;
 }) {
   const [form, setForm] = useState<StudyLogForm>(() => emptyForm(today));
   const [editingId, setEditingId] = useState<number | undefined>(undefined);
@@ -75,11 +76,11 @@ export function StudyLogs({
     setForm((current) => ({ ...current, ...changes }));
   };
 
-  const leaveEdit = () => {
+  const leaveEdit = (saved?: string) => {
     setForm(draft ?? emptyForm(today));
     setDraft(undefined);
     setEditingId(undefined);
-    onEditEnd?.();
+    onEditEnd?.(saved);
   };
 
   // `id` is the log the failed request targeted.
@@ -103,7 +104,7 @@ export function StudyLogs({
       });
       // A new entry keeps its date for the next session of the same day.
       if (editingId === undefined) setForm(emptyForm(form.studyDate));
-      else leaveEdit();
+      else leaveEdit('Updated');
       reloadAll();
     } catch (error) {
       fail(error as RequestError, editingId);
@@ -185,7 +186,7 @@ export function StudyLogs({
           action={action}
           onPatch={patch}
           onSubmit={(event) => void save(event)}
-          onCancel={leaveEdit}
+          onCancel={() => leaveEdit()}
         />
         {/* Always mounted so screen readers announce each new message. */}
         <p role="status" className="status">

@@ -20,14 +20,19 @@ const recentLimit = 20;
 // `onChange` hears each delete attempt, since it can change which reviews are due.
 export function StudyHistory({
   today,
+  notice: arrived,
   onEdit,
   onChange,
 }: {
   today: string;
+  // A status to show on arrival, such as "Updated" after saving an edit on the Study log page.
+  notice?: string;
   onEdit: (id: number) => void;
   onChange?: () => void;
 }) {
-  const [notice, setNotice] = useState<Notice>(undefined);
+  const [notice, setNotice] = useState<Notice>(
+    arrived ? { kind: 'status', text: arrived } : undefined,
+  );
   // One request at a time: action buttons are disabled while a delete is pending.
   const { busy, nameNext, begin, end } = useBusy();
   const [deletingId, setDeletingId] = useState<number | undefined>(undefined);
