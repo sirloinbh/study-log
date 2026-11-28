@@ -1,5 +1,5 @@
 {
-  "centralSha": "8ecfe384e1dd6cfcdf4907cdbe41e60f7831517d",
+  "centralSha": "a8158fd69c6ac66d26d552763bcb22c6e27764f5",
   "profile": "app",
   "project": "study-log",
   "files": {
@@ -1216,7 +1216,7 @@
     },
     "frontend/src/lib/apps.ts": {
       "mode": "full",
-      "sha256": "c6072cc9266d0abdcaf9e00cb4f4002f027b046f6833abe646d215a5eaa1e264",
+      "sha256": "c4fea7f19324bbe490430f74e62bb75e126948d4a231a5b7cc4e9126e63c83e5",
       "source": "design-system/delivery/ui/frontend/src/lib/apps.ts.tmpl"
     },
     "frontend/src/lib/auth-config.ts": {
@@ -1306,7 +1306,7 @@
     },
     "frontend/src/sign-in.tsx": {
       "mode": "full",
-      "sha256": "3e1b2f7cc17dd1932df480e3a8b81f940044009c55e94e261e92cec88b36a7d5",
+      "sha256": "06b7e1665e933cffbe232fe75fe73390d99a8c193ab1c5d8b2b430bb07c311a4",
       "source": "templates/ui/frontend/src/sign-in.tsx"
     },
     "frontend/src/test/standard-setup.ts": {
