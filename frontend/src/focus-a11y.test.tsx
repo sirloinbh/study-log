@@ -4,9 +4,9 @@ import { afterEach, expect, test, vi } from 'vitest';
 import { Exercises } from './exercises';
 import { Keywords } from './keywords';
 import { Memo } from './memo';
-import { StudyLogs } from './study-logs';
 import { fakeApi } from './test/fake-api';
 import { render } from './test/render';
+import { StudyLogScreen } from './test/study-log-screen';
 
 afterEach(() => {
   cleanup();
@@ -26,35 +26,35 @@ test('Edit on a keyword moves focus to the edit form', async () => {
 });
 
 test('Edit on a study log moves focus to the date field', async () => {
+  const studyLog = {
+    id: 1,
+    studyDate: '2026-10-21',
+    startTime: '09:00',
+    endTime: '10:30',
+    durationMinutes: 90,
+    memo: 'matrix',
+    status: 'done',
+    textbookId: null,
+    textbookTitle: null,
+    contentId: null,
+    contentNumber: null,
+    contentTitle: null,
+    understanding: null,
+    difficulties: '',
+    goalAchieved: null,
+    studyType: 'new',
+  };
   fakeApi({
+    'GET /api/study-logs/1': { body: { studyLog } },
     'GET /api/textbooks': { body: { textbooks: [] } },
     'GET /api/study-logs/calendar': { body: { month: '2026-10', days: [] } },
     'GET /api/study-logs': {
       body: {
-        studyLogs: [
-          {
-            id: 1,
-            studyDate: '2026-10-21',
-            startTime: '09:00',
-            endTime: '10:30',
-            durationMinutes: 90,
-            memo: 'matrix',
-            status: 'done',
-            textbookId: null,
-            textbookTitle: null,
-            contentId: null,
-            contentNumber: null,
-            contentTitle: null,
-            understanding: null,
-            difficulties: '',
-            goalAchieved: null,
-            studyType: 'new',
-          },
-        ],
+        studyLogs: [studyLog],
       },
     },
   });
-  render(<StudyLogs today="2026-10-23" />);
+  render(<StudyLogScreen today="2026-10-23" />);
   fireEvent.click(await screen.findByRole('button', { name: /Edit log/ }));
   await waitFor(() => expect(document.activeElement?.id).toBe('study-log-date'));
 });
