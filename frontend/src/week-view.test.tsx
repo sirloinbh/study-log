@@ -23,7 +23,6 @@ const log = (id: number, studyDate: string, minutes: number, status = 'done') =>
   contentNumber: null,
   contentTitle: null,
   understanding: null,
-  difficulties: '',
   goalAchieved: null,
   studyType: 'new',
 });

@@ -138,7 +138,7 @@ export function retrospectiveRoutes(pool: Pool, today: () => string, drafter: Dr
     res.json({ retrospectives: rows });
   });
 
-  // A draft for the period from its study logs and difficult parts (#362). Nothing is
+  // A draft for the period from its study logs (#362). Nothing is
   // saved: the person edits the draft and saves it with the normal save.
   router.post('/:kind/:start/draft', async (req, res) => {
     // Only a JSON request, which another site's page cannot send without a CORS preflight this server
@@ -149,7 +149,7 @@ export function retrospectiveRoutes(pool: Pool, today: () => string, drafter: Dr
     const key = `${period.kind}:${period.from}`;
     const logs = await pool.query(
       `SELECT to_char(l.study_date, 'YYYY-MM-DD') AS date, l.duration_minutes AS minutes,
-         l.study_type AS "studyType", t.title AS textbook, l.memo, l.difficulties, l.understanding,
+         l.study_type AS "studyType", t.title AS textbook, l.memo, l.understanding,
          l.goal_achieved AS "goalAchieved"
        FROM study_logs l LEFT JOIN textbooks t ON t.id = l.textbook_id
        WHERE l.status <> 'planned' AND l.study_date BETWEEN $1 AND $2

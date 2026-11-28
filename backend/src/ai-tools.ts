@@ -20,7 +20,7 @@ export const tools = [
   defineTool({
     name: 'list_study_logs',
     description:
-      'List the study logs (at most 100, default 20), newest first, with textbook, chapter, minutes, status, understanding, memo and difficulties. Optionally only a date range (YYYY-MM-DD) or one textbook.',
+      'List the study logs (at most 100, default 20), newest first, with textbook, chapter, minutes, status, understanding and memo. Optionally only a date range (YYYY-MM-DD) or one textbook.',
     input: listInput,
     access: 'read',
     action: 'read',

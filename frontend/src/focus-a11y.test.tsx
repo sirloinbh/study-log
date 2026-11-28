@@ -33,7 +33,6 @@ test('Edit on a study log moves focus to the date field', async () => {
             contentNumber: null,
             contentTitle: null,
             understanding: null,
-            difficulties: '',
             goalAchieved: null,
             studyType: 'new',
           },

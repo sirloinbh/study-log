@@ -45,7 +45,6 @@ test('left-out fields get their defaults, and fields sent are kept (#151)', asyn
         null,
         null,
         null,
-        '',
         null,
         'new',
       ]);
@@ -58,7 +57,6 @@ test('left-out fields get their defaults, and fields sent are kept (#151)', asyn
         textbookId: 1,
         contentId: 2,
         understanding: 3,
-        difficulties: 'd',
         goalAchieved: false,
         studyType: 'review',
       };
@@ -73,7 +71,6 @@ test('left-out fields get their defaults, and fields sent are kept (#151)', asyn
         1,
         2,
         3,
-        'd',
         false,
         'review',
       ]);

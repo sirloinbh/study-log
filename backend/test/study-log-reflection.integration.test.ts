@@ -10,7 +10,6 @@ const url = process.env.TEST_DATABASE_URL;
 type Log = {
   id: number;
   understanding: number | null;
-  difficulties: string;
   goalAchieved: boolean | null;
 };
 
@@ -33,14 +32,12 @@ test(
       const session = { studyDate: day, startTime: '09:00', endTime: '10:00' };
       const created = await call('/api/study-logs', {
         method: 'POST',
-        body: { ...session, understanding: 4, difficulties: '고유값 분해', goalAchieved: false },
+        body: { ...session, understanding: 4, goalAchieved: false },
       });
       assert.equal(created.status, 201);
       const log = created.data.studyLog as Log;
-      assert.deepEqual(
-        [log.understanding, log.difficulties, log.goalAchieved],
-        [4, '고유값 분해', false],
-      );
+      assert.deepEqual([log.understanding, log.goalAchieved], [4, false]);
+      assert.equal('difficulties' in log, false);
 
       // Read back through the list and the single log.
       const listed = (await call(`/api/study-logs?date=${day}`)).data.studyLogs as Log[];
@@ -53,16 +50,12 @@ test(
       const cleared = await call(`/api/study-logs/${log.id}`, { method: 'PUT', body: session });
       assert.equal(cleared.status, 200);
       const fetched = (await call(`/api/study-logs/${log.id}`)).data.studyLog as Log;
-      assert.deepEqual(
-        [fetched.understanding, fetched.difficulties, fetched.goalAchieved],
-        [null, '', null],
-      );
+      assert.deepEqual([fetched.understanding, fetched.goalAchieved], [null, null]);
 
       // The database itself keeps understanding within 1-5 and the text within 2000 characters.
       for (const [column, value] of [
         ['understanding', 6],
         ['understanding', 0],
-        ['difficulties', 'x'.repeat(2001)],
       ] as const) {
         await assert.rejects(
           pool.query(

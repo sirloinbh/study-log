@@ -120,7 +120,7 @@ export const operations: Record<string, Operation> = {
 
   'POST /api/retrospectives/:kind/:start/draft': {
     summary:
-      'Ask Claude for a draft retrospective of the period from its study logs and difficult parts; nothing is saved',
+      'Ask Claude for a draft retrospective of the period from its study logs; nothing is saved',
     status: [200, 400, 409, 415, 422, 429, 502, 503],
   },
 
