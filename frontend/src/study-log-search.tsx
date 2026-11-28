@@ -20,7 +20,7 @@ import {
 } from './study-logs-data';
 import type { Textbook } from './textbook';
 
-// Searching past study logs (#18) by words in the memo or difficulties, a date range and a
+// Searching past study logs (#18) by words in the memo, a date range and a
 // textbook. Results are read-only; `reloadKey` changes when logs were saved or deleted, and the
 // shown results are searched again.
 export function StudyLogSearch({
@@ -97,7 +97,7 @@ export function StudyLogSearch({
           <Input
             type="search"
             maxLength={50}
-            placeholder="Part of a memo or difficult part"
+            placeholder="Part of a memo"
             disabled={busy}
             value={search.q}
             onChange={change('q')}
@@ -163,9 +163,6 @@ export function StudyLogSearch({
                     {log.studyType === 'review' && <span className="badge">Review</span>}
                   </div>
                   {log.textbookTitle !== null && <p className="log-studied">{studiedLabel(log)}</p>}
-                  {log.difficulties && (
-                    <p className="log-memo">Difficult parts: {log.difficulties}</p>
-                  )}
                   {log.memo && <Memo text={log.memo} clamp />}
                 </li>
               ))}

@@ -45,7 +45,6 @@ export function StudyLogItem({
       </div>
       {log.textbookTitle !== null && <p className="log-studied">{studiedLabel(log)}</p>}
       {reflectionLabel(log) && <p className="log-studied">{reflectionLabel(log)}</p>}
-      {log.difficulties && <p className="log-memo">Difficult parts: {log.difficulties}</p>}
       {log.memo && <Memo text={log.memo} clamp />}
       <div className="log-actions">
         <Button

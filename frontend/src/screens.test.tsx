@@ -28,7 +28,6 @@ describe('study logs', () => {
     contentNumber: null,
     contentTitle: null,
     understanding: null,
-    difficulties: '',
     goalAchieved: null,
     studyType: 'new',
   };

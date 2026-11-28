@@ -13,7 +13,6 @@ type Log = {
   endTime: string;
   durationMinutes: number;
   memo: string;
-  difficulties: string;
   status: string;
   textbookId: number | null;
   textbookTitle: string | null;
@@ -24,20 +23,13 @@ type Log = {
   goalAchieved: null;
 };
 
-const log = (
-  id: number,
-  studyDate: string,
-  memo: string,
-  difficulties = '',
-  book?: number,
-): Log => ({
+const log = (id: number, studyDate: string, memo: string, book?: number): Log => ({
   id,
   studyDate,
   startTime: '09:00',
   endTime: '10:00',
   durationMinutes: 60,
   memo,
-  difficulties,
   status: 'done',
   textbookId: book ?? null,
   textbookTitle: book ? '선형대수' : null,
@@ -49,8 +41,8 @@ const log = (
 });
 
 const stored = [
-  log(1, '2026-10-20', '고유값 정리', '', 1),
-  log(2, '2026-10-12', '미적분', '고유벡터가 어려움'),
+  log(1, '2026-10-20', '고유값 정리', 1),
+  log(2, '2026-10-12', '고유벡터가 어려움'),
   log(3, '2026-09-01', '행렬'),
 ];
 
@@ -81,7 +73,7 @@ function server(initial: Log[], options: { failSearch?: boolean } = {}) {
     const found = logs.filter(
       (l) =>
         (!params.date || l.studyDate === params.date) &&
-        (!words || l.memo.toLowerCase().includes(words) || l.difficulties.includes(words)) &&
+        (!words || l.memo.toLowerCase().includes(words)) &&
         (!params.from || l.studyDate >= params.from) &&
         (!params.to || l.studyDate <= params.to) &&
         (!params.textbookId || l.textbookId === Number(params.textbookId)),
@@ -120,7 +112,7 @@ test('a search asks with every filled condition and lists the matches', async ()
   const found = results();
   expect(found).toHaveLength(2);
   expect(found[0]).toMatch(/2026-10-20.*1 h.*Done.*선형대수.*고유값 정리/s);
-  expect(found[1]).toMatch(/Difficult parts: 고유벡터가 어려움/);
+  expect(found[1]).toMatch(/고유벡터가 어려움/);
 });
 
 test('the textbook condition narrows the search', async () => {
