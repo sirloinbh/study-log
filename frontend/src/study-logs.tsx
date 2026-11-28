@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 import { useBusy } from './busy';
+import { Button } from './components/ui/button';
 import type { RequestError } from './lib/api';
 import { apiKey, useApiMutation, useApiQuery } from './lib/query';
 import { StudyLogFormView } from './study-log-form';
@@ -23,7 +24,8 @@ export function StudyLogs({
   today: string;
   onChange?: () => void;
   editId?: number;
-  onEditEnd?: () => void;
+  // `saved` is the status text when the edit ended with a save.
+  onEditEnd?: (saved?: string) => void;
 }) {
   const [form, setForm] = useState<StudyLogForm>(() => emptyForm(today));
   const [editingId, setEditingId] = useState<number | undefined>(undefined);
@@ -74,11 +76,11 @@ export function StudyLogs({
     setForm((current) => ({ ...current, ...changes }));
   };
 
-  const leaveEdit = () => {
+  const leaveEdit = (saved?: string) => {
     setForm(draft ?? emptyForm(today));
     setDraft(undefined);
     setEditingId(undefined);
-    onEditEnd?.();
+    onEditEnd?.(saved);
   };
 
   // `id` is the log the failed request targeted.
@@ -102,7 +104,7 @@ export function StudyLogs({
       });
       // A new entry keeps its date for the next session of the same day.
       if (editingId === undefined) setForm(emptyForm(form.studyDate));
-      else leaveEdit();
+      else leaveEdit('Updated');
       reloadAll();
     } catch (error) {
       fail(error as RequestError, editingId);
@@ -154,6 +156,23 @@ export function StudyLogs({
   }, [editId, loadedLog]);
   const loadFailure = editId !== undefined && !loadedLog ? target.error : null;
 
+  // A log that cannot be loaded gets no form: saving it would add a new log under an edit address.
+  if (loadFailure) {
+    return (
+      <div className="study-logs">
+        <section className="card">
+          <h2>Edit the study log</h2>
+          <p role="alert" className="error">
+            Could not load the study log to edit: {loadFailure.message}
+          </p>
+          <Button type="button" variant="outline" onClick={() => onEditEnd?.()}>
+            Back to History
+          </Button>
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div className="study-logs">
       <section className="card">
@@ -167,13 +186,8 @@ export function StudyLogs({
           action={action}
           onPatch={patch}
           onSubmit={(event) => void save(event)}
-          onCancel={leaveEdit}
+          onCancel={() => leaveEdit()}
         />
-        {loadFailure && (
-          <p role="alert" className="error">
-            Could not load the study log to edit: {loadFailure.message}
-          </p>
-        )}
         {/* Always mounted so screen readers announce each new message. */}
         <p role="status" className="status">
           {notice?.kind === 'status' ? notice.text : ''}

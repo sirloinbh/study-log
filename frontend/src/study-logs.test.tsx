@@ -1,6 +1,7 @@
 import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { expect, test } from 'vitest';
 
+import { StudyLogs } from './study-logs';
 import {
   crossesMidnight,
   formatMinutes,
@@ -375,6 +376,17 @@ test('editing a log fills the form and saves it with PUT', async () => {
   // Back to a new entry for today, not the edited log's date.
   expect(field('Study date').value).toBe(today);
   expect(field('Start').value).toBe('');
+});
+
+test('an edit address for a missing log shows the error and a way back, not a form (#496)', async () => {
+  serve([morning]);
+  let ended = 0;
+  render(<StudyLogs today={today} editId={999} onEditEnd={() => (ended += 1)} />);
+  expect(await screen.findByRole('alert')).toHaveTextContent(/Study log not found/);
+  expect(document.querySelector('form.log-form')).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Save' })).toBeNull();
+  fireEvent.click(screen.getByRole('button', { name: 'Back to History' }));
+  expect(ended).toBe(1);
 });
 
 test('deleting a log needs a second confirmation click', async () => {
