@@ -71,7 +71,7 @@ test(
         text,
         /7002-03-01,09:00,10:30,90,done,new,export364-textbook,1,Vectors,,,"first, ""quoted""\nsecond"\r\n/,
       );
-      assert.match(text, /7002-03-02,09:00,09:30,30,done,new,,,,,,,'=1\+1\r\n$/);
+      assert.match(text, /7002-03-02,09:00,09:30,30,done,new,,,,,,'=1\+1\r\n$/);
 
       const narrow = await call('/api/export/study-logs.csv?from=7002-03-02&to=7002-03-02');
       assert.equal(
