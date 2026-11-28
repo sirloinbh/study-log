@@ -191,6 +191,9 @@ test('Edit on the History page opens the Study log form with that log, and savin
   fireEvent.submit(screen.getByLabelText('Memo').closest('form')!);
   expect(await screen.findByRole('heading', { level: 1, name: 'History' })).toBeInTheDocument();
   expect(window.location.pathname).toBe('/history');
+  // The saved edit is confirmed on the page the user lands on, once (#497).
+  expect(await screen.findByText('Updated')).toHaveAttribute('role', 'status');
+  await waitFor(() => expect(window.history.state?.usr ?? null).toBeNull());
 });
 
 test('the old stats address goes to the dashboard', async () => {

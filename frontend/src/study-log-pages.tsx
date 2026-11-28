@@ -1,4 +1,5 @@
-import { useNavigate, useSearchParams } from 'react-router';
+import { useEffect } from 'react';
+import { useLocation, useNavigate, useSearchParams } from 'react-router';
 
 import { StudyHistory } from './study-history';
 import { StudyLogs } from './study-logs';
@@ -19,16 +20,25 @@ export function StudyLogPage({ today, onChange }: { today: string; onChange?: ()
       today={today}
       onChange={onChange}
       editId={editId}
-      onEditEnd={() => void navigate(historyPath)}
+      onEditEnd={(saved) =>
+        void navigate(historyPath, saved ? { state: { notice: saved } } : undefined)
+      }
     />
   );
 }
 
 export function StudyHistoryPage({ today, onChange }: { today: string; onChange?: () => void }) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const notice = (location.state as { notice?: string } | null)?.notice;
+  // The notice is shown once: a reload of the page does not bring it back.
+  useEffect(() => {
+    if (notice) void navigate(location.pathname, { replace: true, state: null });
+  }, [notice, location.pathname, navigate]);
   return (
     <StudyHistory
       today={today}
+      notice={notice}
       onChange={onChange}
       onEdit={(id) => void navigate(`/?edit=${id}`)}
     />
