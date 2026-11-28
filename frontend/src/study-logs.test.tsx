@@ -1,7 +1,6 @@
 import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { expect, test } from 'vitest';
 
-import { StudyLogs } from './study-logs';
 import {
   crossesMidnight,
   formatMinutes,
@@ -12,6 +11,7 @@ import {
 } from './study-logs-data';
 import { type Answer, fakeApi } from './test/fake-api';
 import { render } from './test/render';
+import { StudyLogScreen } from './test/study-log-screen';
 
 type Log = {
   id: number;
@@ -105,6 +105,13 @@ function serve(initial: Log[] = [], options: Options = {}) {
     if (reject && method !== 'GET') return { status: reject.status, body: { error: reject.error } };
     const held = hold?.method === method ? { hold: hold.until } : {};
     const id = Number(path.split('/')[3]);
+    // One log, for the form that opens it to edit (#478).
+    if (method === 'GET' && /^\/api\/study-logs\/\d+$/.test(path)) {
+      const found = logs.find((log) => log.id === id);
+      return found
+        ? { body: { studyLog: found } }
+        : { status: 404, body: { error: 'Study log not found' } };
+    }
     if (method === 'GET') {
       if (failGet?.(++gets)) return { status: 500, body: { error: 'Server error' } };
       const sorted = [...logs].sort((a, b) =>
@@ -145,7 +152,8 @@ function serve(initial: Log[] = [], options: Options = {}) {
         (request) =>
           request.path.startsWith('/api/study-logs') &&
           !request.path.startsWith('/api/study-logs/calendar') &&
-          !request.path.startsWith('/api/study-logs?date='),
+          !request.path.startsWith('/api/study-logs?date=') &&
+          !(request.method === 'GET' && /^\/api\/study-logs\/\d+$/.test(request.path)),
       );
     },
     logs,
@@ -193,9 +201,15 @@ const optionsOf = (label: string) =>
     .getAllByRole('option')
     .map((option) => option.textContent?.replaceAll('\u00a0', ' '));
 
+// Clicks Edit on the first log and waits for the form to hold it (it is read by its id, #478).
+async function edit() {
+  fireEvent.click(list(/Edit log/));
+  await waitFor(() => expect(heading()).toHaveTextContent(/Edit the study log/));
+}
+
 // Renders the screen and waits until the recent list has loaded (a log, or the empty notice).
 async function open(api: ReturnType<typeof serve>) {
-  render(<StudyLogs today={today} />);
+  render(<StudyLogScreen today={today} />);
   await waitFor(() => {
     expect(api.requests.filter((request) => request.method === 'GET').length).toBeGreaterThan(0);
   });
@@ -316,7 +330,7 @@ test('a rejected save shows the server message and keeps the input', async () =>
 test('editing a log fills the form and saves it with PUT', async () => {
   const api = serve([morning]);
   await open(api);
-  fireEvent.click(list(/Edit log/));
+  await edit();
   expect(heading()).toHaveTextContent(/Edit the study log/);
   expect(field('Start').value).toBe('09:00');
   expect(field('Memo').value).toBe('선형대수 2장 행렬 곱');
@@ -367,7 +381,7 @@ test('cancelling an edit restores the unsaved new entry', async () => {
   const api = serve([morning]);
   await open(api);
   fill('Start', '08:00');
-  fireEvent.click(list(/Edit log/));
+  await edit();
   expect(field('Study date').value).toBe('2026-10-21');
   fireEvent.click(within(entryForm()).getByRole('button', { name: 'Cancel' }));
   expect(heading()).toHaveTextContent(/Add a study log/);
@@ -377,7 +391,7 @@ test('cancelling an edit restores the unsaved new entry', async () => {
 
 test('a failed first load reports the error instead of claiming there are no logs', async () => {
   serve([morning], { failGet: () => true });
-  render(<StudyLogs today={today} />);
+  render(<StudyLogScreen today={today} />);
   const alert = await screen.findAllByText(/Could not load the recent logs: Server error/);
   expect(alert.length).toBeGreaterThan(0);
   expect(alert[0]).toHaveAttribute('role', 'alert');
@@ -397,7 +411,7 @@ test('a failed reload after saving keeps the list already on screen', async () =
 
 test('an unreachable server shows the connection message', async () => {
   serve([], { offline: true });
-  render(<StudyLogs today={today} />);
+  render(<StudyLogScreen today={today} />);
   expect(await screen.findByRole('alert')).toHaveTextContent(/Cannot reach the server/);
 });
 
@@ -411,8 +425,6 @@ test('buttons stay disabled while a delete is in flight, so it is sent once', as
   fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
   await waitFor(() => expect(methods(api, 'DELETE')).toHaveLength(1));
   expect(screen.getByRole('button', { name: /Delete$/ })).toHaveAttribute('aria-disabled', 'true');
-  // The page behind the dialog is hidden from the accessibility tree while it is open.
-  expect(within(entryForm()).getByRole('button', { name: /^Save/, hidden: true })).toBeDisabled();
   release();
   await waitFor(() => expect(items()).toHaveLength(0));
   expect(methods(api, 'DELETE')).toHaveLength(1);
@@ -421,7 +433,7 @@ test('buttons stay disabled while a delete is in flight, so it is sent once', as
 test('saving an edit of a log deleted elsewhere leaves edit mode and reloads', async () => {
   const api = serve([morning]);
   await open(api);
-  fireEvent.click(list(/Edit log/));
+  await edit();
   api.logs.splice(0, 1);
   submit();
   expect(await screen.findByRole('alert')).toHaveTextContent(/Study log not found/);
@@ -429,7 +441,7 @@ test('saving an edit of a log deleted elsewhere leaves edit mode and reloads', a
   await waitFor(() => expect(items()).toHaveLength(0));
 });
 
-test('a delete confirmation can be cancelled, and deleting the edited log ends the edit', async () => {
+test('a delete confirmation can be cancelled', async () => {
   const api = serve([morning]);
   await open(api);
   fireEvent.click(list(/Delete log/));
@@ -438,15 +450,9 @@ test('a delete confirmation can be cancelled, and deleting the edited log ends t
   expect(list(/Delete log/)).toBeInTheDocument();
   await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
   expect(methods(api, 'DELETE')).toHaveLength(0);
-
-  fireEvent.click(list(/Edit log/));
-  fireEvent.click(list(/Delete log/));
-  fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
-  await waitFor(() => expect(heading()).toHaveTextContent(/Add a study log/));
-  expect(field('Study date').value).toBe(today);
 });
 
-test('a 404 when deleting another log keeps the current edit', async () => {
+test('a 404 when deleting a log shows the server message and reloads the list', async () => {
   const evening: Log = {
     ...morning,
     id: 2,
@@ -460,15 +466,11 @@ test('a 404 when deleting another log keeps the current edit', async () => {
   await open(api);
   const [first, second] = items();
   expect(within(first).getByText('2026-10-21')).toBeInTheDocument();
-  fireEvent.click(within(first).getByRole('button', { name: /Edit log/ }));
-  fill('Memo', '수정 중인 메모');
   // The evening log disappears on the server before it is deleted here.
   api.logs.splice(1, 1);
   fireEvent.click(within(second).getByRole('button', { name: /Delete log/ }));
   fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
   expect(await screen.findByRole('alert')).toHaveTextContent(/Study log not found/);
-  expect(heading()).toHaveTextContent(/Edit the study log/);
-  expect(field('Memo').value).toBe('수정 중인 메모');
   await waitFor(() => expect(items()).toHaveLength(1));
 });
 
@@ -560,7 +562,7 @@ test('editing a linked log fills in its textbook and chapter', async () => {
   const api = serve([linked]);
   await open(api);
   expect(item()).toHaveTextContent(/선형대수 · 1 벡터/);
-  fireEvent.click(list(/Edit log/));
+  await edit();
   await waitFor(() => expect(field('Textbook').value).toBe('1'));
   await waitFor(() => expect(field('Chapter/section').value).toBe('11'));
   fill('Chapter/section', '');
@@ -606,7 +608,7 @@ test('editing a log fills in and can clear its self-assessment', async () => {
   const api = serve([assessed]);
   await open(api);
   expect(item()).toHaveTextContent(/Understanding 5\/5 · Goal achieved/);
-  fireEvent.click(list(/Edit log/));
+  await edit();
   expect(field('Understanding').value).toBe('5');
   expect(field('Goal achieved').value).toBe('true');
   fill('Understanding', '');

@@ -1,4 +1,4 @@
-import { fireEvent, screen, within } from '@testing-library/react';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { expect, test } from 'vitest';
 
 import { App } from './app';
@@ -135,15 +135,61 @@ test('an unknown address falls back to the study log', async () => {
   expect(window.location.pathname).toBe('/');
 });
 
-test('the menu lists the day log, Week, 12 weeks, the other pages, Dashboard, and Settings last', () => {
+test('the menu lists the day log, History, Week, 12 weeks, the other pages, Dashboard, and Settings last', () => {
   server({ body: { today: '2026-10-26' } });
   render(<App />);
   const menu = screen.getByRole('navigation', { name: 'Main menu' });
   const labels = within(menu)
     .getAllByRole('link')
     .map((link) => link.textContent?.trim());
-  expect(labels.slice(0, 3)).toEqual(['Study log', 'Week', '12 weeks']);
+  expect(labels.slice(0, 4)).toEqual(['Study log', 'History', 'Week', '12 weeks']);
+  expect(labels).toContain('Algorithms');
   expect(labels.slice(-2)).toEqual(['Dashboard', 'Settings']);
+});
+
+test('Edit on the History page opens the Study log form with that log, and saving goes back', async () => {
+  const log = {
+    id: 7,
+    studyDate: '2026-10-21',
+    startTime: '09:00',
+    endTime: '10:30',
+    durationMinutes: 90,
+    memo: 'matrix',
+    status: 'done',
+    textbookId: null,
+    textbookTitle: null,
+    contentId: null,
+    contentNumber: null,
+    contentTitle: null,
+    understanding: null,
+    difficulties: '',
+    goalAchieved: null,
+    studyType: 'new',
+  };
+  fakeApi({
+    'GET /api/health': { body: { today: '2026-10-26' } },
+    'GET /api/study-logs': { body: { studyLogs: [log] } },
+    'GET /api/reviews/today/count': { body: { count: 0 } },
+    'GET /api/study-logs/7': { body: { studyLog: log } },
+    'PUT /api/study-logs/7': { body: { studyLog: log } },
+    'GET /api/study-logs/calendar': { body: { month: '2026-10', days: [] } },
+    'GET /api/textbooks': { body: { textbooks: [] } },
+  });
+  window.history.replaceState(null, '', '/history');
+  render(<App />);
+  expect(await screen.findByRole('heading', { level: 1, name: 'History' })).toBeInTheDocument();
+  // The Study log page has no recent list: the form is not on this page.
+  expect(screen.queryByLabelText('Memo')).toBeNull();
+  fireEvent.click(await screen.findByRole('button', { name: /Edit log/ }));
+  expect(await screen.findByRole('heading', { level: 1, name: 'Study log' })).toBeInTheDocument();
+  expect(window.location.search).toBe('?edit=7');
+  await waitFor(() =>
+    expect(screen.getByLabelText<HTMLTextAreaElement>('Memo').value).toBe('matrix'),
+  );
+  expect(screen.queryByRole('heading', { name: 'Recent logs' })).toBeNull();
+  fireEvent.submit(screen.getByLabelText('Memo').closest('form')!);
+  expect(await screen.findByRole('heading', { level: 1, name: 'History' })).toBeInTheDocument();
+  expect(window.location.pathname).toBe('/history');
 });
 
 test('the old stats address goes to the dashboard', async () => {

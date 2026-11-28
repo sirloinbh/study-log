@@ -1,23 +1,30 @@
 import { useQueryClient } from '@tanstack/react-query';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 import { useBusy } from './busy';
-import { Calendar } from './calendar';
 import type { RequestError } from './lib/api';
 import { apiKey, useApiMutation, useApiQuery } from './lib/query';
-import { Loading } from './loading';
 import { StudyLogFormView } from './study-log-form';
-import { StudyLogItem } from './study-log-item';
-import { StudyLogSearch } from './study-log-search';
 import { emptyForm, type StudyLog, type StudyLogForm } from './study-logs-data';
 import { type ContentNode, contentOptions, type Textbook } from './textbook';
 
 type Notice = { kind: 'status' | 'alert'; text: string } | undefined;
 
-const recentLimit = 20;
-
-// `onChange` hears each save or delete attempt, since either can change which reviews are due.
-export function StudyLogs({ today, onChange }: { today: string; onChange?: () => void }) {
+// The Study log page: the entry form only (the recent list, search and calendar are on the History
+// page, #478). `editId` opens the form with that log; `onEditEnd` hears when the edit is saved,
+// cancelled or no longer possible. `onChange` hears each save attempt, since it can change which
+// reviews are due.
+export function StudyLogs({
+  today,
+  onChange,
+  editId,
+  onEditEnd,
+}: {
+  today: string;
+  onChange?: () => void;
+  editId?: number;
+  onEditEnd?: () => void;
+}) {
   const [form, setForm] = useState<StudyLogForm>(() => emptyForm(today));
   const [editingId, setEditingId] = useState<number | undefined>(undefined);
   // The unsaved new entry, restored after an edit is saved or cancelled.
@@ -25,29 +32,8 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
   const [notice, setNotice] = useState<Notice>(undefined);
   // One request at a time: fields and action buttons are disabled while a save or delete is pending.
   const { busy, action, nameNext, begin, end } = useBusy();
-  const [deletingId, setDeletingId] = useState<number | undefined>(undefined);
-  const [reload, setReload] = useState(0);
 
-  // The element to focus once the delete flow has re-rendered and the buttons are enabled again:
-  // the confirm button, the delete button after a cancel, or the list heading once the entry is
-  // gone (#65). Without it focus falls to the page when the focused button is swapped out.
-  const [wantFocus, setWantFocus] = useState<string>();
-  useEffect(() => {
-    if (!wantFocus || busy) return;
-    setWantFocus(undefined);
-    document.getElementById(wantFocus)?.focus?.();
-  }, [wantFocus, busy]);
-
-  // The recent list. A failed refresh keeps whatever list is on screen and only reports that it could not
-  // be refreshed; the error is hidden while a retry runs.
   const client = useQueryClient();
-  const recentKey = apiKey('/api/study-logs', 'recent');
-  const recent = useApiQuery<{ studyLogs: StudyLog[] }>(
-    recentKey,
-    `/api/study-logs?limit=${recentLimit}`,
-  );
-  const logs = recent.data?.studyLogs;
-  const loadError = recent.isFetching ? undefined : recent.error?.message;
 
   // Textbooks to link a log to. Without them the log is simply saved unlinked.
   const textbooksQuery = useApiQuery<{ textbooks: Textbook[] }>(
@@ -71,20 +57,15 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
     [form.textbookId, chaptersQuery.data],
   );
 
-  // Reads the list again and tells the calendar and the search to do the same.
+  // The History page reads its list again the next time it opens.
   const reloadAll = () => {
-    void client.invalidateQueries({ queryKey: recentKey });
-    setReload((count) => count + 1);
+    void client.invalidateQueries({ queryKey: apiKey('/api/study-logs') });
   };
 
   const saveLog = useApiMutation<unknown, { id?: number; body: StudyLogForm }>(({ id, body }) => ({
     path: id === undefined ? '/api/study-logs' : `/api/study-logs/${id}`,
     method: id === undefined ? 'POST' : 'PUT',
     body,
-  }));
-  const deleteLog = useApiMutation<unknown, number>((id) => ({
-    path: `/api/study-logs/${id}`,
-    method: 'DELETE',
   }));
 
   // A change to the form takes back what was said about the last try.
@@ -97,6 +78,7 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
     setForm(draft ?? emptyForm(today));
     setDraft(undefined);
     setEditingId(undefined);
+    onEditEnd?.();
   };
 
   // `id` is the log the failed request targeted.
@@ -133,7 +115,6 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
   const edit = (log: StudyLog) => {
     if (editingId === undefined) setDraft(form);
     setEditingId(log.id);
-    setDeletingId(undefined);
     setNotice(undefined);
     setForm({
       studyDate: log.studyDate,
@@ -147,31 +128,30 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
       goalAchieved: log.goalAchieved,
       studyType: log.studyType,
     });
-    // On a phone the form sits above the list; bring it into view.
-    setWantFocus('study-log-date');
+    document.getElementById('study-log-date')?.focus?.();
   };
 
-  const remove = async (id: number) => {
-    nameNext('delete');
-    if (!begin()) return;
-    try {
-      await deleteLog.mutateAsync(id);
-      setNotice({ kind: 'status', text: 'Deleted' });
-      if (editingId === id) leaveEdit();
-      reloadAll();
-      setWantFocus('study-log-list');
-    } catch (error) {
-      fail(error as RequestError, id);
-      // Already gone elsewhere: like a delete. Otherwise the entry stays with its delete button.
-      setWantFocus(
-        (error as RequestError).status === 404 ? 'study-log-list' : `study-log-delete-${id}`,
-      );
-    } finally {
-      setDeletingId(undefined);
-      end();
-      onChange?.();
+  // The log to edit comes from the address of the Study log page (`?edit=<id>`), so it is read from
+  // the server instead of a list on this page. It fills the form once per id.
+  const target = useApiQuery<{ studyLog: StudyLog }>(
+    apiKey('/api/study-logs', 'one', editId),
+    `/api/study-logs/${editId}`,
+    { enabled: editId !== undefined, staleTime: 0 },
+  );
+  const loaded = useRef<number | undefined>(undefined);
+  const loadedLog = target.data?.studyLog;
+  useEffect(() => {
+    if (editId === undefined) {
+      loaded.current = undefined;
+      return;
     }
-  };
+    if (!loadedLog || loadedLog.id !== editId || loaded.current === editId) return;
+    loaded.current = editId;
+    edit(loadedLog);
+    // `edit` only reads state that is current when a log arrives.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [editId, loadedLog]);
+  const loadFailure = editId !== undefined && !loadedLog ? target.error : null;
 
   return (
     <div className="study-logs">
@@ -188,6 +168,11 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
           onSubmit={(event) => void save(event)}
           onCancel={leaveEdit}
         />
+        {loadFailure && (
+          <p role="alert" className="error">
+            Could not load the study log to edit: {loadFailure.message}
+          </p>
+        )}
         {/* Always mounted so screen readers announce each new message. */}
         <p role="status" className="status">
           {notice?.kind === 'status' ? notice.text : ''}
@@ -198,42 +183,6 @@ export function StudyLogs({ today, onChange }: { today: string; onChange?: () =>
           </p>
         )}
       </section>
-      <section className="card">
-        <h2 id="study-log-list" tabIndex={-1}>
-          Recent logs
-        </h2>
-        {loadError && (
-          <p role="alert" className="error">
-            Could not load the recent logs: {loadError}
-          </p>
-        )}
-        {logs === undefined ? (
-          !loadError && <Loading label="Loading the recent logs" />
-        ) : logs.length === 0 ? (
-          <p className="status">No study logs yet</p>
-        ) : (
-          <ul className="log-list">
-            {logs.map((log) => (
-              <StudyLogItem
-                key={log.id}
-                log={log}
-                editing={log.id === editingId}
-                confirming={deletingId === log.id}
-                busy={busy}
-                onEdit={() => edit(log)}
-                onAskDelete={() => setDeletingId(log.id)}
-                onCancelDelete={() => {
-                  setDeletingId(undefined);
-                  setWantFocus(`study-log-delete-${log.id}`);
-                }}
-                onDelete={() => remove(log.id)}
-              />
-            ))}
-          </ul>
-        )}
-      </section>
-      <StudyLogSearch textbooks={textbooks} reloadKey={reload} />
-      <Calendar today={today} reloadKey={reload} />
     </div>
   );
 }

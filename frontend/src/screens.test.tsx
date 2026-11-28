@@ -5,6 +5,7 @@ import { Exercises } from './exercises';
 import { StudyLogs } from './study-logs';
 import { fakeApi } from './test/fake-api';
 import { render } from './test/render';
+import { StudyLogScreen } from './test/study-log-screen';
 import { TextbookContents } from './textbook-contents';
 import { Textbooks } from './textbooks';
 
@@ -61,14 +62,16 @@ describe('study logs', () => {
   test('the page shows nothing about algorithm problems (#477)', async () => {
     const api = server([log]);
     render(<StudyLogs today={today} />);
-    await screen.findByRole('button', { name: /Delete log/ });
+    await screen.findByRole('button', { name: 'Save' });
+    expect(screen.queryByRole('button', { name: /Delete log/ })).toBeNull();
+    expect(screen.queryByRole('heading', { name: 'Recent logs' })).toBeNull();
     expect(screen.queryByLabelText('Algorithm goals today')).toBeNull();
     expect(api.requests.some((request) => request.path.startsWith('/api/coding'))).toBe(false);
   });
 
   test('the list shows each log with its time, length and status', async () => {
     server([log]);
-    render(<StudyLogs today={today} />);
+    render(<StudyLogScreen today={today} />);
     await screen.findByRole('button', { name: /Delete log/ });
     expect(recent().getByText('09:00–10:30')).toBeInTheDocument();
     expect(recent().getByText('1 h 30 min')).toBeInTheDocument();
@@ -77,7 +80,7 @@ describe('study logs', () => {
 
   test('adding sends the form, reloads the list and keeps the date for the next one', async () => {
     const { sent } = server([]);
-    render(<StudyLogs today={today} />);
+    render(<StudyLogScreen today={today} />);
     expect(await screen.findByText('No study logs yet')).toBeInTheDocument();
     fill('Study date', '2026-10-20');
     fill('Start', '13:00');
@@ -96,7 +99,7 @@ describe('study logs', () => {
 
   test('deleting asks first, then the log leaves the list', async () => {
     const { sent } = server([log]);
-    render(<StudyLogs today={today} />);
+    render(<StudyLogScreen today={today} />);
     fireEvent.click(await screen.findByRole('button', { name: /Delete log/ }));
     expect(sent).toEqual([]);
     fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
@@ -106,7 +109,7 @@ describe('study logs', () => {
 
   test('a refused save shows the server message and keeps what was typed', async () => {
     server([], true);
-    render(<StudyLogs today={today} />);
+    render(<StudyLogScreen today={today} />);
     await screen.findByText('No study logs yet');
     fill('Start', '13:00');
     fill('End', '14:00');
@@ -121,7 +124,7 @@ describe('study logs', () => {
       'GET /api/study-logs': serverError,
       'GET /api/study-logs/calendar': serverError,
     });
-    render(<StudyLogs today={today} />);
+    render(<StudyLogScreen today={today} />);
     expect(
       await screen.findByText('Could not load the recent logs: A server error occurred'),
     ).toBeInTheDocument();

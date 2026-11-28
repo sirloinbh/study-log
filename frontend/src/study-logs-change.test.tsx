@@ -1,9 +1,9 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { expect, test, vi } from 'vitest';
 
-import { StudyLogs } from './study-logs';
 import { fakeApi } from './test/fake-api';
 import { render } from './test/render';
+import { StudyLogScreen } from './test/study-log-screen';
 
 const today = '2026-10-31';
 const log = {
@@ -43,7 +43,7 @@ const submit = () => fireEvent.submit(document.querySelector('form')!);
 test('saving a log reports a change, since it can make a review due', async () => {
   server();
   const onChange = vi.fn();
-  render(<StudyLogs today={today} onChange={onChange} />);
+  render(<StudyLogScreen today={today} onChange={onChange} />);
   await screen.findByRole('button', { name: /Delete log/ });
   submit();
   await waitFor(() => expect(onChange).toHaveBeenCalledTimes(1));
@@ -52,7 +52,7 @@ test('saving a log reports a change, since it can make a review due', async () =
 test('a failed save reports too: the server may have changed anyway', async () => {
   server(500);
   const onChange = vi.fn();
-  render(<StudyLogs today={today} onChange={onChange} />);
+  render(<StudyLogScreen today={today} onChange={onChange} />);
   await screen.findByRole('button', { name: /Delete log/ });
   submit();
   await waitFor(() => expect(onChange).toHaveBeenCalledTimes(1));
@@ -64,7 +64,7 @@ test.each([
 ])('%s reports a change, since its reviews go with it', async (_name, status) => {
   server(200, status);
   const onChange = vi.fn();
-  render(<StudyLogs today={today} onChange={onChange} />);
+  render(<StudyLogScreen today={today} onChange={onChange} />);
   fireEvent.click(await screen.findByRole('button', { name: /Delete log/ }));
   fireEvent.click(await screen.findByRole('button', { name: 'Delete' }));
   await waitFor(() => expect(onChange).toHaveBeenCalledTimes(1));
